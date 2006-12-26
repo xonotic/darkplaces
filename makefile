@@ -9,6 +9,10 @@ else
 
 # UNIXes
 DP_ARCH:=$(shell uname)
+ifeq ($(DP_ARCH), GNU/kFreeBSD)
+	# same userspace as Linux, not a BSDish one
+	DP_MAKE_TARGET=linux
+else
 ifneq ($(filter %BSD,$(DP_ARCH)),)
 	DP_MAKE_TARGET=bsd
 else
@@ -23,6 +27,7 @@ else
 endif  # ifeq ($(DP_ARCH), SunOS)
 endif  # ifeq ($(DP_ARCH), Darwin)
 endif  # ifneq ($(filter %BSD,$(DP_ARCH)),)
+endif  # ifeq ($(DP_ARCH), GNU/kFreeBSD)
 endif  # ifdef windir
 endif  # ifndef DP_MAKE_TARGET
 
