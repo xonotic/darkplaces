@@ -607,17 +607,17 @@ void CL_ClearTempEntities (void)
 	cl.num_temp_entities = 0;
 }
 
-entity_t *CL_NewTempEntity(void)
+entity_t *CL_NewTempEntity(renderscene_t* scene)
 {
 	entity_t *ent;
 
-	if (r_refdef.numentities >= r_refdef.maxentities)
+	if (scene->refdef.numentities >= r_refdef.maxentities)
 		return NULL;
 	if (cl.num_temp_entities >= cl.max_temp_entities)
 		return NULL;
 	ent = &cl.temp_entities[cl.num_temp_entities++];
 	memset (ent, 0, sizeof(*ent));
-	r_refdef.entities[r_refdef.numentities++] = &ent->render;
+	scene->refdef.entities[scene->refdef.numentities++] = &ent->render;
 
 	ent->render.alpha = 1;
 	VectorSet(ent->render.colormod, 1, 1, 1);
@@ -845,7 +845,7 @@ void CL_AddQWCTFFlagModel(entity_t *player, int skin)
 	}
 	// end of code taken from QuakeWorld
 
-	flag = CL_NewTempEntity();
+	flag = CL_NewTempEntity(&client_scene);
 	if (!flag)
 		return;
 
@@ -1552,7 +1552,7 @@ static void CL_RelinkEffects(void)
 
 			// if we're drawing effects, get a new temp entity
 			// (NewTempEntity adds it to the render entities list for us)
-			if (r_draweffects.integer && (ent = CL_NewTempEntity()))
+			if (r_draweffects.integer && (ent = CL_NewTempEntity(&client_scene)))
 			{
 				// interpolation stuff
 				ent->render.frame1 = intframe;
@@ -1676,7 +1676,7 @@ void CL_RelinkBeams(void)
 		d = VectorNormalizeLength(dist);
 		while (d > 0)
 		{
-			ent = CL_NewTempEntity ();
+			ent = CL_NewTempEntity (&client_scene);
 			if (!ent)
 				return;
 			//VectorCopy (org, ent->render.origin);
@@ -1708,7 +1708,7 @@ static void CL_RelinkQWNails(void)
 
 		// if we're drawing effects, get a new temp entity
 		// (NewTempEntity adds it to the render entities list for us)
-		if (!(ent = CL_NewTempEntity()))
+		if (!(ent = CL_NewTempEntity(&client_scene)))
 			continue;
 
 		// normal stuff
@@ -2236,15 +2236,20 @@ void CL_Shutdown (void)
 CL_Init
 =================
 */
+void CL_InitScene (renderscene_t* scene, mempool_t* pool)
+{
+	memset(&scene->refdef, 0, sizeof(scene->refdef));
+	// max entities sent to renderer per frame
+	scene->refdef.maxentities = MAX_EDICTS + 256 + 512;
+	scene->refdef.entities = (entity_render_t **)Mem_Alloc(pool, sizeof(entity_render_t *) * scene->refdef.maxentities);
+}
+
 void CL_Init (void)
 {
 	cls.levelmempool = Mem_AllocPool("client (per-level memory)", 0, NULL);
 	cls.permanentmempool = Mem_AllocPool("client (long term memory)", 0, NULL);
 
-	memset(&r_refdef, 0, sizeof(r_refdef));
-	// max entities sent to renderer per frame
-	r_refdef.maxentities = MAX_EDICTS + 256 + 512;
-	r_refdef.entities = (entity_render_t **)Mem_Alloc(cls.permanentmempool, sizeof(entity_render_t *) * r_refdef.maxentities);
+        CL_InitScene (&client_scene, cls.permanentmempool);
 
 	CL_InitInput ();
 

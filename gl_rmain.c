@@ -28,12 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 mempool_t *r_main_mempool;
 rtexturepool_t *r_main_texturepool;
 
-//
-// screen size info
-//
-r_refdef_t r_refdef;
-r_view_t r_view;
-r_viewcache_t r_viewcache;
+renderscene_t client_scene;
 
 cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "1", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
 cvar_t r_nearclip = {0, "r_nearclip", "1", "distance from camera of nearclip plane" };
@@ -208,7 +203,7 @@ const static float r_screenvertex3f[12] =
 	0, 1, 0
 };
 
-extern void R_DrawModelShadows(void);
+extern void R_DrawModelShadows(renderscene_t* scene);
 
 void R_ModulateColors(float *in, float *out, int verts, float r, float g, float b)
 {
@@ -2196,7 +2191,7 @@ int R_CullBoxCustomPlanes(const vec3_t mins, const vec3_t maxs, int numplanes, c
 
 //==================================================================================
 
-static void R_View_UpdateEntityVisible (void)
+static void R_View_UpdateEntityVisible (renderscene_t* scene)
 {
 	int i, renderimask;
 	entity_render_t *ent;
@@ -2204,27 +2199,27 @@ static void R_View_UpdateEntityVisible (void)
 	if (!r_drawentities.integer)
 		return;
 
-	renderimask = r_refdef.envmap ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL) : ((chase_active.integer || r_waterstate.renderingscene) ? RENDER_VIEWMODEL : RENDER_EXTERIORMODEL);
-	if (r_refdef.worldmodel && r_refdef.worldmodel->brush.BoxTouchingVisibleLeafs)
+	renderimask = scene->refdef.envmap ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL) : ((chase_active.integer || r_waterstate.renderingscene) ? RENDER_VIEWMODEL : RENDER_EXTERIORMODEL);
+	if (scene->refdef.worldmodel && scene->refdef.worldmodel->brush.BoxTouchingVisibleLeafs)
 	{
 		// worldmodel can check visibility
-		for (i = 0;i < r_refdef.numentities;i++)
+		for (i = 0;i < scene->refdef.numentities;i++)
 		{
-			ent = r_refdef.entities[i];
-			r_viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs)) && ((ent->effects & EF_NODEPTHTEST) || (ent->flags & RENDER_VIEWMODEL) || r_refdef.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.worldmodel, r_viewcache.world_leafvisible, ent->mins, ent->maxs));
+			ent = scene->refdef.entities[i];
+			scene->viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs)) && ((ent->effects & EF_NODEPTHTEST) || (ent->flags & RENDER_VIEWMODEL) || scene->refdef.worldmodel->brush.BoxTouchingVisibleLeafs(scene->refdef.worldmodel, scene->viewcache.world_leafvisible, ent->mins, ent->maxs));
 
 		}
 		if(r_cullentities_trace.integer && r_refdef.worldmodel->brush.TraceLineOfSight)
 		{
-			for (i = 0;i < r_refdef.numentities;i++)
+			for (i = 0;i < scene->refdef.numentities;i++)
 			{
-				ent = r_refdef.entities[i];
-				if(r_viewcache.entityvisible[i] && !(ent->effects & EF_NODEPTHTEST) && !(ent->flags & RENDER_VIEWMODEL) && !(ent->model && (ent->model->name[0] == '*')))
+				ent = scene->refdef.entities[i];
+				if(scene->viewcache.entityvisible[i] && !(ent->effects & EF_NODEPTHTEST) && !(ent->flags & RENDER_VIEWMODEL) && !(ent->model && (ent->model->name[0] == '*')))
 				{
-					if(Mod_CanSeeBox_Trace(r_cullentities_trace_samples.integer, r_cullentities_trace_enlarge.value, r_refdef.worldmodel, r_view.origin, ent->mins, ent->maxs))
+					if(Mod_CanSeeBox_Trace(r_cullentities_trace_samples.integer, r_cullentities_trace_enlarge.value, scene->refdef.worldmodel, scene->view.origin, ent->mins, ent->maxs))
 						ent->last_trace_visibility = realtime;
 					if(ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
-						r_viewcache.entityvisible[i] = 0;
+						scene->viewcache.entityvisible[i] = 0;
 				}
 			}
 		}
@@ -2232,10 +2227,10 @@ static void R_View_UpdateEntityVisible (void)
 	else
 	{
 		// no worldmodel or it can't check visibility
-		for (i = 0;i < r_refdef.numentities;i++)
+		for (i = 0;i < scene->refdef.numentities;i++)
 		{
-			ent = r_refdef.entities[i];
-			r_viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
+			ent = scene->refdef.entities[i];
+			scene->viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
 		}
 	}
 }
@@ -2264,7 +2259,7 @@ int R_DrawBrushModelsSky (void)
 }
 
 static void R_DrawNoModel(entity_render_t *ent);
-static void R_DrawModels(void)
+static void R_DrawModels(renderscene_t* scene)
 {
 	int i;
 	entity_render_t *ent;
@@ -2272,12 +2267,12 @@ static void R_DrawModels(void)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < r_refdef.numentities;i++)
+	for (i = 0;i < scene->refdef.numentities;i++)
 	{
-		if (!r_viewcache.entityvisible[i])
+		if (!scene->viewcache.entityvisible[i])
 			continue;
-		ent = r_refdef.entities[i];
-		r_refdef.stats.entities++;
+		ent = scene->refdef.entities[i];
+		scene->refdef.stats.entities++;
 		if (ent->model && ent->model->Draw != NULL)
 			ent->model->Draw(ent);
 		else
@@ -2285,7 +2280,7 @@ static void R_DrawModels(void)
 	}
 }
 
-static void R_DrawModelsDepth(void)
+static void R_DrawModelsDepth(renderscene_t* scene)
 {
 	int i;
 	entity_render_t *ent;
@@ -2293,17 +2288,17 @@ static void R_DrawModelsDepth(void)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < r_refdef.numentities;i++)
+	for (i = 0;i < scene->refdef.numentities;i++)
 	{
-		if (!r_viewcache.entityvisible[i])
+		if (!scene->viewcache.entityvisible[i])
 			continue;
-		ent = r_refdef.entities[i];
+		ent = scene->refdef.entities[i];
 		if (ent->model && ent->model->DrawDepth != NULL)
 			ent->model->DrawDepth(ent);
 	}
 }
 
-static void R_DrawModelsDebug(void)
+static void R_DrawModelsDebug(renderscene_t* scene)
 {
 	int i;
 	entity_render_t *ent;
@@ -2311,17 +2306,17 @@ static void R_DrawModelsDebug(void)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < r_refdef.numentities;i++)
+	for (i = 0;i < scene->refdef.numentities;i++)
 	{
-		if (!r_viewcache.entityvisible[i])
+		if (!scene->viewcache.entityvisible[i])
 			continue;
-		ent = r_refdef.entities[i];
+		ent = scene->refdef.entities[i];
 		if (ent->model && ent->model->DrawDebug != NULL)
 			ent->model->DrawDebug(ent);
 	}
 }
 
-static void R_DrawModelsAddWaterPlanes(void)
+static void R_DrawModelsAddWaterPlanes(renderscene_t* scene)
 {
 	int i;
 	entity_render_t *ent;
@@ -2329,24 +2324,24 @@ static void R_DrawModelsAddWaterPlanes(void)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < r_refdef.numentities;i++)
+	for (i = 0;i < scene->refdef.numentities;i++)
 	{
-		if (!r_viewcache.entityvisible[i])
+		if (!scene->viewcache.entityvisible[i])
 			continue;
-		ent = r_refdef.entities[i];
+		ent = scene->refdef.entities[i];
 		if (ent->model && ent->model->DrawAddWaterPlanes != NULL)
 			ent->model->DrawAddWaterPlanes(ent);
 	}
 }
 
-static void R_View_SetFrustum(void)
+static void R_View_SetFrustum(renderscene_t* scene)
 {
 	int i;
 	double slopex, slopey;
 
 	// break apart the view matrix into vectors for various purposes
-	Matrix4x4_ToVectors(&r_view.matrix, r_view.forward, r_view.left, r_view.up, r_view.origin);
-	VectorNegate(r_view.left, r_view.right);
+	Matrix4x4_ToVectors(&scene->view.matrix, scene->view.forward, scene->view.left, scene->view.up, scene->view.origin);
+	VectorNegate(scene->view.left, scene->view.right);
 
 #if 0
 	r_view.frustum[0].normal[0] = 0 - 1.0 / r_view.frustum_x;
@@ -2410,59 +2405,59 @@ static void R_View_SetFrustum(void)
 	r_view.frustum[5].dist = m[15] + m[14];
 #endif
 
-	if (r_view.useperspective)
+	if (scene->view.useperspective)
 	{
-		slopex = 1.0 / r_view.frustum_x;
-		slopey = 1.0 / r_view.frustum_y;
-		VectorMA(r_view.forward, -slopex, r_view.left, r_view.frustum[0].normal);
-		VectorMA(r_view.forward,  slopex, r_view.left, r_view.frustum[1].normal);
-		VectorMA(r_view.forward, -slopey, r_view.up  , r_view.frustum[2].normal);
-		VectorMA(r_view.forward,  slopey, r_view.up  , r_view.frustum[3].normal);
-		VectorCopy(r_view.forward, r_view.frustum[4].normal);
+		slopex = 1.0 / scene->view.frustum_x;
+		slopey = 1.0 / scene->view.frustum_y;
+		VectorMA(scene->view.forward, -slopex, scene->view.left, scene->view.frustum[0].normal);
+		VectorMA(scene->view.forward,  slopex, scene->view.left, scene->view.frustum[1].normal);
+		VectorMA(scene->view.forward, -slopey, scene->view.up  , scene->view.frustum[2].normal);
+		VectorMA(scene->view.forward,  slopey, scene->view.up  , scene->view.frustum[3].normal);
+		VectorCopy(scene->view.forward, scene->view.frustum[4].normal);
 
 		// Leaving those out was a mistake, those were in the old code, and they
 		// fix a reproducable bug in this one: frustum culling got fucked up when viewmatrix was an identity matrix
 		// I couldn't reproduce it after adding those normalizations. --blub
-		VectorNormalize(r_view.frustum[0].normal);
-		VectorNormalize(r_view.frustum[1].normal);
-		VectorNormalize(r_view.frustum[2].normal);
-		VectorNormalize(r_view.frustum[3].normal);
+		VectorNormalize(scene->view.frustum[0].normal);
+		VectorNormalize(scene->view.frustum[1].normal);
+		VectorNormalize(scene->view.frustum[2].normal);
+		VectorNormalize(scene->view.frustum[3].normal);
 
 		// calculate frustum corners, which are used to calculate deformed frustum planes for shadow caster culling
-		VectorMAMAMAM(1, r_view.origin, 1024, r_view.forward, -1024 * slopex, r_view.left, -1024 * slopey, r_view.up, r_view.frustumcorner[0]);
-		VectorMAMAMAM(1, r_view.origin, 1024, r_view.forward,  1024 * slopex, r_view.left, -1024 * slopey, r_view.up, r_view.frustumcorner[1]);
-		VectorMAMAMAM(1, r_view.origin, 1024, r_view.forward, -1024 * slopex, r_view.left,  1024 * slopey, r_view.up, r_view.frustumcorner[2]);
-		VectorMAMAMAM(1, r_view.origin, 1024, r_view.forward,  1024 * slopex, r_view.left,  1024 * slopey, r_view.up, r_view.frustumcorner[3]);
+		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward, -1024 * slopex, scene->view.left, -1024 * slopey, scene->view.up, scene->view.frustumcorner[0]);
+		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward,  1024 * slopex, scene->view.left, -1024 * slopey, scene->view.up, scene->view.frustumcorner[1]);
+		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward, -1024 * slopex, scene->view.left,  1024 * slopey, scene->view.up, scene->view.frustumcorner[2]);
+		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward,  1024 * slopex, scene->view.left,  1024 * slopey, scene->view.up, scene->view.frustumcorner[3]);
 
-		r_view.frustum[0].dist = DotProduct (r_view.origin, r_view.frustum[0].normal);
-		r_view.frustum[1].dist = DotProduct (r_view.origin, r_view.frustum[1].normal);
-		r_view.frustum[2].dist = DotProduct (r_view.origin, r_view.frustum[2].normal);
-		r_view.frustum[3].dist = DotProduct (r_view.origin, r_view.frustum[3].normal);
-		r_view.frustum[4].dist = DotProduct (r_view.origin, r_view.frustum[4].normal) + r_refdef.nearclip;
+		scene->view.frustum[0].dist = DotProduct (scene->view.origin, scene->view.frustum[0].normal);
+		scene->view.frustum[1].dist = DotProduct (scene->view.origin, scene->view.frustum[1].normal);
+		scene->view.frustum[2].dist = DotProduct (scene->view.origin, scene->view.frustum[2].normal);
+		scene->view.frustum[3].dist = DotProduct (scene->view.origin, scene->view.frustum[3].normal);
+		scene->view.frustum[4].dist = DotProduct (scene->view.origin, scene->view.frustum[4].normal) + scene->refdef.nearclip;
 	}
 	else
 	{
-		VectorScale(r_view.left, -r_view.ortho_x, r_view.frustum[0].normal);
-		VectorScale(r_view.left,  r_view.ortho_x, r_view.frustum[1].normal);
-		VectorScale(r_view.up, -r_view.ortho_y, r_view.frustum[2].normal);
-		VectorScale(r_view.up,  r_view.ortho_y, r_view.frustum[3].normal);
-		VectorCopy(r_view.forward, r_view.frustum[4].normal);
-		r_view.frustum[0].dist = DotProduct (r_view.origin, r_view.frustum[0].normal) + r_view.ortho_x;
-		r_view.frustum[1].dist = DotProduct (r_view.origin, r_view.frustum[1].normal) + r_view.ortho_x;
-		r_view.frustum[2].dist = DotProduct (r_view.origin, r_view.frustum[2].normal) + r_view.ortho_y;
-		r_view.frustum[3].dist = DotProduct (r_view.origin, r_view.frustum[3].normal) + r_view.ortho_y;
-		r_view.frustum[4].dist = DotProduct (r_view.origin, r_view.frustum[4].normal) + r_refdef.nearclip;
+		VectorScale(scene->view.left, -scene->view.ortho_x, scene->view.frustum[0].normal);
+		VectorScale(scene->view.left,  scene->view.ortho_x, scene->view.frustum[1].normal);
+		VectorScale(scene->view.up, -scene->view.ortho_y, scene->view.frustum[2].normal);
+		VectorScale(scene->view.up,  scene->view.ortho_y, scene->view.frustum[3].normal);
+		VectorCopy(scene->view.forward, scene->view.frustum[4].normal);
+		scene->view.frustum[0].dist = DotProduct (scene->view.origin, scene->view.frustum[0].normal) + scene->view.ortho_x;
+		scene->view.frustum[1].dist = DotProduct (scene->view.origin, scene->view.frustum[1].normal) + scene->view.ortho_x;
+		scene->view.frustum[2].dist = DotProduct (scene->view.origin, scene->view.frustum[2].normal) + scene->view.ortho_y;
+		scene->view.frustum[3].dist = DotProduct (scene->view.origin, scene->view.frustum[3].normal) + scene->view.ortho_y;
+		scene->view.frustum[4].dist = DotProduct (scene->view.origin, scene->view.frustum[4].normal) + r_refdef.nearclip;
 	}
-	r_view.numfrustumplanes = 5;
+	scene->view.numfrustumplanes = 5;
 
-	if (r_view.useclipplane)
+	if (scene->view.useclipplane)
 	{
-		r_view.numfrustumplanes = 6;
-		r_view.frustum[5] = r_view.clipplane;
+		scene->view.numfrustumplanes = 6;
+		scene->view.frustum[5] = scene->view.clipplane;
 	}
 
-	for (i = 0;i < r_view.numfrustumplanes;i++)
-		PlaneClassify(r_view.frustum + i);
+	for (i = 0;i < scene->view.numfrustumplanes;i++)
+		PlaneClassify(scene->view.frustum + i);
 
 	// LordHavoc: note to all quake engine coders, Quake had a special case
 	// for 90 degrees which assumed a square view (wrong), so I removed it,
@@ -2494,32 +2489,32 @@ static void R_View_SetFrustum(void)
 	//PlaneClassify(&frustum[4]);
 }
 
-void R_View_Update(void)
+void R_View_Update(renderscene_t* scene)
 {
-	R_View_SetFrustum();
-	R_View_WorldVisibility(r_view.useclipplane);
-	R_View_UpdateEntityVisible();
+	R_View_SetFrustum(scene);
+	R_View_WorldVisibility(scene->view.useclipplane);
+	R_View_UpdateEntityVisible(scene);
 }
 
-void R_SetupView(void)
+void R_SetupView(renderscene_t* scene)
 {
-	if (!r_view.useperspective)
-		GL_SetupView_Mode_Ortho(-r_view.ortho_x, -r_view.ortho_y, r_view.ortho_x, r_view.ortho_y, -r_refdef.farclip, r_refdef.farclip);
-	else if (r_refdef.rtworldshadows || r_refdef.rtdlightshadows)
-		GL_SetupView_Mode_PerspectiveInfiniteFarClip(r_view.frustum_x, r_view.frustum_y, r_refdef.nearclip);
+	if (!scene->view.useperspective)
+		GL_SetupView_Mode_Ortho(-scene->view.ortho_x, -scene->view.ortho_y, scene->view.ortho_x, scene->view.ortho_y, -scene->refdef.farclip, scene->refdef.farclip);
+	else if (scene->refdef.rtworldshadows || scene->refdef.rtdlightshadows)
+		GL_SetupView_Mode_PerspectiveInfiniteFarClip(scene->view.frustum_x, scene->view.frustum_y, scene->refdef.nearclip);
 	else
-		GL_SetupView_Mode_Perspective(r_view.frustum_x, r_view.frustum_y, r_refdef.nearclip, r_refdef.farclip);
+		GL_SetupView_Mode_Perspective(scene->view.frustum_x, scene->view.frustum_y, scene->refdef.nearclip, scene->refdef.farclip);
 
-	GL_SetupView_Orientation_FromEntity(&r_view.matrix);
+	GL_SetupView_Orientation_FromEntity(&scene->view.matrix);
 
-	if (r_view.useclipplane)
+	if (scene->view.useclipplane)
 	{
 		// LordHavoc: couldn't figure out how to make this approach the
-		vec_t dist = r_view.clipplane.dist - r_water_clippingplanebias.value;
-		vec_t viewdist = DotProduct(r_view.origin, r_view.clipplane.normal);
-		if (viewdist < r_view.clipplane.dist + r_water_clippingplanebias.value)
-			dist = r_view.clipplane.dist;
-		GL_SetupView_ApplyCustomNearClipPlane(r_view.clipplane.normal[0], r_view.clipplane.normal[1], r_view.clipplane.normal[2], dist);
+		vec_t dist = scene->view.clipplane.dist - r_water_clippingplanebias.value;
+		vec_t viewdist = DotProduct(scene->view.origin, scene->view.clipplane.normal);
+		if (viewdist < scene->view.clipplane.dist + r_water_clippingplanebias.value)
+			dist = scene->view.clipplane.dist;
+		GL_SetupView_ApplyCustomNearClipPlane(scene->view.clipplane.normal[0], scene->view.clipplane.normal[1], scene->view.clipplane.normal[2], dist);
 	}
 }
 
@@ -2556,7 +2551,7 @@ void R_ResetViewRendering2D(void)
 	GL_CullFace(GL_FRONT); // quake is backwards, this culls back faces
 }
 
-void R_ResetViewRendering3D(void)
+void R_ResetViewRendering3D(renderscene_t* scene)
 {
 	if (gl_support_fragment_shader)
 	{
@@ -2566,11 +2561,11 @@ void R_ResetViewRendering3D(void)
 	DrawQ_Finish();
 
 	// GL is weird because it's bottom to top, r_view.y is top to bottom
-	qglViewport(r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
-	R_SetupView();
-	GL_Scissor(r_view.x, r_view.y, r_view.width, r_view.height);
+	qglViewport(scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
+	R_SetupView(scene);
+	GL_Scissor(scene->view.x, scene->view.y, scene->view.width, scene->view.height);
 	GL_Color(1, 1, 1, 1);
-	GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+	GL_ColorMask(scene->view.colormask[0], scene->view.colormask[1], scene->view.colormask[2], 1);
 	GL_BlendFunc(GL_ONE, GL_ZERO);
 	GL_AlphaTest(false);
 	GL_ScissorTest(true);
@@ -2579,14 +2574,14 @@ void R_ResetViewRendering3D(void)
 	GL_DepthTest(true);
 	R_Mesh_Matrix(&identitymatrix);
 	R_Mesh_ResetTextureState();
-	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
+	GL_PolygonOffset(scene->refdef.polygonfactor, scene->refdef.polygonoffset);
 	qglEnable(GL_POLYGON_OFFSET_FILL);CHECKGLERROR
 	qglDepthFunc(GL_LEQUAL);CHECKGLERROR
 	qglDisable(GL_STENCIL_TEST);CHECKGLERROR
 	qglStencilMask(~0);CHECKGLERROR
 	qglStencilFunc(GL_ALWAYS, 128, ~0);CHECKGLERROR
 	qglStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);CHECKGLERROR
-	GL_CullFace(r_view.cullface_back);
+	GL_CullFace(scene->view.cullface_back);
 }
 
 /*
@@ -2650,7 +2645,7 @@ void R_ResetViewRendering3D(void)
 "#endif // FRAGMENT_SHADER\n"
 */
 
-void R_RenderScene(qboolean addwaterplanes);
+void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes);
 
 static void R_Water_StartFrame(void)
 {
@@ -2772,13 +2767,13 @@ static void R_Water_AddWaterPlane(msurface_t *surface)
 	}
 }
 
-static void R_Water_ProcessPlanes(void)
+static void R_Water_ProcessPlanes(renderscene_t* scene)
 {
 	r_view_t originalview;
 	int planeindex;
 	r_waterstate_waterplane_t *p;
 
-	originalview = r_view;
+	originalview = scene->view;
 
 	// make sure enough textures are allocated
 	for (planeindex = 0, p = r_waterstate.waterplanes;planeindex < r_waterstate.numwaterplanes;planeindex++, p++)
@@ -2803,72 +2798,72 @@ static void R_Water_ProcessPlanes(void)
 	// render views
 	for (planeindex = 0, p = r_waterstate.waterplanes;planeindex < r_waterstate.numwaterplanes;planeindex++, p++)
 	{
-		r_view.showdebug = false;
-		r_view.width = r_waterstate.waterwidth;
-		r_view.height = r_waterstate.waterheight;
-		r_view.useclipplane = true;
+		scene->view.showdebug = false;
+		scene->view.width = r_waterstate.waterwidth;
+		scene->view.height = r_waterstate.waterheight;
+		scene->view.useclipplane = true;
 		r_waterstate.renderingscene = true;
 
 		// render the normal view scene and copy into texture
 		// (except that a clipping plane should be used to hide everything on one side of the water, and the viewer's weapon model should be omitted)
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION))
 		{
-			r_view.clipplane = p->plane;
-			VectorNegate(r_view.clipplane.normal, r_view.clipplane.normal);
-			r_view.clipplane.dist = -r_view.clipplane.dist;
-			PlaneClassify(&r_view.clipplane);
+			scene->view.clipplane = p->plane;
+			VectorNegate(scene->view.clipplane.normal, scene->view.clipplane.normal);
+			scene->view.clipplane.dist = -scene->view.clipplane.dist;
+			PlaneClassify(&scene->view.clipplane);
 
-			R_RenderScene(false);
+			R_RenderScene(scene, false);
 
 			// copy view into the screen texture
 			R_Mesh_TexBind(0, R_GetTexture(p->texture_refraction));
 			GL_ActiveTexture(0);
 			CHECKGLERROR
-			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
+			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
 		}
 
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFLECTION))
 		{
 			// render reflected scene and copy into texture
-			Matrix4x4_Reflect(&r_view.matrix, p->plane.normal[0], p->plane.normal[1], p->plane.normal[2], p->plane.dist, -2);
-			r_view.clipplane = p->plane;
+			Matrix4x4_Reflect(&scene->view.matrix, p->plane.normal[0], p->plane.normal[1], p->plane.normal[2], p->plane.dist, -2);
+			scene->view.clipplane = p->plane;
 			// reverse the cullface settings for this render
-			r_view.cullface_front = GL_FRONT;
-			r_view.cullface_back = GL_BACK;
-			if (r_refdef.worldmodel && r_refdef.worldmodel->brush.num_pvsclusterbytes)
+			scene->view.cullface_front = GL_FRONT;
+			scene->view.cullface_back = GL_BACK;
+			if (scene->refdef.worldmodel && scene->refdef.worldmodel->brush.num_pvsclusterbytes)
 			{
-				r_view.usecustompvs = true;
+				scene->view.usecustompvs = true;
 				if (p->pvsvalid)
-					memcpy(r_viewcache.world_pvsbits, p->pvsbits, r_refdef.worldmodel->brush.num_pvsclusterbytes);
+					memcpy(scene->viewcache.world_pvsbits, p->pvsbits, scene->refdef.worldmodel->brush.num_pvsclusterbytes);
 				else
-					memset(r_viewcache.world_pvsbits, 0xFF, r_refdef.worldmodel->brush.num_pvsclusterbytes);
+					memset(scene->viewcache.world_pvsbits, 0xFF, scene->refdef.worldmodel->brush.num_pvsclusterbytes);
 			}
 
-			R_ResetViewRendering3D();
+			R_ResetViewRendering3D(scene);
 			R_ClearScreen(r_refdef.fogenabled);
 			if (r_timereport_active)
 				R_TimeReport("viewclear");
 
-			R_RenderScene(false);
+			R_RenderScene(scene, false);
 
 			R_Mesh_TexBind(0, R_GetTexture(p->texture_reflection));
 			GL_ActiveTexture(0);
 			CHECKGLERROR
-			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
+			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
 
-			R_ResetViewRendering3D();
+			R_ResetViewRendering3D(scene);
 			R_ClearScreen(r_refdef.fogenabled);
 			if (r_timereport_active)
 				R_TimeReport("viewclear");
 		}
 
-		r_view = originalview;
-		r_view.clear = true;
+		scene->view = originalview;
+		scene->view.clear = true;
 		r_waterstate.renderingscene = false;
 	}
 	return;
 error:
-	r_view = originalview;
+	scene->view = originalview;
 	r_waterstate.renderingscene = false;
 	Cvar_SetValueQuick(&r_water, 0);
 	Con_Printf("R_Water_ProcessPlanes: Error: texture creation failed!  Turned off r_water.\n");
@@ -3125,31 +3120,31 @@ void R_Bloom_MakeTexture(void)
 	}
 }
 
-void R_HDR_RenderBloomTexture(void)
+void R_HDR_RenderBloomTexture(renderscene_t* scene)
 {
 	int oldwidth, oldheight;
 	float oldcolorscale;
 
-	oldcolorscale = r_view.colorscale;
-	oldwidth = r_view.width;
-	oldheight = r_view.height;
-	r_view.width = r_bloomstate.bloomwidth;
-	r_view.height = r_bloomstate.bloomheight;
+	oldcolorscale = scene->view.colorscale;
+	oldwidth = scene->view.width;
+	oldheight = scene->view.height;
+	scene->view.width = r_bloomstate.bloomwidth;
+	scene->view.height = r_bloomstate.bloomheight;
 
 	// TODO: support GL_EXT_framebuffer_object rather than reusing the framebuffer?  it might improve SLI performance.
 	// TODO: add exposure compensation features
 	// TODO: add fp16 framebuffer support
 
-	r_view.showdebug = false;
-	r_view.colorscale *= r_bloom_colorscale.value / bound(1, r_hdr_range.value, 16);
+	scene->view.showdebug = false;
+	scene->view.colorscale *= r_bloom_colorscale.value / bound(1, r_hdr_range.value, 16);
 
 	R_ClearScreen(r_refdef.fogenabled);
 	if (r_timereport_active)
 		R_TimeReport("HDRclear");
 
 	r_waterstate.numwaterplanes = 0;
-	R_RenderScene(r_waterstate.enabled);
-	r_view.showdebug = true;
+	R_RenderScene(scene, r_waterstate.enabled);
+	scene->view.showdebug = true;
 
 	R_ResetViewRendering2D();
 
@@ -3157,11 +3152,11 @@ void R_HDR_RenderBloomTexture(void)
 	R_Bloom_MakeTexture();
 
 	// restore the view settings
-	r_view.width = oldwidth;
-	r_view.height = oldheight;
-	r_view.colorscale = oldcolorscale;
+	scene->view.width = oldwidth;
+	scene->view.height = oldheight;
+	scene->view.colorscale = oldcolorscale;
 
-	R_ResetViewRendering3D();
+	R_ResetViewRendering3D(scene);
 
 	R_ClearScreen(r_refdef.fogenabled);
 	if (r_timereport_active)
@@ -3232,8 +3227,6 @@ static void R_BlendView(void)
 	}
 }
 
-void R_RenderScene(qboolean addwaterplanes);
-
 matrix4x4_t r_waterscrollmatrix;
 
 void R_UpdateFogColor(void) // needs to be called before HDR subrender too, as that changes colorscale!
@@ -3263,88 +3256,88 @@ void R_UpdateFogColor(void) // needs to be called before HDR subrender too, as t
 	}
 }
 
-void R_UpdateVariables(void)
+void R_UpdateVariables(renderscene_t* scene)
 {
 	R_Textures_Frame();
 
-	r_refdef.farclip = 4096;
-	if (r_refdef.worldmodel)
-		r_refdef.farclip += VectorDistance(r_refdef.worldmodel->normalmins, r_refdef.worldmodel->normalmaxs);
-	r_refdef.nearclip = bound (0.001f, r_nearclip.value, r_refdef.farclip - 1.0f);
+	scene->refdef.farclip = 4096;
+	if (scene->refdef.worldmodel)
+		scene->refdef.farclip += VectorDistance(scene->refdef.worldmodel->normalmins, scene->refdef.worldmodel->normalmaxs);
+	scene->refdef.nearclip = bound (0.001f, r_nearclip.value, scene->refdef.farclip - 1.0f);
 
 	if (r_shadow_frontsidecasting.integer < 0 || r_shadow_frontsidecasting.integer > 1)
 		Cvar_SetValueQuick(&r_shadow_frontsidecasting, 1);
-	r_refdef.polygonfactor = 0;
-	r_refdef.polygonoffset = 0;
-	r_refdef.shadowpolygonfactor = r_refdef.polygonfactor + r_shadow_polygonfactor.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
-	r_refdef.shadowpolygonoffset = r_refdef.polygonoffset + r_shadow_polygonoffset.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
+	scene->refdef.polygonfactor = 0;
+	scene->refdef.polygonoffset = 0;
+	scene->refdef.shadowpolygonfactor = scene->refdef.polygonfactor + r_shadow_polygonfactor.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
+	scene->refdef.shadowpolygonoffset = scene->refdef.polygonoffset + r_shadow_polygonoffset.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
 
-	r_refdef.rtworld = r_shadow_realtime_world.integer;
-	r_refdef.rtworldshadows = r_shadow_realtime_world_shadows.integer && gl_stencil;
-	r_refdef.rtdlight = (r_shadow_realtime_world.integer || r_shadow_realtime_dlight.integer) && !gl_flashblend.integer && r_dynamic.integer;
-	r_refdef.rtdlightshadows = r_refdef.rtdlight && r_shadow_realtime_dlight_shadows.integer && gl_stencil;
-	r_refdef.lightmapintensity = r_refdef.rtworld ? r_shadow_realtime_world_lightmaps.value : 1;
+	scene->refdef.rtworld = r_shadow_realtime_world.integer;
+	scene->refdef.rtworldshadows = r_shadow_realtime_world_shadows.integer && gl_stencil;
+	scene->refdef.rtdlight = (r_shadow_realtime_world.integer || r_shadow_realtime_dlight.integer) && !gl_flashblend.integer && r_dynamic.integer;
+	scene->refdef.rtdlightshadows = r_refdef.rtdlight && r_shadow_realtime_dlight_shadows.integer && gl_stencil;
+	scene->refdef.lightmapintensity = r_refdef.rtworld ? r_shadow_realtime_world_lightmaps.value : 1;
 	if (r_showsurfaces.integer)
 	{
-		r_refdef.rtworld = false;
-		r_refdef.rtworldshadows = false;
-		r_refdef.rtdlight = false;
-		r_refdef.rtdlightshadows = false;
-		r_refdef.lightmapintensity = 0;
+		scene->refdef.rtworld = false;
+		scene->refdef.rtworldshadows = false;
+		scene->refdef.rtdlight = false;
+		scene->refdef.rtdlightshadows = false;
+		scene->refdef.lightmapintensity = 0;
 	}
 
 	if (gamemode == GAME_NEHAHRA)
 	{
 		if (gl_fogenable.integer)
 		{
-			r_refdef.oldgl_fogenable = true;
-			r_refdef.fog_density = gl_fogdensity.value;
-			r_refdef.fog_red = gl_fogred.value;
-			r_refdef.fog_green = gl_foggreen.value;
-			r_refdef.fog_blue = gl_fogblue.value;
-			r_refdef.fog_alpha = 1;
-			r_refdef.fog_start = 0;
-			r_refdef.fog_end = gl_skyclip.value;
+			scene->refdef.oldgl_fogenable = true;
+			scene->refdef.fog_density = gl_fogdensity.value;
+			scene->refdef.fog_red = gl_fogred.value;
+			scene->refdef.fog_green = gl_foggreen.value;
+			scene->refdef.fog_blue = gl_fogblue.value;
+			scene->refdef.fog_alpha = 1;
+			scene->refdef.fog_start = 0;
+			scene->refdef.fog_end = gl_skyclip.value;
 		}
-		else if (r_refdef.oldgl_fogenable)
+		else if (scene->refdef.oldgl_fogenable)
 		{
-			r_refdef.oldgl_fogenable = false;
-			r_refdef.fog_density = 0;
-			r_refdef.fog_red = 0;
-			r_refdef.fog_green = 0;
-			r_refdef.fog_blue = 0;
-			r_refdef.fog_alpha = 0;
-			r_refdef.fog_start = 0;
-			r_refdef.fog_end = 0;
+			scene->refdef.oldgl_fogenable = false;
+			scene->refdef.fog_density = 0;
+			scene->refdef.fog_red = 0;
+			scene->refdef.fog_green = 0;
+			scene->refdef.fog_blue = 0;
+			scene->refdef.fog_alpha = 0;
+			scene->refdef.fog_start = 0;
+			scene->refdef.fog_end = 0;
 		}
 	}
 
-	r_refdef.fog_alpha = bound(0, r_refdef.fog_alpha, 1);
-	r_refdef.fog_start = max(0, r_refdef.fog_start);
-	r_refdef.fog_end = max(r_refdef.fog_start + 0.01, r_refdef.fog_end);
+	scene->refdef.fog_alpha = bound(0, scene->refdef.fog_alpha, 1);
+	scene->refdef.fog_start = max(0, scene->refdef.fog_start);
+	scene->refdef.fog_end = max(scene->refdef.fog_start + 0.01, scene->refdef.fog_end);
 
 	// R_UpdateFogColor(); // why? R_RenderScene does it anyway
 
-	if (r_refdef.fog_density)
+	if (scene->refdef.fog_density)
 	{
-		r_refdef.fogenabled = true;
+		scene->refdef.fogenabled = true;
 		// this is the point where the fog reaches 0.9986 alpha, which we
 		// consider a good enough cutoff point for the texture
 		// (0.9986 * 256 == 255.6)
 		if (r_fog_exp2.integer)
-			r_refdef.fogrange = 32 / (r_refdef.fog_density * r_refdef.fog_density) + r_refdef.fog_start;
+			scene->refdef.fogrange = 32 / (scene->refdef.fog_density * scene->refdef.fog_density) + scene->refdef.fog_start;
 		else
-			r_refdef.fogrange = 2048 / r_refdef.fog_density + r_refdef.fog_start;
-		r_refdef.fogrange = bound(r_refdef.fog_start, r_refdef.fogrange, r_refdef.fog_end);
-		r_refdef.fograngerecip = 1.0f / r_refdef.fogrange;
-		r_refdef.fogmasktabledistmultiplier = FOGMASKTABLEWIDTH * r_refdef.fograngerecip;
+			scene->refdef.fogrange = 2048 / scene->refdef.fog_density + scene->refdef.fog_start;
+		scene->refdef.fogrange = bound(scene->refdef.fog_start, scene->refdef.fogrange, scene->refdef.fog_end);
+		scene->refdef.fograngerecip = 1.0f / scene->refdef.fogrange;
+		scene->refdef.fogmasktabledistmultiplier = FOGMASKTABLEWIDTH * scene->refdef.fograngerecip;
 		// fog color was already set
 		// update the fog texture
-		if (r_refdef.fogmasktable_start != r_refdef.fog_start || r_refdef.fogmasktable_alpha != r_refdef.fog_alpha || r_refdef.fogmasktable_density != r_refdef.fog_density || r_refdef.fogmasktable_range != r_refdef.fogrange)
-			R_BuildFogTexture();
+		if (scene->refdef.fogmasktable_start != scene->refdef.fog_start || scene->refdef.fogmasktable_alpha != scene->refdef.fog_alpha || scene->refdef.fogmasktable_density != scene->refdef.fog_density || scene->refdef.fogmasktable_range != scene->refdef.fogrange)
+			R_BuildFogTexture(scene);
 	}
 	else
-		r_refdef.fogenabled = false;
+		scene->refdef.fogenabled = false;
 }
 
 /*
@@ -3352,9 +3345,9 @@ void R_UpdateVariables(void)
 R_RenderView
 ================
 */
-void R_RenderView(void)
+void R_RenderView(renderscene_t* scene)
 {
-	if (!r_refdef.entities/* || !r_refdef.worldmodel*/)
+	if (!scene->refdef.entities/* || !r_refdef.worldmodel*/)
 		return; //Host_Error ("R_RenderView: NULL worldmodel");
 
 	r_view.colorscale = r_hdr_scenebrightness.value;
@@ -3368,24 +3361,24 @@ void R_RenderView(void)
 	if (r_timereport_active)
 		R_TimeReport("viewsetup");
 
-	R_ResetViewRendering3D();
+	R_ResetViewRendering3D(scene);
 
-	if (r_view.clear || r_refdef.fogenabled)
+	if (scene->view.clear || scene->refdef.fogenabled)
 	{
 		R_ClearScreen(r_refdef.fogenabled);
 		if (r_timereport_active)
 			R_TimeReport("viewclear");
 	}
-	r_view.clear = true;
+	scene->view.clear = true;
 
-	r_view.showdebug = true;
+	scene->view.showdebug = true;
 
 	// this produces a bloom texture to be used in R_BlendView() later
 	if (r_hdr.integer)
-		R_HDR_RenderBloomTexture();
+		R_HDR_RenderBloomTexture(scene);
 
 	r_waterstate.numwaterplanes = 0;
-	R_RenderScene(r_waterstate.enabled);
+	R_RenderScene(scene, r_waterstate.enabled);
 
 	R_BlendView();
 	if (r_timereport_active)
@@ -3402,16 +3395,16 @@ extern void R_DrawPortals (void);
 extern cvar_t cl_locs_show;
 static void R_DrawLocs(void);
 static void R_DrawEntityBBoxes(void);
-void R_RenderScene(qboolean addwaterplanes)
+void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 {
 	Matrix4x4_Invert_Simple(&r_view.inverse_matrix, &r_view.matrix);
 	R_UpdateFogColor();
 
 	if (addwaterplanes)
 	{
-		R_ResetViewRendering3D();
+		R_ResetViewRendering3D(scene);
 
-		R_View_Update();
+		R_View_Update(scene);
 		if (r_timereport_active)
 			R_TimeReport("watervis");
 
@@ -3426,16 +3419,16 @@ void R_RenderScene(qboolean addwaterplanes)
 		if (r_refdef.extraupdate)
 			S_ExtraUpdate ();
 
-		R_DrawModelsAddWaterPlanes();
+		R_DrawModelsAddWaterPlanes(scene);
 		if (r_timereport_active)
 			R_TimeReport("watermodels");
 
-		R_Water_ProcessPlanes();
+		R_Water_ProcessPlanes(scene);
 		if (r_timereport_active)
 			R_TimeReport("waterscenes");
 	}
 
-	R_ResetViewRendering3D();
+	R_ResetViewRendering3D(scene);
 
 	// don't let sound skip if going slow
 	if (r_refdef.extraupdate)
@@ -3445,7 +3438,7 @@ void R_RenderScene(qboolean addwaterplanes)
 
 	R_SkyStartFrame();
 
-	R_View_Update();
+	R_View_Update(scene);
 	if (r_timereport_active)
 		R_TimeReport("visibility");
 
@@ -3476,7 +3469,7 @@ void R_RenderScene(qboolean addwaterplanes)
 	}
 	if (r_depthfirst.integer >= 2)
 	{
-		R_DrawModelsDepth();
+		R_DrawModelsDepth(scene);
 		if (r_timereport_active)
 			R_TimeReport("modeldepth");
 	}
@@ -3492,7 +3485,7 @@ void R_RenderScene(qboolean addwaterplanes)
 	if (r_refdef.extraupdate)
 		S_ExtraUpdate ();
 
-	R_DrawModels();
+	R_DrawModels(scene);
 	if (r_timereport_active)
 		R_TimeReport("models");
 
@@ -3502,9 +3495,9 @@ void R_RenderScene(qboolean addwaterplanes)
 
 	if (r_shadows.integer > 0 && r_refdef.lightmapintensity > 0)
 	{
-		R_DrawModelShadows();
+		R_DrawModelShadows(scene);
 
-		R_ResetViewRendering3D();
+		R_ResetViewRendering3D(scene);
 
 		// don't let sound skip if going slow
 		if (r_refdef.extraupdate)
@@ -3586,7 +3579,7 @@ void R_RenderScene(qboolean addwaterplanes)
 		r_refdef.worldmodel->DrawDebug(r_refdef.worldentity);
 		if (r_timereport_active)
 			R_TimeReport("worlddebug");
-		R_DrawModelsDebug();
+		R_DrawModelsDebug(scene);
 		if (r_timereport_active)
 			R_TimeReport("modeldebug");
 	}

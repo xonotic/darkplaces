@@ -1168,7 +1168,8 @@ void CL_Beam_CalculatePositions (const beam_t *b, vec3_t start, vec3_t end);
 void CL_ClientMovement_Replay(void);
 
 void CL_ClearTempEntities (void);
-entity_t *CL_NewTempEntity (void);
+struct renderscene_s;
+entity_t *CL_NewTempEntity (struct renderscene_s* scene);
 
 void CL_Effect(vec3_t org, int modelindex, int startframe, int framecount, float framerate);
 
@@ -1511,9 +1512,23 @@ typedef struct r_viewcache_s
 }
 r_viewcache_t;
 
-extern r_refdef_t r_refdef;
-extern r_view_t r_view;
-extern r_viewcache_t r_viewcache;
+typedef struct renderscene_s
+{
+  //
+  // screen size info
+  //
+  r_refdef_t refdef;
+  r_view_t view;
+  r_viewcache_t viewcache;
+} renderscene_t;
+
+void CL_InitScene (renderscene_t* scene, mempool_t* pool);
+
+extern renderscene_t client_scene;
+/* Convenience */
+#define r_refdef    (client_scene.refdef)
+#define r_view      (client_scene.view)
+#define r_viewcache (client_scene.viewcache)
 
 #endif
 

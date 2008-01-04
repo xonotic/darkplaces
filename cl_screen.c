@@ -1710,7 +1710,7 @@ static void R_Envmap_f (void)
 
 	r_refdef.envmap = true;
 
-	R_UpdateVariables();
+	R_UpdateVariables (&client_scene);
 
 	r_view.x = 0;
 	r_view.y = 0;
@@ -1733,7 +1733,7 @@ static void R_Envmap_f (void)
 		Matrix4x4_CreateFromQuakeEntity(&r_view.matrix, r_view.origin[0], r_view.origin[1], r_view.origin[2], envmapinfo[j].angles[0], envmapinfo[j].angles[1], envmapinfo[j].angles[2], 1);
 		r_view.clear = true;
 		R_Mesh_Start();
-		R_RenderView();
+		R_RenderView(&client_scene);
 		R_Mesh_Finish();
 		SCR_ScreenShot(filename, buffer1, buffer2, buffer3, 0, vid.height - (r_view.y + r_view.height), size, size, envmapinfo[j].flipx, envmapinfo[j].flipy, envmapinfo[j].flipdiagonaly, false, false);
 	}
@@ -1900,7 +1900,7 @@ void SCR_DrawScreen (void)
 
 	R_TimeReport_BeginFrame();
 
-	R_UpdateVariables();
+	R_UpdateVariables (&client_scene);
 
 	// Quake uses clockwise winding, so these are swapped
 	r_view.cullface_front = GL_BACK;
@@ -1948,7 +1948,7 @@ void SCR_DrawScreen (void)
 		r_view.frustum_y *= r_refdef.frustumscale_y;
 
 		if(!CL_VM_UpdateView())
-			R_RenderView();
+			R_RenderView(&client_scene);
 
 		if (scr_zoomwindow.integer)
 		{
@@ -1969,7 +1969,7 @@ void SCR_DrawScreen (void)
 			r_view.frustum_y *= r_refdef.frustumscale_y;
 
 			if(!CL_VM_UpdateView())
-				R_RenderView();
+				R_RenderView(&client_scene);
 		}
 	}
 

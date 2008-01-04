@@ -123,7 +123,7 @@ void CSQC_Think (prvm_edict_t *ed)
 }
 
 extern cvar_t cl_noplayershadow;
-qboolean CSQC_AddRenderEdict(prvm_edict_t *ed)
+qboolean CSQC_AddRenderEdict(renderscene_t* scene, prvm_edict_t *ed)
 {
 	int renderflags;
 	int c;
@@ -137,7 +137,7 @@ qboolean CSQC_AddRenderEdict(prvm_edict_t *ed)
 	if (!model)
 		return false;
 
-	e = CL_NewTempEntity();
+	e = CL_NewTempEntity(scene);
 	if (!e)
 		return false;
 

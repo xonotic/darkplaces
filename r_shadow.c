@@ -3165,7 +3165,7 @@ void R_ShadowVolumeLighting(qboolean visible)
 
 extern void R_SetupView(void);
 extern cvar_t r_shadows_throwdistance;
-void R_DrawModelShadows(void)
+void R_DrawModelShadows(renderscene_t* scene)
 {
 	int i;
 	float relativethrowdistance;
@@ -3179,7 +3179,7 @@ void R_DrawModelShadows(void)
 		return;
 
 	CHECKGLERROR
-	GL_Scissor(r_view.x, r_view.y, r_view.width, r_view.height);
+	GL_Scissor(scene->view.x, scene->view.y, scene->view.width, scene->view.height);
 
 	r_shadow_rendermode = R_SHADOW_RENDERMODE_NONE;
 
@@ -3192,9 +3192,9 @@ void R_DrawModelShadows(void)
 
 	R_Shadow_RenderMode_StencilShadowVolumes(true);
 
-	for (i = 0;i < r_refdef.numentities;i++)
+	for (i = 0;i < scene->refdef.numentities;i++)
 	{
-		ent = r_refdef.entities[i];
+		ent = scene->refdef.entities[i];
 		// cast shadows from anything that is not a submodel of the map
 		if (ent->model && ent->model->DrawShadowVolume != NULL && !ent->model->brush.submodel && (ent->flags & RENDER_SHADOW))
 		{
@@ -3219,8 +3219,8 @@ void R_DrawModelShadows(void)
 
 	// set up ortho view for rendering this pass
 	GL_SetupView_Mode_Ortho(0, 0, 1, 1, -10, 100);
-	GL_Scissor(r_view.x, r_view.y, r_view.width, r_view.height);
-	GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+	GL_Scissor(scene->view.x, scene->view.y, scene->view.width, scene->view.height);
+	GL_ColorMask(scene->view.colormask[0], scene->view.colormask[1], scene->view.colormask[2], 1);
 	GL_ScissorTest(true);
 	R_Mesh_Matrix(&identitymatrix);
 	R_Mesh_ResetTextureState();
@@ -3234,7 +3234,7 @@ void R_DrawModelShadows(void)
 	GL_DepthMask(false);
 	GL_PolygonOffset(0, 0);CHECKGLERROR
 	GL_Color(0, 0, 0, 0.5);
-	GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+	GL_ColorMask(scene->view.colormask[0], scene->view.colormask[1], scene->view.colormask[2], 1);
 	qglDepthFunc(GL_ALWAYS);CHECKGLERROR
 	qglEnable(GL_STENCIL_TEST);CHECKGLERROR
 	qglStencilMask(~0);CHECKGLERROR
