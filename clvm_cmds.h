@@ -10,9 +10,6 @@ void VM_CL_setmodel (void);
 void VM_CL_precache_model (void);
 void VM_CL_setorigin (void);
 
-/* Per-VM scenes */
-extern renderscene_t* renderscenes[PRVM_MAXPROGS];
-
 void VM_CL_R_AddDynamicLight (void);
 void VM_CL_R_ClearScene (void);
 void VM_CL_R_AddEntities (void);

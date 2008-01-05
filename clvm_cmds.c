@@ -5,10 +5,6 @@
 #include "cl_collision.h"
 #include "r_shadow.h"
 
-/* Per-VM scenes */
-renderscene_t* renderscenes[PRVM_MAXPROGS];
-#define RENDERSCENE     (*renderscenes[prognum])
-
 //============================================================================
 // Client
 //[515]: unsolved PROBLEMS
@@ -29,11 +25,6 @@ void CL_FindNonSolidLocation(const vec3_t in, vec3_t out, vec_t radius);
 void CSQC_RelinkAllEntities (int drawmask);
 void CSQC_RelinkCSQCEntities (void);
 const char *Key_GetBind (int key);
-
-
-
-
-
 
 // #1 void(vector ang) makevectors
 static void VM_CL_makevectors (void)
@@ -640,7 +631,7 @@ static void VM_CL_getlight (void)
 
 //============================================================================
 //[515]: SCENE MANAGER builtins
-extern qboolean CSQC_AddRenderEdict (renderscene_t* scene, prvm_edict_t *ed);//csprogs.c
+extern qboolean CSQC_AddRenderEdict (prvm_edict_t *ed);//csprogs.c
 
 static void CSQC_R_RecalcView (void)
 {
@@ -2245,13 +2236,13 @@ typedef struct
 
 typedef struct vmpolygons_s
 {
-  //static float			vm_polygon_linewidth = 1;
-  mempool_t		*pool;
-  unsigned char		current_vertices;
-  qboolean		initialized;
-  vm_polygon_t		*polygons;
-  unsigned long	polygons_num, drawpolygons_num;	//[515]: ok long on 64bit ?
-  qboolean		polygonbegin;	//[515]: for "no-crap-on-the-screen" check
+	//static float			vm_polygon_linewidth = 1;
+	mempool_t		*pool;
+	unsigned char		current_vertices;
+	qboolean		initialized;
+	vm_polygon_t		*polygons;
+	unsigned long	polygons_num, drawpolygons_num;	//[515]: ok long on 64bit ?
+	qboolean		polygonbegin;	//[515]: for "no-crap-on-the-screen" check
 } vmpolygons_t;
 vmpolygons_t vmpolygons[PRVM_MAXPROGS];
 #define VM_DEFPOLYNUM 64	//[515]: enough for default ?
@@ -2275,8 +2266,8 @@ static void VM_InitPolygons (vmpolygons_t* polys)
 static void VM_DrawPolygonCallback (const entity_render_t *ent, const rtlight_t *rtlight, int numsurfaces, int *surfacelist)
 {
 	int surfacelistindex;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	// LordHavoc: FIXME: this is stupid code
 	for (surfacelistindex = 0;surfacelistindex < numsurfaces;surfacelistindex++)
 	{
@@ -2379,8 +2370,8 @@ static void VM_CL_AddPolygonTo2DScene (vm_polygon_t *p)
 void VM_CL_AddPolygonsToMeshQueue (void)
 {
 	int i;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	if(!polys->drawpolygons_num)
 		return;
 	R_Mesh_Matrix(&identitymatrix);
@@ -2395,8 +2386,8 @@ void VM_CL_R_PolygonBegin (void)
 {
 	vm_polygon_t	*p;
 	const char		*picname;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	VM_SAFEPARMCOUNTRANGE(2, 4, VM_CL_R_PolygonBegin);
 
 	if(!polys->initialized)
@@ -2441,8 +2432,8 @@ void VM_CL_R_PolygonVertex (void)
 {
 	float			*coords, *tx, *rgb, alpha;
 	vm_polygon_t	*p;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	VM_SAFEPARMCOUNT(4, VM_CL_R_PolygonVertex);
 
 	if(!polys->polygonbegin)
@@ -2486,8 +2477,8 @@ void VM_CL_R_PolygonVertex (void)
 //void() R_EndPolygon
 void VM_CL_R_PolygonEnd (void)
 {
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	VM_SAFEPARMCOUNT(0, VM_CL_R_PolygonEnd);
 	if(!polys->polygonbegin)
 	{
@@ -3388,8 +3379,8 @@ const int vm_cl_numbuiltins = sizeof(vm_cl_builtins) / sizeof(prvm_builtin_t);
 
 void VM_Polygons_Reset(void)
 {
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
+	vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
+
 	// TODO: replace vm_polygons stuff with a more general debugging polygon system, and make vm_polygons functions use that system
 	if(polys->initialized)
 	{
@@ -3402,7 +3393,6 @@ void VM_CL_Cmd_Init(void)
 {
 	VM_Cmd_Init();
 	VM_Polygons_Reset();
-	renderscenes[PRVM_CLIENTPROG] = &client_scene;
 }
 
 void VM_CL_Cmd_Reset(void)
