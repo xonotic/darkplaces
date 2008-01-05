@@ -607,17 +607,17 @@ void CL_ClearTempEntities (void)
 	cl.num_temp_entities = 0;
 }
 
-entity_t *CL_NewTempEntity(renderscene_t* scene)
+entity_t *CL_NewTempEntity(void)
 {
 	entity_t *ent;
 
-	if (scene->refdef.numentities >= r_refdef.maxentities)
+	if (r_refdef.numentities >= r_refdef.maxentities)
 		return NULL;
 	if (cl.num_temp_entities >= cl.max_temp_entities)
 		return NULL;
 	ent = &cl.temp_entities[cl.num_temp_entities++];
 	memset (ent, 0, sizeof(*ent));
-	scene->refdef.entities[scene->refdef.numentities++] = &ent->render;
+	r_refdef.entities[r_refdef.numentities++] = &ent->render;
 
 	ent->render.alpha = 1;
 	VectorSet(ent->render.colormod, 1, 1, 1);
@@ -845,7 +845,7 @@ void CL_AddQWCTFFlagModel(entity_t *player, int skin)
 	}
 	// end of code taken from QuakeWorld
 
-	flag = CL_NewTempEntity(&client_scene);
+	flag = CL_NewTempEntity();
 	if (!flag)
 		return;
 
@@ -955,7 +955,7 @@ void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qboolean interpolat
 	{
 		// view-relative entity (guns and such)
 		if (e->render.effects & EF_NOGUNBOB)
-			matrix = &r_view.matrix; // really attached to view
+			matrix = &r_refdef.view.matrix; // really attached to view
 		else
 			matrix = &viewmodelmatrix; // attached to gun bob matrix
 	}
@@ -1552,7 +1552,7 @@ static void CL_RelinkEffects(void)
 
 			// if we're drawing effects, get a new temp entity
 			// (NewTempEntity adds it to the render entities list for us)
-			if (r_draweffects.integer && (ent = CL_NewTempEntity(&client_scene)))
+			if (r_draweffects.integer && (ent = CL_NewTempEntity()))
 			{
 				// interpolation stuff
 				ent->render.frame1 = intframe;
@@ -1606,7 +1606,7 @@ void CL_Beam_CalculatePositions(const beam_t *b, vec3_t start, vec3_t end)
 			len = VectorLength(dir);
 			VectorNormalize(dir);
 			VectorSet(localend, len, 0, 0);
-			Matrix4x4_Transform(&r_view.matrix, localend, end);
+			Matrix4x4_Transform(&r_refdef.view.matrix, localend, end);
 		}
 	}
 }
@@ -1676,7 +1676,7 @@ void CL_RelinkBeams(void)
 		d = VectorNormalizeLength(dist);
 		while (d > 0)
 		{
-			ent = CL_NewTempEntity (&client_scene);
+			ent = CL_NewTempEntity ();
 			if (!ent)
 				return;
 			//VectorCopy (org, ent->render.origin);
@@ -1708,7 +1708,7 @@ static void CL_RelinkQWNails(void)
 
 		// if we're drawing effects, get a new temp entity
 		// (NewTempEntity adds it to the render entities list for us)
-		if (!(ent = CL_NewTempEntity(&client_scene)))
+		if (!(ent = CL_NewTempEntity()))
 			continue;
 
 		// normal stuff
@@ -1781,7 +1781,7 @@ void CL_UpdateWorld(void)
 	r_refdef.extraupdate = !r_speeds.integer;
 	r_refdef.numentities = 0;
 	r_refdef.numlights = 0;
-	r_view.matrix = identitymatrix;
+	r_refdef.view.matrix = identitymatrix;
 
 	cl.num_brushmodel_entities = 0;
 
@@ -1884,7 +1884,7 @@ static void CL_TimeRefresh_f (void)
 	timestart = Sys_DoubleTime();
 	for (i = 0;i < 128;i++)
 	{
-		Matrix4x4_CreateFromQuakeEntity(&r_view.matrix, r_view.origin[0], r_view.origin[1], r_view.origin[2], 0, i / 128.0 * 360.0, 0, 1);
+		Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, r_refdef.view.origin[0], r_refdef.view.origin[1], r_refdef.view.origin[2], 0, i / 128.0 * 360.0, 0, 1);
 		CL_UpdateScreen();
 	}
 	timedelta = Sys_DoubleTime() - timestart;
@@ -1991,7 +1991,7 @@ void CL_Locs_Add_f(void)
 void CL_Locs_RemoveNearest_f(void)
 {
 	cl_locnode_t *loc;
-	loc = CL_Locs_FindNearest(r_view.origin);
+	loc = CL_Locs_FindNearest(r_refdef.view.origin);
 	if (loc)
 		CL_Locs_FreeNode(loc);
 	else
@@ -2236,20 +2236,15 @@ void CL_Shutdown (void)
 CL_Init
 =================
 */
-void CL_InitScene (renderscene_t* scene, mempool_t* pool)
-{
-	memset(&scene->refdef, 0, sizeof(scene->refdef));
-	// max entities sent to renderer per frame
-	scene->refdef.maxentities = MAX_EDICTS + 256 + 512;
-	scene->refdef.entities = (entity_render_t **)Mem_Alloc(pool, sizeof(entity_render_t *) * scene->refdef.maxentities);
-}
-
 void CL_Init (void)
 {
 	cls.levelmempool = Mem_AllocPool("client (per-level memory)", 0, NULL);
 	cls.permanentmempool = Mem_AllocPool("client (long term memory)", 0, NULL);
 
-        CL_InitScene (&client_scene, cls.permanentmempool);
+	memset(&r_refdef, 0, sizeof(r_refdef));
+	// max entities sent to renderer per frame
+	r_refdef.maxentities = MAX_EDICTS + 256 + 512;
+	r_refdef.entities = (entity_render_t **)Mem_Alloc(cls.permanentmempool, sizeof(entity_render_t *) * r_refdef.maxentities);
 
 	CL_InitInput ();
 

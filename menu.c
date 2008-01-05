@@ -5068,15 +5068,10 @@ void MP_KeyEvent (int key, char ascii, qboolean downevent)
 	PRVM_End;
 }
 
-extern renderscene_t menu_renderscene;
-
 void MP_Draw (void)
 {
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
-
-	// Here?
-	R_UpdateVariables (&menu_renderscene);
 
 	PRVM_ExecuteProgram(prog->funcoffsets.m_draw,"m_draw() required");
 
@@ -5228,7 +5223,4 @@ void MR_Init(void)
 		MR_SetRouting (TRUE);
 	else
 		MR_SetRouting (FALSE);
-
-	// FIXME: needed so cl.max_entities is set
-	CL_ClearState ();
 }

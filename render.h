@@ -121,8 +121,8 @@ extern cvar_t r_wateralpha;
 extern cvar_t r_dynamic;
 
 void R_Init(void);
-void R_UpdateVariables(renderscene_t* scene); // must call after setting up most of r_refdef, but before calling R_RenderView
-void R_RenderView(renderscene_t* scene); // must set r_refdef and call R_UpdateVariables first
+void R_UpdateVariables(void); // must call after setting up most of r_refdef, but before calling R_RenderView
+void R_RenderView(void); // must set r_refdef and call R_UpdateVariables first
 
 
 void R_InitSky (unsigned char *src, int bytesperpixel); // called at level load

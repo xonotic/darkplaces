@@ -28,7 +28,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 mempool_t *r_main_mempool;
 rtexturepool_t *r_main_texturepool;
 
-renderscene_t client_scene;
+//
+// screen size info
+//
+r_refdef_t r_refdef;
 
 cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "1", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
 cvar_t r_nearclip = {0, "r_nearclip", "1", "distance from camera of nearclip plane" };
@@ -203,7 +206,7 @@ const static float r_screenvertex3f[12] =
 	0, 1, 0
 };
 
-extern void R_DrawModelShadows(renderscene_t* scene);
+extern void R_DrawModelShadows(void);
 
 void R_ModulateColors(float *in, float *out, int verts, float r, float g, float b)
 {
@@ -260,7 +263,7 @@ float FogForDistance(vec_t dist)
 
 float FogPoint_World(const vec3_t p)
 {
-	return FogForDistance(VectorDistance((p), r_view.origin));
+	return FogForDistance(VectorDistance((p), r_refdef.view.origin));
 }
 
 float FogPoint_Model(const vec3_t p)
@@ -1453,10 +1456,10 @@ int R_SetupSurfaceShader(const vec3_t lightcolorbase, qboolean modellighting, fl
 		//   color.rgb = [[SceneBrightness * ContrastBoost]] * color.rgb / ([[ContrastBoost - 1]] * color.rgb + 1);
 		// and do [[calculations]] here in the engine
 		qglUniform1fARB(r_glsl_permutation->loc_ContrastBoostCoeff, r_glsl_contrastboost.value - 1);
-		if (r_glsl_permutation->loc_SceneBrightness >= 0) qglUniform1fARB(r_glsl_permutation->loc_SceneBrightness, r_view.colorscale * r_glsl_contrastboost.value);
+		if (r_glsl_permutation->loc_SceneBrightness >= 0) qglUniform1fARB(r_glsl_permutation->loc_SceneBrightness, r_refdef.view.colorscale * r_glsl_contrastboost.value);
 	}
 	else
-		if (r_glsl_permutation->loc_SceneBrightness >= 0) qglUniform1fARB(r_glsl_permutation->loc_SceneBrightness, r_view.colorscale);
+		if (r_glsl_permutation->loc_SceneBrightness >= 0) qglUniform1fARB(r_glsl_permutation->loc_SceneBrightness, r_refdef.view.colorscale);
 	if (r_glsl_permutation->loc_FogColor >= 0)
 	{
 		// additive passes are only darkened by fog, not tinted
@@ -2096,12 +2099,12 @@ int R_CullBox(const vec3_t mins, const vec3_t maxs)
 {
 	int i;
 	mplane_t *p;
-	for (i = 0;i < r_view.numfrustumplanes;i++)
+	for (i = 0;i < r_refdef.view.numfrustumplanes;i++)
 	{
 		// skip nearclip plane, it often culls portals when you are very close, and is almost never useful
 		if (i == 4)
 			continue;
-		p = r_view.frustum + i;
+		p = r_refdef.view.frustum + i;
 		switch(p->signbits)
 		{
 		default:
@@ -2191,7 +2194,7 @@ int R_CullBoxCustomPlanes(const vec3_t mins, const vec3_t maxs, int numplanes, c
 
 //==================================================================================
 
-static void R_View_UpdateEntityVisible (renderscene_t* scene)
+static void R_View_UpdateEntityVisible (void)
 {
 	int i, renderimask;
 	entity_render_t *ent;
@@ -2199,27 +2202,27 @@ static void R_View_UpdateEntityVisible (renderscene_t* scene)
 	if (!r_drawentities.integer)
 		return;
 
-	renderimask = scene->refdef.envmap ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL) : ((chase_active.integer || r_waterstate.renderingscene) ? RENDER_VIEWMODEL : RENDER_EXTERIORMODEL);
-	if (scene->refdef.worldmodel && scene->refdef.worldmodel->brush.BoxTouchingVisibleLeafs)
+	renderimask = r_refdef.envmap ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL) : ((chase_active.integer || r_waterstate.renderingscene) ? RENDER_VIEWMODEL : RENDER_EXTERIORMODEL);
+	if (r_refdef.worldmodel && r_refdef.worldmodel->brush.BoxTouchingVisibleLeafs)
 	{
 		// worldmodel can check visibility
-		for (i = 0;i < scene->refdef.numentities;i++)
+		for (i = 0;i < r_refdef.numentities;i++)
 		{
-			ent = scene->refdef.entities[i];
-			scene->viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs)) && ((ent->effects & EF_NODEPTHTEST) || (ent->flags & RENDER_VIEWMODEL) || scene->refdef.worldmodel->brush.BoxTouchingVisibleLeafs(scene->refdef.worldmodel, scene->viewcache.world_leafvisible, ent->mins, ent->maxs));
+			ent = r_refdef.entities[i];
+			r_refdef.viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs)) && ((ent->effects & EF_NODEPTHTEST) || (ent->flags & RENDER_VIEWMODEL) || r_refdef.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.worldmodel, r_refdef.viewcache.world_leafvisible, ent->mins, ent->maxs));
 
 		}
 		if(r_cullentities_trace.integer && r_refdef.worldmodel->brush.TraceLineOfSight)
 		{
-			for (i = 0;i < scene->refdef.numentities;i++)
+			for (i = 0;i < r_refdef.numentities;i++)
 			{
-				ent = scene->refdef.entities[i];
-				if(scene->viewcache.entityvisible[i] && !(ent->effects & EF_NODEPTHTEST) && !(ent->flags & RENDER_VIEWMODEL) && !(ent->model && (ent->model->name[0] == '*')))
+				ent = r_refdef.entities[i];
+				if(r_refdef.viewcache.entityvisible[i] && !(ent->effects & EF_NODEPTHTEST) && !(ent->flags & RENDER_VIEWMODEL) && !(ent->model && (ent->model->name[0] == '*')))
 				{
-					if(Mod_CanSeeBox_Trace(r_cullentities_trace_samples.integer, r_cullentities_trace_enlarge.value, scene->refdef.worldmodel, scene->view.origin, ent->mins, ent->maxs))
+					if(Mod_CanSeeBox_Trace(r_cullentities_trace_samples.integer, r_cullentities_trace_enlarge.value, r_refdef.worldmodel, r_refdef.view.origin, ent->mins, ent->maxs))
 						ent->last_trace_visibility = realtime;
 					if(ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
-						scene->viewcache.entityvisible[i] = 0;
+						r_refdef.viewcache.entityvisible[i] = 0;
 				}
 			}
 		}
@@ -2227,10 +2230,10 @@ static void R_View_UpdateEntityVisible (renderscene_t* scene)
 	else
 	{
 		// no worldmodel or it can't check visibility
-		for (i = 0;i < scene->refdef.numentities;i++)
+		for (i = 0;i < r_refdef.numentities;i++)
 		{
-			ent = scene->refdef.entities[i];
-			scene->viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
+			ent = r_refdef.entities[i];
+			r_refdef.viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
 		}
 	}
 }
@@ -2247,7 +2250,7 @@ int R_DrawBrushModelsSky (void)
 	sky = false;
 	for (i = 0;i < r_refdef.numentities;i++)
 	{
-		if (!r_viewcache.entityvisible[i])
+		if (!r_refdef.viewcache.entityvisible[i])
 			continue;
 		ent = r_refdef.entities[i];
 		if (!ent->model || !ent->model->DrawSky)
@@ -2259,7 +2262,7 @@ int R_DrawBrushModelsSky (void)
 }
 
 static void R_DrawNoModel(entity_render_t *ent);
-static void R_DrawModels(renderscene_t* scene)
+static void R_DrawModels(void)
 {
 	int i;
 	entity_render_t *ent;
@@ -2267,12 +2270,12 @@ static void R_DrawModels(renderscene_t* scene)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < scene->refdef.numentities;i++)
+	for (i = 0;i < r_refdef.numentities;i++)
 	{
-		if (!scene->viewcache.entityvisible[i])
+		if (!r_refdef.viewcache.entityvisible[i])
 			continue;
-		ent = scene->refdef.entities[i];
-		scene->refdef.stats.entities++;
+		ent = r_refdef.entities[i];
+		r_refdef.stats.entities++;
 		if (ent->model && ent->model->Draw != NULL)
 			ent->model->Draw(ent);
 		else
@@ -2280,7 +2283,7 @@ static void R_DrawModels(renderscene_t* scene)
 	}
 }
 
-static void R_DrawModelsDepth(renderscene_t* scene)
+static void R_DrawModelsDepth(void)
 {
 	int i;
 	entity_render_t *ent;
@@ -2288,17 +2291,17 @@ static void R_DrawModelsDepth(renderscene_t* scene)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < scene->refdef.numentities;i++)
+	for (i = 0;i < r_refdef.numentities;i++)
 	{
-		if (!scene->viewcache.entityvisible[i])
+		if (!r_refdef.viewcache.entityvisible[i])
 			continue;
-		ent = scene->refdef.entities[i];
+		ent = r_refdef.entities[i];
 		if (ent->model && ent->model->DrawDepth != NULL)
 			ent->model->DrawDepth(ent);
 	}
 }
 
-static void R_DrawModelsDebug(renderscene_t* scene)
+static void R_DrawModelsDebug(void)
 {
 	int i;
 	entity_render_t *ent;
@@ -2306,17 +2309,17 @@ static void R_DrawModelsDebug(renderscene_t* scene)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < scene->refdef.numentities;i++)
+	for (i = 0;i < r_refdef.numentities;i++)
 	{
-		if (!scene->viewcache.entityvisible[i])
+		if (!r_refdef.viewcache.entityvisible[i])
 			continue;
-		ent = scene->refdef.entities[i];
+		ent = r_refdef.entities[i];
 		if (ent->model && ent->model->DrawDebug != NULL)
 			ent->model->DrawDebug(ent);
 	}
 }
 
-static void R_DrawModelsAddWaterPlanes(renderscene_t* scene)
+static void R_DrawModelsAddWaterPlanes(void)
 {
 	int i;
 	entity_render_t *ent;
@@ -2324,197 +2327,197 @@ static void R_DrawModelsAddWaterPlanes(renderscene_t* scene)
 	if (!r_drawentities.integer)
 		return;
 
-	for (i = 0;i < scene->refdef.numentities;i++)
+	for (i = 0;i < r_refdef.numentities;i++)
 	{
-		if (!scene->viewcache.entityvisible[i])
+		if (!r_refdef.viewcache.entityvisible[i])
 			continue;
-		ent = scene->refdef.entities[i];
+		ent = r_refdef.entities[i];
 		if (ent->model && ent->model->DrawAddWaterPlanes != NULL)
 			ent->model->DrawAddWaterPlanes(ent);
 	}
 }
 
-static void R_View_SetFrustum(renderscene_t* scene)
+static void R_View_SetFrustum(void)
 {
 	int i;
 	double slopex, slopey;
 
 	// break apart the view matrix into vectors for various purposes
-	Matrix4x4_ToVectors(&scene->view.matrix, scene->view.forward, scene->view.left, scene->view.up, scene->view.origin);
-	VectorNegate(scene->view.left, scene->view.right);
+	Matrix4x4_ToVectors(&r_refdef.view.matrix, r_refdef.view.forward, r_refdef.view.left, r_refdef.view.up, r_refdef.view.origin);
+	VectorNegate(r_refdef.view.left, r_refdef.view.right);
 
 #if 0
-	r_view.frustum[0].normal[0] = 0 - 1.0 / r_view.frustum_x;
-	r_view.frustum[0].normal[1] = 0 - 0;
-	r_view.frustum[0].normal[2] = -1 - 0;
-	r_view.frustum[1].normal[0] = 0 + 1.0 / r_view.frustum_x;
-	r_view.frustum[1].normal[1] = 0 + 0;
-	r_view.frustum[1].normal[2] = -1 + 0;
-	r_view.frustum[2].normal[0] = 0 - 0;
-	r_view.frustum[2].normal[1] = 0 - 1.0 / r_view.frustum_y;
-	r_view.frustum[2].normal[2] = -1 - 0;
-	r_view.frustum[3].normal[0] = 0 + 0;
-	r_view.frustum[3].normal[1] = 0 + 1.0 / r_view.frustum_y;
-	r_view.frustum[3].normal[2] = -1 + 0;
+	r_refdef.view.frustum[0].normal[0] = 0 - 1.0 / r_refdef.view.frustum_x;
+	r_refdef.view.frustum[0].normal[1] = 0 - 0;
+	r_refdef.view.frustum[0].normal[2] = -1 - 0;
+	r_refdef.view.frustum[1].normal[0] = 0 + 1.0 / r_refdef.view.frustum_x;
+	r_refdef.view.frustum[1].normal[1] = 0 + 0;
+	r_refdef.view.frustum[1].normal[2] = -1 + 0;
+	r_refdef.view.frustum[2].normal[0] = 0 - 0;
+	r_refdef.view.frustum[2].normal[1] = 0 - 1.0 / r_refdef.view.frustum_y;
+	r_refdef.view.frustum[2].normal[2] = -1 - 0;
+	r_refdef.view.frustum[3].normal[0] = 0 + 0;
+	r_refdef.view.frustum[3].normal[1] = 0 + 1.0 / r_refdef.view.frustum_y;
+	r_refdef.view.frustum[3].normal[2] = -1 + 0;
 #endif
 
 #if 0
 	zNear = r_refdef.nearclip;
 	nudge = 1.0 - 1.0 / (1<<23);
-	r_view.frustum[4].normal[0] = 0 - 0;
-	r_view.frustum[4].normal[1] = 0 - 0;
-	r_view.frustum[4].normal[2] = -1 - -nudge;
-	r_view.frustum[4].dist = 0 - -2 * zNear * nudge;
-	r_view.frustum[5].normal[0] = 0 + 0;
-	r_view.frustum[5].normal[1] = 0 + 0;
-	r_view.frustum[5].normal[2] = -1 + -nudge;
-	r_view.frustum[5].dist = 0 + -2 * zNear * nudge;
+	r_refdef.view.frustum[4].normal[0] = 0 - 0;
+	r_refdef.view.frustum[4].normal[1] = 0 - 0;
+	r_refdef.view.frustum[4].normal[2] = -1 - -nudge;
+	r_refdef.view.frustum[4].dist = 0 - -2 * zNear * nudge;
+	r_refdef.view.frustum[5].normal[0] = 0 + 0;
+	r_refdef.view.frustum[5].normal[1] = 0 + 0;
+	r_refdef.view.frustum[5].normal[2] = -1 + -nudge;
+	r_refdef.view.frustum[5].dist = 0 + -2 * zNear * nudge;
 #endif
 
 
 
 #if 0
-	r_view.frustum[0].normal[0] = m[3] - m[0];
-	r_view.frustum[0].normal[1] = m[7] - m[4];
-	r_view.frustum[0].normal[2] = m[11] - m[8];
-	r_view.frustum[0].dist = m[15] - m[12];
+	r_refdef.view.frustum[0].normal[0] = m[3] - m[0];
+	r_refdef.view.frustum[0].normal[1] = m[7] - m[4];
+	r_refdef.view.frustum[0].normal[2] = m[11] - m[8];
+	r_refdef.view.frustum[0].dist = m[15] - m[12];
 
-	r_view.frustum[1].normal[0] = m[3] + m[0];
-	r_view.frustum[1].normal[1] = m[7] + m[4];
-	r_view.frustum[1].normal[2] = m[11] + m[8];
-	r_view.frustum[1].dist = m[15] + m[12];
+	r_refdef.view.frustum[1].normal[0] = m[3] + m[0];
+	r_refdef.view.frustum[1].normal[1] = m[7] + m[4];
+	r_refdef.view.frustum[1].normal[2] = m[11] + m[8];
+	r_refdef.view.frustum[1].dist = m[15] + m[12];
 
-	r_view.frustum[2].normal[0] = m[3] - m[1];
-	r_view.frustum[2].normal[1] = m[7] - m[5];
-	r_view.frustum[2].normal[2] = m[11] - m[9];
-	r_view.frustum[2].dist = m[15] - m[13];
+	r_refdef.view.frustum[2].normal[0] = m[3] - m[1];
+	r_refdef.view.frustum[2].normal[1] = m[7] - m[5];
+	r_refdef.view.frustum[2].normal[2] = m[11] - m[9];
+	r_refdef.view.frustum[2].dist = m[15] - m[13];
 
-	r_view.frustum[3].normal[0] = m[3] + m[1];
-	r_view.frustum[3].normal[1] = m[7] + m[5];
-	r_view.frustum[3].normal[2] = m[11] + m[9];
-	r_view.frustum[3].dist = m[15] + m[13];
+	r_refdef.view.frustum[3].normal[0] = m[3] + m[1];
+	r_refdef.view.frustum[3].normal[1] = m[7] + m[5];
+	r_refdef.view.frustum[3].normal[2] = m[11] + m[9];
+	r_refdef.view.frustum[3].dist = m[15] + m[13];
 
-	r_view.frustum[4].normal[0] = m[3] - m[2];
-	r_view.frustum[4].normal[1] = m[7] - m[6];
-	r_view.frustum[4].normal[2] = m[11] - m[10];
-	r_view.frustum[4].dist = m[15] - m[14];
+	r_refdef.view.frustum[4].normal[0] = m[3] - m[2];
+	r_refdef.view.frustum[4].normal[1] = m[7] - m[6];
+	r_refdef.view.frustum[4].normal[2] = m[11] - m[10];
+	r_refdef.view.frustum[4].dist = m[15] - m[14];
 
-	r_view.frustum[5].normal[0] = m[3] + m[2];
-	r_view.frustum[5].normal[1] = m[7] + m[6];
-	r_view.frustum[5].normal[2] = m[11] + m[10];
-	r_view.frustum[5].dist = m[15] + m[14];
+	r_refdef.view.frustum[5].normal[0] = m[3] + m[2];
+	r_refdef.view.frustum[5].normal[1] = m[7] + m[6];
+	r_refdef.view.frustum[5].normal[2] = m[11] + m[10];
+	r_refdef.view.frustum[5].dist = m[15] + m[14];
 #endif
 
-	if (scene->view.useperspective)
+	if (r_refdef.view.useperspective)
 	{
-		slopex = 1.0 / scene->view.frustum_x;
-		slopey = 1.0 / scene->view.frustum_y;
-		VectorMA(scene->view.forward, -slopex, scene->view.left, scene->view.frustum[0].normal);
-		VectorMA(scene->view.forward,  slopex, scene->view.left, scene->view.frustum[1].normal);
-		VectorMA(scene->view.forward, -slopey, scene->view.up  , scene->view.frustum[2].normal);
-		VectorMA(scene->view.forward,  slopey, scene->view.up  , scene->view.frustum[3].normal);
-		VectorCopy(scene->view.forward, scene->view.frustum[4].normal);
+		slopex = 1.0 / r_refdef.view.frustum_x;
+		slopey = 1.0 / r_refdef.view.frustum_y;
+		VectorMA(r_refdef.view.forward, -slopex, r_refdef.view.left, r_refdef.view.frustum[0].normal);
+		VectorMA(r_refdef.view.forward,  slopex, r_refdef.view.left, r_refdef.view.frustum[1].normal);
+		VectorMA(r_refdef.view.forward, -slopey, r_refdef.view.up  , r_refdef.view.frustum[2].normal);
+		VectorMA(r_refdef.view.forward,  slopey, r_refdef.view.up  , r_refdef.view.frustum[3].normal);
+		VectorCopy(r_refdef.view.forward, r_refdef.view.frustum[4].normal);
 
 		// Leaving those out was a mistake, those were in the old code, and they
 		// fix a reproducable bug in this one: frustum culling got fucked up when viewmatrix was an identity matrix
 		// I couldn't reproduce it after adding those normalizations. --blub
-		VectorNormalize(scene->view.frustum[0].normal);
-		VectorNormalize(scene->view.frustum[1].normal);
-		VectorNormalize(scene->view.frustum[2].normal);
-		VectorNormalize(scene->view.frustum[3].normal);
+		VectorNormalize(r_refdef.view.frustum[0].normal);
+		VectorNormalize(r_refdef.view.frustum[1].normal);
+		VectorNormalize(r_refdef.view.frustum[2].normal);
+		VectorNormalize(r_refdef.view.frustum[3].normal);
 
 		// calculate frustum corners, which are used to calculate deformed frustum planes for shadow caster culling
-		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward, -1024 * slopex, scene->view.left, -1024 * slopey, scene->view.up, scene->view.frustumcorner[0]);
-		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward,  1024 * slopex, scene->view.left, -1024 * slopey, scene->view.up, scene->view.frustumcorner[1]);
-		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward, -1024 * slopex, scene->view.left,  1024 * slopey, scene->view.up, scene->view.frustumcorner[2]);
-		VectorMAMAMAM(1, scene->view.origin, 1024, scene->view.forward,  1024 * slopex, scene->view.left,  1024 * slopey, scene->view.up, scene->view.frustumcorner[3]);
+		VectorMAMAMAM(1, r_refdef.view.origin, 1024, r_refdef.view.forward, -1024 * slopex, r_refdef.view.left, -1024 * slopey, r_refdef.view.up, r_refdef.view.frustumcorner[0]);
+		VectorMAMAMAM(1, r_refdef.view.origin, 1024, r_refdef.view.forward,  1024 * slopex, r_refdef.view.left, -1024 * slopey, r_refdef.view.up, r_refdef.view.frustumcorner[1]);
+		VectorMAMAMAM(1, r_refdef.view.origin, 1024, r_refdef.view.forward, -1024 * slopex, r_refdef.view.left,  1024 * slopey, r_refdef.view.up, r_refdef.view.frustumcorner[2]);
+		VectorMAMAMAM(1, r_refdef.view.origin, 1024, r_refdef.view.forward,  1024 * slopex, r_refdef.view.left,  1024 * slopey, r_refdef.view.up, r_refdef.view.frustumcorner[3]);
 
-		scene->view.frustum[0].dist = DotProduct (scene->view.origin, scene->view.frustum[0].normal);
-		scene->view.frustum[1].dist = DotProduct (scene->view.origin, scene->view.frustum[1].normal);
-		scene->view.frustum[2].dist = DotProduct (scene->view.origin, scene->view.frustum[2].normal);
-		scene->view.frustum[3].dist = DotProduct (scene->view.origin, scene->view.frustum[3].normal);
-		scene->view.frustum[4].dist = DotProduct (scene->view.origin, scene->view.frustum[4].normal) + scene->refdef.nearclip;
+		r_refdef.view.frustum[0].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[0].normal);
+		r_refdef.view.frustum[1].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[1].normal);
+		r_refdef.view.frustum[2].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[2].normal);
+		r_refdef.view.frustum[3].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[3].normal);
+		r_refdef.view.frustum[4].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[4].normal) + r_refdef.nearclip;
 	}
 	else
 	{
-		VectorScale(scene->view.left, -scene->view.ortho_x, scene->view.frustum[0].normal);
-		VectorScale(scene->view.left,  scene->view.ortho_x, scene->view.frustum[1].normal);
-		VectorScale(scene->view.up, -scene->view.ortho_y, scene->view.frustum[2].normal);
-		VectorScale(scene->view.up,  scene->view.ortho_y, scene->view.frustum[3].normal);
-		VectorCopy(scene->view.forward, scene->view.frustum[4].normal);
-		scene->view.frustum[0].dist = DotProduct (scene->view.origin, scene->view.frustum[0].normal) + scene->view.ortho_x;
-		scene->view.frustum[1].dist = DotProduct (scene->view.origin, scene->view.frustum[1].normal) + scene->view.ortho_x;
-		scene->view.frustum[2].dist = DotProduct (scene->view.origin, scene->view.frustum[2].normal) + scene->view.ortho_y;
-		scene->view.frustum[3].dist = DotProduct (scene->view.origin, scene->view.frustum[3].normal) + scene->view.ortho_y;
-		scene->view.frustum[4].dist = DotProduct (scene->view.origin, scene->view.frustum[4].normal) + r_refdef.nearclip;
+		VectorScale(r_refdef.view.left, -r_refdef.view.ortho_x, r_refdef.view.frustum[0].normal);
+		VectorScale(r_refdef.view.left,  r_refdef.view.ortho_x, r_refdef.view.frustum[1].normal);
+		VectorScale(r_refdef.view.up, -r_refdef.view.ortho_y, r_refdef.view.frustum[2].normal);
+		VectorScale(r_refdef.view.up,  r_refdef.view.ortho_y, r_refdef.view.frustum[3].normal);
+		VectorCopy(r_refdef.view.forward, r_refdef.view.frustum[4].normal);
+		r_refdef.view.frustum[0].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[0].normal) + r_refdef.view.ortho_x;
+		r_refdef.view.frustum[1].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[1].normal) + r_refdef.view.ortho_x;
+		r_refdef.view.frustum[2].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[2].normal) + r_refdef.view.ortho_y;
+		r_refdef.view.frustum[3].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[3].normal) + r_refdef.view.ortho_y;
+		r_refdef.view.frustum[4].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[4].normal) + r_refdef.nearclip;
 	}
-	scene->view.numfrustumplanes = 5;
+	r_refdef.view.numfrustumplanes = 5;
 
-	if (scene->view.useclipplane)
+	if (r_refdef.view.useclipplane)
 	{
-		scene->view.numfrustumplanes = 6;
-		scene->view.frustum[5] = scene->view.clipplane;
+		r_refdef.view.numfrustumplanes = 6;
+		r_refdef.view.frustum[5] = r_refdef.view.clipplane;
 	}
 
-	for (i = 0;i < scene->view.numfrustumplanes;i++)
-		PlaneClassify(scene->view.frustum + i);
+	for (i = 0;i < r_refdef.view.numfrustumplanes;i++)
+		PlaneClassify(r_refdef.view.frustum + i);
 
 	// LordHavoc: note to all quake engine coders, Quake had a special case
 	// for 90 degrees which assumed a square view (wrong), so I removed it,
 	// Quake2 has it disabled as well.
 
 	// rotate R_VIEWFORWARD right by FOV_X/2 degrees
-	//RotatePointAroundVector( r_view.frustum[0].normal, r_view.up, r_view.forward, -(90 - r_refdef.fov_x / 2));
-	//r_view.frustum[0].dist = DotProduct (r_view.origin, frustum[0].normal);
+	//RotatePointAroundVector( r_refdef.view.frustum[0].normal, r_refdef.view.up, r_refdef.view.forward, -(90 - r_refdef.fov_x / 2));
+	//r_refdef.view.frustum[0].dist = DotProduct (r_refdef.view.origin, frustum[0].normal);
 	//PlaneClassify(&frustum[0]);
 
 	// rotate R_VIEWFORWARD left by FOV_X/2 degrees
-	//RotatePointAroundVector( r_view.frustum[1].normal, r_view.up, r_view.forward, (90 - r_refdef.fov_x / 2));
-	//r_view.frustum[1].dist = DotProduct (r_view.origin, frustum[1].normal);
+	//RotatePointAroundVector( r_refdef.view.frustum[1].normal, r_refdef.view.up, r_refdef.view.forward, (90 - r_refdef.fov_x / 2));
+	//r_refdef.view.frustum[1].dist = DotProduct (r_refdef.view.origin, frustum[1].normal);
 	//PlaneClassify(&frustum[1]);
 
 	// rotate R_VIEWFORWARD up by FOV_X/2 degrees
-	//RotatePointAroundVector( r_view.frustum[2].normal, r_view.left, r_view.forward, -(90 - r_refdef.fov_y / 2));
-	//r_view.frustum[2].dist = DotProduct (r_view.origin, frustum[2].normal);
+	//RotatePointAroundVector( r_refdef.view.frustum[2].normal, r_refdef.view.left, r_refdef.view.forward, -(90 - r_refdef.fov_y / 2));
+	//r_refdef.view.frustum[2].dist = DotProduct (r_refdef.view.origin, frustum[2].normal);
 	//PlaneClassify(&frustum[2]);
 
 	// rotate R_VIEWFORWARD down by FOV_X/2 degrees
-	//RotatePointAroundVector( r_view.frustum[3].normal, r_view.left, r_view.forward, (90 - r_refdef.fov_y / 2));
-	//r_view.frustum[3].dist = DotProduct (r_view.origin, frustum[3].normal);
+	//RotatePointAroundVector( r_refdef.view.frustum[3].normal, r_refdef.view.left, r_refdef.view.forward, (90 - r_refdef.fov_y / 2));
+	//r_refdef.view.frustum[3].dist = DotProduct (r_refdef.view.origin, frustum[3].normal);
 	//PlaneClassify(&frustum[3]);
 
 	// nearclip plane
-	//VectorCopy(r_view.forward, r_view.frustum[4].normal);
-	//r_view.frustum[4].dist = DotProduct (r_view.origin, frustum[4].normal) + r_nearclip.value;
+	//VectorCopy(r_refdef.view.forward, r_refdef.view.frustum[4].normal);
+	//r_refdef.view.frustum[4].dist = DotProduct (r_refdef.view.origin, frustum[4].normal) + r_nearclip.value;
 	//PlaneClassify(&frustum[4]);
 }
 
-void R_View_Update(renderscene_t* scene)
+void R_View_Update(void)
 {
-	R_View_SetFrustum(scene);
-	R_View_WorldVisibility(scene->view.useclipplane);
-	R_View_UpdateEntityVisible(scene);
+	R_View_SetFrustum();
+	R_View_WorldVisibility(r_refdef.view.useclipplane);
+	R_View_UpdateEntityVisible();
 }
 
-void R_SetupView(renderscene_t* scene)
+void R_SetupView(void)
 {
-	if (!scene->view.useperspective)
-		GL_SetupView_Mode_Ortho(-scene->view.ortho_x, -scene->view.ortho_y, scene->view.ortho_x, scene->view.ortho_y, -scene->refdef.farclip, scene->refdef.farclip);
-	else if (scene->refdef.rtworldshadows || scene->refdef.rtdlightshadows)
-		GL_SetupView_Mode_PerspectiveInfiniteFarClip(scene->view.frustum_x, scene->view.frustum_y, scene->refdef.nearclip);
+	if (!r_refdef.view.useperspective)
+		GL_SetupView_Mode_Ortho(-r_refdef.view.ortho_x, -r_refdef.view.ortho_y, r_refdef.view.ortho_x, r_refdef.view.ortho_y, -r_refdef.farclip, r_refdef.farclip);
+	else if (r_refdef.rtworldshadows || r_refdef.rtdlightshadows)
+		GL_SetupView_Mode_PerspectiveInfiniteFarClip(r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip);
 	else
-		GL_SetupView_Mode_Perspective(scene->view.frustum_x, scene->view.frustum_y, scene->refdef.nearclip, scene->refdef.farclip);
+		GL_SetupView_Mode_Perspective(r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, r_refdef.farclip);
 
-	GL_SetupView_Orientation_FromEntity(&scene->view.matrix);
+	GL_SetupView_Orientation_FromEntity(&r_refdef.view.matrix);
 
-	if (scene->view.useclipplane)
+	if (r_refdef.view.useclipplane)
 	{
 		// LordHavoc: couldn't figure out how to make this approach the
-		vec_t dist = scene->view.clipplane.dist - r_water_clippingplanebias.value;
-		vec_t viewdist = DotProduct(scene->view.origin, scene->view.clipplane.normal);
-		if (viewdist < scene->view.clipplane.dist + r_water_clippingplanebias.value)
-			dist = scene->view.clipplane.dist;
-		GL_SetupView_ApplyCustomNearClipPlane(scene->view.clipplane.normal[0], scene->view.clipplane.normal[1], scene->view.clipplane.normal[2], dist);
+		vec_t dist = r_refdef.view.clipplane.dist - r_water_clippingplanebias.value;
+		vec_t viewdist = DotProduct(r_refdef.view.origin, r_refdef.view.clipplane.normal);
+		if (viewdist < r_refdef.view.clipplane.dist + r_water_clippingplanebias.value)
+			dist = r_refdef.view.clipplane.dist;
+		GL_SetupView_ApplyCustomNearClipPlane(r_refdef.view.clipplane.normal[0], r_refdef.view.clipplane.normal[1], r_refdef.view.clipplane.normal[2], dist);
 	}
 }
 
@@ -2527,12 +2530,12 @@ void R_ResetViewRendering2D(void)
 
 	DrawQ_Finish();
 
-	// GL is weird because it's bottom to top, r_view.y is top to bottom
-	qglViewport(r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
+	// GL is weird because it's bottom to top, r_refdef.view.y is top to bottom
+	qglViewport(r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
 	GL_SetupView_Mode_Ortho(0, 0, 1, 1, -10, 100);
-	GL_Scissor(r_view.x, r_view.y, r_view.width, r_view.height);
+	GL_Scissor(r_refdef.view.x, r_refdef.view.y, r_refdef.view.width, r_refdef.view.height);
 	GL_Color(1, 1, 1, 1);
-	GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+	GL_ColorMask(r_refdef.view.colormask[0], r_refdef.view.colormask[1], r_refdef.view.colormask[2], 1);
 	GL_BlendFunc(GL_ONE, GL_ZERO);
 	GL_AlphaTest(false);
 	GL_ScissorTest(false);
@@ -2551,7 +2554,7 @@ void R_ResetViewRendering2D(void)
 	GL_CullFace(GL_FRONT); // quake is backwards, this culls back faces
 }
 
-void R_ResetViewRendering3D(renderscene_t* scene)
+void R_ResetViewRendering3D(void)
 {
 	if (gl_support_fragment_shader)
 	{
@@ -2560,12 +2563,12 @@ void R_ResetViewRendering3D(renderscene_t* scene)
 
 	DrawQ_Finish();
 
-	// GL is weird because it's bottom to top, r_view.y is top to bottom
-	qglViewport(scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
-	R_SetupView(scene);
-	GL_Scissor(scene->view.x, scene->view.y, scene->view.width, scene->view.height);
+	// GL is weird because it's bottom to top, r_refdef.view.y is top to bottom
+	qglViewport(r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
+	R_SetupView();
+	GL_Scissor(r_refdef.view.x, r_refdef.view.y, r_refdef.view.width, r_refdef.view.height);
 	GL_Color(1, 1, 1, 1);
-	GL_ColorMask(scene->view.colormask[0], scene->view.colormask[1], scene->view.colormask[2], 1);
+	GL_ColorMask(r_refdef.view.colormask[0], r_refdef.view.colormask[1], r_refdef.view.colormask[2], 1);
 	GL_BlendFunc(GL_ONE, GL_ZERO);
 	GL_AlphaTest(false);
 	GL_ScissorTest(true);
@@ -2574,14 +2577,14 @@ void R_ResetViewRendering3D(renderscene_t* scene)
 	GL_DepthTest(true);
 	R_Mesh_Matrix(&identitymatrix);
 	R_Mesh_ResetTextureState();
-	GL_PolygonOffset(scene->refdef.polygonfactor, scene->refdef.polygonoffset);
+	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
 	qglEnable(GL_POLYGON_OFFSET_FILL);CHECKGLERROR
 	qglDepthFunc(GL_LEQUAL);CHECKGLERROR
 	qglDisable(GL_STENCIL_TEST);CHECKGLERROR
 	qglStencilMask(~0);CHECKGLERROR
 	qglStencilFunc(GL_ALWAYS, 128, ~0);CHECKGLERROR
 	qglStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);CHECKGLERROR
-	GL_CullFace(scene->view.cullface_back);
+	GL_CullFace(r_refdef.view.cullface_back);
 }
 
 /*
@@ -2645,7 +2648,7 @@ void R_ResetViewRendering3D(renderscene_t* scene)
 "#endif // FRAGMENT_SHADER\n"
 */
 
-void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes);
+void R_RenderScene(qboolean addwaterplanes);
 
 static void R_Water_StartFrame(void)
 {
@@ -2655,8 +2658,8 @@ static void R_Water_StartFrame(void)
 
 	// set waterwidth and waterheight to the water resolution that will be
 	// used (often less than the screen resolution for faster rendering)
-	waterwidth = (int)bound(1, r_view.width * r_water_resolutionmultiplier.value, r_view.width);
-	waterheight = (int)bound(1, r_view.height * r_water_resolutionmultiplier.value, r_view.height);
+	waterwidth = (int)bound(1, r_refdef.view.width * r_water_resolutionmultiplier.value, r_refdef.view.width);
+	waterheight = (int)bound(1, r_refdef.view.height * r_water_resolutionmultiplier.value, r_refdef.view.height);
 
 	// calculate desired texture sizes
 	// can't use water if the card does not support the texture size
@@ -2745,7 +2748,7 @@ static void R_Water_AddWaterPlane(msurface_t *surface)
 		p->plane.dist = DotProduct(vert[0], p->plane.normal);
 		PlaneClassify(&p->plane);
 		// flip the plane if it does not face the viewer
-		if (PlaneDiff(r_view.origin, &p->plane) < 0)
+		if (PlaneDiff(r_refdef.view.origin, &p->plane) < 0)
 		{
 			VectorNegate(p->plane.normal, p->plane.normal);
 			p->plane.dist *= -1;
@@ -2767,13 +2770,13 @@ static void R_Water_AddWaterPlane(msurface_t *surface)
 	}
 }
 
-static void R_Water_ProcessPlanes(renderscene_t* scene)
+static void R_Water_ProcessPlanes(void)
 {
-	r_view_t originalview;
+	r_refdef_view_t originalview;
 	int planeindex;
 	r_waterstate_waterplane_t *p;
 
-	originalview = scene->view;
+	originalview = r_refdef.view;
 
 	// make sure enough textures are allocated
 	for (planeindex = 0, p = r_waterstate.waterplanes;planeindex < r_waterstate.numwaterplanes;planeindex++, p++)
@@ -2798,72 +2801,72 @@ static void R_Water_ProcessPlanes(renderscene_t* scene)
 	// render views
 	for (planeindex = 0, p = r_waterstate.waterplanes;planeindex < r_waterstate.numwaterplanes;planeindex++, p++)
 	{
-		scene->view.showdebug = false;
-		scene->view.width = r_waterstate.waterwidth;
-		scene->view.height = r_waterstate.waterheight;
-		scene->view.useclipplane = true;
+		r_refdef.view.showdebug = false;
+		r_refdef.view.width = r_waterstate.waterwidth;
+		r_refdef.view.height = r_waterstate.waterheight;
+		r_refdef.view.useclipplane = true;
 		r_waterstate.renderingscene = true;
 
 		// render the normal view scene and copy into texture
 		// (except that a clipping plane should be used to hide everything on one side of the water, and the viewer's weapon model should be omitted)
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION))
 		{
-			scene->view.clipplane = p->plane;
-			VectorNegate(scene->view.clipplane.normal, scene->view.clipplane.normal);
-			scene->view.clipplane.dist = -scene->view.clipplane.dist;
-			PlaneClassify(&scene->view.clipplane);
+			r_refdef.view.clipplane = p->plane;
+			VectorNegate(r_refdef.view.clipplane.normal, r_refdef.view.clipplane.normal);
+			r_refdef.view.clipplane.dist = -r_refdef.view.clipplane.dist;
+			PlaneClassify(&r_refdef.view.clipplane);
 
-			R_RenderScene(scene, false);
+			R_RenderScene(false);
 
 			// copy view into the screen texture
 			R_Mesh_TexBind(0, R_GetTexture(p->texture_refraction));
 			GL_ActiveTexture(0);
 			CHECKGLERROR
-			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
+			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
 		}
 
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFLECTION))
 		{
 			// render reflected scene and copy into texture
-			Matrix4x4_Reflect(&scene->view.matrix, p->plane.normal[0], p->plane.normal[1], p->plane.normal[2], p->plane.dist, -2);
-			scene->view.clipplane = p->plane;
+			Matrix4x4_Reflect(&r_refdef.view.matrix, p->plane.normal[0], p->plane.normal[1], p->plane.normal[2], p->plane.dist, -2);
+			r_refdef.view.clipplane = p->plane;
 			// reverse the cullface settings for this render
-			scene->view.cullface_front = GL_FRONT;
-			scene->view.cullface_back = GL_BACK;
-			if (scene->refdef.worldmodel && scene->refdef.worldmodel->brush.num_pvsclusterbytes)
+			r_refdef.view.cullface_front = GL_FRONT;
+			r_refdef.view.cullface_back = GL_BACK;
+			if (r_refdef.worldmodel && r_refdef.worldmodel->brush.num_pvsclusterbytes)
 			{
-				scene->view.usecustompvs = true;
+				r_refdef.view.usecustompvs = true;
 				if (p->pvsvalid)
-					memcpy(scene->viewcache.world_pvsbits, p->pvsbits, scene->refdef.worldmodel->brush.num_pvsclusterbytes);
+					memcpy(r_refdef.viewcache.world_pvsbits, p->pvsbits, r_refdef.worldmodel->brush.num_pvsclusterbytes);
 				else
-					memset(scene->viewcache.world_pvsbits, 0xFF, scene->refdef.worldmodel->brush.num_pvsclusterbytes);
+					memset(r_refdef.viewcache.world_pvsbits, 0xFF, r_refdef.worldmodel->brush.num_pvsclusterbytes);
 			}
 
-			R_ResetViewRendering3D(scene);
+			R_ResetViewRendering3D();
 			R_ClearScreen(r_refdef.fogenabled);
 			if (r_timereport_active)
 				R_TimeReport("viewclear");
 
-			R_RenderScene(scene, false);
+			R_RenderScene(false);
 
 			R_Mesh_TexBind(0, R_GetTexture(p->texture_reflection));
 			GL_ActiveTexture(0);
 			CHECKGLERROR
-			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, scene->view.x, vid.height - (scene->view.y + scene->view.height), scene->view.width, scene->view.height);CHECKGLERROR
+			qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
 
-			R_ResetViewRendering3D(scene);
+			R_ResetViewRendering3D();
 			R_ClearScreen(r_refdef.fogenabled);
 			if (r_timereport_active)
 				R_TimeReport("viewclear");
 		}
 
-		scene->view = originalview;
-		scene->view.clear = true;
+		r_refdef.view = originalview;
+		r_refdef.view.clear = true;
 		r_waterstate.renderingscene = false;
 	}
 	return;
 error:
-	scene->view = originalview;
+	r_refdef.view = originalview;
 	r_waterstate.renderingscene = false;
 	Cvar_SetValueQuick(&r_water, 0);
 	Con_Printf("R_Water_ProcessPlanes: Error: texture creation failed!  Turned off r_water.\n");
@@ -2876,15 +2879,15 @@ void R_Bloom_StartFrame(void)
 
 	// set bloomwidth and bloomheight to the bloom resolution that will be
 	// used (often less than the screen resolution for faster rendering)
-	r_bloomstate.bloomwidth = bound(1, r_bloom_resolution.integer, r_view.width);
-	r_bloomstate.bloomheight = r_bloomstate.bloomwidth * r_view.height / r_view.width;
-	r_bloomstate.bloomheight = bound(1, r_bloomstate.bloomheight, r_view.height);
+	r_bloomstate.bloomwidth = bound(1, r_bloom_resolution.integer, r_refdef.view.width);
+	r_bloomstate.bloomheight = r_bloomstate.bloomwidth * r_refdef.view.height / r_refdef.view.width;
+	r_bloomstate.bloomheight = bound(1, r_bloomstate.bloomheight, r_refdef.view.height);
 
 	// calculate desired texture sizes
 	if (gl_support_arb_texture_non_power_of_two)
 	{
-		screentexturewidth = r_view.width;
-		screentextureheight = r_view.height;
+		screentexturewidth = r_refdef.view.width;
+		screentextureheight = r_refdef.view.height;
 		bloomtexturewidth = r_bloomstate.bloomwidth;
 		bloomtextureheight = r_bloomstate.bloomheight;
 	}
@@ -2949,10 +2952,10 @@ void R_Bloom_StartFrame(void)
 	// set up a texcoord array for the full resolution screen image
 	// (we have to keep this around to copy back during final render)
 	r_bloomstate.screentexcoord2f[0] = 0;
-	r_bloomstate.screentexcoord2f[1] = (float)r_view.height / (float)r_bloomstate.screentextureheight;
-	r_bloomstate.screentexcoord2f[2] = (float)r_view.width / (float)r_bloomstate.screentexturewidth;
-	r_bloomstate.screentexcoord2f[3] = (float)r_view.height / (float)r_bloomstate.screentextureheight;
-	r_bloomstate.screentexcoord2f[4] = (float)r_view.width / (float)r_bloomstate.screentexturewidth;
+	r_bloomstate.screentexcoord2f[1] = (float)r_refdef.view.height / (float)r_bloomstate.screentextureheight;
+	r_bloomstate.screentexcoord2f[2] = (float)r_refdef.view.width / (float)r_bloomstate.screentexturewidth;
+	r_bloomstate.screentexcoord2f[3] = (float)r_refdef.view.height / (float)r_bloomstate.screentextureheight;
+	r_bloomstate.screentexcoord2f[4] = (float)r_refdef.view.width / (float)r_bloomstate.screentexturewidth;
 	r_bloomstate.screentexcoord2f[5] = 0;
 	r_bloomstate.screentexcoord2f[6] = 0;
 	r_bloomstate.screentexcoord2f[7] = 0;
@@ -2982,12 +2985,12 @@ void R_Bloom_CopyScreenTexture(float colorscale)
 	// copy view into the screen texture
 	GL_ActiveTexture(0);
 	CHECKGLERROR
-	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
-	r_refdef.stats.bloom_copypixels += r_view.width * r_view.height;
+	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
+	r_refdef.stats.bloom_copypixels += r_refdef.view.width * r_refdef.view.height;
 
 	// now scale it down to the bloom texture size
 	CHECKGLERROR
-	qglViewport(r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+	qglViewport(r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 	GL_BlendFunc(GL_ONE, GL_ZERO);
 	GL_Color(colorscale, colorscale, colorscale, 1);
 	// TODO: optimize with multitexture or GLSL
@@ -2999,7 +3002,7 @@ void R_Bloom_CopyScreenTexture(float colorscale)
 	R_Mesh_TexBind(0, R_GetTexture(r_bloomstate.texture_bloom));
 	GL_ActiveTexture(0);
 	CHECKGLERROR
-	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 	r_refdef.stats.bloom_copypixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 }
 
@@ -3008,8 +3011,8 @@ void R_Bloom_CopyHDRTexture(void)
 	R_Mesh_TexBind(0, R_GetTexture(r_bloomstate.texture_bloom));
 	GL_ActiveTexture(0);
 	CHECKGLERROR
-	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_view.height), r_view.width, r_view.height);CHECKGLERROR
-	r_refdef.stats.bloom_copypixels += r_view.width * r_view.height;
+	qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_refdef.view.height), r_refdef.view.width, r_refdef.view.height);CHECKGLERROR
+	r_refdef.stats.bloom_copypixels += r_refdef.view.width * r_refdef.view.height;
 }
 
 void R_Bloom_MakeTexture(void)
@@ -3025,7 +3028,7 @@ void R_Bloom_MakeTexture(void)
 
 	// we have a bloom image in the framebuffer
 	CHECKGLERROR
-	qglViewport(r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+	qglViewport(r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 
 	for (x = 1;x < min(r_bloom_colorexponent.value, 32);)
 	{
@@ -3041,7 +3044,7 @@ void R_Bloom_MakeTexture(void)
 		// copy the vertically blurred bloom view to a texture
 		GL_ActiveTexture(0);
 		CHECKGLERROR
-		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 		r_refdef.stats.bloom_copypixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 	}
 
@@ -3087,7 +3090,7 @@ void R_Bloom_MakeTexture(void)
 		// copy the vertically blurred bloom view to a texture
 		GL_ActiveTexture(0);
 		CHECKGLERROR
-		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 		r_refdef.stats.bloom_copypixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 	}
 
@@ -3115,36 +3118,36 @@ void R_Bloom_MakeTexture(void)
 		R_Mesh_TexBind(0, R_GetTexture(r_bloomstate.texture_bloom));
 		GL_ActiveTexture(0);
 		CHECKGLERROR
-		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_view.x, vid.height - (r_view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
+		qglCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, r_refdef.view.x, vid.height - (r_refdef.view.y + r_bloomstate.bloomheight), r_bloomstate.bloomwidth, r_bloomstate.bloomheight);CHECKGLERROR
 		r_refdef.stats.bloom_copypixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 	}
 }
 
-void R_HDR_RenderBloomTexture(renderscene_t* scene)
+void R_HDR_RenderBloomTexture(void)
 {
 	int oldwidth, oldheight;
 	float oldcolorscale;
 
-	oldcolorscale = scene->view.colorscale;
-	oldwidth = scene->view.width;
-	oldheight = scene->view.height;
-	scene->view.width = r_bloomstate.bloomwidth;
-	scene->view.height = r_bloomstate.bloomheight;
+	oldcolorscale = r_refdef.view.colorscale;
+	oldwidth = r_refdef.view.width;
+	oldheight = r_refdef.view.height;
+	r_refdef.view.width = r_bloomstate.bloomwidth;
+	r_refdef.view.height = r_bloomstate.bloomheight;
 
 	// TODO: support GL_EXT_framebuffer_object rather than reusing the framebuffer?  it might improve SLI performance.
 	// TODO: add exposure compensation features
 	// TODO: add fp16 framebuffer support
 
-	scene->view.showdebug = false;
-	scene->view.colorscale *= r_bloom_colorscale.value / bound(1, r_hdr_range.value, 16);
+	r_refdef.view.showdebug = false;
+	r_refdef.view.colorscale *= r_bloom_colorscale.value / bound(1, r_hdr_range.value, 16);
 
 	R_ClearScreen(r_refdef.fogenabled);
 	if (r_timereport_active)
 		R_TimeReport("HDRclear");
 
 	r_waterstate.numwaterplanes = 0;
-	R_RenderScene(scene, r_waterstate.enabled);
-	scene->view.showdebug = true;
+	R_RenderScene(r_waterstate.enabled);
+	r_refdef.view.showdebug = true;
 
 	R_ResetViewRendering2D();
 
@@ -3152,11 +3155,11 @@ void R_HDR_RenderBloomTexture(renderscene_t* scene)
 	R_Bloom_MakeTexture();
 
 	// restore the view settings
-	scene->view.width = oldwidth;
-	scene->view.height = oldheight;
-	scene->view.colorscale = oldcolorscale;
+	r_refdef.view.width = oldwidth;
+	r_refdef.view.height = oldheight;
+	r_refdef.view.colorscale = oldcolorscale;
 
-	R_ResetViewRendering3D(scene);
+	R_ResetViewRendering3D();
 
 	R_ClearScreen(r_refdef.fogenabled);
 	if (r_timereport_active)
@@ -3178,7 +3181,7 @@ static void R_BlendView(void)
 		R_Mesh_TexBind(0, R_GetTexture(r_bloomstate.texture_bloom));
 		R_Mesh_TexCoordPointer(0, 2, r_bloomstate.bloomtexcoord2f, 0, 0);
 		R_Mesh_Draw(0, 4, 2, polygonelements, 0, 0);
-		r_refdef.stats.bloom_drawpixels += r_view.width * r_view.height;
+		r_refdef.stats.bloom_drawpixels += r_refdef.view.width * r_refdef.view.height;
 	}
 	else if (r_bloomstate.enabled)
 	{
@@ -3206,14 +3209,14 @@ static void R_BlendView(void)
 		else
 		{
 			R_Mesh_Draw(0, 4, 2, polygonelements, 0, 0);
-			r_refdef.stats.bloom_drawpixels += r_view.width * r_view.height;
+			r_refdef.stats.bloom_drawpixels += r_refdef.view.width * r_refdef.view.height;
 			// now blend on the bloom texture
 			GL_BlendFunc(GL_ONE, GL_ONE);
 			R_Mesh_TexBind(0, R_GetTexture(r_bloomstate.texture_screen));
 			R_Mesh_TexCoordPointer(0, 2, r_bloomstate.screentexcoord2f, 0, 0);
 		}
 		R_Mesh_Draw(0, 4, 2, polygonelements, 0, 0);
-		r_refdef.stats.bloom_drawpixels += r_view.width * r_view.height;
+		r_refdef.stats.bloom_drawpixels += r_refdef.view.width * r_refdef.view.height;
 	}
 	if (r_refdef.viewblend[3] >= (1.0f / 256.0f))
 	{
@@ -3226,6 +3229,8 @@ static void R_BlendView(void)
 		R_Mesh_Draw(0, 4, 2, polygonelements, 0, 0);
 	}
 }
+
+void R_RenderScene(qboolean addwaterplanes);
 
 matrix4x4_t r_waterscrollmatrix;
 
@@ -3248,7 +3253,7 @@ void R_UpdateFogColor(void) // needs to be called before HDR subrender too, as t
 				fogvec[2] *= r_glsl_contrastboost.value / ((r_glsl_contrastboost.value - 1) * fogvec[2] + 1);
 			}
 			//   color.rgb *= ContrastBoost * SceneBrightness;
-			VectorScale(fogvec, r_view.colorscale, fogvec);
+			VectorScale(fogvec, r_refdef.view.colorscale, fogvec);
 			r_refdef.fogcolor[0] = bound(0.0f, fogvec[0], 1.0f);
 			r_refdef.fogcolor[1] = bound(0.0f, fogvec[1], 1.0f);
 			r_refdef.fogcolor[2] = bound(0.0f, fogvec[2], 1.0f);
@@ -3256,88 +3261,88 @@ void R_UpdateFogColor(void) // needs to be called before HDR subrender too, as t
 	}
 }
 
-void R_UpdateVariables(renderscene_t* scene)
+void R_UpdateVariables(void)
 {
 	R_Textures_Frame();
 
-	scene->refdef.farclip = 4096;
-	if (scene->refdef.worldmodel)
-		scene->refdef.farclip += VectorDistance(scene->refdef.worldmodel->normalmins, scene->refdef.worldmodel->normalmaxs);
-	scene->refdef.nearclip = bound (0.001f, r_nearclip.value, scene->refdef.farclip - 1.0f);
+	r_refdef.farclip = 4096;
+	if (r_refdef.worldmodel)
+		r_refdef.farclip += VectorDistance(r_refdef.worldmodel->normalmins, r_refdef.worldmodel->normalmaxs);
+	r_refdef.nearclip = bound (0.001f, r_nearclip.value, r_refdef.farclip - 1.0f);
 
 	if (r_shadow_frontsidecasting.integer < 0 || r_shadow_frontsidecasting.integer > 1)
 		Cvar_SetValueQuick(&r_shadow_frontsidecasting, 1);
-	scene->refdef.polygonfactor = 0;
-	scene->refdef.polygonoffset = 0;
-	scene->refdef.shadowpolygonfactor = scene->refdef.polygonfactor + r_shadow_polygonfactor.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
-	scene->refdef.shadowpolygonoffset = scene->refdef.polygonoffset + r_shadow_polygonoffset.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
+	r_refdef.polygonfactor = 0;
+	r_refdef.polygonoffset = 0;
+	r_refdef.shadowpolygonfactor = r_refdef.polygonfactor + r_shadow_polygonfactor.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
+	r_refdef.shadowpolygonoffset = r_refdef.polygonoffset + r_shadow_polygonoffset.value * (r_shadow_frontsidecasting.integer ? 1 : -1);
 
-	scene->refdef.rtworld = r_shadow_realtime_world.integer;
-	scene->refdef.rtworldshadows = r_shadow_realtime_world_shadows.integer && gl_stencil;
-	scene->refdef.rtdlight = (r_shadow_realtime_world.integer || r_shadow_realtime_dlight.integer) && !gl_flashblend.integer && r_dynamic.integer;
-	scene->refdef.rtdlightshadows = r_refdef.rtdlight && r_shadow_realtime_dlight_shadows.integer && gl_stencil;
-	scene->refdef.lightmapintensity = r_refdef.rtworld ? r_shadow_realtime_world_lightmaps.value : 1;
+	r_refdef.rtworld = r_shadow_realtime_world.integer;
+	r_refdef.rtworldshadows = r_shadow_realtime_world_shadows.integer && gl_stencil;
+	r_refdef.rtdlight = (r_shadow_realtime_world.integer || r_shadow_realtime_dlight.integer) && !gl_flashblend.integer && r_dynamic.integer;
+	r_refdef.rtdlightshadows = r_refdef.rtdlight && r_shadow_realtime_dlight_shadows.integer && gl_stencil;
+	r_refdef.lightmapintensity = r_refdef.rtworld ? r_shadow_realtime_world_lightmaps.value : 1;
 	if (r_showsurfaces.integer)
 	{
-		scene->refdef.rtworld = false;
-		scene->refdef.rtworldshadows = false;
-		scene->refdef.rtdlight = false;
-		scene->refdef.rtdlightshadows = false;
-		scene->refdef.lightmapintensity = 0;
+		r_refdef.rtworld = false;
+		r_refdef.rtworldshadows = false;
+		r_refdef.rtdlight = false;
+		r_refdef.rtdlightshadows = false;
+		r_refdef.lightmapintensity = 0;
 	}
 
 	if (gamemode == GAME_NEHAHRA)
 	{
 		if (gl_fogenable.integer)
 		{
-			scene->refdef.oldgl_fogenable = true;
-			scene->refdef.fog_density = gl_fogdensity.value;
-			scene->refdef.fog_red = gl_fogred.value;
-			scene->refdef.fog_green = gl_foggreen.value;
-			scene->refdef.fog_blue = gl_fogblue.value;
-			scene->refdef.fog_alpha = 1;
-			scene->refdef.fog_start = 0;
-			scene->refdef.fog_end = gl_skyclip.value;
+			r_refdef.oldgl_fogenable = true;
+			r_refdef.fog_density = gl_fogdensity.value;
+			r_refdef.fog_red = gl_fogred.value;
+			r_refdef.fog_green = gl_foggreen.value;
+			r_refdef.fog_blue = gl_fogblue.value;
+			r_refdef.fog_alpha = 1;
+			r_refdef.fog_start = 0;
+			r_refdef.fog_end = gl_skyclip.value;
 		}
-		else if (scene->refdef.oldgl_fogenable)
+		else if (r_refdef.oldgl_fogenable)
 		{
-			scene->refdef.oldgl_fogenable = false;
-			scene->refdef.fog_density = 0;
-			scene->refdef.fog_red = 0;
-			scene->refdef.fog_green = 0;
-			scene->refdef.fog_blue = 0;
-			scene->refdef.fog_alpha = 0;
-			scene->refdef.fog_start = 0;
-			scene->refdef.fog_end = 0;
+			r_refdef.oldgl_fogenable = false;
+			r_refdef.fog_density = 0;
+			r_refdef.fog_red = 0;
+			r_refdef.fog_green = 0;
+			r_refdef.fog_blue = 0;
+			r_refdef.fog_alpha = 0;
+			r_refdef.fog_start = 0;
+			r_refdef.fog_end = 0;
 		}
 	}
 
-	scene->refdef.fog_alpha = bound(0, scene->refdef.fog_alpha, 1);
-	scene->refdef.fog_start = max(0, scene->refdef.fog_start);
-	scene->refdef.fog_end = max(scene->refdef.fog_start + 0.01, scene->refdef.fog_end);
+	r_refdef.fog_alpha = bound(0, r_refdef.fog_alpha, 1);
+	r_refdef.fog_start = max(0, r_refdef.fog_start);
+	r_refdef.fog_end = max(r_refdef.fog_start + 0.01, r_refdef.fog_end);
 
 	// R_UpdateFogColor(); // why? R_RenderScene does it anyway
 
-	if (scene->refdef.fog_density)
+	if (r_refdef.fog_density)
 	{
-		scene->refdef.fogenabled = true;
+		r_refdef.fogenabled = true;
 		// this is the point where the fog reaches 0.9986 alpha, which we
 		// consider a good enough cutoff point for the texture
 		// (0.9986 * 256 == 255.6)
 		if (r_fog_exp2.integer)
-			scene->refdef.fogrange = 32 / (scene->refdef.fog_density * scene->refdef.fog_density) + scene->refdef.fog_start;
+			r_refdef.fogrange = 32 / (r_refdef.fog_density * r_refdef.fog_density) + r_refdef.fog_start;
 		else
-			scene->refdef.fogrange = 2048 / scene->refdef.fog_density + scene->refdef.fog_start;
-		scene->refdef.fogrange = bound(scene->refdef.fog_start, scene->refdef.fogrange, scene->refdef.fog_end);
-		scene->refdef.fograngerecip = 1.0f / scene->refdef.fogrange;
-		scene->refdef.fogmasktabledistmultiplier = FOGMASKTABLEWIDTH * scene->refdef.fograngerecip;
+			r_refdef.fogrange = 2048 / r_refdef.fog_density + r_refdef.fog_start;
+		r_refdef.fogrange = bound(r_refdef.fog_start, r_refdef.fogrange, r_refdef.fog_end);
+		r_refdef.fograngerecip = 1.0f / r_refdef.fogrange;
+		r_refdef.fogmasktabledistmultiplier = FOGMASKTABLEWIDTH * r_refdef.fograngerecip;
 		// fog color was already set
 		// update the fog texture
-		if (scene->refdef.fogmasktable_start != scene->refdef.fog_start || scene->refdef.fogmasktable_alpha != scene->refdef.fog_alpha || scene->refdef.fogmasktable_density != scene->refdef.fog_density || scene->refdef.fogmasktable_range != scene->refdef.fogrange)
-			R_BuildFogTexture(scene);
+		if (r_refdef.fogmasktable_start != r_refdef.fog_start || r_refdef.fogmasktable_alpha != r_refdef.fog_alpha || r_refdef.fogmasktable_density != r_refdef.fog_density || r_refdef.fogmasktable_range != r_refdef.fogrange)
+			R_BuildFogTexture();
 	}
 	else
-		scene->refdef.fogenabled = false;
+		r_refdef.fogenabled = false;
 }
 
 /*
@@ -3345,12 +3350,12 @@ void R_UpdateVariables(renderscene_t* scene)
 R_RenderView
 ================
 */
-void R_RenderView(renderscene_t* scene)
+void R_RenderView(void)
 {
-	if (!scene->refdef.entities/* || !r_refdef.worldmodel*/)
+	if (!r_refdef.entities/* || !r_refdef.worldmodel*/)
 		return; //Host_Error ("R_RenderView: NULL worldmodel");
 
-	r_view.colorscale = r_hdr_scenebrightness.value;
+	r_refdef.view.colorscale = r_hdr_scenebrightness.value;
 
 	R_Shadow_UpdateWorldLightSelection();
 
@@ -3361,24 +3366,24 @@ void R_RenderView(renderscene_t* scene)
 	if (r_timereport_active)
 		R_TimeReport("viewsetup");
 
-	R_ResetViewRendering3D(scene);
+	R_ResetViewRendering3D();
 
-	if (scene->view.clear || scene->refdef.fogenabled)
+	if (r_refdef.view.clear || r_refdef.fogenabled)
 	{
 		R_ClearScreen(r_refdef.fogenabled);
 		if (r_timereport_active)
 			R_TimeReport("viewclear");
 	}
-	scene->view.clear = true;
+	r_refdef.view.clear = true;
 
-	scene->view.showdebug = true;
+	r_refdef.view.showdebug = true;
 
 	// this produces a bloom texture to be used in R_BlendView() later
 	if (r_hdr.integer)
-		R_HDR_RenderBloomTexture(scene);
+		R_HDR_RenderBloomTexture();
 
 	r_waterstate.numwaterplanes = 0;
-	R_RenderScene(scene, r_waterstate.enabled);
+	R_RenderScene(r_waterstate.enabled);
 
 	R_BlendView();
 	if (r_timereport_active)
@@ -3395,16 +3400,16 @@ extern void R_DrawPortals (void);
 extern cvar_t cl_locs_show;
 static void R_DrawLocs(void);
 static void R_DrawEntityBBoxes(void);
-void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
+void R_RenderScene(qboolean addwaterplanes)
 {
-	Matrix4x4_Invert_Simple(&r_view.inverse_matrix, &r_view.matrix);
+	Matrix4x4_Invert_Simple(&r_refdef.view.inverse_matrix, &r_refdef.view.matrix);
 	R_UpdateFogColor();
 
 	if (addwaterplanes)
 	{
-		R_ResetViewRendering3D(scene);
+		R_ResetViewRendering3D();
 
-		R_View_Update(scene);
+		R_View_Update();
 		if (r_timereport_active)
 			R_TimeReport("watervis");
 
@@ -3419,16 +3424,16 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 		if (r_refdef.extraupdate)
 			S_ExtraUpdate ();
 
-		R_DrawModelsAddWaterPlanes(scene);
+		R_DrawModelsAddWaterPlanes();
 		if (r_timereport_active)
 			R_TimeReport("watermodels");
 
-		R_Water_ProcessPlanes(scene);
+		R_Water_ProcessPlanes();
 		if (r_timereport_active)
 			R_TimeReport("waterscenes");
 	}
 
-	R_ResetViewRendering3D(scene);
+	R_ResetViewRendering3D();
 
 	// don't let sound skip if going slow
 	if (r_refdef.extraupdate)
@@ -3438,7 +3443,7 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 
 	R_SkyStartFrame();
 
-	R_View_Update(scene);
+	R_View_Update();
 	if (r_timereport_active)
 		R_TimeReport("visibility");
 
@@ -3469,7 +3474,7 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 	}
 	if (r_depthfirst.integer >= 2)
 	{
-		R_DrawModelsDepth(scene);
+		R_DrawModelsDepth();
 		if (r_timereport_active)
 			R_TimeReport("modeldepth");
 	}
@@ -3485,7 +3490,7 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 	if (r_refdef.extraupdate)
 		S_ExtraUpdate ();
 
-	R_DrawModels(scene);
+	R_DrawModels();
 	if (r_timereport_active)
 		R_TimeReport("models");
 
@@ -3495,9 +3500,9 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 
 	if (r_shadows.integer > 0 && r_refdef.lightmapintensity > 0)
 	{
-		R_DrawModelShadows(scene);
+		R_DrawModelShadows();
 
-		R_ResetViewRendering3D(scene);
+		R_ResetViewRendering3D();
 
 		// don't let sound skip if going slow
 		if (r_refdef.extraupdate)
@@ -3537,7 +3542,7 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 	}
 	VM_CL_AddPolygonsToMeshQueue();
 
-	if (r_view.showdebug)
+	if (r_refdef.view.showdebug)
 	{
 		if (cl_locs_show.integer)
 		{
@@ -3574,12 +3579,12 @@ void R_RenderScene(renderscene_t* scene, qboolean addwaterplanes)
 		qglUseProgramObjectARB(0);CHECKGLERROR
 	}
 
-	if (r_view.showdebug && r_refdef.worldmodel && r_refdef.worldmodel->DrawDebug && (r_showtris.value > 0 || r_shownormals.value > 0 || r_showcollisionbrushes.value > 0))
+	if (r_refdef.view.showdebug && r_refdef.worldmodel && r_refdef.worldmodel->DrawDebug && (r_showtris.value > 0 || r_shownormals.value > 0 || r_showcollisionbrushes.value > 0))
 	{
 		r_refdef.worldmodel->DrawDebug(r_refdef.worldentity);
 		if (r_timereport_active)
 			R_TimeReport("worlddebug");
-		R_DrawModelsDebug(scene);
+		R_DrawModelsDebug();
 		if (r_timereport_active)
 			R_TimeReport("modeldebug");
 	}
@@ -3674,7 +3679,7 @@ static void R_DrawEntityBBoxes_Callback(const entity_render_t *ent, const rtligh
 		color[3] *= r_showbboxes.value;
 		color[3] = bound(0, color[3], 1);
 		GL_DepthTest(!r_showdisabledepthtest.integer);
-		GL_CullFace(r_view.cullface_front);
+		GL_CullFace(r_refdef.view.cullface_front);
 		R_DrawBBoxMesh(edict->priv.server->areamins, edict->priv.server->areamaxs, color[0], color[1], color[2], color[3]);
 	}
 	SV_VM_End();
@@ -3759,7 +3764,7 @@ void R_DrawNoModel_TransparentCallback(const entity_render_t *ent, const rtlight
 	GL_DepthRange(0, (ent->flags & RENDER_VIEWMODEL) ? 0.0625 : 1);
 	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
 	GL_DepthTest(!(ent->effects & EF_NODEPTHTEST));
-	GL_CullFace((ent->effects & EF_DOUBLESIDED) ? GL_NONE : r_view.cullface_back);
+	GL_CullFace((ent->effects & EF_DOUBLESIDED) ? GL_NONE : r_refdef.view.cullface_back);
 	R_Mesh_VertexPointer(nomodelvertex3f, 0, 0);
 	if (r_refdef.fogenabled)
 	{
@@ -3795,7 +3800,7 @@ void R_DrawNoModel(entity_render_t *ent)
 	vec3_t org;
 	Matrix4x4_OriginFromMatrix(&ent->matrix, org);
 	//if ((ent->effects & EF_ADDITIVE) || (ent->alpha < 1))
-		R_MeshQueue_AddTransparent(ent->effects & EF_NODEPTHTEST ? r_view.origin : org, R_DrawNoModel_TransparentCallback, ent, 0, rsurface.rtlight);
+		R_MeshQueue_AddTransparent(ent->effects & EF_NODEPTHTEST ? r_refdef.view.origin : org, R_DrawNoModel_TransparentCallback, ent, 0, rsurface.rtlight);
 	//else
 	//	R_DrawNoModelCallback(ent, 0);
 }
@@ -3807,12 +3812,12 @@ void R_CalcBeam_Vertex3f (float *vert, const vec3_t org1, const vec3_t org2, flo
 	VectorSubtract (org2, org1, normal);
 
 	// calculate 'right' vector for start
-	VectorSubtract (r_view.origin, org1, diff);
+	VectorSubtract (r_refdef.view.origin, org1, diff);
 	CrossProduct (normal, diff, right1);
 	VectorNormalize (right1);
 
 	// calculate 'right' vector for end
-	VectorSubtract (r_view.origin, org2, diff);
+	VectorSubtract (r_refdef.view.origin, org2, diff);
 	CrossProduct (normal, diff, right2);
 	VectorNormalize (right2);
 
@@ -3847,10 +3852,10 @@ void R_DrawSprite(int blendfunc1, int blendfunc2, rtexture_t *texture, rtexture_
 	{
 		scalex1 = -scalex1;
 		scalex2 = -scalex2;
-		GL_CullFace(r_view.cullface_front);
+		GL_CullFace(r_refdef.view.cullface_front);
 	}
 	else
-		GL_CullFace(r_view.cullface_back);
+		GL_CullFace(r_refdef.view.cullface_back);
 
 	GL_DepthMask(false);
 	GL_DepthRange(0, depthshort ? 0.0625 : 1);
@@ -3875,8 +3880,8 @@ void R_DrawSprite(int blendfunc1, int blendfunc2, rtexture_t *texture, rtexture_
 	R_Mesh_ResetTextureState();
 	R_Mesh_TexBind(0, R_GetTexture(texture));
 	R_Mesh_TexCoordPointer(0, 2, spritetexcoord2f, 0, 0);
-	// FIXME: fixed function path can't properly handle r_view.colorscale > 1
-	GL_Color(cr * fog * r_view.colorscale, cg * fog * r_view.colorscale, cb * fog * r_view.colorscale, ca);
+	// FIXME: fixed function path can't properly handle r_refdef.view.colorscale > 1
+	GL_Color(cr * fog * r_refdef.view.colorscale, cg * fog * r_refdef.view.colorscale, cb * fog * r_refdef.view.colorscale, ca);
 	R_Mesh_Draw(0, 4, 2, polygonelements, 0, 0);
 
 	if (blendfunc2 == GL_ONE_MINUS_SRC_ALPHA)
@@ -3997,9 +4002,9 @@ static void R_Texture_AddLayer(texture_t *t, qboolean depthmask, int blendfunc1,
 	layer->blendfunc2 = blendfunc2;
 	layer->texture = texture;
 	layer->texmatrix = *matrix;
-	layer->color[0] = r * r_view.colorscale;
-	layer->color[1] = g * r_view.colorscale;
-	layer->color[2] = b * r_view.colorscale;
+	layer->color[0] = r * r_refdef.view.colorscale;
+	layer->color[1] = g * r_refdef.view.colorscale;
+	layer->color[2] = b * r_refdef.view.colorscale;
 	layer->color[3] = a;
 }
 
@@ -4314,7 +4319,7 @@ void R_UpdateTextureInfo(const entity_render_t *ent, texture_t *t)
 					// were darkened by fog already, and we should not add fog color
 					// (because the background was not darkened, there is no fog color
 					// that was lost behind it).
-					R_Texture_AddLayer(t, false, GL_SRC_ALPHA, (t->currentmaterialflags & MATERIALFLAG_BLENDED) ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA, TEXTURELAYERTYPE_FOG, t->currentskinframe->fog, &identitymatrix, r_refdef.fogcolor[0] / r_view.colorscale, r_refdef.fogcolor[1] / r_view.colorscale, r_refdef.fogcolor[2] / r_view.colorscale, t->lightmapcolor[3]);
+					R_Texture_AddLayer(t, false, GL_SRC_ALPHA, (t->currentmaterialflags & MATERIALFLAG_BLENDED) ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA, TEXTURELAYERTYPE_FOG, t->currentskinframe->fog, &identitymatrix, r_refdef.fogcolor[0] / r_refdef.view.colorscale, r_refdef.fogcolor[1] / r_refdef.view.colorscale, r_refdef.fogcolor[2] / r_refdef.view.colorscale, t->lightmapcolor[3]);
 				}
 			}
 		}
@@ -4375,7 +4380,7 @@ void RSurf_ActiveWorldEntity(void)
 	rsurface.matrix = identitymatrix;
 	rsurface.inversematrix = identitymatrix;
 	R_Mesh_Matrix(&identitymatrix);
-	VectorCopy(r_view.origin, rsurface.modelorg);
+	VectorCopy(r_refdef.view.origin, rsurface.modelorg);
 	VectorSet(rsurface.modellight_ambient, 0, 0, 0);
 	VectorSet(rsurface.modellight_diffuse, 0, 0, 0);
 	VectorSet(rsurface.modellight_lightdir, 0, 0, 1);
@@ -4443,7 +4448,7 @@ void RSurf_ActiveModelEntity(const entity_render_t *ent, qboolean wantnormals, q
 	rsurface.matrix = ent->matrix;
 	rsurface.inversematrix = ent->inversematrix;
 	R_Mesh_Matrix(&rsurface.matrix);
-	Matrix4x4_Transform(&rsurface.inversematrix, r_view.origin, rsurface.modelorg);
+	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.origin, rsurface.modelorg);
 	rsurface.modellight_ambient[0] = ent->modellight_ambient[0] * ent->colormod[0];
 	rsurface.modellight_ambient[1] = ent->modellight_ambient[1] * ent->colormod[1];
 	rsurface.modellight_ambient[2] = ent->modellight_ambient[2] * ent->colormod[2];
@@ -4628,9 +4633,9 @@ void RSurf_PrepareVerticesForBatch(qboolean generatenormals, qboolean generateta
 		case Q3DEFORM_NONE:
 			break;
 		case Q3DEFORM_AUTOSPRITE:
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.forward, newforward);
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.right, newright);
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.up, newup);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.forward, newforward);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.right, newright);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.up, newup);
 			VectorNormalize(newforward);
 			VectorNormalize(newright);
 			VectorNormalize(newup);
@@ -4671,9 +4676,9 @@ void RSurf_PrepareVerticesForBatch(qboolean generatenormals, qboolean generateta
 			rsurface.normal3f_bufferoffset = 0;
 			break;
 		case Q3DEFORM_AUTOSPRITE2:
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.forward, newforward);
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.right, newright);
-			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.up, newup);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.forward, newforward);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.right, newright);
+			Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.up, newup);
 			VectorNormalize(newforward);
 			VectorNormalize(newright);
 			VectorNormalize(newup);
@@ -4747,7 +4752,7 @@ void RSurf_PrepareVerticesForBatch(qboolean generatenormals, qboolean generateta
 					VectorNormalize(up);
 					// calculate a forward vector to use instead of the original plane normal (this is how we get a new right vector)
 					//VectorSubtract(rsurface.modelorg, center, forward);
-					Matrix4x4_Transform3x3(&rsurface.inversematrix, r_view.forward, forward);
+					Matrix4x4_Transform3x3(&rsurface.inversematrix, r_refdef.view.forward, forward);
 					VectorNegate(forward, forward);
 					VectorReflect(forward, 0, up, forward);
 					VectorNormalize(forward);
@@ -5212,7 +5217,7 @@ static void RSurf_DrawBatch_ShowSurfaces(int texturenumsurfaces, msurface_t **te
 			const msurface_t *surface = texturesurfacelist[texturesurfaceindex];
 			for (j = 0;j < surface->num_triangles;j++)
 			{
-				float f = ((j + surface->num_firsttriangle) & 31) * (1.0f / 31.0f) * r_view.colorscale;
+				float f = ((j + surface->num_firsttriangle) & 31) * (1.0f / 31.0f) * r_refdef.view.colorscale;
 				GL_Color(f, f, f, 1);
 				R_Mesh_Draw(surface->num_firstvertex, surface->num_vertices, 1, (rsurface.modelelement3i + 3 * (j + surface->num_firsttriangle)), rsurface.modelelement3i_bufferobject, (sizeof(int[3]) * (j + surface->num_firsttriangle)));
 			}
@@ -5224,7 +5229,7 @@ static void RSurf_DrawBatch_ShowSurfaces(int texturenumsurfaces, msurface_t **te
 		{
 			const msurface_t *surface = texturesurfacelist[texturesurfaceindex];
 			int k = (int)(((size_t)surface) / sizeof(msurface_t));
-			GL_Color((k & 15) * (1.0f / 16.0f) * r_view.colorscale, ((k >> 4) & 15) * (1.0f / 16.0f) * r_view.colorscale, ((k >> 8) & 15) * (1.0f / 16.0f) * r_view.colorscale, 1);
+			GL_Color((k & 15) * (1.0f / 16.0f) * r_refdef.view.colorscale, ((k >> 4) & 15) * (1.0f / 16.0f) * r_refdef.view.colorscale, ((k >> 8) & 15) * (1.0f / 16.0f) * r_refdef.view.colorscale, 1);
 			GL_LockArrays(surface->num_firstvertex, surface->num_vertices);
 			R_Mesh_Draw(surface->num_firstvertex, surface->num_vertices, surface->num_triangles, (rsurface.modelelement3i + 3 * surface->num_firsttriangle), rsurface.modelelement3i_bufferobject, (sizeof(int[3]) * surface->num_firsttriangle));
 		}
@@ -5456,7 +5461,7 @@ void RSurf_SetupDepthAndCulling(void)
 	GL_DepthRange(0, (rsurface.texture->currentmaterialflags & MATERIALFLAG_SHORTDEPTHRANGE) ? 0.0625 : 1);
 	GL_PolygonOffset(rsurface.basepolygonfactor + rsurface.texture->biaspolygonfactor, rsurface.basepolygonoffset + rsurface.texture->biaspolygonoffset);
 	GL_DepthTest(!(rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST));
-	GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_view.cullface_back);
+	GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_refdef.view.cullface_back);
 }
 
 static void R_DrawTextureSurfaceList_ShowSurfaces(int texturenumsurfaces, msurface_t **texturesurfacelist)
@@ -5502,7 +5507,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, msurface_t **te
 	// in Quake3 maps as it causes problems with q3map2 sky tricks,
 	// and skymasking also looks very bad when noclipping outside the
 	// level, so don't use it then either.
-	if (r_refdef.worldmodel && r_refdef.worldmodel->type == mod_brushq1 && r_q1bsp_skymasking.integer && !r_viewcache.world_novis)
+	if (r_refdef.worldmodel && r_refdef.worldmodel->type == mod_brushq1 && r_q1bsp_skymasking.integer && !r_refdef.viewcache.world_novis)
 	{
 		GL_Color(r_refdef.fogcolor[0], r_refdef.fogcolor[1], r_refdef.fogcolor[2], 1);
 		R_Mesh_ColorPointer(NULL, 0, 0);
@@ -5523,7 +5528,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, msurface_t **te
 		RSurf_PrepareVerticesForBatch(false, false, texturenumsurfaces, texturesurfacelist);
 		RSurf_DrawBatch_Simple(texturenumsurfaces, texturesurfacelist);
 		if (skyrendermasked)
-			GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+			GL_ColorMask(r_refdef.view.colormask[0], r_refdef.view.colormask[1], r_refdef.view.colormask[2], 1);
 	}
 }
 
@@ -5924,7 +5929,7 @@ static void R_DrawTextureSurfaceList(int texturenumsurfaces, msurface_t **textur
 		if (r_depthfirst.integer == 3)
 		{
 			int i = (int)(texturesurfacelist[0] - rsurface.modelsurfaces);
-			if (!r_view.showdebug)
+			if (!r_refdef.view.showdebug)
 				GL_Color(0, 0, 0, 1);
 			else
 				GL_Color(((i >> 6) & 7) / 7.0f, ((i >> 3) & 7) / 7.0f, (i & 7) / 7.0f,1);
@@ -5943,11 +5948,11 @@ static void R_DrawTextureSurfaceList(int texturenumsurfaces, msurface_t **textur
 		R_Mesh_ResetTextureState();
 		RSurf_PrepareVerticesForBatch(false, false, texturenumsurfaces, texturesurfacelist);
 		RSurf_DrawBatch_Simple(texturenumsurfaces, texturesurfacelist);
-		GL_ColorMask(r_view.colormask[0], r_view.colormask[1], r_view.colormask[2], 1);
+		GL_ColorMask(r_refdef.view.colormask[0], r_refdef.view.colormask[1], r_refdef.view.colormask[2], 1);
 	}
 	else if (r_depthfirst.integer == 3)
 		return;
-	else if (!r_view.showdebug && (r_showsurfaces.integer || gl_lightmaps.integer))
+	else if (!r_refdef.view.showdebug && (r_showsurfaces.integer || gl_lightmaps.integer))
 	{
 		GL_Color(0, 0, 0, 1);
 		RSurf_DrawBatch_Simple(texturenumsurfaces, texturesurfacelist);
@@ -5974,7 +5979,7 @@ static void R_DrawTextureSurfaceList(int texturenumsurfaces, msurface_t **textur
 			rsurface.mode = RSURFMODE_MULTIPASS;
 		GL_DepthRange(0, (rsurface.texture->currentmaterialflags & MATERIALFLAG_SHORTDEPTHRANGE) ? 0.0625 : 1);
 		GL_DepthTest(true);
-		GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_view.cullface_back);
+		GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_refdef.view.cullface_back);
 		GL_BlendFunc(GL_ONE, GL_ZERO);
 		GL_DepthMask(writedepth);
 		GL_Color(1,1,1,1);
@@ -6101,7 +6106,7 @@ void R_QueueSurfaceList(entity_render_t *ent, int numsurfaces, msurface_t **surf
 			tempcenter[1] = (surface->mins[1] + surface->maxs[1]) * 0.5f;
 			tempcenter[2] = (surface->mins[2] + surface->maxs[2]) * 0.5f;
 			Matrix4x4_Transform(&rsurface.matrix, tempcenter, center);
-			R_MeshQueue_AddTransparent(rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST ? r_view.origin : center, R_DrawSurface_TransparentCallback, ent, surface - rsurface.modelsurfaces, rsurface.rtlight);
+			R_MeshQueue_AddTransparent(rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST ? r_refdef.view.origin : center, R_DrawSurface_TransparentCallback, ent, surface - rsurface.modelsurfaces, rsurface.rtlight);
 		}
 		else
 		{
@@ -6154,9 +6159,9 @@ void R_DrawLoc_Callback(const entity_render_t *ent, const rtlight_t *rtlight, in
 	R_Mesh_ResetTextureState();
 
 	i = surfacelist[0];
-	GL_Color(((i & 0x0007) >> 0) * (1.0f / 7.0f) * r_view.colorscale,
-			 ((i & 0x0038) >> 3) * (1.0f / 7.0f) * r_view.colorscale,
-			 ((i & 0x01C0) >> 6) * (1.0f / 7.0f) * r_view.colorscale,
+	GL_Color(((i & 0x0007) >> 0) * (1.0f / 7.0f) * r_refdef.view.colorscale,
+			 ((i & 0x0038) >> 3) * (1.0f / 7.0f) * r_refdef.view.colorscale,
+			 ((i & 0x01C0) >> 6) * (1.0f / 7.0f) * r_refdef.view.colorscale,
 			surfacelist[0] < 0 ? 0.5f : 0.125f);
 
 	if (VectorCompare(loc->mins, loc->maxs))
@@ -6216,7 +6221,7 @@ void R_DrawDebugModel(entity_render_t *ent)
 			if (brush->colbrushf && brush->colbrushf->numtriangles)
 			{
 				R_Mesh_VertexPointer(brush->colbrushf->points->v, 0, 0);
-				GL_Color((i & 31) * (1.0f / 32.0f) * r_view.colorscale, ((i >> 5) & 31) * (1.0f / 32.0f) * r_view.colorscale, ((i >> 10) & 31) * (1.0f / 32.0f) * r_view.colorscale, r_showcollisionbrushes.value);
+				GL_Color((i & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, ((i >> 5) & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, ((i >> 10) & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, r_showcollisionbrushes.value);
 				R_Mesh_Draw(0, brush->colbrushf->numpoints, brush->colbrushf->numtriangles, brush->colbrushf->elements, 0, 0);
 			}
 		}
@@ -6225,7 +6230,7 @@ void R_DrawDebugModel(entity_render_t *ent)
 			if (surface->num_collisiontriangles)
 			{
 				R_Mesh_VertexPointer(surface->data_collisionvertex3f, 0, 0);
-				GL_Color((i & 31) * (1.0f / 32.0f) * r_view.colorscale, ((i >> 5) & 31) * (1.0f / 32.0f) * r_view.colorscale, ((i >> 10) & 31) * (1.0f / 32.0f) * r_view.colorscale, r_showcollisionbrushes.value);
+				GL_Color((i & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, ((i >> 5) & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, ((i >> 10) & 31) * (1.0f / 32.0f) * r_refdef.view.colorscale, r_showcollisionbrushes.value);
 				R_Mesh_Draw(0, surface->num_collisionvertices, surface->num_collisiontriangles, surface->data_collisionelement3i, 0, 0);
 			}
 		}
@@ -6247,7 +6252,7 @@ void R_DrawDebugModel(entity_render_t *ent)
 		}
 		for (i = 0, j = model->firstmodelsurface, surface = model->data_surfaces + j;i < model->nummodelsurfaces;i++, j++, surface++)
 		{
-			if (ent == r_refdef.worldentity && !r_viewcache.world_surfacevisible[j])
+			if (ent == r_refdef.worldentity && !r_refdef.viewcache.world_surfacevisible[j])
 				continue;
 			rsurface.texture = surface->texture->currentframe;
 			if ((rsurface.texture->currentmaterialflags & flagsmask) && surface->num_triangles)
@@ -6256,11 +6261,11 @@ void R_DrawDebugModel(entity_render_t *ent)
 				if (r_showtris.value > 0)
 				{
 					if (!rsurface.texture->currentlayers->depthmask)
-						GL_Color(r_view.colorscale, 0, 0, r_showtris.value);
+						GL_Color(r_refdef.view.colorscale, 0, 0, r_showtris.value);
 					else if (ent == r_refdef.worldentity)
-						GL_Color(r_view.colorscale, r_view.colorscale, r_view.colorscale, r_showtris.value);
+						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, r_showtris.value);
 					else
-						GL_Color(0, r_view.colorscale, 0, r_showtris.value);
+						GL_Color(0, r_refdef.view.colorscale, 0, r_showtris.value);
 					elements = (ent->model->surfmesh.data_element3i + 3 * surface->num_firsttriangle);
 					CHECKGLERROR
 					qglBegin(GL_LINES);
@@ -6280,10 +6285,10 @@ void R_DrawDebugModel(entity_render_t *ent)
 					for (k = 0, l = surface->num_firstvertex;k < surface->num_vertices;k++, l++)
 					{
 						VectorCopy(rsurface.vertex3f + l * 3, v);
-						GL_Color(r_view.colorscale, 0, 0, 1);
+						GL_Color(r_refdef.view.colorscale, 0, 0, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 						VectorMA(v, r_shownormals.value, rsurface.svector3f + l * 3, v);
-						GL_Color(r_view.colorscale, 1, 1, 1);
+						GL_Color(r_refdef.view.colorscale, 1, 1, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
 					qglEnd();
@@ -6292,10 +6297,10 @@ void R_DrawDebugModel(entity_render_t *ent)
 					for (k = 0, l = surface->num_firstvertex;k < surface->num_vertices;k++, l++)
 					{
 						VectorCopy(rsurface.vertex3f + l * 3, v);
-						GL_Color(0, r_view.colorscale, 0, 1);
+						GL_Color(0, r_refdef.view.colorscale, 0, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 						VectorMA(v, r_shownormals.value, rsurface.tvector3f + l * 3, v);
-						GL_Color(r_view.colorscale, 1, 1, 1);
+						GL_Color(r_refdef.view.colorscale, 1, 1, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
 					qglEnd();
@@ -6304,10 +6309,10 @@ void R_DrawDebugModel(entity_render_t *ent)
 					for (k = 0, l = surface->num_firstvertex;k < surface->num_vertices;k++, l++)
 					{
 						VectorCopy(rsurface.vertex3f + l * 3, v);
-						GL_Color(0, 0, r_view.colorscale, 1);
+						GL_Color(0, 0, r_refdef.view.colorscale, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 						VectorMA(v, r_shownormals.value, rsurface.normal3f + l * 3, v);
-						GL_Color(r_view.colorscale, 1, 1, 1);
+						GL_Color(r_refdef.view.colorscale, 1, 1, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
 					qglEnd();
@@ -6370,10 +6375,10 @@ void R_DrawWorldSurfaces(qboolean skysurfaces, qboolean writedepth, qboolean dep
 	while (j < endj)
 	{
 		// quickly skip over non-visible surfaces
-		for (;j < endj && !r_viewcache.world_surfacevisible[j];j++)
+		for (;j < endj && !r_refdef.viewcache.world_surfacevisible[j];j++)
 			;
 		// quickly iterate over visible surfaces
-		for (;j < endj && r_viewcache.world_surfacevisible[j];j++)
+		for (;j < endj && r_refdef.viewcache.world_surfacevisible[j];j++)
 		{
 			// process this surface
 			surface = model->data_surfaces + j;

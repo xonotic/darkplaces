@@ -5,10 +5,6 @@
 #include "cl_collision.h"
 #include "r_shadow.h"
 
-/* Per-VM scenes */
-renderscene_t* renderscenes[PRVM_MAXPROGS];
-#define RENDERSCENE     (*renderscenes[prognum])
-
 //============================================================================
 // Client
 //[515]: unsolved PROBLEMS
@@ -43,7 +39,7 @@ static void VM_CL_makevectors (void)
 }
 
 // #2 void(entity e, vector o) setorigin
-void VM_CL_setorigin (void)
+static void VM_CL_setorigin (void)
 {
 	prvm_edict_t	*e;
 	float	*org;
@@ -66,7 +62,7 @@ void VM_CL_setorigin (void)
 }
 
 // #3 void(entity e, string m) setmodel
-void VM_CL_setmodel (void)
+static void VM_CL_setmodel (void)
 {
 	prvm_edict_t	*e;
 	const char		*m;
@@ -343,7 +339,7 @@ static void VM_CL_tracetoss (void)
 
 
 // #20 void(string s) precache_model
-void VM_CL_precache_model (void)
+static void VM_CL_precache_model (void)
 {
 	const char	*name;
 	int			i;
@@ -640,41 +636,38 @@ static void VM_CL_getlight (void)
 
 //============================================================================
 //[515]: SCENE MANAGER builtins
-extern qboolean CSQC_AddRenderEdict (renderscene_t* scene, prvm_edict_t *ed);//csprogs.c
+extern qboolean CSQC_AddRenderEdict (prvm_edict_t *ed);//csprogs.c
 
 static void CSQC_R_RecalcView (void)
 {
 	extern matrix4x4_t viewmodelmatrix;
-	const int prognum = PRVM_GetProgNr();
-	Matrix4x4_CreateFromQuakeEntity(&RENDERSCENE.view.matrix, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], 1);
+	Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], 1);
 	Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], cl_viewmodel_scale.value);
 }
 
 void CL_RelinkLightFlashes(void);
 //#300 void() clearscene (EXT_CSQC)
-void VM_CL_R_ClearScene (void)
+static void VM_CL_R_ClearScene (void)
 {
-	const int prognum = PRVM_GetProgNr();
-	
 	VM_SAFEPARMCOUNT(0, VM_CL_R_ClearScene);
 	// clear renderable entity and light lists
-	RENDERSCENE.refdef.numentities = 0;
-	RENDERSCENE.refdef.numlights = 0;
+	r_refdef.numentities = 0;
+	r_refdef.numlights = 0;
 	// FIXME: restore these to the values from VM_CL_UpdateView
-	RENDERSCENE.view.x = 0;
-	RENDERSCENE.view.y = 0;
-	RENDERSCENE.view.z = 0;
-	RENDERSCENE.view.width = vid.width;
-	RENDERSCENE.view.height = vid.height;
-	RENDERSCENE.view.depth = 1;
+	r_refdef.view.x = 0;
+	r_refdef.view.y = 0;
+	r_refdef.view.z = 0;
+	r_refdef.view.width = vid.width;
+	r_refdef.view.height = vid.height;
+	r_refdef.view.depth = 1;
 	// FIXME: restore frustum_x/frustum_y
-	RENDERSCENE.view.useperspective = true;
-	RENDERSCENE.view.frustum_y = tan(scr_fov.value * M_PI / 360.0) * (3.0/4.0) * cl.viewzoom;
-	RENDERSCENE.view.frustum_x = RENDERSCENE.view.frustum_y * (float)RENDERSCENE.view.width / (float)RENDERSCENE.view.height / vid_pixelheight.value;
-	RENDERSCENE.view.frustum_x *= RENDERSCENE.refdef.frustumscale_x;
-	RENDERSCENE.view.frustum_y *= RENDERSCENE.refdef.frustumscale_y;
-	RENDERSCENE.view.ortho_x = scr_fov.value * (3.0 / 4.0) * (float)RENDERSCENE.view.width / (float)RENDERSCENE.view.height / vid_pixelheight.value;
-	RENDERSCENE.view.ortho_y = scr_fov.value * (3.0 / 4.0);
+	r_refdef.view.useperspective = true;
+	r_refdef.view.frustum_y = tan(scr_fov.value * M_PI / 360.0) * (3.0/4.0) * cl.viewzoom;
+	r_refdef.view.frustum_x = r_refdef.view.frustum_y * (float)r_refdef.view.width / (float)r_refdef.view.height / vid_pixelheight.value;
+	r_refdef.view.frustum_x *= r_refdef.frustumscale_x;
+	r_refdef.view.frustum_y *= r_refdef.frustumscale_y;
+	r_refdef.view.ortho_x = scr_fov.value * (3.0 / 4.0) * (float)r_refdef.view.width / (float)r_refdef.view.height / vid_pixelheight.value;
+	r_refdef.view.ortho_y = scr_fov.value * (3.0 / 4.0);
 	// FIXME: restore cl.csqc_origin
 	// FIXME: restore cl.csqc_angles
 	cl.csqc_vidvars.drawworld = true;
@@ -685,12 +678,10 @@ void VM_CL_R_ClearScene (void)
 //#301 void(float mask) addentities (EXT_CSQC)
 extern void CSQC_Predraw (prvm_edict_t *ed);//csprogs.c
 extern void CSQC_Think (prvm_edict_t *ed);//csprogs.c
-void VM_CL_R_AddEntities (void)
+static void VM_CL_R_AddEntities (void)
 {
 	int			i, drawmask;
 	prvm_edict_t *ed;
-	const int prognum = PRVM_GetProgNr();
-	
 	VM_SAFEPARMCOUNT(1, VM_CL_R_AddEntities);
 	drawmask = (int)PRVM_G_FLOAT(OFS_PARM0);
 	CSQC_RelinkAllEntities(drawmask);
@@ -711,26 +702,23 @@ void VM_CL_R_AddEntities (void)
 			continue;
 		if(!((int)ed->fields.client->drawmask & drawmask))
 			continue;
-		CSQC_AddRenderEdict(&RENDERSCENE, ed);
+		CSQC_AddRenderEdict(ed);
 	}
 }
 
 //#302 void(entity ent) addentity (EXT_CSQC)
-void VM_CL_R_AddEntity (void)
+static void VM_CL_R_AddEntity (void)
 {
-	const int prognum = PRVM_GetProgNr();
-	
 	VM_SAFEPARMCOUNT(1, VM_CL_R_AddEntity);
-	CSQC_AddRenderEdict(&RENDERSCENE, PRVM_G_EDICT(OFS_PARM0));
+	CSQC_AddRenderEdict(PRVM_G_EDICT(OFS_PARM0));
 }
 
 //#303 float(float property, ...) setproperty (EXT_CSQC)
-void VM_CL_R_SetView (void)
+static void VM_CL_R_SetView (void)
 {
 	int		c;
 	float	*f;
 	float	k;
-	const int prognum = PRVM_GetProgNr();
 
 	VM_SAFEPARMCOUNTRANGE(2, 3, VM_CL_R_SetView);
 
@@ -741,41 +729,41 @@ void VM_CL_R_SetView (void)
 	switch(c)
 	{
 	case VF_MIN:
-		RENDERSCENE.view.x = (int)(f[0] * vid.width / vid_conwidth.value);
-		RENDERSCENE.view.y = (int)(f[1] * vid.height / vid_conheight.value);
+		r_refdef.view.x = (int)(f[0] * vid.width / vid_conwidth.value);
+		r_refdef.view.y = (int)(f[1] * vid.height / vid_conheight.value);
 		break;
 	case VF_MIN_X:
-		RENDERSCENE.view.x = (int)(k * vid.width / vid_conwidth.value);
+		r_refdef.view.x = (int)(k * vid.width / vid_conwidth.value);
 		break;
 	case VF_MIN_Y:
-		RENDERSCENE.view.y = (int)(k * vid.height / vid_conheight.value);
+		r_refdef.view.y = (int)(k * vid.height / vid_conheight.value);
 		break;
 	case VF_SIZE:
-		RENDERSCENE.view.width = (int)(f[0] * vid.width / vid_conwidth.value);
-		RENDERSCENE.view.height = (int)(f[1] * vid.height / vid_conheight.value);
+		r_refdef.view.width = (int)(f[0] * vid.width / vid_conwidth.value);
+		r_refdef.view.height = (int)(f[1] * vid.height / vid_conheight.value);
 		break;
 	case VF_SIZE_Y:
-		RENDERSCENE.view.width = (int)(k * vid.width / vid_conwidth.value);
+		r_refdef.view.width = (int)(k * vid.width / vid_conwidth.value);
 		break;
 	case VF_SIZE_X:
-		RENDERSCENE.view.height = (int)(k * vid.height / vid_conheight.value);
+		r_refdef.view.height = (int)(k * vid.height / vid_conheight.value);
 		break;
 	case VF_VIEWPORT:
-		RENDERSCENE.view.x = (int)(f[0] * vid.width / vid_conwidth.value);
-		RENDERSCENE.view.y = (int)(f[1] * vid.height / vid_conheight.value);
+		r_refdef.view.x = (int)(f[0] * vid.width / vid_conwidth.value);
+		r_refdef.view.y = (int)(f[1] * vid.height / vid_conheight.value);
 		f = PRVM_G_VECTOR(OFS_PARM2);
-		RENDERSCENE.view.width = (int)(f[0] * vid.width / vid_conwidth.value);
-		RENDERSCENE.view.height = (int)(f[1] * vid.height / vid_conheight.value);
+		r_refdef.view.width = (int)(f[0] * vid.width / vid_conwidth.value);
+		r_refdef.view.height = (int)(f[1] * vid.height / vid_conheight.value);
 		break;
 	case VF_FOV:
-		RENDERSCENE.view.frustum_x = tan(f[0] * M_PI / 360.0);RENDERSCENE.view.ortho_x = f[0];
-		RENDERSCENE.view.frustum_y = tan(f[1] * M_PI / 360.0);RENDERSCENE.view.ortho_y = f[1];
+		r_refdef.view.frustum_x = tan(f[0] * M_PI / 360.0);r_refdef.view.ortho_x = f[0];
+		r_refdef.view.frustum_y = tan(f[1] * M_PI / 360.0);r_refdef.view.ortho_y = f[1];
 		break;
 	case VF_FOVX:
-		RENDERSCENE.view.frustum_x = tan(k * M_PI / 360.0);RENDERSCENE.view.ortho_x = k;
+		r_refdef.view.frustum_x = tan(k * M_PI / 360.0);r_refdef.view.ortho_x = k;
 		break;
 	case VF_FOVY:
-		RENDERSCENE.view.frustum_y = tan(k * M_PI / 360.0);RENDERSCENE.view.ortho_y = k;
+		r_refdef.view.frustum_y = tan(k * M_PI / 360.0);r_refdef.view.ortho_y = k;
 		break;
 	case VF_ORIGIN:
 		VectorCopy(f, cl.csqc_origin);
@@ -831,7 +819,7 @@ void VM_CL_R_SetView (void)
 		cl.viewangles[2] = k;
 		break;
 	case VF_PERSPECTIVE:
-		RENDERSCENE.view.useperspective = k != 0;
+		r_refdef.view.useperspective = k != 0;
 		break;
 	default:
 		PRVM_G_FLOAT(OFS_RETURN) = 0;
@@ -842,35 +830,31 @@ void VM_CL_R_SetView (void)
 }
 
 //#304 void() renderscene (EXT_CSQC)
-void VM_CL_R_RenderScene (void)
+static void VM_CL_R_RenderScene (void)
 {
-	const int prognum = PRVM_GetProgNr();
-	
 	VM_SAFEPARMCOUNT(0, VM_CL_R_RenderScene);
-	// we need to update any RENDERENDERSCENE.viewMODEL entities at this point because
+	// we need to update any RENDER_VIEWMODEL entities at this point because
 	// csqc supplies its own view matrix
 	CL_UpdateViewEntities();
 	// now draw stuff!
-	R_RenderView(&RENDERSCENE);
+	R_RenderView();
 }
 
 //#305 void(vector org, float radius, vector lightcolours) adddynamiclight (EXT_CSQC)
-void VM_CL_R_AddDynamicLight (void)
+static void VM_CL_R_AddDynamicLight (void)
 {
 	float		*pos, *col;
 	matrix4x4_t	matrix;
-	const int prognum = PRVM_GetProgNr();
-	
 	VM_SAFEPARMCOUNTRANGE(3, 3, VM_CL_R_AddDynamicLight);
 
 	// if we've run out of dlights, just return
-	if (RENDERSCENE.refdef.numlights >= MAX_DLIGHTS)
+	if (r_refdef.numlights >= MAX_DLIGHTS)
 		return;
 
 	pos = PRVM_G_VECTOR(OFS_PARM0);
 	col = PRVM_G_VECTOR(OFS_PARM2);
 	Matrix4x4_CreateFromQuakeEntity(&matrix, pos[0], pos[1], pos[2], 0, 0, 0, PRVM_G_FLOAT(OFS_PARM1));
-	R_RTLight_Update(&RENDERSCENE.refdef.lights[RENDERSCENE.refdef.numlights++], false, &matrix, col, -1, NULL, true, 1, 0.25, 0, 1, 1, LIGHTFLAG_NORMALMODE | LIGHTFLAG_REALTIMEMODE);
+	R_RTLight_Update(&r_refdef.lights[r_refdef.numlights++], false, &matrix, col, -1, NULL, true, 1, 0.25, 0, 1, 1, LIGHTFLAG_NORMALMODE | LIGHTFLAG_REALTIMEMODE);
 }
 
 //============================================================================
@@ -880,12 +864,11 @@ static void VM_CL_unproject (void)
 {
 	float	*f;
 	vec3_t	temp;
-	const int prognum = PRVM_GetProgNr();
 
 	VM_SAFEPARMCOUNT(1, VM_CL_unproject);
 	f = PRVM_G_VECTOR(OFS_PARM0);
-	VectorSet(temp, f[2], f[0] * f[2] * -RENDERSCENE.view.frustum_x * 2.0 / RENDERSCENE.view.width, f[1] * f[2] * -RENDERSCENE.view.frustum_y * 2.0 / RENDERSCENE.view.height);
-	Matrix4x4_Transform(&RENDERSCENE.view.matrix, temp, PRVM_G_VECTOR(OFS_RETURN));
+	VectorSet(temp, f[2], f[0] * f[2] * -r_refdef.view.frustum_x * 2.0 / r_refdef.view.width, f[1] * f[2] * -r_refdef.view.frustum_y * 2.0 / r_refdef.view.height);
+	Matrix4x4_Transform(&r_refdef.view.matrix, temp, PRVM_G_VECTOR(OFS_RETURN));
 }
 
 //#311 vector (vector v) cs_project (EXT_CSQC)
@@ -894,13 +877,12 @@ static void VM_CL_project (void)
 	float	*f;
 	vec3_t	v;
 	matrix4x4_t m;
-	const int prognum = PRVM_GetProgNr();
 
 	VM_SAFEPARMCOUNT(1, VM_CL_project);
 	f = PRVM_G_VECTOR(OFS_PARM0);
-	Matrix4x4_Invert_Simple(&m, &RENDERSCENE.view.matrix);
+	Matrix4x4_Invert_Simple(&m, &r_refdef.view.matrix);
 	Matrix4x4_Transform(&m, f, v);
-	VectorSet(PRVM_G_VECTOR(OFS_RETURN), v[1]/v[0]/-RENDERSCENE.view.frustum_x*0.5*RENDERSCENE.view.width, v[2]/v[0]/-RENDERSCENE.view.frustum_y*RENDERSCENE.view.height*0.5, v[0]);
+	VectorSet(PRVM_G_VECTOR(OFS_RETURN), v[1]/v[0]/-r_refdef.view.frustum_x*0.5*r_refdef.view.width, v[2]/v[0]/-r_refdef.view.frustum_y*r_refdef.view.height*0.5, v[0]);
 }
 
 //#330 float(float stnum) getstatf (EXT_CSQC)
@@ -2257,17 +2239,13 @@ typedef struct
 	unsigned char			flags;	//[515]: + VM_POLYGON_2D and VM_POLYGON_FL4V flags
 }vm_polygon_t;
 
-typedef struct vmpolygons_s
-{
-  //static float			vm_polygon_linewidth = 1;
-  mempool_t		*pool;
-  unsigned char		current_vertices;
-  qboolean		initialized;
-  vm_polygon_t		*polygons;
-  unsigned long	polygons_num, drawpolygons_num;	//[515]: ok long on 64bit ?
-  qboolean		polygonbegin;	//[515]: for "no-crap-on-the-screen" check
-} vmpolygons_t;
-vmpolygons_t vmpolygons[PRVM_MAXPROGS];
+//static float			vm_polygon_linewidth = 1;
+static mempool_t		*vm_polygons_pool = NULL;
+static unsigned char			vm_current_vertices = 0;
+static qboolean			vm_polygons_initialized = false;
+static vm_polygon_t		*vm_polygons = NULL;
+static unsigned long	vm_polygons_num = 0, vm_drawpolygons_num = 0;	//[515]: ok long on 64bit ?
+static qboolean			vm_polygonbegin = false;	//[515]: for "no-crap-on-the-screen" check
 #define VM_DEFPOLYNUM 64	//[515]: enough for default ?
 
 #define VM_POLYGON_FL3V		16	//more than 2 vertices (used only for lines)
@@ -2275,26 +2253,24 @@ vmpolygons_t vmpolygons[PRVM_MAXPROGS];
 #define VM_POLYGON_FL2D		64
 #define VM_POLYGON_FL4V		128	//4 vertices
 
-static void VM_InitPolygons (vmpolygons_t* polys)
+static void VM_InitPolygons (void)
 {
-	polys->pool = Mem_AllocPool("VMPOLY", 0, NULL);
-	polys->polygons = (vm_polygon_t *)Mem_Alloc(polys->pool, VM_DEFPOLYNUM*sizeof(vm_polygon_t));
-	memset(polys->polygons, 0, VM_DEFPOLYNUM*sizeof(vm_polygon_t));
-	polys->polygons_num = VM_DEFPOLYNUM;
-	polys->drawpolygons_num = 0;
-	polys->polygonbegin = false;
-	polys->initialized = true;
+	vm_polygons_pool = Mem_AllocPool("VMPOLY", 0, NULL);
+	vm_polygons = (vm_polygon_t *)Mem_Alloc(vm_polygons_pool, VM_DEFPOLYNUM*sizeof(vm_polygon_t));
+	memset(vm_polygons, 0, VM_DEFPOLYNUM*sizeof(vm_polygon_t));
+	vm_polygons_num = VM_DEFPOLYNUM;
+	vm_drawpolygons_num = 0;
+	vm_polygonbegin = false;
+	vm_polygons_initialized = true;
 }
 
 static void VM_DrawPolygonCallback (const entity_render_t *ent, const rtlight_t *rtlight, int numsurfaces, int *surfacelist)
 {
 	int surfacelistindex;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
 	// LordHavoc: FIXME: this is stupid code
 	for (surfacelistindex = 0;surfacelistindex < numsurfaces;surfacelistindex++)
 	{
-		const vm_polygon_t	*p = &polys->polygons[surfacelist[surfacelistindex]];
+		const vm_polygon_t	*p = &vm_polygons[surfacelist[surfacelistindex]];
 		int					flags = p->flags & 0x0f;
 
 		if(flags == DRAWFLAG_ADDITIVE)
@@ -2369,6 +2345,7 @@ static void VM_CL_AddPolygonTo2DScene (vm_polygon_t *p)
 {
 	drawqueuemesh_t	mesh;
 	static int		picelements[6] = {0, 1, 2, 0, 2, 3};
+
 	mesh.texture = p->tex;
 	mesh.data_element3i = picelements;
 	mesh.data_vertex3f = p->data;
@@ -2393,51 +2370,47 @@ static void VM_CL_AddPolygonTo2DScene (vm_polygon_t *p)
 void VM_CL_AddPolygonsToMeshQueue (void)
 {
 	int i;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
-	if(!polys->drawpolygons_num)
+	if(!vm_drawpolygons_num)
 		return;
 	R_Mesh_Matrix(&identitymatrix);
 	GL_CullFace(GL_NONE);
-	for(i = 0;i < (int)polys->drawpolygons_num;i++)
+	for(i = 0;i < (int)vm_drawpolygons_num;i++)
 		VM_DrawPolygonCallback(NULL, NULL, 1, &i);
-	polys->drawpolygons_num = 0;
+	vm_drawpolygons_num = 0;
 }
 
 //void(string texturename, float flag[, float 2d[, float lines]]) R_BeginPolygon
-void VM_CL_R_PolygonBegin (void)
+static void VM_CL_R_PolygonBegin (void)
 {
 	vm_polygon_t	*p;
 	const char		*picname;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
 	VM_SAFEPARMCOUNTRANGE(2, 4, VM_CL_R_PolygonBegin);
 
-	if(!polys->initialized)
-		VM_InitPolygons(polys);
-	if(polys->polygonbegin)
+	if(!vm_polygons_initialized)
+		VM_InitPolygons();
+	if(vm_polygonbegin)
 	{
 		VM_Warning("VM_CL_R_PolygonBegin: called twice without VM_CL_R_PolygonEnd after first\n");
 		return;
 	}
-	if(polys->drawpolygons_num >= polys->polygons_num)
+	if(vm_drawpolygons_num >= vm_polygons_num)
 	{
-		p = (vm_polygon_t *)Mem_Alloc(polys->pool, 2 * polys->polygons_num * sizeof(vm_polygon_t));
-		memset(p, 0, 2 * polys->polygons_num * sizeof(vm_polygon_t));
-		memcpy(p, polys->polygons, polys->polygons_num * sizeof(vm_polygon_t));
-		Mem_Free(polys->polygons);
-		polys->polygons = p;
-		polys->polygons_num *= 2;
+		p = (vm_polygon_t *)Mem_Alloc(vm_polygons_pool, 2 * vm_polygons_num * sizeof(vm_polygon_t));
+		memset(p, 0, 2 * vm_polygons_num * sizeof(vm_polygon_t));
+		memcpy(p, vm_polygons, vm_polygons_num * sizeof(vm_polygon_t));
+		Mem_Free(vm_polygons);
+		vm_polygons = p;
+		vm_polygons_num *= 2;
 	}
-	p = &polys->polygons[polys->drawpolygons_num];
+	p = &vm_polygons[vm_drawpolygons_num];
 	picname = PRVM_G_STRING(OFS_PARM0);
 	if(picname[0])
 		p->tex = Draw_CachePic(picname, true)->tex;
 	else
 		p->tex = r_texture_white;
 	p->flags = (unsigned char)PRVM_G_FLOAT(OFS_PARM1);
-	polys->current_vertices = 0;
-	polys->polygonbegin = true;
+	vm_current_vertices = 0;
+	vm_polygonbegin = true;
 	if(prog->argc >= 3)
 	{
 		if(PRVM_G_FLOAT(OFS_PARM2))
@@ -2451,15 +2424,13 @@ void VM_CL_R_PolygonBegin (void)
 }
 
 //void(vector org, vector texcoords, vector rgb, float alpha) R_PolygonVertex
-void VM_CL_R_PolygonVertex (void)
+static void VM_CL_R_PolygonVertex (void)
 {
 	float			*coords, *tx, *rgb, alpha;
 	vm_polygon_t	*p;
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
 	VM_SAFEPARMCOUNT(4, VM_CL_R_PolygonVertex);
 
-	if(!polys->polygonbegin)
+	if(!vm_polygonbegin)
 	{
 		VM_Warning("VM_CL_R_PolygonVertex: VM_CL_R_PolygonBegin wasn't called\n");
 		return;
@@ -2469,90 +2440,86 @@ void VM_CL_R_PolygonVertex (void)
 	rgb		= PRVM_G_VECTOR(OFS_PARM2);
 	alpha = PRVM_G_FLOAT(OFS_PARM3);
 
-	p = &polys->polygons[polys->drawpolygons_num];
-	if(polys->current_vertices > 4)
+	p = &vm_polygons[vm_drawpolygons_num];
+	if(vm_current_vertices > 4)
 	{
 		VM_Warning("VM_CL_R_PolygonVertex: may have 4 vertices max\n");
 		return;
 	}
 
-	p->data[polys->current_vertices*3]	= coords[0];
-	p->data[1+polys->current_vertices*3]	= coords[1];
-	p->data[2+polys->current_vertices*3]	= coords[2];
+	p->data[vm_current_vertices*3]		= coords[0];
+	p->data[1+vm_current_vertices*3]	= coords[1];
+	p->data[2+vm_current_vertices*3]	= coords[2];
 
-	p->data[12+polys->current_vertices*2]	= tx[0];
+	p->data[12+vm_current_vertices*2]	= tx[0];
 	if(!(p->flags & VM_POLYGON_FLLINES))
-		p->data[13+polys->current_vertices*2]	= tx[1];
+		p->data[13+vm_current_vertices*2]	= tx[1];
 
-	p->data[20+polys->current_vertices*4]	= rgb[0];
-	p->data[21+polys->current_vertices*4]	= rgb[1];
-	p->data[22+polys->current_vertices*4]	= rgb[2];
-	p->data[23+polys->current_vertices*4]	= alpha;
+	p->data[20+vm_current_vertices*4]	= rgb[0];
+	p->data[21+vm_current_vertices*4]	= rgb[1];
+	p->data[22+vm_current_vertices*4]	= rgb[2];
+	p->data[23+vm_current_vertices*4]	= alpha;
 
-	polys->current_vertices++;
-	if(polys->current_vertices == 4)
+	vm_current_vertices++;
+	if(vm_current_vertices == 4)
 		p->flags |= VM_POLYGON_FL4V;
 	else
-		if(polys->current_vertices == 3)
+		if(vm_current_vertices == 3)
 			p->flags |= VM_POLYGON_FL3V;
 }
 
 //void() R_EndPolygon
-void VM_CL_R_PolygonEnd (void)
+static void VM_CL_R_PolygonEnd (void)
 {
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
 	VM_SAFEPARMCOUNT(0, VM_CL_R_PolygonEnd);
-	if(!polys->polygonbegin)
+	if(!vm_polygonbegin)
 	{
 		VM_Warning("VM_CL_R_PolygonEnd: VM_CL_R_PolygonBegin wasn't called\n");
 		return;
 	}
-	polys->polygonbegin = false;
-	if(polys->current_vertices > 2 || (polys->current_vertices >= 2 && polys->polygons[polys->drawpolygons_num].flags & VM_POLYGON_FLLINES))
+	vm_polygonbegin = false;
+	if(vm_current_vertices > 2 || (vm_current_vertices >= 2 && vm_polygons[vm_drawpolygons_num].flags & VM_POLYGON_FLLINES))
 	{
-		if(polys->polygons[polys->drawpolygons_num].flags & VM_POLYGON_FL2D)	//[515]: don't use qcpolygons memory if 2D
-			VM_CL_AddPolygonTo2DScene(&polys->polygons[polys->drawpolygons_num]);
+		if(vm_polygons[vm_drawpolygons_num].flags & VM_POLYGON_FL2D)	//[515]: don't use qcpolygons memory if 2D
+			VM_CL_AddPolygonTo2DScene(&vm_polygons[vm_drawpolygons_num]);
 		else
-			polys->drawpolygons_num++;
+			vm_drawpolygons_num++;
 	}
 	else
-		VM_Warning("VM_CL_R_PolygonEnd: %i vertices isn't a good choice\n", polys->current_vertices);
+		VM_Warning("VM_CL_R_PolygonEnd: %i vertices isn't a good choice\n", vm_current_vertices);
 }
-
-static vmpolygons_t debugPolys;
 
 void Debug_PolygonBegin(const char *picname, int flags, qboolean draw2d, float linewidth)
 {
 	vm_polygon_t	*p;
 
-	if(!debugPolys.initialized)
-		VM_InitPolygons(&debugPolys);
-	if(debugPolys.polygonbegin)
+	if(!vm_polygons_initialized)
+		VM_InitPolygons();
+	if(vm_polygonbegin)
 	{
 		Con_Printf("Debug_PolygonBegin: called twice without Debug_PolygonEnd after first\n");
 		return;
 	}
 	// limit polygons to a vaguely sane amount, beyond this each one just
 	// replaces the last one
-	debugPolys.drawpolygons_num = min(debugPolys.drawpolygons_num, (1<<20)-1);
-	if(debugPolys.drawpolygons_num >= debugPolys.polygons_num)
+	vm_drawpolygons_num = min(vm_drawpolygons_num, (1<<20)-1);
+	if(vm_drawpolygons_num >= vm_polygons_num)
 	{
-		p = (vm_polygon_t *)Mem_Alloc(debugPolys.pool, 2 * debugPolys.polygons_num * sizeof(vm_polygon_t));
-		memset(p, 0, 2 * debugPolys.polygons_num * sizeof(vm_polygon_t));
-		memcpy(p, debugPolys.polygons, debugPolys.polygons_num * sizeof(vm_polygon_t));
-		Mem_Free(debugPolys.polygons);
-		debugPolys.polygons = p;
-		debugPolys.polygons_num *= 2;
+		p = (vm_polygon_t *)Mem_Alloc(vm_polygons_pool, 2 * vm_polygons_num * sizeof(vm_polygon_t));
+		memset(p, 0, 2 * vm_polygons_num * sizeof(vm_polygon_t));
+		memcpy(p, vm_polygons, vm_polygons_num * sizeof(vm_polygon_t));
+		Mem_Free(vm_polygons);
+		vm_polygons = p;
+		vm_polygons_num *= 2;
 	}
-	p = &debugPolys.polygons[debugPolys.drawpolygons_num];
+	p = &vm_polygons[vm_drawpolygons_num];
 	if(picname && picname[0])
 		p->tex = Draw_CachePic(picname, true)->tex;
 	else
 		p->tex = r_texture_white;
 	p->flags = flags;
-	debugPolys.current_vertices = 0;
-	debugPolys.polygonbegin = true;
+	vm_current_vertices = 0;
+	vm_polygonbegin = true;
 	if(draw2d)
 		p->flags |= VM_POLYGON_FL2D;
 	if(linewidth)
@@ -2566,57 +2533,57 @@ void Debug_PolygonVertex(float x, float y, float z, float s, float t, float r, f
 {
 	vm_polygon_t	*p;
 
-	if(!debugPolys.polygonbegin)
+	if(!vm_polygonbegin)
 	{
 		Con_Printf("Debug_PolygonVertex: Debug_PolygonBegin wasn't called\n");
 		return;
 	}
 
-	p = &debugPolys.polygons[debugPolys.drawpolygons_num];
-	if(debugPolys.current_vertices > 4)
+	p = &vm_polygons[vm_drawpolygons_num];
+	if(vm_current_vertices > 4)
 	{
 		Con_Printf("Debug_PolygonVertex: may have 4 vertices max\n");
 		return;
 	}
 
-	p->data[debugPolys.current_vertices*3]		= x;
-	p->data[1+debugPolys.current_vertices*3]	= y;
-	p->data[2+debugPolys.current_vertices*3]	= z;
+	p->data[vm_current_vertices*3]		= x;
+	p->data[1+vm_current_vertices*3]	= y;
+	p->data[2+vm_current_vertices*3]	= z;
 
-	p->data[12+debugPolys.current_vertices*2]	= s;
+	p->data[12+vm_current_vertices*2]	= s;
 	if(!(p->flags & VM_POLYGON_FLLINES))
-		p->data[13+debugPolys.current_vertices*2]	= t;
+		p->data[13+vm_current_vertices*2]	= t;
 
-	p->data[20+debugPolys.current_vertices*4]	= r;
-	p->data[21+debugPolys.current_vertices*4]	= g;
-	p->data[22+debugPolys.current_vertices*4]	= b;
-	p->data[23+debugPolys.current_vertices*4]	= a;
+	p->data[20+vm_current_vertices*4]	= r;
+	p->data[21+vm_current_vertices*4]	= g;
+	p->data[22+vm_current_vertices*4]	= b;
+	p->data[23+vm_current_vertices*4]	= a;
 
-	debugPolys.current_vertices++;
-	if(debugPolys.current_vertices == 4)
+	vm_current_vertices++;
+	if(vm_current_vertices == 4)
 		p->flags |= VM_POLYGON_FL4V;
 	else
-		if(debugPolys.current_vertices == 3)
+		if(vm_current_vertices == 3)
 			p->flags |= VM_POLYGON_FL3V;
 }
 
 void Debug_PolygonEnd(void)
 {
-	if(!debugPolys.polygonbegin)
+	if(!vm_polygonbegin)
 	{
 		Con_Printf("Debug_PolygonEnd: Debug_PolygonBegin wasn't called\n");
 		return;
 	}
-	debugPolys.polygonbegin = false;
-	if(debugPolys.current_vertices > 2 || (debugPolys.current_vertices >= 2 && debugPolys.polygons[debugPolys.drawpolygons_num].flags & VM_POLYGON_FLLINES))
+	vm_polygonbegin = false;
+	if(vm_current_vertices > 2 || (vm_current_vertices >= 2 && vm_polygons[vm_drawpolygons_num].flags & VM_POLYGON_FLLINES))
 	{
-		if(debugPolys.polygons[debugPolys.drawpolygons_num].flags & VM_POLYGON_FL2D)	//[515]: don't use qcpolygons memory if 2D
-			VM_CL_AddPolygonTo2DScene(&debugPolys.polygons[debugPolys.drawpolygons_num]);
+		if(vm_polygons[vm_drawpolygons_num].flags & VM_POLYGON_FL2D)	//[515]: don't use qcpolygons memory if 2D
+			VM_CL_AddPolygonTo2DScene(&vm_polygons[vm_drawpolygons_num]);
 		else
-			debugPolys.drawpolygons_num++;
+			vm_drawpolygons_num++;
 	}
 	else
-		Con_Printf("Debug_PolygonEnd: %i vertices isn't a good choice\n", debugPolys.current_vertices);
+		Con_Printf("Debug_PolygonEnd: %i vertices isn't a good choice\n", vm_current_vertices);
 }
 
 /*
@@ -3196,7 +3163,7 @@ VM_CL_R_AddDynamicLight,		// #305 void(vector org, float radius, vector lightcol
 VM_CL_R_PolygonBegin,			// #306 void(string texturename, float flag[, float is2d, float lines]) R_BeginPolygon
 VM_CL_R_PolygonVertex,			// #307 void(vector org, vector texcoords, vector rgb, float alpha) R_PolygonVertex
 VM_CL_R_PolygonEnd,				// #308 void() R_EndPolygon
-NULL /* R_LoadWorldModel in menu VM, should stay unassigned in client*/, // #309
+NULL,							// #309
 VM_CL_unproject,				// #310 vector (vector v) cs_unproject (EXT_CSQC)
 VM_CL_project,					// #311 vector (vector v) cs_project (EXT_CSQC)
 NULL,							// #312
@@ -3400,28 +3367,24 @@ NULL,							// #499
 
 const int vm_cl_numbuiltins = sizeof(vm_cl_builtins) / sizeof(prvm_builtin_t);
 
-void VM_Polygons_Reset(void)
-{
-        vmpolygons_t* polys = vmpolygons + PRVM_GetProgNr();
-        
-	// TODO: replace vm_polygons stuff with a more general debugging polygon system, and make vm_polygons functions use that system
-	if(polys->initialized)
-	{
-		Mem_FreePool(&polys->pool);
-		polys->initialized = false;
-	}
-}
-
 void VM_CL_Cmd_Init(void)
 {
 	VM_Cmd_Init();
-	VM_Polygons_Reset();
-	renderscenes[PRVM_CLIENTPROG] = &client_scene;
+	// TODO: replace vm_polygons stuff with a more general debugging polygon system, and make vm_polygons functions use that system
+	if(vm_polygons_initialized)
+	{
+		Mem_FreePool(&vm_polygons_pool);
+		vm_polygons_initialized = false;
+	}
 }
 
 void VM_CL_Cmd_Reset(void)
 {
 	VM_Cmd_Reset();
-	VM_Polygons_Reset();
+	if(vm_polygons_initialized)
+	{
+		Mem_FreePool(&vm_polygons_pool);
+		vm_polygons_initialized = false;
+	}
 }
 
