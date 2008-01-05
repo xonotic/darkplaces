@@ -5074,10 +5074,13 @@ void MP_Draw (void)
 	clientrefdef = r_refdef;
 	r_refdef = menu_refdef;
 
-	PRVM_Begin;
-	PRVM_SetProg(PRVM_MENUPROG);
+	// reset the temp entities each frame
+	r_refdef.numtempentities = 0;
 
 	R_UpdateVariables();
+
+	PRVM_Begin;
+	PRVM_SetProg(PRVM_MENUPROG);
 
 	// FIXME: this really shouldnt error out lest we have a very broken refdef state...?
 	// or does it kill the server too?
@@ -5142,9 +5145,6 @@ void MP_Init (void)
 
 	// call the prog init
 	PRVM_ExecuteProgram(prog->funcoffsets.m_init,"m_init() required");
-
-	// FIXME: needed so cl.max_entities is set
-	CL_ClearState ();
 
 	PRVM_End;
 }

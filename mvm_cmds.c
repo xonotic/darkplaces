@@ -1432,6 +1432,9 @@ void VM_M_Cmd_Init(void)
 	VM_Polygons_Reset();
 
 	memset (&menu_refdef, 0, sizeof (r_refdef_t));
+
+	menu_refdef.maxtempentities = 128;
+	menu_refdef.tempentities = (entity_render_t*) Mem_Alloc(prog->progs_mempool, sizeof(entity_render_t) * menu_refdef.maxtempentities);
 	
 	menu_refdef.frustumscale_x = 1;
 	menu_refdef.frustumscale_y = 1;
