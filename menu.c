@@ -5070,7 +5070,8 @@ void MP_KeyEvent (int key, char ascii, qboolean downevent)
 
 void MP_Draw (void)
 {
-	r_refdef_t clientrefdef = r_refdef;
+	static r_refdef_t clientrefdef;
+	clientrefdef = r_refdef;
 	r_refdef = menu_refdef;
 
 	PRVM_Begin;
