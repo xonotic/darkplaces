@@ -77,9 +77,6 @@ void MP_Shutdown (void);*/
 // menu router
 //
 
-// hack
-extern r_refdef_t menu_refdef;
-
 void MR_Init_Commands (void);
 void MR_Init (void);
 void MR_Restart (void);
