@@ -5076,6 +5076,8 @@ void MP_Draw (void)
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
 
+	R_UpdateVariables();
+
 	// FIXME: this really shouldnt error out lest we have a very broken refdef state...?
 	// or does it kill the server too?
 	PRVM_ExecuteProgram(prog->funcoffsets.m_draw,"m_draw() required");
@@ -5139,6 +5141,9 @@ void MP_Init (void)
 
 	// call the prog init
 	PRVM_ExecuteProgram(prog->funcoffsets.m_init,"m_init() required");
+
+	// FIXME: needed so cl.max_entities is set
+	CL_ClearState ();
 
 	PRVM_End;
 }
