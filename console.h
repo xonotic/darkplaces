@@ -75,6 +75,7 @@ void Con_CompleteCommandLine(void);
 /// formatted in columns on the console
 void Con_DisplayList(const char **list);
 
+void SanitizeString(char *in, char *out);
 
 /*! \name log
  * @{

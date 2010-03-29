@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "csprogs.h"
 #include "sv_demo.h"
 #include "snd_main.h"
+#include "irc.h"
 
 /*
 
@@ -696,6 +697,8 @@ void Host_Main(void)
 
 		Curl_Run();
 
+		IRC_Frame();
+
 		// check for commands typed to the host
 		Host_GetConsoleCommands();
 
@@ -1115,6 +1118,7 @@ static void Host_Init (void)
 	FS_Init();
 
 	NetConn_Init();
+	IRC_Init();
 	Curl_Init();
 	//PR_Init();
 	//PR_Cmd_Init();

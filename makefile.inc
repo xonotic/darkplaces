@@ -141,6 +141,7 @@ OBJ_COMMON= \
 	model_sprite.o \
 	mvm_cmds.o \
 	netconn.o \
+	irc.o \
 	palette.o \
 	polygon.o \
 	portals.o \
