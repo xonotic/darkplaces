@@ -56,6 +56,8 @@
 #if defined(WIN32)
 #define EWOULDBLOCK WSAEWOULDBLOCK
 #define ECONNREFUSED WSAECONNREFUSED
+#define EINPROGRESS WSAEINPROGRESS
+#define EALREADY WSAEALREADY
 
 #define SOCKETERRNO WSAGetLastError()
 
@@ -997,6 +999,146 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 	return NULL;
 }
 
+lhnetsocket_t *LHNET_AllocSocket(lhnetaddress_t *address)
+{
+	lhnetsocket_t *lhnetsocket;
+	if (!address)
+		return NULL;
+	lhnetsocket = (lhnetsocket_t *)Z_Malloc(sizeof (*lhnetsocket));
+	if (lhnetsocket)
+	{
+		memset(lhnetsocket, 0, sizeof (*lhnetsocket));
+		lhnetsocket->address = *address;
+		lhnetsocket->constatus = LHNETCONSTATUS_DISCONNECTED;
+		return lhnetsocket;
+	}
+	return NULL;
+}
+
+void LHNET_OpenSocket_Connected(lhnetsocket_t *lhnetsocket)
+{
+	lhnetsocket_t *s;
+	lhnetaddressnative_t *remoteaddress;
+	SOCKLEN_T namelen;
+	int connectresult;
+	if (!lhnetsocket)
+		return;
+	if (lhnetsocket->constatus == LHNETCONSTATUS_CONNECTED)
+		return;
+	switch(lhnetsocket->address.addresstype)
+	{
+		case LHNETADDRESSTYPE_LOOP:
+			if (lhnetsocket->address.port == 0)
+			{
+				// allocate a port dynamically
+				// this search will always terminate because there is never
+				// an allocated socket with port 0, so if the number wraps it
+				// will find the port is unused, and then refuse to use port
+				// 0, causing an intentional failure condition
+				lhnetsocket->address.port = 1024;
+				for (;;)
+				{
+					for (s = lhnet_socketlist.next;s != &lhnet_socketlist;s = s->next)
+						if (s->address.addresstype == lhnetsocket->address.addresstype && s->address.port == lhnetsocket->address.port)
+							break;
+					if (s == &lhnet_socketlist)
+						break;
+					lhnetsocket->address.port++;
+				}
+			}
+			// check if the port is available
+			for (s = lhnet_socketlist.next;s != &lhnet_socketlist;s = s->next)
+				if (s->address.addresstype == lhnetsocket->address.addresstype && s->address.port == lhnetsocket->address.port)
+					break;
+			if (s == &lhnet_socketlist && lhnetsocket->address.port != 0)
+			{
+				lhnetsocket->next = &lhnet_socketlist;
+				lhnetsocket->prev = lhnetsocket->next->prev;
+				lhnetsocket->next->prev = lhnetsocket;
+				lhnetsocket->prev->next = lhnetsocket;
+				lhnetsocket->constatus = LHNETCONSTATUS_CONNECTED;
+				return;
+			}
+			lhnetsocket->constatus = LHNETCONSTATUS_ERROR;
+			break;
+
+		case LHNETADDRESSTYPE_INET4:
+#ifdef SUPPORTIPV6
+		case LHNETADDRESSTYPE_INET6:
+#endif
+
+#ifdef WIN32
+			if (!lhnet_didWSAStartup)
+			{
+				Con_Print("LHNET_OpenSocket_Connected: can't open a socket (WSAStartup failed during LHNET_Init)\n");
+				lhnetsocket->constatus = LHNETCONSTATUS_ERROR;
+				return;
+			}
+#endif
+
+			if (lhnetsocket->constatus == LHNETCONSTATUS_DISCONNECTED)
+			{
+#ifdef WIN32
+				u_long _true = 1;
+#else
+				char _true = 1;
+#endif
+
+#ifdef SUPPORTIPV6
+				if ((lhnetsocket->inetsocket = socket(address->addresstype == LHNETADDRESSTYPE_INET6 ? PF_INET6 : PF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
+#else
+				if ((lhnetsocket->inetsocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
+#endif
+				{
+					Con_Printf("LHNET_OpenSocket_Connected: socket returned error: %s\n", LHNETPRIVATE_StrError());
+					lhnetsocket->constatus = LHNETCONSTATUS_ERROR;
+					break;
+				}
+
+				if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, &_true) == -1)
+				{
+					Con_Printf("LHNET_OpenSocket_Connected: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
+					closesocket(lhnetsocket->inetsocket);
+					lhnetsocket->constatus = LHNETCONSTATUS_ERROR;
+					break;
+				}
+			}
+
+			remoteaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+#ifdef SUPPORTIPV6
+			namelen = sizeof(remoteaddress->addr.in6);
+#else
+			namelen = sizeof(remoteaddress->addr.in);
+#endif
+			connectresult = connect(lhnetsocket->inetsocket, &remoteaddress->addr.sock, namelen);
+
+			if (connectresult != -1)
+			{
+				lhnetsocket->next = &lhnet_socketlist;
+				lhnetsocket->prev = lhnetsocket->next->prev;
+				lhnetsocket->next->prev = lhnetsocket;
+				lhnetsocket->prev->next = lhnetsocket;
+				lhnetsocket->constatus = LHNETCONSTATUS_CONNECTED;
+			}
+			else
+			{
+				if (SOCKETERRNO == EINPROGRESS || SOCKETERRNO == EALREADY)
+				{
+					lhnetsocket->constatus = LHNETCONSTATUS_INPROGRESS;
+				}
+				else
+				{
+					Con_Printf("LHNET_OpenSocket_Connected: connect returned error: %s\n", LHNETPRIVATE_StrError());
+					closesocket(lhnetsocket->inetsocket);
+					lhnetsocket->constatus = LHNETCONSTATUS_ERROR;
+				}
+			}
+			break;
+		default:
+			break;
+	}
+}
+
 void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket)
 {
 	if (lhnetsocket)
@@ -1098,6 +1240,12 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 			}
 			Con_Printf("LHNET_Read: recvfrom returned error: %s\n", LHNETPRIVATE_StrError());
 		}
+		else if (value == 0)
+		{
+			/* Connection closed. */
+			lhnetsocket->constatus = LHNETCONSTATUS_DISCONNECTED;
+			return 0;
+		}
 	}
 #ifdef SUPPORTIPV6
 	else if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_INET6)
@@ -1124,6 +1272,11 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 					return 0;
 			}
 			Con_Printf("LHNET_Read: recvfrom returned error: %s\n", LHNETPRIVATE_StrError());
+		}
+		else if (value == 0)
+		{
+			lhnetsocket->constatus = LHNETCONSTATUS_DISCONNECTED;
+			return 0;
 		}
 	}
 #endif

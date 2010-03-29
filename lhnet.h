@@ -30,10 +30,20 @@ int LHNETADDRESS_GetPort(const lhnetaddress_t *address);
 int LHNETADDRESS_SetPort(lhnetaddress_t *address, int port);
 int LHNETADDRESS_Compare(const lhnetaddress_t *address1, const lhnetaddress_t *address2);
 
+typedef enum lhnetconstatus_e
+{
+	LHNETCONSTATUS_DISCONNECTED,
+	LHNETCONSTATUS_INPROGRESS,
+	LHNETCONSTATUS_CONNECTED,
+	LHNETCONSTATUS_ERROR
+}
+lhnetconstatus_t;
+
 typedef struct lhnetsocket_s
 {
 	lhnetaddress_t address;
 	int inetsocket;
+	lhnetconstatus_t constatus;
 	struct lhnetsocket_s *next, *prev;
 }
 lhnetsocket_t;
@@ -42,6 +52,8 @@ void LHNET_Init(void);
 void LHNET_Shutdown(void);
 void LHNET_SleepUntilPacket_Microseconds(int microseconds);
 lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address);
+lhnetsocket_t *LHNET_AllocSocket(lhnetaddress_t *address);
+void LHNET_OpenSocket_Connected(lhnetsocket_t *socket);
 void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket);
 lhnetaddress_t *LHNET_AddressFromSocket(lhnetsocket_t *sock);
 int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, lhnetaddress_t *address);
