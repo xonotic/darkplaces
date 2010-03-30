@@ -12,7 +12,7 @@ static void IRC_Disconnect(void)
 {
 	if (irc_socket)
 	{
-		Con_Print("[IRC] Disconnected.\n");
+		Con_Print("[IRC] Closed connection.\n");
 		LHNET_CloseSocket(irc_socket);
 		irc_socket = NULL;
 	}
