@@ -194,7 +194,10 @@ void IRC_Frame(void)
 		switch (irc_socket->constatus)
 		{
 			case LHNETCONSTATUS_INPROGRESS:
+				break;
+
 			case LHNETCONSTATUS_DISCONNECTED:
+				IRC_Disconnect();
 				break;
 
 			case LHNETCONSTATUS_ERROR:
@@ -205,10 +208,6 @@ void IRC_Frame(void)
 			case LHNETCONSTATUS_CONNECTED:
 				IRC_WriteMessages();
 				IRC_ReadMessages();
-
-				if (irc_socket->constatus == LHNETCONSTATUS_DISCONNECTED)
-					IRC_Disconnect();
-
 				break;
 		}
 	}
