@@ -231,7 +231,7 @@ static void IRC_ProcessAllMessages(void)
 		char *nl;
 		int len;
 
-		nl = memchr((void *) remaining, '\n', remaining_len);
+		nl = memchr(remaining, '\n', remaining_len);
 
 		if (!nl)
 		{
