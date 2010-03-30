@@ -90,7 +90,7 @@ static void IRC_Connect_f(void)
 		const char *nick = IRC_NickFromPlayerName();
 
 		IRC_AddMessage(va("NICK %s", nick));
-		IRC_AddMessage(va("USER %s localhost localhost :%s", nick, nick));
+		IRC_AddMessage(va("USER %s %s %s :%s", nick, nick, Cmd_Argv(1), nick));
 
 		Z_Free((void *) nick);
 	}
