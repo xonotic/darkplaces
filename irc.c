@@ -115,9 +115,78 @@ static void IRC_IRC_f(void)
 		Con_Print("[IRC] Not connected to a server.\n");
 }
 
-static void IRC_ProcessMessage(const char *msg)
+typedef struct ircmessage_s
 {
-	Con_Printf("[IRC} %s\n", msg);
+	char *prefix;
+	char *command;
+	char *args;
+}
+ircmessage_t;
+
+static void IRC_ProcessMessage(const char *line)
+{
+	const int line_len = strlen(line);
+	const char *line_end = line + line_len;
+	ircmessage_t msg;
+	int len;
+
+	memset(&msg, 0, sizeof (msg));
+
+	if (line[0] == ':')
+	{
+		line += 1;
+
+		len = strcspn(line, " ");
+
+		if (line + len == line_end)
+			return;
+
+		msg.prefix = Z_Malloc(len + 1);
+		memcpy(msg.prefix, line, len);
+		msg.prefix[len] = 0;
+
+		line += len;
+		line += strspn(line, " ");
+	}
+	else
+		msg.prefix = NULL;
+
+	len = strcspn(line, " ");
+
+	msg.command = Z_Malloc(len + 1);
+	memcpy(msg.command, line, len);
+	msg.command[len] = 0;
+
+	if (line + len != line_end)
+	{
+		line += len;
+		line += strspn(line, " ");
+
+		len = line_end - line;
+
+		msg.args = Z_Malloc(len + 1);
+		memcpy(msg.args, line, len);
+		msg.args[len] = 0;
+	}
+	else
+		msg.args = NULL;
+
+	Con_Printf("[IRC] prefix:  %s\n"
+			   "[IRC] command: %s\n"
+			   "[IRC] args:    %s\n",
+			   msg.prefix ? msg.prefix : "",
+			   msg.command,
+			   msg.args ? msg.args : "");
+
+	/* Free stuff. */
+
+	if (msg.prefix)
+		Z_Free(msg.prefix);
+
+	Z_Free(msg.command);
+
+	if (msg.args)
+		Z_Free(msg.args);
 }
 
 static void IRC_ProcessAllMessages(void)
