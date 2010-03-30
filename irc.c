@@ -122,34 +122,28 @@ static void IRC_ProcessMessages(void)
 
 	while (remaining_len > 0)
 	{
-		char *cr;
+		char *nl;
+		int len;
 
-		cr = memchr((void *) remaining, '\r', remaining_len);
+		nl = memchr((void *) remaining, '\n', remaining_len);
 
-		if (!cr || cr == remaining + remaining_len - 1)
+		if (!nl)
 		{
 			/* Probably incomplete message. */
 			memmove(irc_incoming, remaining, remaining_len);
 			break;
 		}
 
-		if (cr[1] == '\n')
-		{
-			int len = (cr - remaining) + 2;
+		nl[0] = 0;
 
-			cr[0] = 0;
-			cr[1] = 0;
+		if (nl != remaining && nl[-1] == '\r')
+			nl[-1] = 0;
 
-			Con_Printf("[IRC] %s\n", remaining);
+		Con_Printf("[IRC] %s\n", remaining);
 
-			remaining += len;
-			remaining_len -= len;
-		}
-		else
-		{
-			/* Garbage or embedded CR?  Discard it and retry. */
-			cr[0] = '.';
-		}
+		len = (nl - remaining) + 1;
+		remaining += len;
+		remaining_len -= len;
 	}
 
 	irc_incoming_len = remaining_len;
