@@ -115,7 +115,12 @@ static void IRC_IRC_f(void)
 		Con_Print("[IRC] Not connected to a server.\n");
 }
 
-static void IRC_ProcessMessages(void)
+static void IRC_ProcessMessage(const char *msg)
+{
+	Con_Printf("[IRC} %s\n", msg);
+}
+
+static void IRC_ProcessAllMessages(void)
 {
 	char *remaining = irc_incoming;
 	int remaining_len = irc_incoming_len;
@@ -139,7 +144,7 @@ static void IRC_ProcessMessages(void)
 		if (nl != remaining && nl[-1] == '\r')
 			nl[-1] = 0;
 
-		Con_Printf("[IRC] %s\n", remaining);
+		IRC_ProcessMessage(remaining);
 
 		len = (nl - remaining) + 1;
 		remaining += len;
@@ -160,7 +165,7 @@ static void IRC_ReadMessages(void)
 	{
 		Con_Printf("[IRC] Read %d bytes\n", read);
 		irc_incoming_len += read;
-		IRC_ProcessMessages();
+		IRC_ProcessAllMessages();
 	}
 }
 
