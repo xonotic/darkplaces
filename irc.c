@@ -123,14 +123,39 @@ typedef struct ircmessage_s
 }
 ircmessage_t;
 
-static void IRC_ProcessMessage(const char *line)
+static ircmessage_t *IRC_AllocMessage(void)
+{
+	ircmessage_t *msg;
+
+	if ((msg = Z_Malloc(sizeof (*msg))))
+		memset(msg, 0, sizeof (*msg));
+
+	return msg;
+}
+
+static void IRC_FreeMessage(ircmessage_t *msg)
+{
+	if (msg)
+	{
+		if (msg->prefix) Z_Free(msg->prefix);
+		if (msg->command) Z_Free(msg->command);
+		if (msg->args) Z_Free(msg->args);
+
+		Z_Free(msg);
+	}
+}
+
+static ircmessage_t *IRC_ParseMessage(const char *line)
 {
 	const int line_len = strlen(line);
 	const char *line_end = line + line_len;
-	ircmessage_t msg;
+	ircmessage_t *msg;
 	int len;
 
-	memset(&msg, 0, sizeof (msg));
+	msg = IRC_AllocMessage();
+
+	if (!msg)
+		return NULL;
 
 	if (line[0] == ':')
 	{
@@ -138,24 +163,29 @@ static void IRC_ProcessMessage(const char *line)
 
 		len = strcspn(line, " ");
 
-		if (line + len == line_end)
-			return;
+		/* TODO, is this really needed? */
 
-		msg.prefix = Z_Malloc(len + 1);
-		memcpy(msg.prefix, line, len);
-		msg.prefix[len] = 0;
+		if (line + len == line_end)
+		{
+			IRC_FreeMessage(msg);
+			return NULL;
+		}
+
+		msg->prefix = Z_Malloc(len + 1);
+		memcpy(msg->prefix, line, len);
+		msg->prefix[len] = 0;
 
 		line += len;
 		line += strspn(line, " ");
 	}
 	else
-		msg.prefix = NULL;
+		msg->prefix = NULL;
 
 	len = strcspn(line, " ");
 
-	msg.command = Z_Malloc(len + 1);
-	memcpy(msg.command, line, len);
-	msg.command[len] = 0;
+	msg->command = Z_Malloc(len + 1);
+	memcpy(msg->command, line, len);
+	msg->command[len] = 0;
 
 	if (line + len != line_end)
 	{
@@ -164,29 +194,31 @@ static void IRC_ProcessMessage(const char *line)
 
 		len = line_end - line;
 
-		msg.args = Z_Malloc(len + 1);
-		memcpy(msg.args, line, len);
-		msg.args[len] = 0;
+		msg->args = Z_Malloc(len + 1);
+		memcpy(msg->args, line, len);
+		msg->args[len] = 0;
 	}
 	else
-		msg.args = NULL;
+		msg->args = NULL;
 
-	Con_Printf("[IRC] prefix:  %s\n"
-			   "[IRC] command: %s\n"
-			   "[IRC] args:    %s\n",
-			   msg.prefix ? msg.prefix : "",
-			   msg.command,
-			   msg.args ? msg.args : "");
+	return msg;
+}
 
-	/* Free stuff. */
+static void IRC_ProcessMessage(const char *line)
+{
+	ircmessage_t *msg;
 
-	if (msg.prefix)
-		Z_Free(msg.prefix);
+	if ((msg = IRC_ParseMessage(line)))
+	{
+		Con_Printf("[IRC] prefix:  %s\n"
+				   "[IRC] command: %s\n"
+				   "[IRC] args:    %s\n",
+				   msg->prefix ? msg->prefix : "",
+				   msg->command,
+				   msg->args ? msg->args : "");
 
-	Z_Free(msg.command);
-
-	if (msg.args)
-		Z_Free(msg.args);
+		IRC_FreeMessage(msg);
+	}
 }
 
 static void IRC_ProcessAllMessages(void)
