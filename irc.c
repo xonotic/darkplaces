@@ -115,11 +115,14 @@ static void IRC_IRC_f(void)
 		Con_Print("[IRC] Not connected to a server.\n");
 }
 
+#define IRC_MAX_ARGS 15
+
 typedef struct ircmessage_s
 {
 	char *prefix;
 	char *command;
-	char *args;
+	char *args[IRC_MAX_ARGS];
+	int args_num;
 }
 ircmessage_t;
 
@@ -137,11 +140,53 @@ static void IRC_FreeMessage(ircmessage_t *msg)
 {
 	if (msg)
 	{
+		int i;
+
 		if (msg->prefix) Z_Free(msg->prefix);
 		if (msg->command) Z_Free(msg->command);
-		if (msg->args) Z_Free(msg->args);
+
+		for (i = 0; i < msg->args_num; i++)
+			Z_Free(msg->args[i]);
 
 		Z_Free(msg);
+	}
+}
+
+static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
+{
+	msg->args_num = 0;
+
+	while (msg->args_num < IRC_MAX_ARGS && *args)
+	{
+		char **arg;
+		int len;
+
+		if (args[0] == ':')
+		{
+			arg = msg->args + msg->args_num;
+			len = strlen(args + 1);
+
+			*arg = Z_Malloc(len + 1);
+			memcpy(*arg, args + 1, len);
+			(*arg)[len] = 0;
+
+			msg->args_num++;
+			break;
+		}
+		else
+		{
+			arg = msg->args + msg->args_num;
+			len = strcspn(args, " ");
+
+			*arg = Z_Malloc(len + 1);
+			memcpy(*arg, args, len);
+			(*arg)[len] = 0;
+
+			msg->args_num++;
+
+			args += len;
+			args += strspn(args, " ");
+		}
 	}
 }
 
@@ -189,15 +234,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 	line += strspn(line, " ");
 
 	if (line != line_end)
-	{
-		len = line_end - line;
-
-		msg->args = Z_Malloc(len + 1);
-		memcpy(msg->args, line, len);
-		msg->args[len] = 0;
-	}
-	else
-		msg->args = NULL;
+		IRC_ParseArgs(msg, line);
 
 	return msg;
 }
@@ -208,12 +245,13 @@ static void IRC_ProcessMessage(const char *line)
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
-		Con_Printf("[IRC] prefix:  %s\n"
-				   "[IRC] command: %s\n"
-				   "[IRC] args:    %s\n",
-				   msg->prefix ? msg->prefix : "",
-				   msg->command,
-				   msg->args ? msg->args : "");
+		int i;
+
+		Con_Printf("[IRC] prefix : %s\n", msg->prefix ? msg->prefix : "");
+		Con_Printf("[IRC] command: %s\n", msg->command);
+
+		for (i = 0; i < msg->args_num; i++)
+			Con_Printf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
 
 		IRC_FreeMessage(msg);
 	}
