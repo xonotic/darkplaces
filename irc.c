@@ -239,20 +239,24 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 	return msg;
 }
 
+static void IRC_DumpMessage(const ircmessage_t *msg)
+{
+	int i;
+
+	Con_Printf("[IRC] prefix : %s\n", msg->prefix ? msg->prefix : "");
+	Con_Printf("[IRC] command: %s\n", msg->command);
+
+	for (i = 0; i < msg->args_num; i++)
+		Con_Printf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
+}
+
 static void IRC_ProcessMessage(const char *line)
 {
 	ircmessage_t *msg;
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
-		int i;
-
-		Con_Printf("[IRC] prefix : %s\n", msg->prefix ? msg->prefix : "");
-		Con_Printf("[IRC] command: %s\n", msg->command);
-
-		for (i = 0; i < msg->args_num; i++)
-			Con_Printf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
-
+		IRC_DumpMessage(msg);
 		IRC_FreeMessage(msg);
 	}
 }
