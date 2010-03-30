@@ -106,14 +106,13 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 {
 	msg->args_num = 0;
 
-	while (msg->args_num < IRC_MAX_ARGS && *args)
+	while (msg->args_num < IRC_MAX_ARGS && args[0])
 	{
-		char **arg;
+		char **arg = msg->args + msg->args_num;
 		int len;
 
 		if (args[0] == ':')
 		{
-			arg = msg->args + msg->args_num;
 			len = strlen(args + 1);
 
 			*arg = Z_Malloc(len + 1);
@@ -125,7 +124,6 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 		}
 		else
 		{
-			arg = msg->args + msg->args_num;
 			len = strcspn(args, " ");
 
 			*arg = Z_Malloc(len + 1);
