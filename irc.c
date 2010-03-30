@@ -163,14 +163,6 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 
 		len = strcspn(line, " ");
 
-		/* TODO, is this really needed? */
-
-		if (line + len == line_end)
-		{
-			IRC_FreeMessage(msg);
-			return NULL;
-		}
-
 		msg->prefix = Z_Malloc(len + 1);
 		memcpy(msg->prefix, line, len);
 		msg->prefix[len] = 0;
@@ -181,17 +173,23 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 	else
 		msg->prefix = NULL;
 
+	if (line == line_end)
+	{
+		IRC_FreeMessage(msg);
+		return NULL;
+	}
+
 	len = strcspn(line, " ");
 
 	msg->command = Z_Malloc(len + 1);
 	memcpy(msg->command, line, len);
 	msg->command[len] = 0;
 
-	if (line + len != line_end)
-	{
-		line += len;
-		line += strspn(line, " ");
+	line += len;
+	line += strspn(line, " ");
 
+	if (line != line_end)
+	{
 		len = line_end - line;
 
 		msg->args = Z_Malloc(len + 1);
