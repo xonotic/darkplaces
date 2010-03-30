@@ -3,10 +3,22 @@
 #include "console.h"
 
 static lhnetsocket_t *irc_socket;
+
 static char irc_incoming[1024];
 static char irc_outgoing[1024];
 static int irc_incoming_len;
 static int irc_outgoing_len;
+
+#define IRC_MAX_ARGS 15
+
+typedef struct ircmessage_s
+{
+	char *prefix;
+	char *command;
+	char *args[IRC_MAX_ARGS];
+	int args_num;
+}
+ircmessage_t;
 
 static void IRC_Disconnect(void)
 {
@@ -63,68 +75,6 @@ static void IRC_AddMessage(const char *message)
 
 	Con_Printf("[IRC] %d bytes waiting to be written\n", irc_outgoing_len);
 }
-
-static const char *IRC_NickFromPlayerName(void)
-{
-	const char prefix[] = "[DP]";
-	const int prefix_len = sizeof (prefix) - 1;
-	char *nick;
-
-	nick = Z_Malloc(prefix_len + strlen(cl_name.string) + 1);
-	memcpy(nick, prefix, prefix_len + 1);
-	SanitizeString(cl_name.string, nick + prefix_len);
-
-	return nick;
-}
-
-static void IRC_Connect_f(void)
-{
-	if (Cmd_Argc() != 2)
-	{
-		Con_Print("ircconnect <address> : connect to an IRC server\n");
-		return;
-	}
-
-	if (IRC_Connect(Cmd_Argv(1)))
-	{
-		const char *nick = IRC_NickFromPlayerName();
-
-		IRC_AddMessage(va("NICK %s", nick));
-		IRC_AddMessage(va("USER %s %s %s :%s", nick, nick, Cmd_Argv(1), nick));
-
-		Z_Free((void *) nick);
-	}
-}
-
-static void IRC_Disconnect_f(void)
-{
-	IRC_Disconnect();
-}
-
-static void IRC_IRC_f(void)
-{
-	if (Cmd_Argc() < 2)
-	{
-		Con_Print("irc <raw IRC message>\n");
-		return;
-	}
-
-	if (irc_socket)
-		IRC_AddMessage(Cmd_Args());
-	else
-		Con_Print("[IRC] Not connected to a server.\n");
-}
-
-#define IRC_MAX_ARGS 15
-
-typedef struct ircmessage_s
-{
-	char *prefix;
-	char *command;
-	char *args[IRC_MAX_ARGS];
-	int args_num;
-}
-ircmessage_t;
 
 static ircmessage_t *IRC_AllocMessage(void)
 {
@@ -352,6 +302,57 @@ void IRC_Frame(void)
 				break;
 		}
 	}
+}
+
+static const char *IRC_NickFromPlayerName(void)
+{
+	const char prefix[] = "[DP]";
+	const int prefix_len = sizeof (prefix) - 1;
+	char *nick;
+
+	nick = Z_Malloc(prefix_len + strlen(cl_name.string) + 1);
+	memcpy(nick, prefix, prefix_len + 1);
+	SanitizeString(cl_name.string, nick + prefix_len);
+
+	return nick;
+}
+
+static void IRC_Connect_f(void)
+{
+	if (Cmd_Argc() != 2)
+	{
+		Con_Print("ircconnect <address> : connect to an IRC server\n");
+		return;
+	}
+
+	if (IRC_Connect(Cmd_Argv(1)))
+	{
+		const char *nick = IRC_NickFromPlayerName();
+
+		IRC_AddMessage(va("NICK %s", nick));
+		IRC_AddMessage(va("USER %s %s %s :%s", nick, nick, Cmd_Argv(1), nick));
+
+		Z_Free((void *) nick);
+	}
+}
+
+static void IRC_Disconnect_f(void)
+{
+	IRC_Disconnect();
+}
+
+static void IRC_IRC_f(void)
+{
+	if (Cmd_Argc() < 2)
+	{
+		Con_Print("irc <raw IRC message>\n");
+		return;
+	}
+
+	if (irc_socket)
+		IRC_AddMessage(Cmd_Args());
+	else
+		Con_Print("[IRC] Not connected to a server.\n");
 }
 
 void IRC_Init(void)
