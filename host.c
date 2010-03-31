@@ -1440,6 +1440,7 @@ void Host_Shutdown(void)
 #endif
 	S_Terminate ();
 	Curl_Shutdown ();
+	IRC_Shutdown ();
 	NetConn_Shutdown ();
 	//PR_Shutdown ();
 
