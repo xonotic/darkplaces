@@ -1280,6 +1280,7 @@ void Host_Shutdown(void)
 	CDAudio_Shutdown ();
 	S_Terminate ();
 	Curl_Shutdown ();
+	IRC_Shutdown ();
 	NetConn_Shutdown ();
 	//PR_Shutdown ();
 

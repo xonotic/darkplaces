@@ -359,3 +359,8 @@ void IRC_Init(void)
 	Cmd_AddCommand("ircdisconnect", IRC_Disconnect_f, "disconnect from an IRC server");
 	Cmd_AddCommand("irc", IRC_IRC_f, "send raw messages to a connected IRC server");
 }
+
+void IRC_Shutdown(void)
+{
+	IRC_Disconnect();
+}
