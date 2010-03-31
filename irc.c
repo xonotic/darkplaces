@@ -16,7 +16,7 @@ ircmessage_t;
 
 typedef struct ircnetbuffer_s
 {
-	int len;
+	size_t len;
 	/* Don't add new members below this. */
 	char data[IRC_NET_BUFFER_LEN];
 }
@@ -79,7 +79,7 @@ static void IRC_AddMessage(const char *message)
 
 	irc_outgoing.len = min(irc_outgoing.len + len + 2, sizeof (irc_outgoing.data));
 
-	Con_Printf("[IRC] %d bytes waiting to be written\n", irc_outgoing.len);
+	Con_Printf("[IRC] %lu bytes waiting to be written\n", (unsigned long) irc_outgoing.len);
 }
 
 static ircmessage_t *IRC_AllocMessage(void)
@@ -115,7 +115,7 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 	while (msg->args_num < IRC_MAX_ARGS && args[0])
 	{
 		char **arg = msg->args + msg->args_num;
-		int len;
+		size_t len;
 
 		if (args[0] == ':')
 		{
@@ -149,7 +149,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 	const int line_len = strlen(line);
 	const char *line_end = line + line_len;
 	ircmessage_t *msg;
-	int len;
+	size_t len;
 
 	msg = IRC_AllocMessage();
 
@@ -217,13 +217,13 @@ static void IRC_ProcessMessage(const char *line)
 
 static void IRC_ProcessAllMessages(void)
 {
-	int remaining_len = irc_incoming.len;
+	size_t remaining_len = irc_incoming.len;
 	char *remaining = irc_incoming.data;
 
 	while (remaining_len > 0)
 	{
 		char *nl;
-		int len;
+		size_t len;
 
 		nl = memchr(remaining, '\n', remaining_len);
 
@@ -311,7 +311,7 @@ void IRC_Frame(void)
 static const char *IRC_NickFromPlayerName(void)
 {
 	const char prefix[] = "[DP]";
-	const int prefix_len = sizeof (prefix) - 1;
+	const size_t prefix_len = sizeof (prefix) - 1;
 	char *nick;
 
 	nick = Z_Malloc(prefix_len + strlen(cl_name.string) + 1);
