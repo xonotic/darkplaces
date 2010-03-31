@@ -47,7 +47,7 @@ static int IRC_Connect(const char *addr)
 
 	if (!LHNETADDRESS_FromString(&address, addr, 6667))
 	{
-		Con_Printf("[IRC] Bad server address given: %s.\n", addr);
+		Con_Printf("[IRC] Bad server address: %s.\n", addr);
 		return 0;
 	}
 
@@ -66,7 +66,7 @@ static int IRC_Connect(const char *addr)
 		return 0;
 	}
 
-	Con_Print("[IRC] Connecting to the server...\n");
+	Con_Printf("[IRC] Connecting to %s...\n", addr);
 	return 1;
 }
 
@@ -310,7 +310,7 @@ void IRC_Frame(void)
 				break;
 
 			case LHNETCONSTATUS_ERROR:
-				Con_Print("[IRC] Failed to connect to the server.\n");
+				Con_Print("[IRC] Connection error.\n");
 				IRC_Disconnect();
 				break;
 
