@@ -85,7 +85,7 @@ static void IRC_AddMessage(const char *message)
 
 	irc_outgoing.len += len + 2;
 
-	Con_Printf("[IRC] %lu bytes waiting to be written\n", (unsigned long) irc_outgoing.len);
+	Con_DPrintf("[IRC] %lu bytes waiting to be written\n", (unsigned long) irc_outgoing.len);
 }
 
 static ircmessage_t *IRC_AllocMessage(void)
@@ -203,11 +203,11 @@ static void IRC_DumpMessage(const ircmessage_t *msg)
 {
 	int i;
 
-	Con_Printf("[IRC] prefix : %s\n", msg->prefix ? msg->prefix : "");
-	Con_Printf("[IRC] command: %s\n", msg->command);
+	Con_DPrintf("[IRC] prefix : %s\n", msg->prefix ? msg->prefix : "");
+	Con_DPrintf("[IRC] command: %s\n", msg->command);
 
 	for (i = 0; i < msg->args_num; i++)
-		Con_Printf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
+		Con_DPrintf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
 }
 
 static void IRC_ProcessMessage(const char *line)
@@ -272,7 +272,7 @@ static void IRC_ReadMessages(void)
 
 	if (read > 0)
 	{
-		Con_Printf("[IRC] Read %d bytes\n", read);
+		Con_DPrintf("[IRC] Read %d bytes\n", read);
 		irc_incoming.len += read;
 		IRC_ProcessAllMessages();
 	}
@@ -287,7 +287,7 @@ static void IRC_WriteMessages(void)
 
 	if (written > 0)
 	{
-		Con_Printf("[IRC] Wrote %d bytes\n", written);
+		Con_DPrintf("[IRC] Wrote %d bytes\n", written);
 		memmove(irc_outgoing.data, irc_outgoing.data + written, irc_outgoing.len - written);
 		irc_outgoing.len -= written;
 	}
