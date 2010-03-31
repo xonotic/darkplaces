@@ -2,14 +2,8 @@
 #include "lhnet.h"
 #include "console.h"
 
-static lhnetsocket_t *irc_socket;
-
-static char irc_incoming[1024];
-static char irc_outgoing[1024];
-static int irc_incoming_len;
-static int irc_outgoing_len;
-
 #define IRC_MAX_ARGS 15
+#define IRC_NET_BUFFER_LEN 1024
 
 typedef struct ircmessage_s
 {
@@ -20,6 +14,18 @@ typedef struct ircmessage_s
 }
 ircmessage_t;
 
+typedef struct ircnetbuffer_s
+{
+	int len;
+	/* Don't add new members below this. */
+	char data[IRC_NET_BUFFER_LEN];
+}
+ircnetbuffer_t;
+
+static lhnetsocket_t *irc_socket;
+static ircnetbuffer_t irc_incoming;
+static ircnetbuffer_t irc_outgoing;
+
 static void IRC_Disconnect(void)
 {
 	if (irc_socket)
@@ -29,8 +35,8 @@ static void IRC_Disconnect(void)
 		irc_socket = NULL;
 	}
 
-	irc_incoming_len = 0;
-	irc_outgoing_len = 0;
+	memset(&irc_incoming, 0, offsetof(ircnetbuffer_t, data));
+	memset(&irc_outgoing, 0, offsetof(ircnetbuffer_t, data));
 }
 
 static int IRC_Connect(const char *addr)
@@ -68,12 +74,12 @@ static void IRC_AddMessage(const char *message)
 {
 	size_t len = strlen(message);
 
-	memcpy(irc_outgoing + irc_outgoing_len, message, sizeof (irc_outgoing) - irc_outgoing_len - 2);
-	memcpy(irc_outgoing + min(irc_outgoing_len + len, sizeof (irc_outgoing) - 2), "\r\n", 2);
+	memcpy(irc_outgoing.data + irc_outgoing.len, message, sizeof (irc_outgoing.data) - irc_outgoing.len - 2);
+	memcpy(irc_outgoing.data + min(irc_outgoing.len + len, sizeof (irc_outgoing.data) - 2), "\r\n", 2);
 
-	irc_outgoing_len = min(irc_outgoing_len + len + 2, sizeof (irc_outgoing));
+	irc_outgoing.len = min(irc_outgoing.len + len + 2, sizeof (irc_outgoing.data));
 
-	Con_Printf("[IRC] %d bytes waiting to be written\n", irc_outgoing_len);
+	Con_Printf("[IRC] %d bytes waiting to be written\n", irc_outgoing.len);
 }
 
 static ircmessage_t *IRC_AllocMessage(void)
@@ -211,8 +217,8 @@ static void IRC_ProcessMessage(const char *line)
 
 static void IRC_ProcessAllMessages(void)
 {
-	char *remaining = irc_incoming;
-	int remaining_len = irc_incoming_len;
+	int remaining_len = irc_incoming.len;
+	char *remaining = irc_incoming.data;
 
 	while (remaining_len > 0)
 	{
@@ -224,7 +230,7 @@ static void IRC_ProcessAllMessages(void)
 		if (!nl)
 		{
 			/* Probably incomplete message. */
-			memmove(irc_incoming, remaining, remaining_len);
+			memmove(irc_incoming.data, remaining, remaining_len);
 			break;
 		}
 
@@ -240,7 +246,7 @@ static void IRC_ProcessAllMessages(void)
 		remaining_len -= len;
 	}
 
-	irc_incoming_len = remaining_len;
+	irc_incoming.len = remaining_len;
 }
 
 static void IRC_ReadMessages(void)
@@ -248,12 +254,12 @@ static void IRC_ReadMessages(void)
 	lhnetaddress_t dummyaddress;
 	int read;
 
-	read = LHNET_Read(irc_socket, irc_incoming + irc_incoming_len, sizeof (irc_incoming) - irc_incoming_len, &dummyaddress);
+	read = LHNET_Read(irc_socket, irc_incoming.data + irc_incoming.len, sizeof (irc_incoming.data) - irc_incoming.len, &dummyaddress);
 
 	if (read > 0)
 	{
 		Con_Printf("[IRC] Read %d bytes\n", read);
-		irc_incoming_len += read;
+		irc_incoming.len += read;
 		IRC_ProcessAllMessages();
 	}
 }
@@ -263,13 +269,13 @@ static void IRC_WriteMessages(void)
 	lhnetaddress_t dummyaddress = irc_socket->address;
 	int written;
 
-	written = LHNET_Write(irc_socket, irc_outgoing, irc_outgoing_len, &dummyaddress);
+	written = LHNET_Write(irc_socket, irc_outgoing.data, irc_outgoing.len, &dummyaddress);
 
 	if (written > 0)
 	{
 		Con_Printf("[IRC] Wrote %d bytes\n", written);
-		memmove(irc_outgoing, irc_outgoing + written, irc_outgoing_len - written);
-		irc_outgoing_len -= written;
+		memmove(irc_outgoing.data, irc_outgoing.data + written, irc_outgoing.len - written);
+		irc_outgoing.len -= written;
 	}
 }
 
