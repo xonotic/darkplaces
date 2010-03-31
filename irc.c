@@ -74,10 +74,16 @@ static void IRC_AddMessage(const char *message)
 {
 	size_t len = strlen(message);
 
-	memcpy(irc_outgoing.data + irc_outgoing.len, message, sizeof (irc_outgoing.data) - irc_outgoing.len - 2);
-	memcpy(irc_outgoing.data + min(irc_outgoing.len + len, sizeof (irc_outgoing.data) - 2), "\r\n", 2);
+	if (irc_outgoing.len + len + 2 > sizeof (irc_outgoing.data))
+	{
+		Con_Print("[IRC] Output buffer overflow.\n");
+		return;
+	}
 
-	irc_outgoing.len = min(irc_outgoing.len + len + 2, sizeof (irc_outgoing.data));
+	memcpy(irc_outgoing.data + irc_outgoing.len, message, sizeof (irc_outgoing.data) - irc_outgoing.len - 2);
+	memcpy(irc_outgoing.data + irc_outgoing.len + len, "\r\n", 2);
+
+	irc_outgoing.len += len + 2;
 
 	Con_Printf("[IRC] %lu bytes waiting to be written\n", (unsigned long) irc_outgoing.len);
 }
@@ -229,6 +235,14 @@ static void IRC_ProcessAllMessages(void)
 
 		if (!nl)
 		{
+			if (remaining_len == irc_incoming.len && irc_incoming.len == sizeof (irc_incoming.data))
+			{
+				/* Full buffer, yet STILL no newline?  Flush it. */
+				irc_incoming.len = 0;
+				Con_Print("[IRC] Input buffer overflow.\n");
+				return;
+			}
+
 			/* Probably incomplete message. */
 			memmove(irc_incoming.data, remaining, remaining_len);
 			break;
