@@ -342,15 +342,15 @@ static char *IRC_NickFromPlayerName(void)
 
 static void IRC_Register(void)
 {
+	char *nick = IRC_NickFromPlayerName();
+
 	if (!irc_nickname.string[0])
-	{
-		char *nick = IRC_NickFromPlayerName();
 		Cvar_SetQuick(&irc_nickname, nick);
-		Z_Free(nick);
-	}
 
 	IRC_AddMessage(va("NICK %s", irc_nickname.string));
-	IRC_AddMessage(va("USER %s optional optional :%s", irc_nickname.string, irc_nickname.string));
+	IRC_AddMessage(va("USER %s optional optional :%s", irc_nickname.string, nick));
+
+	Z_Free(nick);
 }
 
 static void IRC_Connect_f(void)
