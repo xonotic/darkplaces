@@ -26,6 +26,8 @@ static lhnetsocket_t *irc_socket;
 static ircnetbuffer_t irc_incoming;
 static ircnetbuffer_t irc_outgoing;
 
+static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "", "nickname to use when connecting to IRC" };
+
 static void IRC_Disconnect(void)
 {
 	if (irc_socket)
@@ -216,6 +218,14 @@ static void IRC_ProcessMessage(const char *line)
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
+		if (strcmp("NICK", msg->command) == 0)
+		{
+			size_t orig_len = strcspn(msg->prefix, "!");
+
+			if (strlen(irc_nickname.string) == orig_len && strncmp(irc_nickname.string, msg->prefix, orig_len) == 0)
+				Cvar_SetQuick(&irc_nickname, msg->args[0]);
+		}
+
 		IRC_DumpMessage(msg);
 		IRC_FreeMessage(msg);
 	}
@@ -322,17 +332,25 @@ void IRC_Frame(void)
 	}
 }
 
-static const char *IRC_NickFromPlayerName(void)
+static char *IRC_NickFromPlayerName(void)
 {
-	const char prefix[] = "[DP]";
-	const size_t prefix_len = sizeof (prefix) - 1;
 	char *nick;
-
-	nick = Z_Malloc(prefix_len + strlen(cl_name.string) + 1);
-	memcpy(nick, prefix, prefix_len + 1);
-	SanitizeString(cl_name.string, nick + prefix_len);
-
+	nick = Z_Malloc(strlen(cl_name.string) + 1);
+	SanitizeString(cl_name.string, nick);
 	return nick;
+}
+
+static void IRC_Register(void)
+{
+	if (!irc_nickname.string[0])
+	{
+		char *nick = IRC_NickFromPlayerName();
+		Cvar_SetQuick(&irc_nickname, nick);
+		Z_Free(nick);
+	}
+
+	IRC_AddMessage(va("NICK %s", irc_nickname.string));
+	IRC_AddMessage(va("USER %s optional optional :%s", irc_nickname.string, irc_nickname.string));
 }
 
 static void IRC_Connect_f(void)
@@ -344,14 +362,7 @@ static void IRC_Connect_f(void)
 	}
 
 	if (IRC_Connect(Cmd_Argv(1)))
-	{
-		const char *nick = IRC_NickFromPlayerName();
-
-		IRC_AddMessage(va("NICK %s", nick));
-		IRC_AddMessage(va("USER %s %s %s :%s", nick, nick, Cmd_Argv(1), nick));
-
-		Z_Free((void *) nick);
-	}
+		IRC_Register();
 }
 
 static void IRC_Disconnect_f(void)
@@ -375,6 +386,8 @@ static void IRC_IRC_f(void)
 
 void IRC_Init(void)
 {
+	Cvar_RegisterVariable(&irc_nickname);
+
 	Cmd_AddCommand("ircconnect", IRC_Connect_f, "connect to an IRC server");
 	Cmd_AddCommand("ircdisconnect", IRC_Disconnect_f, "disconnect from an IRC server");
 	Cmd_AddCommand("irc", IRC_IRC_f, "send raw messages to a connected IRC server");
