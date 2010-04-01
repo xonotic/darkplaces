@@ -26,6 +26,8 @@ static lhnetsocket_t *irc_socket;
 static ircnetbuffer_t irc_incoming;
 static ircnetbuffer_t irc_outgoing;
 
+static qboolean irc_registered;
+
 static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "", "nickname to use when connecting to IRC" };
 
 static void IRC_Disconnect(void)
@@ -39,6 +41,8 @@ static void IRC_Disconnect(void)
 
 	memset(&irc_incoming, 0, offsetof(ircnetbuffer_t, data));
 	memset(&irc_outgoing, 0, offsetof(ircnetbuffer_t, data));
+
+	irc_registered = false;
 }
 
 static int IRC_Connect(const char *addr)
@@ -212,13 +216,31 @@ static void IRC_DumpMessage(const ircmessage_t *msg)
 		Con_DPrintf("[IRC] arg %-3d: %s\n", i, msg->args[i]);
 }
 
+#define RPL_WELCOME 1
+
 static void IRC_ProcessMessage(const char *line)
 {
 	ircmessage_t *msg;
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
-		if (strcmp("NICK", msg->command) == 0)
+		long int reply;
+		char *end;
+
+		reply = strtol(msg->command, &end, 10);
+
+		if (end != msg->command && *end == 0)
+		{
+			switch (reply)
+			{
+				case RPL_WELCOME:
+					/* Update nickname in case it was truncated. */
+					Cvar_SetQuick(&irc_nickname, msg->args[0]);
+					irc_registered = true;
+					break;
+			}
+		}
+		else if (strcmp("NICK", msg->command) == 0)
 		{
 			size_t orig_len = strcspn(msg->prefix, "!");
 
