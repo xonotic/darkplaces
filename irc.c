@@ -239,13 +239,24 @@ static void IRC_ProcessMessage(const char *line)
 					irc_registered = true;
 					break;
 			}
+
+			if (msg->args_num > 0)
+				Con_Printf("[IRC] %s: %s\n", msg->prefix, msg->args[msg->args_num - 1]);
 		}
 		else if (strcmp("NICK", msg->command) == 0)
 		{
 			size_t orig_len = strcspn(msg->prefix, "!");
 
 			if (strlen(irc_nickname.string) == orig_len && strncmp(irc_nickname.string, msg->prefix, orig_len) == 0)
+			{
 				Cvar_SetQuick(&irc_nickname, msg->args[0]);
+				Con_Printf("[IRC] You are now known as %s\n", irc_nickname.string);
+			}
+			else
+			{
+				/* Print only the nickname part of the prefix. */
+				Con_Printf("[IRC] %.*s is now known as %s\n", (int) orig_len, msg->prefix, msg->args[0]);
+			}
 		}
 
 		IRC_DumpMessage(msg);
