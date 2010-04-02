@@ -217,6 +217,7 @@ static void IRC_DumpMessage(const ircmessage_t *msg)
 }
 
 #define RPL_WELCOME 1
+#define RPL_INVITING 341
 
 static void IRC_ProcessMessage(const char *line)
 {
@@ -224,6 +225,7 @@ static void IRC_ProcessMessage(const char *line)
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
+		size_t nick_len = strcspn(msg->prefix, "!");
 		long int reply;
 		char *end;
 
@@ -231,6 +233,8 @@ static void IRC_ProcessMessage(const char *line)
 
 		if (end != msg->command && *end == 0)
 		{
+			qboolean suppress = false;
+
 			switch (reply)
 			{
 				case RPL_WELCOME:
@@ -238,16 +242,19 @@ static void IRC_ProcessMessage(const char *line)
 					Cvar_SetQuick(&irc_nickname, msg->args[0]);
 					irc_registered = true;
 					break;
+
+				case RPL_INVITING:
+					Con_Printf("[IRC] You have invited %s to %s\n", msg->args[1], msg->args[2]);
+					suppress = true;
+					break;
 			}
 
-			if (msg->args_num > 0)
+			if (!suppress && msg->args_num > 0)
 				Con_Printf("[IRC] %s: %s\n", msg->prefix, msg->args[msg->args_num - 1]);
 		}
 		else if (strcmp("NICK", msg->command) == 0)
 		{
-			size_t orig_len = strcspn(msg->prefix, "!");
-
-			if (strlen(irc_nickname.string) == orig_len && strncmp(irc_nickname.string, msg->prefix, orig_len) == 0)
+			if (strlen(irc_nickname.string) == nick_len && strncmp(irc_nickname.string, msg->prefix, nick_len) == 0)
 			{
 				Cvar_SetQuick(&irc_nickname, msg->args[0]);
 				Con_Printf("[IRC] You are now known as %s\n", irc_nickname.string);
@@ -255,8 +262,37 @@ static void IRC_ProcessMessage(const char *line)
 			else
 			{
 				/* Print only the nickname part of the prefix. */
-				Con_Printf("[IRC] %.*s is now known as %s\n", (int) orig_len, msg->prefix, msg->args[0]);
+				Con_Printf("[IRC] %.*s is now known as %s\n", (int) nick_len, msg->prefix, msg->args[0]);
 			}
+		}
+		else if (strcmp("QUIT", msg->command) == 0)
+		{
+			if (msg->args_num > 0)
+				Con_Printf("[IRC] %.*s has quit (%s)\n", (int) nick_len, msg->prefix, msg->args[0]);
+			else
+				Con_Printf("[IRC] %.*s has quit\n", (int) nick_len, msg->prefix);
+		}
+		else if (strcmp("JOIN", msg->command) == 0)
+		{
+			Con_Printf("[IRC] %.*s has joined %s\n", (int) nick_len, msg->prefix, msg->args[0]);
+		}
+		else if (strcmp("PART", msg->command) == 0)
+		{
+			if (msg->args_num > 1)
+				Con_Printf("[IRC] %.*s has left %s (%s)\n", (int) nick_len, msg->prefix, msg->args[0], msg->args[1]);
+			else
+				Con_Printf("[IRC] %.*s has left %s\n", (int) nick_len, msg->prefix, msg->args[0]);
+		}
+		else if (strcmp("TOPIC", msg->command) == 0)
+		{
+			if (msg->args[1][0])
+				Con_Printf("[IRC] %.*s changed %s topic to: %s\n", (int) nick_len, msg->prefix, msg->args[0], msg->args[1]);
+			else
+				Con_Printf("[IRC] %.*s deleted %s topic\n", (int) nick_len, msg->prefix, msg->args[0]);
+		}
+		else if (strcmp("INVITE", msg->command) == 0)
+		{
+			Con_Printf("[IRC] %.*s has invited you to %s\n", (int) nick_len, msg->prefix, msg->args[1]);
 		}
 
 		IRC_DumpMessage(msg);
