@@ -30,6 +30,8 @@ static qboolean irc_registered;
 
 static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "", "nickname to use when connecting to IRC" };
 
+static mempool_t *irc_mempool;
+
 static void IRC_Disconnect(void)
 {
 	if (irc_socket)
@@ -68,7 +70,7 @@ static int IRC_Connect(const char *addr)
 	if (irc_socket->constatus == LHNETCONSTATUS_ERROR)
 	{
 		/* LHNET prints an error, so we don't have to. */
-		Z_Free((void *) irc_socket);
+		Mem_Free((void *) irc_socket);
 		return 0;
 	}
 
@@ -98,7 +100,7 @@ static ircmessage_t *IRC_AllocMessage(void)
 {
 	ircmessage_t *msg;
 
-	if ((msg = Z_Malloc(sizeof (*msg))))
+	if ((msg = Mem_Alloc(irc_mempool, sizeof (*msg))))
 		memset(msg, 0, sizeof (*msg));
 
 	return msg;
@@ -110,13 +112,13 @@ static void IRC_FreeMessage(ircmessage_t *msg)
 	{
 		int i;
 
-		if (msg->prefix) Z_Free(msg->prefix);
-		if (msg->command) Z_Free(msg->command);
+		if (msg->prefix) Mem_Free(msg->prefix);
+		if (msg->command) Mem_Free(msg->command);
 
 		for (i = 0; i < msg->args_num; i++)
-			Z_Free(msg->args[i]);
+			Mem_Free(msg->args[i]);
 
-		Z_Free(msg);
+		Mem_Free(msg);
 	}
 }
 
@@ -133,7 +135,7 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 		{
 			len = strlen(args + 1);
 
-			*arg = Z_Malloc(len + 1);
+			*arg = Mem_Alloc(irc_mempool, len + 1);
 			memcpy(*arg, args + 1, len);
 			(*arg)[len] = 0;
 
@@ -144,7 +146,7 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 		{
 			len = strcspn(args, " ");
 
-			*arg = Z_Malloc(len + 1);
+			*arg = Mem_Alloc(irc_mempool, len + 1);
 			memcpy(*arg, args, len);
 			(*arg)[len] = 0;
 
@@ -174,7 +176,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 
 		len = strcspn(line, " ");
 
-		msg->prefix = Z_Malloc(len + 1);
+		msg->prefix = Mem_Alloc(irc_mempool, len + 1);
 		memcpy(msg->prefix, line, len);
 		msg->prefix[len] = 0;
 
@@ -192,7 +194,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 
 	len = strcspn(line, " ");
 
-	msg->command = Z_Malloc(len + 1);
+	msg->command = Mem_Alloc(irc_mempool, len + 1);
 	memcpy(msg->command, line, len);
 	msg->command[len] = 0;
 
@@ -404,7 +406,7 @@ void IRC_Frame(void)
 static char *IRC_NickFromPlayerName(void)
 {
 	char *nick;
-	nick = Z_Malloc(strlen(cl_name.string) + 1);
+	nick = Mem_Alloc(irc_mempool, strlen(cl_name.string) + 1);
 	SanitizeString(cl_name.string, nick);
 	return nick;
 }
@@ -419,7 +421,7 @@ static void IRC_Register(void)
 	IRC_AddMessage(va("NICK %s", irc_nickname.string));
 	IRC_AddMessage(va("USER %s optional optional :%s", irc_nickname.string, nick));
 
-	Z_Free(nick);
+	Mem_Free(nick);
 }
 
 static void IRC_Connect_f(void)
@@ -455,6 +457,8 @@ static void IRC_IRC_f(void)
 
 void IRC_Init(void)
 {
+	irc_mempool = Mem_AllocPool("IRC", 0, NULL);
+
 	Cvar_RegisterVariable(&irc_nickname);
 
 	Cmd_AddCommand("ircconnect", IRC_Connect_f, "connect to an IRC server");
@@ -465,4 +469,6 @@ void IRC_Init(void)
 void IRC_Shutdown(void)
 {
 	IRC_Disconnect();
+
+	Mem_FreePool(&irc_mempool);
 }
