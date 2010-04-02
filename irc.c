@@ -184,7 +184,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 		line += strspn(line, " ");
 	}
 	else
-		msg->prefix = NULL;
+		msg->prefix = Mem_strdup(irc_mempool, "");
 
 	if (line == line_end)
 	{
