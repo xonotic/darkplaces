@@ -296,6 +296,10 @@ static void IRC_ProcessMessage(const char *line)
 		{
 			Con_Printf("[IRC] %.*s has invited you to %s\n", (int) nick_len, msg->prefix, msg->args[1]);
 		}
+		else if (strcmp("PING", msg->command) == 0)
+		{
+			IRC_AddMessage(va("PONG :%s", msg->args[0]));
+		}
 
 		IRC_DumpMessage(msg);
 		IRC_FreeMessage(msg);
