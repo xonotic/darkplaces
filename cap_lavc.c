@@ -13,11 +13,11 @@
 #include <libavutil/pixfmt.h>
 #include <libavutil/opt.h>
 
-static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "avi", "video format to use"};
-static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "mpeg4", "video codec to use"};
-static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "qscale=4", "space separated key=value pairs for video encoder flags"};
-static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "mp3", "audio codec to use"};
-static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "b=128000", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
+static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libvpx", "video codec to use"};
+static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
+static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 
 qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 {
@@ -253,9 +253,10 @@ static int64_t lavc_seek(void *f, int64_t offset, int whence)
 // TODO error checking in this function
 void SCR_CaptureVideo_Lavc_BeginVideo(void)
 {
-	const char *fn = va("%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension);
+	const char *fn;
 	cls.capturevideo.format = CAPTUREVIDEOFORMAT_LAVC;
 	cls.capturevideo.formatextension = cl_capturevideo_lavc_format.string;
+	fn = va("%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension);
 	cls.capturevideo.videofile = FS_OpenRealFile(fn, "wb", false);
 	cls.capturevideo.endvideo = SCR_CaptureVideo_Lavc_EndVideo;
 	cls.capturevideo.videoframes = SCR_CaptureVideo_Lavc_VideoFrames;
