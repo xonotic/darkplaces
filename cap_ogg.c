@@ -886,7 +886,7 @@ static void SCR_CaptureVideo_Ogg_VideoFrames(int num)
 }
 
 typedef int channelmapping_t[8];
-channelmapping_t mapping[8] =
+static channelmapping_t mapping[8] =
 {
 	{ 0, -1, -1, -1, -1, -1, -1, -1 }, // mono
 	{ 0, 1, -1, -1, -1, -1, -1, -1 }, // stereo

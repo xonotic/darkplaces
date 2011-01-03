@@ -60,6 +60,7 @@ cvar_t cl_capturevideo_fps = {CVAR_SAVE, "cl_capturevideo_fps", "30", "how many 
 cvar_t cl_capturevideo_nameformat = {CVAR_SAVE, "cl_capturevideo_nameformat", "dpvideo", "prefix for saved videos (the date is encoded using strftime escapes)"};
 cvar_t cl_capturevideo_number = {CVAR_SAVE, "cl_capturevideo_number", "1", "number to append to video filename, incremented each time a capture begins"};
 cvar_t cl_capturevideo_ogg = {CVAR_SAVE, "cl_capturevideo_ogg", "1", "save captured video data as Ogg/Vorbis/Theora streams"};
+cvar_t cl_capturevideo_lavc = {CVAR_SAVE, "cl_capturevideo_lavc", "1", "save captured video data as libavcodec streams"};
 cvar_t cl_capturevideo_framestep = {CVAR_SAVE, "cl_capturevideo_framestep", "1", "when set to n >= 1, render n frames to capture one (useful for motion blur like effects)"};
 cvar_t r_letterbox = {0, "r_letterbox", "0", "reduces vertical height of view to simulate a letterboxed movie effect (can be used by mods for cutscenes)"};
 cvar_t r_stereo_separation = {0, "r_stereo_separation", "4", "separation distance of eyes in the world (negative values are only useful for cross-eyed viewing)"};
@@ -933,6 +934,7 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable (&cl_capturevideo_nameformat);
 	Cvar_RegisterVariable (&cl_capturevideo_number);
 	Cvar_RegisterVariable (&cl_capturevideo_ogg);
+	Cvar_RegisterVariable (&cl_capturevideo_lavc);
 	Cvar_RegisterVariable (&cl_capturevideo_framestep);
 	Cvar_RegisterVariable (&r_letterbox);
 	Cvar_RegisterVariable(&r_stereo_separation);
@@ -960,6 +962,7 @@ void CL_Screen_Init(void)
 	Cmd_AddCommand ("infobar", SCR_InfoBar_f, "display a text in the infobar (usage: infobar expiretime string)");
 
 	SCR_CaptureVideo_Ogg_Init();
+	SCR_CaptureVideo_Lavc_Init();
 
 	scr_initialized = true;
 }
@@ -1158,6 +1161,17 @@ Cr = R *  .500 + G * -.419 + B * -.0813 + 128.;
 		cls.capturevideo.yuvnormalizetable[0][i] = 16 + i * (236-16) / 256;
 		cls.capturevideo.yuvnormalizetable[1][i] = 16 + i * (240-16) / 256;
 		cls.capturevideo.yuvnormalizetable[2][i] = 16 + i * (240-16) / 256;
+	}
+
+	if (cl_capturevideo_lavc.integer)
+	{
+		if(SCR_CaptureVideo_Lavc_Available())
+		{
+			SCR_CaptureVideo_Lavc_BeginVideo();
+			return;
+		}
+		else
+			Con_Print("cl_capturevideo_lavc: libraries not available. Capturing in Ogg instead.\n");
 	}
 
 	if (cl_capturevideo_ogg.integer)
