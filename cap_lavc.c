@@ -106,8 +106,6 @@ static void SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(AVFrame *frame)
 			b += 4;
 		}
 
-	// format->yuv = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height + ((cls.capturevideo.width + 1) / 2) * ((cls.capturevideo.height + 1) / 2));
-
 		if((y & 1) == 0)
 		{
 			for(b = cls.capturevideo.outbuffer + (h-2-y)*w*4, x = 0; x < (w+1)/2; ++x)
@@ -182,6 +180,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 		int *map = mapping[bound(1, cls.capturevideo.soundchannels, 8) - 1];
 		size_t bufpos = 0;
 
+		// FIXME encode the rest of the buffer at the end of the video, filled with zeroes!
 		while(bufpos < length)
 		{
 			// fill up buffer
@@ -224,6 +223,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 }
 
 // TODO error checking in this function
+// TODO parameters in this function
 void SCR_CaptureVideo_Lavc_BeginVideo(void)
 {
 	cls.capturevideo.format = CAPTUREVIDEOFORMAT_LAVC;
@@ -330,7 +330,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		av_write_header(format->avf);
 
 		format->buffer = Z_Malloc(format->bufsize);
-
 		format->yuv = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height + ((cls.capturevideo.width + 1) / 2) * ((cls.capturevideo.height + 1) / 2) * 2);
 	}
 }
