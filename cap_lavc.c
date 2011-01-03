@@ -16,8 +16,8 @@
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "avi", "video format to use"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "mpeg4", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "qscale=4", "space separated key=value pairs for video encoder flags"};
-static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "mp3", "audio codec to use"};
-static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "b=128000", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "mp3", "audio codec to use"};
+static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "b=128000", "space separated key=value pairs for video encoder flags"};
 
 qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 {
