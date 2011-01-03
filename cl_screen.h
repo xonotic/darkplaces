@@ -23,5 +23,7 @@ void CL_UpdateScreen(void);
 qboolean R_Stereo_Active(void);
 qboolean R_Stereo_ColorMasking(void);
 
+void SCR_CaptureVideo_EndVideo(void);
+
 #endif
 

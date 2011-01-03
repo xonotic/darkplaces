@@ -9,6 +9,7 @@
 #include "csprogs.h"
 #include "cap_avi.h"
 #include "cap_ogg.h"
+#include "cap_lavc.h"
 
 // we have to include snd_main.h here only to get access to snd_renderbuffer->format.speed when writing the AVI headers
 #include "snd_main.h"
