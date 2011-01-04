@@ -7,9 +7,36 @@
 #include "client.h"
 #include "cap_lavc.h"
 
+#ifdef DP_LINK_TO_LAVC
+
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+
+#define qavcodec_register_all avcodec_register_all
+#define qav_register_all av_register_all
+#define qav_write_trailer av_write_trailer
+#define qavcodec_close avcodec_close
+#define qav_free av_free
+#define qavcodec_get_frame_defaults avcodec_get_frame_defaults
+#define qavcodec_encode_video avcodec_encode_video
+#define qavcodec_encode_audio avcodec_encode_audio
+#define qav_init_packet av_init_packet
+#define qav_interleaved_write_frame av_interleaved_write_frame
+#define qavformat_alloc_context avformat_alloc_context
+#define qav_guess_format av_guess_format
+#define qav_new_stream av_new_stream
+#define qavcodec_find_encoder_by_name avcodec_find_encoder_by_name
+#define qav_set_options_string av_set_options_string
+#define qavcodec_open avcodec_open
+#define qav_get_bits_per_sample av_get_bits_per_sample
+#define qav_alloc_put_byte av_alloc_put_byte
+#define qav_write_header av_write_header
+
+#else
+
 #define FF_MIN_BUFFER_SIZE 16384
-#define AVFMT_GLOBALHEADER  0x0040 /**< Format wants global header. */
-#define CODEC_FLAG_GLOBAL_HEADER  0x00400000
+#define AVFMT_GLOBALHEADER 0x0040
+#define CODEC_FLAG_GLOBAL_HEADER 0x00400000
 
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
@@ -266,25 +293,27 @@ typedef struct AVOutputFormat {
     // remaining fields stripped
 } AVOutputFormat;
 
-void avcodec_register_all(void);
-void av_register_all(void);
-int av_write_trailer(AVFormatContext *s);
-int avcodec_close(AVCodecContext *avctx);
-void av_free(void *ptr);
-void avcodec_get_frame_defaults(AVFrame *pic);
-int avcodec_encode_video(AVCodecContext *avctx, uint8_t *buf, int buf_size, const AVFrame *pict);
-int avcodec_encode_audio(AVCodecContext *avctx, uint8_t *buf, int buf_size, const short *samples);
-void av_init_packet(AVPacket *pkt);
-int av_interleaved_write_frame(AVFormatContext *s, AVPacket *pkt);
-AVFormatContext *avformat_alloc_context(void);
-AVOutputFormat *av_guess_format(const char *short_name, const char *filename, const char *mime_type);
-AVStream *av_new_stream(AVFormatContext *s, int id);
-AVCodec *avcodec_find_encoder_by_name(const char *name);
-int av_set_options_string(void *ctx, const char *opts, const char *key_val_sep, const char *pairs_sep);
-int avcodec_open(AVCodecContext *avctx, AVCodec *codec);
-int av_get_bits_per_sample(enum CodecID codec_id);
-ByteIOContext *av_alloc_put_byte( unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, uint8_t *buf, int buf_size), int (*write_packet)(void *opaque, uint8_t *buf, int buf_size), int64_t (*seek)(void *opaque, int64_t offset, int whence));
-int av_write_header(AVFormatContext *s);
+void (*qavcodec_register_all) (void);
+void (*qav_register_all) (void);
+int (*qav_write_trailer) (AVFormatContext *s);
+int (*qavcodec_close) (AVCodecContext *avctx);
+void (*qav_free) (void *ptr);
+void (*qavcodec_get_frame_defaults) (AVFrame *pic);
+int (*qavcodec_encode_video) (AVCodecContext *avctx, uint8_t *buf, int buf_size, const AVFrame *pict);
+int (*qavcodec_encode_audio) (AVCodecContext *avctx, uint8_t *buf, int buf_size, const short *samples);
+void (*qav_init_packet) (AVPacket *pkt);
+int (*qav_interleaved_write_frame) (AVFormatContext *s, AVPacket *pkt);
+AVFormatContext * (*qavformat_alloc_context) (void);
+AVOutputFormat * (*qav_guess_format) (const char *short_name, const char *filename, const char *mime_type);
+AVStream * (*qav_new_stream) (AVFormatContext *s, int id);
+AVCodec * (*qavcodec_find_encoder_by_name) (const char *name);
+int (*qav_set_options_string) (void *ctx, const char *opts, const char *key_val_sep, const char *pairs_sep);
+int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
+int (*qav_get_bits_per_sample) (enum CodecID codec_id);
+ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, uint8_t *buf, int buf_size), int (*write_packet)(void *opaque, uint8_t *buf, int buf_size), int64_t (*seek) (void *opaque, int64_t offset, int whence));
+int (*qav_write_header) (AVFormatContext *s);
+
+#endif
 
 #ifdef DEFAULT_VP8
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
@@ -311,8 +340,8 @@ qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 
 void SCR_CaptureVideo_Lavc_Init(void)
 {
-	avcodec_register_all();
-	av_register_all();
+	qavcodec_register_all();
+	qav_register_all();
 	Cvar_RegisterVariable(&cl_capturevideo_lavc_format);
 	Cvar_RegisterVariable(&cl_capturevideo_lavc_vcodec);
 	Cvar_RegisterVariable(&cl_capturevideo_lavc_voptions);
@@ -345,34 +374,6 @@ typedef struct capturevideostate_lavc_formatspecific_s
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
-
-static void SCR_CaptureVideo_Lavc_EndVideo(void)
-{
-	LOAD_FORMATSPECIFIC_LAVC();
-
-	if(format->buffer)
-	{
-		av_write_trailer(format->avf);
-		{
-			unsigned int i;
-			for (i = 0; i < format->avf->nb_streams; i++) {
-				avcodec_close(format->avf->streams[i]->codec);
-				av_free(format->avf->streams[i]->codec);
-				av_free(format->avf->streams[i]->info);
-				av_free(format->avf->streams[i]);
-			}
-			av_free(format->avf->pb);
-			av_free(format->avf);
-		}
-		Mem_Free(format->buffer);
-	}
-	if(format->aframe)
-		Mem_Free(format->aframe);
-	Mem_Free(format);
-
-	FS_Close(cls.capturevideo.videofile);
-	cls.capturevideo.videofile = NULL;
-}
 
 static void SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(AVFrame *frame)
 {
@@ -436,21 +437,21 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 	AVFrame frame;
 	int size;
 
-	avcodec_get_frame_defaults(&frame);
+	qavcodec_get_frame_defaults(&frame);
 	SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
 	frame.pts = format->vpts;
-	size = avcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
+	size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
 	if(size < 0)
 		Con_Printf("error encoding\n");
 	if(size > 0)
 	{
 		AVPacket packet;
-		av_init_packet(&packet);
+		qav_init_packet(&packet);
 		packet.stream_index = 0;
 		packet.data = format->buffer;
 		packet.size = size;
 		packet.pts = format->vpts;
-		if(av_interleaved_write_frame(format->avf, &packet) < 0)
+		if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 			Con_Printf("error writing\n");
 	}
 
@@ -471,6 +472,34 @@ static channelmapping_t mapping[8] =
 	{ 0, 2, 3, 4, 1, 5, 6, 7 } // surround71 (not defined by vorbis spec)
 };
 
+static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
+{
+	LOAD_FORMATSPECIFIC_LAVC();
+	int size;
+	AVCodecContext *avc = format->avf->streams[1]->codec;
+
+	if(format->pcmhack)
+		size = qavcodec_encode_audio(avc, format->buffer, format->aframesize * format->pcmhack, format->aframe);
+	else
+		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
+	if(size < 0)
+		Con_Printf("error encoding\n");
+	if(size > 0)
+	{
+		AVPacket packet;
+		qav_init_packet(&packet);
+		packet.stream_index = 1;
+		packet.data = format->buffer;
+		packet.size = size;
+		packet.pts = format->apts;
+		if(qav_interleaved_write_frame(format->avf, &packet) < 0)
+			Con_Printf("error writing\n");
+	}
+
+	format->apts += avc->frame_size;
+	format->aframepos = 0;
+}
+
 static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paintbuffer, size_t length)
 {
 	LOAD_FORMATSPECIFIC_LAVC();
@@ -478,54 +507,71 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 	if(cls.capturevideo.soundrate)
 	{
 		AVCodecContext *avc = format->avf->streams[1]->codec;
-		int size;
 		int i;
 		int *map = mapping[bound(1, cls.capturevideo.soundchannels, 8) - 1];
 		size_t bufpos = 0;
 
 		// FIXME encode the rest of the buffer at the end of the video, filled with zeroes!
-		while(bufpos < length)
+		if(paintbuffer)
 		{
-			// fill up buffer
-			while(bufpos < length && format->aframepos < format->aframesize)
+			while(bufpos < length)
 			{
-				for(i = 0; i < cls.capturevideo.soundchannels; ++i)
-					format->aframe[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i];
-				++bufpos;
-				++format->aframepos;
-			}
-
-			if(format->aframepos >= avc->frame_size)
-			{
-				if(format->pcmhack)
-					size = avcodec_encode_audio(avc, format->buffer, format->aframesize * format->pcmhack, format->aframe);
-				else
-					size = avcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
-				if(size < 0)
-					Con_Printf("error encoding\n");
-				if(size > 0)
+				// fill up buffer
+				while(bufpos < length && format->aframepos < format->aframesize)
 				{
-					AVPacket packet;
-					av_init_packet(&packet);
-					packet.stream_index = 1;
-					packet.data = format->buffer;
-					packet.size = size;
-					packet.pts = format->apts;
-					if(av_interleaved_write_frame(format->avf, &packet) < 0)
-						Con_Printf("error writing\n");
+					for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+						format->aframe[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i];
+					++bufpos;
+					++format->aframepos;
 				}
 
-				format->apts += avc->frame_size;
-				format->aframepos = 0;
-			}
-			else
-			{
-				// if we get here, frame_size was not hit
-				// this means that length has been hit!
-				break;
+				if(format->aframepos >= avc->frame_size)
+				{
+					SCR_CaptureVideo_Lavc_SoundFrame_Encode();
+				}
+				else
+				{
+					// if we get here, frame_size was not hit
+					// this means that length has been hit!
+					break;
+				}
 			}
 		}
+		else
+		{
+			memset(format->aframe + format->aframepos*cls.capturevideo.soundchannels, 0, sizeof(format->aframe[0]) * (format->aframesize - format->aframepos));
+			SCR_CaptureVideo_Lavc_SoundFrame_Encode();
+		}
 	}
+}
+
+static void SCR_CaptureVideo_Lavc_EndVideo(void)
+{
+	LOAD_FORMATSPECIFIC_LAVC();
+
+	if(format->buffer)
+	{
+		SCR_CaptureVideo_Lavc_SoundFrame(NULL, 0);
+		qav_write_trailer(format->avf);
+		{
+			unsigned int i;
+			for (i = 0; i < format->avf->nb_streams; i++) {
+				qavcodec_close(format->avf->streams[i]->codec);
+				qav_free(format->avf->streams[i]->codec);
+				qav_free(format->avf->streams[i]->info);
+				qav_free(format->avf->streams[i]);
+			}
+			qav_free(format->avf->pb);
+			qav_free(format->avf);
+		}
+		Mem_Free(format->buffer);
+	}
+	if(format->aframe)
+		Mem_Free(format->aframe);
+	Mem_Free(format);
+
+	FS_Close(cls.capturevideo.videofile);
+	cls.capturevideo.videofile = NULL;
 }
 
 static int lavc_write(void *f, uint8_t *buf, int bufsize)
@@ -558,8 +604,8 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 		format->bufsize = FF_MIN_BUFFER_SIZE;
 
-		format->avf = avformat_alloc_context();
-		format->avf->oformat = av_guess_format(NULL, va("%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension), NULL);
+		format->avf = qavformat_alloc_context();
+		format->avf->oformat = qav_guess_format(NULL, va("%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension), NULL);
 		if(!format->avf->oformat)
 		{
 			Con_Printf("Failed to find format\n");
@@ -568,10 +614,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		}
 		strlcpy(format->avf->filename, fn, sizeof(format->avf->filename));
 
-		video_str = av_new_stream(format->avf, 0);
+		video_str = qav_new_stream(format->avf, 0);
 		video_str->codec->codec_type = AVMEDIA_TYPE_VIDEO;
 
-		encoder = avcodec_find_encoder_by_name(cl_capturevideo_lavc_vcodec.string);
+		encoder = qavcodec_find_encoder_by_name(cl_capturevideo_lavc_vcodec.string);
 		if(!encoder)
 		{
 			Con_Printf("Failed to find encoder\n");
@@ -579,7 +625,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			return;
 		}
 		video_str->codec->codec_id = encoder->id;
-		if(av_set_options_string(video_str->codec, cl_capturevideo_lavc_voptions.string, "=", " \t") < 0)
+		if(qav_set_options_string(video_str->codec, cl_capturevideo_lavc_voptions.string, "=", " \t") < 0)
 		{
 			Con_Printf("Failed to set video options\n");
 		}
@@ -601,7 +647,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
 			video_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 
-		if(avcodec_open(video_str->codec, encoder) < 0)
+		if(qavcodec_open(video_str->codec, encoder) < 0)
 		{
 			Con_Printf("Failed to open encoder\n");
 			SCR_CaptureVideo_EndVideo();
@@ -614,10 +660,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		if(cls.capturevideo.soundrate)
 		{
 			AVStream *audio_str;
-			audio_str = av_new_stream(format->avf, 0);
+			audio_str = qav_new_stream(format->avf, 0);
 			audio_str->codec->codec_type = AVMEDIA_TYPE_AUDIO;
 
-			encoder = avcodec_find_encoder_by_name(cl_capturevideo_lavc_acodec.string);
+			encoder = qavcodec_find_encoder_by_name(cl_capturevideo_lavc_acodec.string);
 			if(!encoder)
 			{
 				Con_Printf("Failed to find encoder\n");
@@ -625,7 +671,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				return;
 			}
 			audio_str->codec->codec_id = encoder->id;
-			if(av_set_options_string(audio_str->codec, cl_capturevideo_lavc_aoptions.string, "=", " \t") < 0)
+			if(qav_set_options_string(audio_str->codec, cl_capturevideo_lavc_aoptions.string, "=", " \t") < 0)
 			{
 				Con_Printf("Failed to set audio options\n");
 			}
@@ -640,7 +686,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
 				audio_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
 
-			if(avcodec_open(audio_str->codec, encoder) < 0)
+			if(qavcodec_open(audio_str->codec, encoder) < 0)
 			{
 				Con_Printf("Failed to open encoder\n");
 				SCR_CaptureVideo_EndVideo();
@@ -650,7 +696,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			// is it a nasty PCM codec?
 			if(audio_str->codec->frame_size <= 1)
 			{
-				format->pcmhack = av_get_bits_per_sample(audio_str->codec->codec_id) / 8;
+				format->pcmhack = qav_get_bits_per_sample(audio_str->codec->codec_id) / 8;
 			}
 
 			format->aframesize = audio_str->codec->frame_size;
@@ -667,8 +713,8 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				format->bufsize = max(format->bufsize, format->aframesize * sizeof(*format->aframe) * cls.capturevideo.soundchannels * 2 + 200);
 		}
 
-		format->avf->pb = av_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
-		if(av_write_header(format->avf) < 0)
+		format->avf->pb = qav_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
+		if(qav_write_header(format->avf) < 0)
 		{
 			Con_Printf("Failed to write header\n");
 			SCR_CaptureVideo_EndVideo();
