@@ -400,6 +400,8 @@ static dllfunction_t libavcodec_funcs[] =
 	{"avcodec_get_frame_defaults",		(void **) &qavcodec_get_frame_defaults},
 	{"avcodec_open",			(void **) &qavcodec_open},
 	{"avcodec_register_all",		(void **) &qavcodec_register_all},
+	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
+	{"av_init_packet",			(void **) &qav_init_packet},
 	{NULL, NULL}
 };
 
@@ -408,9 +410,7 @@ static dllfunction_t libavformat_funcs[] =
 {
 	{"av_alloc_put_byte",			(void **) &qav_alloc_put_byte},
 	{"avformat_alloc_context",		(void **) &qavformat_alloc_context},
-	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
 	{"av_guess_format",			(void **) &qav_guess_format},
-	{"av_init_packet",			(void **) &qav_init_packet},
 	{"av_interleaved_write_frame",		(void **) &qav_interleaved_write_frame},
 	{"av_new_stream",			(void **) &qav_new_stream},
 	{"av_register_all",			(void **) &qav_register_all},
@@ -431,19 +431,31 @@ qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 {
 	const char* libavcodec_dllnames [] =
 	{
+#if defined(WIN32)
+		"avcodec-" LIBAVCODEC_VERSION_MAJOR_STRING ".dll",
+#else
 		"libavcodec.so." LIBAVCODEC_VERSION_MAJOR_STRING,
+#endif
 		NULL
 	};
 
 	const char* libavformat_dllnames [] =
 	{
+#if defined(WIN32)
+		"avformat-" LIBAVFORMAT_VERSION_MAJOR_STRING ".dll",
+#else
 		"libavformat.so." LIBAVFORMAT_VERSION_MAJOR_STRING,
+#endif
 		NULL
 	};
 
 	const char* libavutil_dllnames [] =
 	{
+#if defined(WIN32)
+		"avutil-" LIBAVUTIL_VERSION_MAJOR_STRING ".dll",
+#else
 		"libavutil.so." LIBAVUTIL_VERSION_MAJOR_STRING,
+#endif
 		NULL
 	};
 
@@ -471,13 +483,13 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 
 #endif
 
-#ifdef DEFAULT_VP8
+#if DEFAULT_VP8
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libvpx", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
-#else
+#elif DEFAULT_X264
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mp4", "video format to use"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libx264", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions",
@@ -486,6 +498,12 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 	/* baseline */ "coder=0 bf=0 flags2=-wpred-dct8x8 wpredp=0",
 	"space separated key=value pairs for video encoder flags"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "aac", "audio codec to use"};
+static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
+#else
+static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "ogg", "video format to use"};
+static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "huffyuv", "video codec to use"};
+static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #endif
 
