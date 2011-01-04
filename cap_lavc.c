@@ -59,6 +59,7 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 #else
 
 #ifdef WIN32
+// MSVC does not know *int*_t
 typedef unsigned __int64 qint64_t;
 typedef   signed __int64 quint64_t;
 typedef unsigned __int32 qint32_t;
