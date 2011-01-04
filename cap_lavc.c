@@ -11,6 +11,7 @@
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/opt.h>
 
 #define qavcodec_register_all avcodec_register_all
 #define qav_register_all av_register_all
@@ -32,11 +33,40 @@
 #define qav_alloc_put_byte av_alloc_put_byte
 #define qav_write_header av_write_header
 
+qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
+{
+	return 1;
+}
+
+void SCR_CaptureVideo_Lavc_CloseLibrary(void)
+{
+}
+
+qboolean SCR_CaptureVideo_Lavc_Available(void)
+{
+	return 1;
+}
+
 #else
 
 #define FF_MIN_BUFFER_SIZE 16384
 #define AVFMT_GLOBALHEADER 0x0040
 #define CODEC_FLAG_GLOBAL_HEADER 0x00400000
+
+#define LIBAVCODEC_VERSION_MAJOR 52
+#define LIBAVCODEC_VERSION_MAJOR_STRING "52"
+#define LIBAVFORMAT_VERSION_MAJOR 52
+#define LIBAVFORMAT_VERSION_MAJOR_STRING "52"
+#define LIBAVUTIL_VERSION_MAJOR 50
+#define LIBAVUTIL_VERSION_MAJOR_STRING "50"
+
+#define FF_API_OLD_METADATA            (LIBAVFORMAT_VERSION_MAJOR < 53)
+#define FF_API_LAVF_UNUSED             (LIBAVFORMAT_VERSION_MAJOR < 53)
+#define FF_API_MAX_STREAMS             (LIBAVFORMAT_VERSION_MAJOR < 53)
+
+#ifdef FF_API_MAX_STREAMS
+#define MAX_STREAMS 20
+#endif
 
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
@@ -68,6 +98,7 @@ typedef struct AVCodec {
     const char *name;
     enum AVMediaType type;
     enum CodecID id;
+    // remaining fields stripped
 } AVCodec;
 
 typedef struct AVProbeData {
@@ -146,7 +177,9 @@ typedef struct AVCodecContext {
     enum AVSampleFormat sample_fmt;
     int frame_size;
     int frame_number;
+#if LIBAVCODEC_VERSION_MAJOR < 53
     int real_pict_num;
+#endif
     int delay;
     float qcompress;
     float qblur;
@@ -235,6 +268,9 @@ typedef struct AVStream {
     float quality;
     int64_t start_time;
     int64_t duration;
+#if FF_API_OLD_METADATA
+    char language[4];
+#endif
     enum AVStreamParseType need_parsing;
     struct AVCodecParserContext *parser;
     int64_t cur_dts;
@@ -244,6 +280,12 @@ typedef struct AVStream {
     int nb_index_entries;
     unsigned int index_entries_allocated_size;
     int64_t nb_frames;
+#if FF_API_LAVF_UNUSED
+    int64_t unused[4+1];
+#endif
+#if FF_API_OLD_METADATA
+    char *filename;
+#endif
     int disposition;
     AVProbeData probe_data;
     int64_t pts_buffer[16 +1];
@@ -273,7 +315,11 @@ typedef struct AVFormatContext {
     void *priv_data;
     ByteIOContext *pb;
     unsigned int nb_streams;
+#if FF_API_MAX_STREAMS
+    AVStream *streams[MAX_STREAMS];
+#else
     AVStream **streams;
+#endif
     char filename[1024];
     // remaining fields stripped
 } AVFormatContext;
@@ -313,6 +359,85 @@ int (*qav_get_bits_per_sample) (enum CodecID codec_id);
 ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, uint8_t *buf, int buf_size), int (*write_packet)(void *opaque, uint8_t *buf, int buf_size), int64_t (*seek) (void *opaque, int64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
 
+static void *libavcodec_dll = NULL;
+static dllfunction_t libavcodec_funcs[] =
+{
+	{"avcodec_close",			(void **) &qavcodec_close},
+	{"avcodec_encode_audio",		(void **) &qavcodec_encode_audio},
+	{"avcodec_encode_video",		(void **) &qavcodec_encode_video},
+	{"avcodec_find_encoder_by_name",	(void **) &qavcodec_find_encoder_by_name},
+	{"avcodec_get_frame_defaults",		(void **) &qavcodec_get_frame_defaults},
+	{"avcodec_open",			(void **) &qavcodec_open},
+	{"avcodec_register_all",		(void **) &qavcodec_register_all},
+	{NULL, NULL}
+};
+
+static void *libavformat_dll = NULL;
+static dllfunction_t libavformat_funcs[] =
+{
+	{"av_alloc_put_byte",			(void **) &qav_alloc_put_byte},
+	{"avformat_alloc_context",		(void **) &qavformat_alloc_context},
+	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
+	{"av_guess_format",			(void **) &qav_guess_format},
+	{"av_init_packet",			(void **) &qav_init_packet},
+	{"av_interleaved_write_frame",		(void **) &qav_interleaved_write_frame},
+	{"av_new_stream",			(void **) &qav_new_stream},
+	{"av_register_all",			(void **) &qav_register_all},
+	{"av_write_header",			(void **) &qav_write_header},
+	{"av_write_trailer",			(void **) &qav_write_trailer},
+	{NULL, NULL}
+};
+
+static void *libavutil_dll = NULL;
+static dllfunction_t libavutil_funcs[] =
+{
+	{"av_set_options_string",		(void **) &qav_set_options_string},
+	{"av_free",				(void **) &qav_free},
+	{NULL, NULL}
+};
+
+qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
+{
+	const char* libavcodec_dllnames [] =
+	{
+		"libavcodec.so." LIBAVCODEC_VERSION_MAJOR_STRING,
+		NULL
+	};
+
+	const char* libavformat_dllnames [] =
+	{
+		"libavformat.so." LIBAVFORMAT_VERSION_MAJOR_STRING,
+		NULL
+	};
+
+	const char* libavutil_dllnames [] =
+	{
+		"libavutil.so." LIBAVUTIL_VERSION_MAJOR_STRING,
+		NULL
+	};
+
+	if (!libavcodec_dll)
+		 Sys_LoadLibrary (libavcodec_dllnames, &libavcodec_dll, libavcodec_funcs);
+	if (!libavformat_dll)
+		 Sys_LoadLibrary (libavformat_dllnames, &libavformat_dll, libavformat_funcs);
+	if (!libavutil_dll)
+		 Sys_LoadLibrary (libavutil_dllnames, &libavutil_dll, libavutil_funcs);
+
+	return libavcodec_dll && libavformat_dll && libavutil_dll;
+}
+
+void SCR_CaptureVideo_Lavc_CloseLibrary(void)
+{
+	Sys_UnloadLibrary(&libavutil_dll);
+	Sys_UnloadLibrary(&libavformat_dll);
+	Sys_UnloadLibrary(&libavcodec_dll);
+}
+
+qboolean SCR_CaptureVideo_Lavc_Available(void)
+{
+	return libavcodec_dll && libavformat_dll && libavutil_dll;
+}
+
 #endif
 
 #ifdef DEFAULT_VP8
@@ -333,29 +458,23 @@ static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_ac
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #endif
 
-qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
-{
-	return 1;
-}
-
 void SCR_CaptureVideo_Lavc_Init(void)
 {
-	qavcodec_register_all();
-	qav_register_all();
-	Cvar_RegisterVariable(&cl_capturevideo_lavc_format);
-	Cvar_RegisterVariable(&cl_capturevideo_lavc_vcodec);
-	Cvar_RegisterVariable(&cl_capturevideo_lavc_voptions);
-	Cvar_RegisterVariable(&cl_capturevideo_lavc_acodec);
-	Cvar_RegisterVariable(&cl_capturevideo_lavc_aoptions);
+	if(SCR_CaptureVideo_Lavc_OpenLibrary())
+	{
+		qavcodec_register_all();
+		qav_register_all();
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_format);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_vcodec);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_voptions);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_acodec);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_aoptions);
+	}
 }
 
-qboolean SCR_CaptureVideo_Lavc_Available(void)
+void SCR_CaptureVideo_Lavc_Shutdown(void)
 {
-	return 1;
-}
-
-void SCR_CaptureVideo_Lavc_CloseDLL(void)
-{
+	SCR_CaptureVideo_Lavc_CloseLibrary();
 }
 
 typedef struct capturevideostate_lavc_formatspecific_s
