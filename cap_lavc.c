@@ -60,14 +60,14 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 
 #ifdef WIN32
 // MSVC does not know *int*_t
-typedef unsigned __int64 qint64_t;
-typedef   signed __int64 quint64_t;
-typedef unsigned __int32 qint32_t;
-typedef   signed __int32 quint32_t;
-typedef unsigned __int16 qint16_t;
-typedef   signed __int16 quint16_t;
-typedef unsigned __int8  qint8_t;
-typedef   signed __int8  quint8_t;
+typedef   signed __int64 qint64_t;
+typedef unsigned __int64 quint64_t;
+typedef   signed __int32 qint32_t;
+typedef unsigned __int32 quint32_t;
+typedef   signed __int16 qint16_t;
+typedef unsigned __int16 quint16_t;
+typedef   signed __int8  qint8_t;
+typedef unsigned __int8  quint8_t;
 #else
 // sane assumptions, but not always true...
 typedef long long          qint64_t;
@@ -390,7 +390,7 @@ int (*qav_get_bits_per_sample) (enum CodecID codec_id);
 ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
 
-static void *libavcodec_dll = NULL;
+static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
 {
 	{"avcodec_close",			(void **) &qavcodec_close},
@@ -403,7 +403,7 @@ static dllfunction_t libavcodec_funcs[] =
 	{NULL, NULL}
 };
 
-static void *libavformat_dll = NULL;
+static dllhandle_t libavformat_dll = NULL;
 static dllfunction_t libavformat_funcs[] =
 {
 	{"av_alloc_put_byte",			(void **) &qav_alloc_put_byte},
@@ -419,7 +419,7 @@ static dllfunction_t libavformat_funcs[] =
 	{NULL, NULL}
 };
 
-static void *libavutil_dll = NULL;
+static dllhandle_t libavutil_dll = NULL;
 static dllfunction_t libavutil_funcs[] =
 {
 	{"av_set_options_string",		(void **) &qav_set_options_string},
