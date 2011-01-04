@@ -1194,6 +1194,7 @@ void SCR_CaptureVideo_EndVideo(void)
 	if (!cls.capturevideo.active)
 		return;
 	cls.capturevideo.active = false;
+	Cvar_SetValueQuick(&cl_capturevideo, 0);
 
 	Con_Printf("Finishing capture of %s.%s (%d frames, %d audio frames)\n", cls.capturevideo.basename, cls.capturevideo.formatextension, cls.capturevideo.frame, cls.capturevideo.soundsampleframe);
 
@@ -1312,6 +1313,8 @@ void SCR_CaptureVideo(void)
 	{
 		if (!cls.capturevideo.active)
 			SCR_CaptureVideo_BeginVideo();
+		if(!cls.capturevideo.active)
+			return;
 		if (cls.capturevideo.framerate != cl_capturevideo_fps.value * cl_capturevideo_framestep.integer)
 		{
 			Con_Printf("You can not change the video framerate while recording a video.\n");
@@ -1330,7 +1333,6 @@ void SCR_CaptureVideo(void)
 		// if falling behind more than one second, stop
 		if (newframenum - cls.capturevideo.frame > 60 * (int)ceil(cls.capturevideo.framerate))
 		{
-			Cvar_SetValueQuick(&cl_capturevideo, 0);
 			Con_Printf("video saving failed on frame %i, your machine is too slow for this capture speed.\n", cls.capturevideo.frame);
 			SCR_CaptureVideo_EndVideo();
 			return;
@@ -1340,7 +1342,6 @@ void SCR_CaptureVideo(void)
 		cls.capturevideo.frame = newframenum;
 		if (cls.capturevideo.error)
 		{
-			Cvar_SetValueQuick(&cl_capturevideo, 0);
 			Con_Printf("video saving failed on frame %i, out of disk space? stopping video capture.\n", cls.capturevideo.frame);
 			SCR_CaptureVideo_EndVideo();
 		}

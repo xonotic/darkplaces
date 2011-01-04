@@ -886,6 +886,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		{
 			Con_Printf("Failed to write header\n");
 			SCR_CaptureVideo_EndVideo();
+			return;
 		}
 
 		format->buffer = Z_Malloc(format->bufsize);
