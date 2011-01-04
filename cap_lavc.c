@@ -33,6 +33,15 @@
 #define qav_alloc_put_byte av_alloc_put_byte
 #define qav_write_header av_write_header
 
+typedef  int64_t qint64_t;
+typedef uint64_t quint64_t;
+typedef  int32_t qint32_t;
+typedef uint32_t quint32_t;
+typedef  int16_t qint16_t;
+typedef uint16_t quint16_t;
+typedef  int8_t  qint8_t;
+typedef uint8_t  quint8_t;
+
 qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 {
 	return 1;
@@ -48,6 +57,27 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 }
 
 #else
+
+#ifdef WIN32
+typedef unsigned __int64 qint64_t;
+typedef   signed __int64 quint64_t;
+typedef unsigned __int32 qint32_t;
+typedef   signed __int32 quint32_t;
+typedef unsigned __int16 qint16_t;
+typedef   signed __int16 quint16_t;
+typedef unsigned __int8  qint8_t;
+typedef   signed __int8  quint8_t;
+#else
+// sane assumptions, but not always true...
+typedef long long          qint64_t;
+typedef unsigned long long quint64_t;
+typedef int                qint32_t;
+typedef unsigned int       quint32_t;
+typedef short              qint16_t;
+typedef unsigned short     quint16_t;
+typedef signed char        qint8_t;
+typedef unsigned char      quint8_t;
+#endif
 
 #define FF_MIN_BUFFER_SIZE 16384
 #define AVFMT_GLOBALHEADER 0x0040
@@ -91,7 +121,7 @@ typedef struct AVRational {
 } AVRational;
 
 typedef struct AVFrac {
-    int64_t val, num, den;
+    qint64_t val, num, den;
 } AVFrac;
 
 typedef struct AVCodec {
@@ -108,25 +138,25 @@ typedef struct AVProbeData {
 } AVProbeData;
 
 typedef struct AVFrame {
-    uint8_t *data[4];
+    quint8_t *data[4];
     int linesize[4];
-    uint8_t *base[4];
+    quint8_t *base[4];
     int key_frame;
     int pict_type;
-    int64_t pts;
+    qint64_t pts;
     int coded_picture_number;
     int display_picture_number;
     int quality;
     int age;
     int reference;
-    int8_t *qscale_table;
+    qint8_t *qscale_table;
     int qstride;
-    uint8_t *mbskip_table;
-    int16_t (*motion_val[2])[2];
-    uint32_t *mb_type;
-    uint8_t motion_subsample_log2;
+    quint8_t *mbskip_table;
+    qint16_t (*motion_val[2])[2];
+    quint32_t *mb_type;
+    quint8_t motion_subsample_log2;
     void *opaque;
-    uint64_t error[4];
+    quint64_t error[4];
     int type;
     int repeat_pict;
     int qscale_type;
@@ -136,25 +166,25 @@ typedef struct AVFrame {
     int palette_has_changed;
     int buffer_hints;
     short *dct_coeff;
-    int8_t *ref_index[2];
-    int64_t reordered_opaque;
+    qint8_t *ref_index[2];
+    qint64_t reordered_opaque;
     void *hwaccel_picture_private;
     struct AVCodecContext *owner;
     void *thread_opaque;
 } AVFrame;
 
 typedef struct AVPacket {
-    int64_t pts;
-    int64_t dts;
-    uint8_t *data;
+    qint64_t pts;
+    qint64_t dts;
+    quint8_t *data;
     int size;
     int stream_index;
     int flags;
     int duration;
     void (*destruct)(struct AVPacket *);
     void *priv;
-    int64_t pos;
-    int64_t convergence_duration;
+    qint64_t pos;
+    qint64_t convergence_duration;
 } AVPacket;
 
 typedef struct AVCodecContext {
@@ -164,7 +194,7 @@ typedef struct AVCodecContext {
     int flags;
     int sub_id;
     int me_method;
-    uint8_t *extradata;
+    quint8_t *extradata;
     int extradata_size;
     AVRational time_base;
     int width, height;
@@ -259,52 +289,52 @@ typedef struct AVStream {
     AVCodecContext *codec;
     AVRational r_frame_rate;
     void *priv_data;
-    int64_t first_dts;
+    qint64_t first_dts;
     struct AVFrac pts;
     AVRational time_base;
     int pts_wrap_bits;
     int stream_copy;
     enum AVDiscard discard;
     float quality;
-    int64_t start_time;
-    int64_t duration;
+    qint64_t start_time;
+    qint64_t duration;
 #if FF_API_OLD_METADATA
     char language[4];
 #endif
     enum AVStreamParseType need_parsing;
     struct AVCodecParserContext *parser;
-    int64_t cur_dts;
+    qint64_t cur_dts;
     int last_IP_duration;
-    int64_t last_IP_pts;
+    qint64_t last_IP_pts;
     AVIndexEntry *index_entries;
     int nb_index_entries;
     unsigned int index_entries_allocated_size;
-    int64_t nb_frames;
+    qint64_t nb_frames;
 #if FF_API_LAVF_UNUSED
-    int64_t unused[4+1];
+    qint64_t unused[4+1];
 #endif
 #if FF_API_OLD_METADATA
     char *filename;
 #endif
     int disposition;
     AVProbeData probe_data;
-    int64_t pts_buffer[16 +1];
+    qint64_t pts_buffer[16 +1];
     AVRational sample_aspect_ratio;
     AVMetadata *metadata;
-    const uint8_t *cur_ptr;
+    const quint8_t *cur_ptr;
     int cur_len;
     AVPacket cur_pkt;
-    int64_t reference_dts;
+    qint64_t reference_dts;
     int probe_packets;
     struct AVPacketList *last_in_packet_buffer;
     AVRational avg_frame_rate;
     int codec_info_nb_frames;
     struct {
-        int64_t last_dts;
-        int64_t duration_gcd;
+        qint64_t last_dts;
+        qint64_t duration_gcd;
         int duration_count;
         double duration_error[(60*12+5)];
-        int64_t codec_info_duration;
+        qint64_t codec_info_duration;
     } *info;
 } AVStream;
 
@@ -345,8 +375,8 @@ int (*qav_write_trailer) (AVFormatContext *s);
 int (*qavcodec_close) (AVCodecContext *avctx);
 void (*qav_free) (void *ptr);
 void (*qavcodec_get_frame_defaults) (AVFrame *pic);
-int (*qavcodec_encode_video) (AVCodecContext *avctx, uint8_t *buf, int buf_size, const AVFrame *pict);
-int (*qavcodec_encode_audio) (AVCodecContext *avctx, uint8_t *buf, int buf_size, const short *samples);
+int (*qavcodec_encode_video) (AVCodecContext *avctx, quint8_t *buf, int buf_size, const AVFrame *pict);
+int (*qavcodec_encode_audio) (AVCodecContext *avctx, quint8_t *buf, int buf_size, const short *samples);
 void (*qav_init_packet) (AVPacket *pkt);
 int (*qav_interleaved_write_frame) (AVFormatContext *s, AVPacket *pkt);
 AVFormatContext * (*qavformat_alloc_context) (void);
@@ -356,7 +386,7 @@ AVCodec * (*qavcodec_find_encoder_by_name) (const char *name);
 int (*qav_set_options_string) (void *ctx, const char *opts, const char *key_val_sep, const char *pairs_sep);
 int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
 int (*qav_get_bits_per_sample) (enum CodecID codec_id);
-ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, uint8_t *buf, int buf_size), int (*write_packet)(void *opaque, uint8_t *buf, int buf_size), int64_t (*seek) (void *opaque, int64_t offset, int whence));
+ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
 
 static void *libavcodec_dll = NULL;
@@ -489,7 +519,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	int aframesize;
 	int aframepos;
 	qboolean pcmhack;
-	uint8_t bytebuffer[32768];
+	quint8_t bytebuffer[32768];
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
@@ -693,12 +723,12 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 	cls.capturevideo.videofile = NULL;
 }
 
-static int lavc_write(void *f, uint8_t *buf, int bufsize)
+static int lavc_write(void *f, quint8_t *buf, int bufsize)
 {
 	return FS_Write((qfile_t *) f, buf, bufsize);
 }
 
-static int64_t lavc_seek(void *f, int64_t offset, int whence)
+static qint64_t lavc_seek(void *f, qint64_t offset, int whence)
 {
 	return FS_Seek((qfile_t *) f, offset, whence);
 }
