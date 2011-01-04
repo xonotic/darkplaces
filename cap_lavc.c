@@ -7,11 +7,284 @@
 #include "client.h"
 #include "cap_lavc.h"
 
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/avstring.h>
-#include <libavutil/pixfmt.h>
-#include <libavutil/opt.h>
+#define FF_MIN_BUFFER_SIZE 16384
+#define AVFMT_GLOBALHEADER  0x0040 /**< Format wants global header. */
+#define CODEC_FLAG_GLOBAL_HEADER  0x00400000
+
+enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
+enum CodecID { CODEC_ID_NONE = 0 };
+enum AVDiscard { AVDISCARD_DEFAULT = 0 };
+enum AVStreamParseType { AVSTREAM_PARSE_NONE = 0 };
+enum PixelFormat { PIX_FMT_YUV420P = 0 };
+enum AVSampleFormat { AV_SAMPLE_FMT_S16 = 1 };
+enum AVMediaType { AVMEDIA_TYPE_VIDEO = 0, AVMEDIA_TYPE_AUDIO = 1 };
+
+typedef struct AVPanScan AVPanScan;
+typedef struct AVClass AVClass;
+typedef struct ByteIOContext ByteIOContext;
+typedef struct AVProgram AVProgram;
+typedef struct AVChapter AVChapter;
+typedef struct AVMetadata AVMetadata;
+typedef struct AVIndexEntry AVIndexEntry;
+typedef struct RcOverride RcOverride;
+
+typedef struct AVRational {
+    int num;
+    int den;
+} AVRational;
+
+typedef struct AVFrac {
+    int64_t val, num, den;
+} AVFrac;
+
+typedef struct AVCodec {
+    const char *name;
+    enum AVMediaType type;
+    enum CodecID id;
+} AVCodec;
+
+typedef struct AVProbeData {
+    const char *filename;
+    unsigned char *buf;
+    int buf_size;
+} AVProbeData;
+
+typedef struct AVFrame {
+    uint8_t *data[4];
+    int linesize[4];
+    uint8_t *base[4];
+    int key_frame;
+    int pict_type;
+    int64_t pts;
+    int coded_picture_number;
+    int display_picture_number;
+    int quality;
+    int age;
+    int reference;
+    int8_t *qscale_table;
+    int qstride;
+    uint8_t *mbskip_table;
+    int16_t (*motion_val[2])[2];
+    uint32_t *mb_type;
+    uint8_t motion_subsample_log2;
+    void *opaque;
+    uint64_t error[4];
+    int type;
+    int repeat_pict;
+    int qscale_type;
+    int interlaced_frame;
+    int top_field_first;
+    AVPanScan *pan_scan;
+    int palette_has_changed;
+    int buffer_hints;
+    short *dct_coeff;
+    int8_t *ref_index[2];
+    int64_t reordered_opaque;
+    void *hwaccel_picture_private;
+    struct AVCodecContext *owner;
+    void *thread_opaque;
+} AVFrame;
+
+typedef struct AVPacket {
+    int64_t pts;
+    int64_t dts;
+    uint8_t *data;
+    int size;
+    int stream_index;
+    int flags;
+    int duration;
+    void (*destruct)(struct AVPacket *);
+    void *priv;
+    int64_t pos;
+    int64_t convergence_duration;
+} AVPacket;
+
+typedef struct AVCodecContext {
+    const AVClass *av_class;
+    int bit_rate;
+    int bit_rate_tolerance;
+    int flags;
+    int sub_id;
+    int me_method;
+    uint8_t *extradata;
+    int extradata_size;
+    AVRational time_base;
+    int width, height;
+    int gop_size;
+    enum PixelFormat pix_fmt;
+    int rate_emu;
+    void (*draw_horiz_band)(struct AVCodecContext *s, const AVFrame *src, int offset[4], int y, int type, int height);
+    int sample_rate;
+    int channels;
+    enum AVSampleFormat sample_fmt;
+    int frame_size;
+    int frame_number;
+    int real_pict_num;
+    int delay;
+    float qcompress;
+    float qblur;
+    int qmin;
+    int qmax;
+    int max_qdiff;
+    int max_b_frames;
+    float b_quant_factor;
+    int rc_strategy;
+    int b_frame_strategy;
+    int hurry_up;
+    struct AVCodec *codec;
+    void *priv_data;
+    int rtp_payload_size;
+    void (*rtp_callback)(struct AVCodecContext *avctx, void *data, int size, int mb_nb);
+    int mv_bits;
+    int header_bits;
+    int i_tex_bits;
+    int p_tex_bits;
+    int i_count;
+    int p_count;
+    int skip_count;
+    int misc_bits;
+    int frame_bits;
+    void *opaque;
+    char codec_name[32];
+    enum AVMediaType codec_type;
+    enum CodecID codec_id;
+    unsigned int codec_tag;
+    int workaround_bugs;
+    int luma_elim_threshold;
+    int chroma_elim_threshold;
+    int strict_std_compliance;
+    float b_quant_offset;
+    int error_recognition;
+    int (*get_buffer)(struct AVCodecContext *c, AVFrame *pic);
+    void (*release_buffer)(struct AVCodecContext *c, AVFrame *pic);
+    int has_b_frames;
+    int block_align;
+    int parse_only;
+    int mpeg_quant;
+    char *stats_out;
+    char *stats_in;
+    float rc_qsquish;
+    float rc_qmod_amp;
+    int rc_qmod_freq;
+    RcOverride *rc_override;
+    int rc_override_count;
+    const char *rc_eq;
+    int rc_max_rate;
+    int rc_min_rate;
+    int rc_buffer_size;
+    float rc_buffer_aggressivity;
+    float i_quant_factor;
+    float i_quant_offset;
+    float rc_initial_cplx;
+    int dct_algo;
+    float lumi_masking;
+    float temporal_cplx_masking;
+    float spatial_cplx_masking;
+    float p_masking;
+    float dark_masking;
+    int idct_algo;
+    int slice_count;
+    int *slice_offset;
+    int error_concealment;
+    unsigned dsp_mask;
+     int bits_per_coded_sample;
+     int prediction_method;
+    AVRational sample_aspect_ratio;
+    // remaining fields stripped
+} AVCodecContext;
+
+typedef struct AVStream {
+    int index;
+    int id;
+    AVCodecContext *codec;
+    AVRational r_frame_rate;
+    void *priv_data;
+    int64_t first_dts;
+    struct AVFrac pts;
+    AVRational time_base;
+    int pts_wrap_bits;
+    int stream_copy;
+    enum AVDiscard discard;
+    float quality;
+    int64_t start_time;
+    int64_t duration;
+    enum AVStreamParseType need_parsing;
+    struct AVCodecParserContext *parser;
+    int64_t cur_dts;
+    int last_IP_duration;
+    int64_t last_IP_pts;
+    AVIndexEntry *index_entries;
+    int nb_index_entries;
+    unsigned int index_entries_allocated_size;
+    int64_t nb_frames;
+    int disposition;
+    AVProbeData probe_data;
+    int64_t pts_buffer[16 +1];
+    AVRational sample_aspect_ratio;
+    AVMetadata *metadata;
+    const uint8_t *cur_ptr;
+    int cur_len;
+    AVPacket cur_pkt;
+    int64_t reference_dts;
+    int probe_packets;
+    struct AVPacketList *last_in_packet_buffer;
+    AVRational avg_frame_rate;
+    int codec_info_nb_frames;
+    struct {
+        int64_t last_dts;
+        int64_t duration_gcd;
+        int duration_count;
+        double duration_error[(60*12+5)];
+        int64_t codec_info_duration;
+    } *info;
+} AVStream;
+
+typedef struct AVFormatContext {
+    const AVClass *av_class;
+    struct AVInputFormat *iformat;
+    struct AVOutputFormat *oformat;
+    void *priv_data;
+    ByteIOContext *pb;
+    unsigned int nb_streams;
+    AVStream **streams;
+    char filename[1024];
+    // remaining fields stripped
+} AVFormatContext;
+
+typedef struct AVOutputFormat {
+    const char *name;
+    const char *long_name;
+    const char *mime_type;
+    const char *extensions;
+    int priv_data_size;
+    enum CodecID audio_codec;
+    enum CodecID video_codec;
+    int (*write_header)(struct AVFormatContext *);
+    int (*write_packet)(struct AVFormatContext *, AVPacket *pkt);
+    int (*write_trailer)(struct AVFormatContext *);
+    int flags;
+    // remaining fields stripped
+} AVOutputFormat;
+
+void avcodec_register_all(void);
+void av_register_all(void);
+int av_write_trailer(AVFormatContext *s);
+int avcodec_close(AVCodecContext *avctx);
+void av_free(void *ptr);
+void avcodec_get_frame_defaults(AVFrame *pic);
+int avcodec_encode_video(AVCodecContext *avctx, uint8_t *buf, int buf_size, const AVFrame *pict);
+int avcodec_encode_audio(AVCodecContext *avctx, uint8_t *buf, int buf_size, const short *samples);
+void av_init_packet(AVPacket *pkt);
+int av_interleaved_write_frame(AVFormatContext *s, AVPacket *pkt);
+AVFormatContext *avformat_alloc_context(void);
+AVOutputFormat *av_guess_format(const char *short_name, const char *filename, const char *mime_type);
+AVStream *av_new_stream(AVFormatContext *s, int id);
+AVCodec *avcodec_find_encoder_by_name(const char *name);
+int av_set_options_string(void *ctx, const char *opts, const char *key_val_sep, const char *pairs_sep);
+int avcodec_open(AVCodecContext *avctx, AVCodec *codec);
+int av_get_bits_per_sample(enum CodecID codec_id);
+ByteIOContext *av_alloc_put_byte( unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, uint8_t *buf, int buf_size), int (*write_packet)(void *opaque, uint8_t *buf, int buf_size), int64_t (*seek)(void *opaque, int64_t offset, int whence));
+int av_write_header(AVFormatContext *s);
 
 #ifdef DEFAULT_VP8
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
