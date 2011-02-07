@@ -180,7 +180,8 @@ OBJ_COMMON= \
 	view.o \
 	wad.o \
 	world.o \
-	zone.o
+	zone.o \
+	irc.o
 
 # note that builddate.c is very intentionally not compiled to a .o before
 # being linked, because it should be recompiled every time an executable is
