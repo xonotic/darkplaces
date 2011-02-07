@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_shadow.h"
 #include "libcurl.h"
 #include "snd_main.h"
+#include "irc.h"
 
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
@@ -2468,6 +2469,7 @@ void CL_Init (void)
 
 	CL_Video_Init();
 	CL_Gecko_Init();
+	CL_Irc_Init();
 }
 
 
