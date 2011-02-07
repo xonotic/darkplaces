@@ -36,6 +36,7 @@ const char* Irc_GetLastChannel(void);
 void Irc_SendMessage(const char *msg);
 int irc_cmd_nick(irc_session_t * session, const char *nick);
 qboolean Irc_CheckHilight(const char* msg);
+qboolean Irc_IsWatchedChannel(const char* chan);
 
 #define IRCEVENT(funcname) void funcname(irc_session_t *session, const char *event, const char *origin, const char **params, unsigned int count)
 #define IRCNUMEVENT(funcname) void funcname (irc_session_t *session, unsigned int event, const char *origin, const char **params, unsigned int count)

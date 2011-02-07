@@ -31,6 +31,7 @@ cvar_t irc_save_target = {CVAR_SAVE, "irc_save_target", "1", "Whether to save ta
 cvar_t irc_current_nick = {CVAR_READONLY, "irc_current_nick", "", "Holds your current IRC nick"};
 cvar_t irc_hilights = {CVAR_SAVE, "irc_hilights", "", "Space separated list of words to hilight"};
 cvar_t irc_autochangetarget = {CVAR_SAVE, "irc_autochangetarget", "0", "if 1, will automatically change target for irc_messagemode when a hilight or a private message is recieved, so you can reply instantly. Requires irc_save_target"};
+cvar_t irc_watched_channels = {CVAR_SAVE, "irc_watched_channels", "", "Space separated list of watched channels. PRIVMSGs from those channels will be always printed to the chat area, regardless of irc_chatwindow setting"};
 
 irc_session_t *irc_session_global = NULL;
 int irc_msgmode;
@@ -54,6 +55,7 @@ void CL_Irc_Init(void)
     Cvar_RegisterVariable(&irc_current_nick);
     Cvar_RegisterVariable(&irc_hilights);
     Cvar_RegisterVariable(&irc_autochangetarget);
+    Cvar_RegisterVariable(&irc_watched_channels);
     
     Cmd_AddCommand ("irc_connect", CL_Irc_Connect_f, "Connects you to the IRC server");
     Cmd_AddCommand ("irc_disconnect", CL_Irc_Disconnect_f, "Disconnects you from the IRC server");
@@ -195,6 +197,7 @@ static void CL_Irc_Say_Universal_f(void)
     int cmdlen, i, j, space;
     const char *cmd, *dest;
     char message[MAX_INPUTLINE];
+    qboolean watched;
 
     if(Cmd_Argc() < 3) switch(irc_msgmode)
     {
@@ -230,9 +233,10 @@ static void CL_Irc_Say_Universal_f(void)
     {
         case MSGMODE_PRIVMSG:
             irc_cmd_msg(irc_session_global, dest, message);
+            watched = Irc_IsWatchedChannel(dest);
             
             if(ISCHANNEL(dest)) Con_Printf("%s%s^3%s^0|^7<^2%s^7> %s\n",
-                CHATWINDOW,
+                watched? "\001" : CHATWINDOW,
                 irc_msgprefix.string,
                 dest,
                 irc_current_nick.string,
@@ -394,13 +398,14 @@ const char* Irc_GetLastChannel(void)
 void Irc_SendMessage(const char *message)
 {
     const char* dest = Irc_GetLastChannel();
+    qboolean watched = Irc_IsWatchedChannel(dest);
     
     MUSTCONNECT
     
     irc_cmd_msg(irc_session_global, dest, message);
             
     if(ISCHANNEL(dest)) Con_Printf("%s%s^3%s^0|^7<^2%s^7> %s\n",
-        CHATWINDOW,
+        watched? "\001" : CHATWINDOW,
         irc_msgprefix.string,
         dest,
         irc_current_nick.string,
@@ -470,6 +475,7 @@ IRCEVENT(event_privmsg)
 IRCEVENT(event_channel)
 {
     char* msgstr = "";
+    qboolean watched;
     
     //weird shit
     if(!ISCHANNEL(params[0]))
@@ -478,12 +484,14 @@ IRCEVENT(event_channel)
     if(count > 1)
         msgstr = irc_color_strip_from_mirc(params[1]);
     
+    watched = Irc_IsWatchedChannel(params[0]);
+    
     if(Irc_CheckHilight(msgstr))
     {   
         UPDATETARGET(params[0])
         
         Con_Printf("%s%s^3%s^0|^7<^2%s^7> ^1%s\n",
-            CHATWINDOW_URGENT,
+            watched? "\001" : CHATWINDOW_URGENT,
             irc_msgprefix.string,
             params[0],
             origin,
@@ -491,7 +499,7 @@ IRCEVENT(event_channel)
         );
     }
     else Con_Printf("%s%s^3%s^0|^7<^2%s^7> %s\n",
-        CHATWINDOW,
+        watched? "\001" : CHATWINDOW,
         irc_msgprefix.string,
         params[0],
         origin,
@@ -677,6 +685,38 @@ qboolean Irc_CheckHilight(const char *msg)
     strlcpy(buffer, irc_hilights.string+start, idx+1);
     if(strcasestr(msg, buffer))
         return TRUE; //Contains a word from hilight list
+    
+    return FALSE;
+}
+
+//
+//  Checks if channel is watched
+//
+
+qboolean Irc_IsWatchedChannel(const char* chan)
+{
+    int start, idx, len;
+    char buffer[512];
+    
+    len = strlen(irc_watched_channels.string);
+    start = 0;
+    
+    for(idx = 0; idx < len; ++idx)
+    {
+        if(irc_watched_channels.string[idx] == ' ')
+        {
+            strlcpy(buffer, irc_watched_channels.string+start, idx+1);
+            if(strcasestr(chan, buffer))
+                return TRUE;
+                
+            start = idx+1;
+        }
+    }
+    
+    //Catch the final channel
+    strlcpy(buffer, irc_watched_channels.string+start, idx+1);
+    if(strcasestr(chan, buffer))
+        return TRUE;
     
     return FALSE;
 }
