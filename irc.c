@@ -698,6 +698,9 @@ qboolean Irc_IsWatchedChannel(const char* chan)
     int start, idx, len;
     char buffer[512];
     
+    if(NOTSET(irc_watched_channels))
+        return FALSE;
+    
     len = strlen(irc_watched_channels.string);
     start = 0;
     
