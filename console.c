@@ -29,6 +29,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // for u8_encodech
 #include "ft2.h"
 
+#include <pthread.h>
+
 float con_cursorspeed = 4;
 
 // lines up from bottom to display
@@ -1041,11 +1043,18 @@ Con_MaskPrint
 extern cvar_t timestamps;
 extern cvar_t timeformat;
 extern qboolean sys_nostdout;
+
+// -- Akari: attempted to make this somewhat thread safe.... works.... sometimes
+
+pthread_mutex_t con_print_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void Con_MaskPrint(int additionalmask, const char *msg)
 {
 	static int mask = 0;
 	static int index = 0;
 	static char line[MAX_INPUTLINE];
+
+	pthread_mutex_lock(&con_print_mutex);
 
 	for (;*msg;msg++)
 	{
@@ -1313,6 +1322,8 @@ void Con_MaskPrint(int additionalmask, const char *msg)
 			mask = 0;
 		}
 	}
+	
+	pthread_mutex_unlock(&con_print_mutex);
 }
 
 /*
@@ -1736,11 +1747,20 @@ void Con_DrawNotify (void)
 
 		// LordHavoc: speedup, and other improvements
 		if (chat_mode < 0)
-			dpsnprintf(temptext, sizeof(temptext), "]%s%s", chat_buffer, cursor);
+			dpsnprintf(temptext, sizeof(temptext), "]%s%c", chat_buffer, cursor);
+		else if(chat_mode == 2)
+		{
+			if(chat_buffer[0] == '#' || chat_buffer[0] == '&') //Channels are yellow, nicks are green
+				dpsnprintf(temptext, sizeof(temptext), "(IRC)target:^3%s^7%c", chat_buffer, cursor);
+			else
+				dpsnprintf(temptext, sizeof(temptext), "(IRC)target:^2%s^7%c", chat_buffer, cursor);
+		}
+		else if(chat_mode == 3)
+			dpsnprintf(temptext, sizeof(temptext), "(IRC)message:%s%c", chat_buffer, cursor);
 		else if(chat_mode)
-			dpsnprintf(temptext, sizeof(temptext), "say_team:%s%s", chat_buffer, cursor);
+			dpsnprintf(temptext, sizeof(temptext), "say_team:%s%c", chat_buffer, cursor);
 		else
-			dpsnprintf(temptext, sizeof(temptext), "say:%s%s", chat_buffer, cursor);
+			dpsnprintf(temptext, sizeof(temptext), "say:%s%c", chat_buffer, cursor);
 
 		// FIXME word wrap
 		inputsize = (numChatlines ? con_chatsize : con_notifysize).value;

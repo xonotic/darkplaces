@@ -213,7 +213,7 @@ DO_CC=$(CC) $(CFLAGS) -c $< -o $@
 # Link
 LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=debug
 LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=profile
-LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=release
+LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=release -lircclient
 
 
 ##### UNIX specific variables #####

@@ -1164,6 +1164,10 @@ unsigned int	chat_bufferlen = 0;
 
 extern int Nicks_CompleteChatLine(char *buffer, size_t size, unsigned int pos);
 
+extern void Irc_SetLastChannel(const char *value);
+extern const char* Irc_GetLastChannel();
+extern void Irc_SendMessage(const char *msg);
+
 static void
 Key_Message (int key, int ascii)
 {
@@ -1171,10 +1175,19 @@ Key_Message (int key, int ascii)
 	{
 		if(chat_mode < 0)
 			Cmd_ExecuteString(chat_buffer, src_command); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
+		else if(chat_mode == 2)
+			Irc_SetLastChannel(chat_buffer);
+		else if(chat_mode == 3)
+			Irc_SendMessage(chat_buffer);
 		else
 			Cmd_ForwardStringToServer(va("%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
 
-		key_dest = key_game;
+		//after IRC target input, go to message input
+		if(chat_mode != 2)
+			key_dest = key_game;
+		else
+			chat_mode = 3;
+			
 		chat_bufferlen = 0;
 		chat_buffer[0] = 0;
 		return;
