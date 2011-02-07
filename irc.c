@@ -13,7 +13,6 @@
 //      GNU General Public License for more details.
 
 #include <pthread.h>
-#include <libircclient/libircclient.h>
 #include <string.h>
 
 #include "quakedef.h"
