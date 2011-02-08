@@ -184,11 +184,15 @@ static void CL_Irc_Disconnect_f(void)
         Con_Printf("%sNot connected\n",
             irc_msgprefix.string
         );
+        
+        return;
     }
     
     Con_Printf("^1Disconnected from the IRC server\n");
     irc_cmd_quit(irc_session_global, "Disconnected");
+    
     irc_destroy_session(irc_session_global);
+
     Cvar_SetQuick(&irc_connected, "0");
 }
 
