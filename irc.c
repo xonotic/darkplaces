@@ -547,7 +547,7 @@ IRCEVENT(event_quit)
         CHATWINDOW,
         irc_msgprefix.string,
         origin,
-        count > 1? params[0] : "^8(quit message missing)"
+        count? params[0] : "^8(quit message missing)"
     );
 }
 
@@ -659,7 +659,7 @@ IRCEVENT(event_invite)
 }
 
 //
-//  Functions that checks if a message contains hilights
+//  Function that checks if a message contains hilights
 //
 
 qboolean Irc_CheckHilight(const char *msg)
