@@ -670,6 +670,9 @@ qboolean Irc_CheckHilight(const char *msg)
     if(strcasestr(msg, irc_current_nick.string))
         return TRUE; //Contains our nick
     
+    if(NOTSET(irc_hilights))
+        return FALSE;
+    
     len = strlen(irc_hilights.string);
     start = 0;
     
