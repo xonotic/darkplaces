@@ -157,6 +157,7 @@ static void CL_Irc_Connect_f(void)
     cb.event_kick    = event_kick;
     cb.event_notice  = event_notice;
     cb.event_invite  = event_invite;
+    cb.event_ctcp_action = event_ctcp_action;
 
     Cvar_SetQuick(&irc_current_nick, irc_nick.string);
 
@@ -276,8 +277,22 @@ static void CL_Irc_Say_Universal_f(void)
             
             break;
         
-        case MSGMODE_ACTION: //to-do
+        case MSGMODE_ACTION:
             irc_cmd_me(irc_session_global, dest, message);
+            
+            if(ISCHANNEL(dest)) Con_Printf("%s%s^3%s^0| ^2* %s ^7%s\n",
+                watched? "\001" : CHATWINDOW,
+                irc_msgprefix.string,
+                dest,
+                irc_current_nick.string,
+                message
+            ); else Con_Printf("%s%s^1Privmsg to ^2%s^7: ^2* %s ^3%s\n",
+                CHATWINDOW_URGENT,
+                irc_msgprefix.string,
+                dest,
+                irc_current_nick.string,
+                message
+            );
             break;
     }
 }
@@ -660,6 +675,65 @@ IRCEVENT(event_invite)
         origin,
         params[1]
     );
+}
+
+IRCEVENT(event_ctcp_action)
+{
+    char* msgstr = "";
+    qboolean watched;
+    
+    if(!ISCHANNEL(params[0]))
+    {
+        event_ctcp_action_priv(session, event, origin, params, count);
+        return;
+    }
+    
+    if(count > 1)
+        msgstr = irc_color_strip_from_mirc(params[1]);
+    
+    watched = Irc_IsWatchedChannel(params[0]);
+    
+    if(Irc_CheckHilight(msgstr))
+    {   
+        UPDATETARGET(params[0])
+        
+        Con_Printf("%s%s^3%s^0| ^1* %s ^7%s\n",
+            watched? "\001" : CHATWINDOW_URGENT,
+            irc_msgprefix.string,
+            params[0],
+            origin,
+            msgstr
+        );
+    }
+    else Con_Printf("%s%s^3%s^0| ^2* %s ^7%s\n",
+        watched? "\001" : CHATWINDOW,
+        irc_msgprefix.string,
+        params[0],
+        origin,
+        msgstr
+    );
+    
+    if(count > 1) free(msgstr);
+}
+
+//called by event_ctcp_action
+IRCEVENT(event_ctcp_action_priv)
+{
+    char* msgstr = "";
+    
+    if(count > 1)
+        msgstr = irc_color_strip_from_mirc(params[1]);
+    
+    UPDATETARGET(origin)
+    
+    Con_Printf("%s%s^1Privmsg^7: ^2* %s ^3%s\n",
+        CHATWINDOW_URGENT,
+        irc_msgprefix.string,
+        origin,
+        msgstr
+    );
+    
+    if(count > 1) free(msgstr);
 }
 
 //

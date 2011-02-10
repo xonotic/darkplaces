@@ -54,6 +54,8 @@ IRCEVENT(event_topic);
 IRCEVENT(event_kick);
 IRCEVENT(event_notice);
 IRCEVENT(event_invite);
+IRCEVENT(event_ctcp_action);
+IRCEVENT(event_ctcp_action_priv);
 
 #define MSGMODE_PRIVMSG 0
 #define MSGMODE_NOTICE  1
