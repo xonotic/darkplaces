@@ -23,7 +23,7 @@ cvar_t irc_server = {CVAR_SAVE, "irc_server", "", "IRC server to connect to"};
 cvar_t irc_port = {CVAR_SAVE, "irc_port", "6667", "Port of the IRC server"};
 cvar_t irc_password = {CVAR_SAVE, "irc_password", "", "IRC server password"};
 cvar_t irc_nick = {CVAR_SAVE, "irc_nick", "", "Your nickname to use on IRC. Note: this cvar only defines your prefered nick, do NOT use this to change your nickname while connected, use irc_chnick instead"};
-cvar_t irc_connected = {CVAR_READONLY, "irc_connected", "0", "IRC connection state (0 = not connected, 1 = connecting, 2 = connected)"};
+cvar_t irc_connected = {CVAR_READONLY, "irc_connected", "0", "IRC connection state (0 = not connected, 1 = connecting, 2 = connected, 3 = disconnecting)"};
 cvar_t irc_msgprefix = {CVAR_SAVE, "irc_msgprefix", "^5IRC^0|^7", "What all IRC events will be prefixed with when printed to the console"};
 cvar_t irc_chatwindow = {CVAR_SAVE, "irc_chatwindow", "2", "0 = IRC messages will be printed in the console only, 1 = IRC messages will go to the chat window, 2 = Only hilights and private messages will appear in the chat window"};
 cvar_t irc_numeric_errorsonly = {CVAR_SAVE, "irc_numeric_errorsonly", "0", "If 1, any numeric event below 400 won't be printed'"};
@@ -78,6 +78,12 @@ static void IRC_Thread(void *p)
 {
     if(irc_run(irc_session_global))
     {
+        if(irc_connected.integer == 3) //irc_disconnect
+        {
+            Cvar_SetQuick(&irc_connected, "0");
+            return;
+        }
+        
         Con_Printf("%s^1Error: ^7%s\n",
             irc_msgprefix.string,
             irc_strerror(irc_errno(irc_session_global))
@@ -189,11 +195,9 @@ static void CL_Irc_Disconnect_f(void)
     }
     
     Con_Printf("^1Disconnected from the IRC server\n");
+    Cvar_SetQuick(&irc_connected, "3");
     irc_cmd_quit(irc_session_global, "Disconnected");
-    
     irc_destroy_session(irc_session_global);
-
-    Cvar_SetQuick(&irc_connected, "0");
 }
 
 static void CL_Irc_Say_Universal_f(void)
