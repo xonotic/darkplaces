@@ -485,6 +485,7 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 
 #if DEFAULT_VP8
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
+static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libvpx", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
@@ -514,6 +515,7 @@ void SCR_CaptureVideo_Lavc_Init(void)
 		qavcodec_register_all();
 		qav_register_all();
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_format);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_formatoptions);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_vcodec);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_voptions);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_acodec);
@@ -781,6 +783,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			return;
 		}
 		strlcpy(format->avf->filename, fn, sizeof(format->avf->filename));
+		if(qav_set_options_string(video_str->codec, cl_capturevideo_lavc_formatoptions.string, "=", " \t") < 0)
+		{
+			Con_Printf("Failed to set format options\n");
+		}
 
 		video_str = qav_new_stream(format->avf, 0);
 		video_str->codec->codec_type = AVMEDIA_TYPE_VIDEO;
