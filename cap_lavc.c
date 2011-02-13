@@ -80,6 +80,9 @@ typedef signed char        qint8_t;
 typedef unsigned char      quint8_t;
 #endif
 
+#define AV_NOPTS_VALUE (qint64_t)0x8000000000000000LLU
+#define AV_TIME_BASE 1000000
+
 #define FF_MIN_BUFFER_SIZE 16384
 #define AVFMT_GLOBALHEADER 0x0040
 #define CODEC_FLAG_GLOBAL_HEADER 0x00400000
@@ -98,6 +101,8 @@ typedef unsigned char      quint8_t;
 #ifdef FF_API_MAX_STREAMS
 #define MAX_STREAMS 20
 #endif
+
+#define AV_PKT_FLAG_KEY   0x0001
 
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
@@ -281,6 +286,7 @@ typedef struct AVCodecContext {
      int bits_per_coded_sample;
      int prediction_method;
     AVRational sample_aspect_ratio;
+    AVFrame *coded_frame;
     // remaining fields stripped
 } AVCodecContext;
 
@@ -352,6 +358,35 @@ typedef struct AVFormatContext {
     AVStream **streams;
 #endif
     char filename[1024];
+    int64_t timestamp;
+#if FF_API_OLD_METADATA
+    char title[512];
+    char author[512];
+    char copyright[512];
+    char comment[512];
+    char album[512];
+    int year;
+    int track;
+    char genre[32];
+#endif
+    int ctx_flags;
+    struct AVPacketList *packet_buffer;
+    int64_t start_time;
+    int64_t duration;
+    int64_t file_size;
+    int bit_rate;
+    AVStream *cur_st;
+#if FF_API_LAVF_UNUSED
+    const uint8_t *cur_ptr_deprecated;
+    int cur_len_deprecated;
+    AVPacket cur_pkt_deprecated;
+#endif
+    int64_t data_offset;
+    int index_built;
+    int mux_rate;
+    unsigned int packet_size;
+    int preload;
+    int max_delay;
     // remaining fields stripped
 } AVFormatContext;
 
@@ -389,6 +424,7 @@ int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
 int (*qav_get_bits_per_sample) (enum CodecID codec_id);
 ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
+int64_t (*qav_rescale_q)(int64_t a, AVRational bq, AVRational cq);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -424,6 +460,7 @@ static dllfunction_t libavutil_funcs[] =
 {
 	{"av_set_options_string",		(void **) &qav_set_options_string},
 	{"av_free",				(void **) &qav_free},
+	{"av_rescale_q",			(void **) &qav_rescale_q},
 	{NULL, NULL}
 };
 
@@ -492,6 +529,7 @@ static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_ac
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #elif DEFAULT_X264
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mp4", "video format to use"};
+static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libx264", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions",
 	/* sane */     "crf=23 threads=4 "
@@ -502,6 +540,7 @@ static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_ac
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #else
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
+static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "ffvhuff", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "flac", "audio codec to use"};
@@ -633,14 +672,15 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 			if (avc->coded_frame->key_frame)
 				packet.flags |= AV_PKT_FLAG_KEY;
 			if (avc->coded_frame->pts != AV_NOPTS_VALUE)
-				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->time_base);
+				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[0]->time_base);
 			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 				Con_Printf("error writing\n");
 		}
-
-		format->vpts += num;
 	}
 	while(num < 0 && size > 0);
+
+	if(num > 0)
+		format->vpts += num;
 }
 
 // FIXME find the correct mappings for DP to ffmpeg
@@ -686,6 +726,9 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 }
 static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 {
+	LOAD_FORMATSPECIFIC_LAVC();
+	int size;
+	AVCodecContext *avc = format->avf->streams[1]->codec;
 	do
 	{
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, NULL);
@@ -758,7 +801,7 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 
 	if(format->buffer)
 	{
-		SCR_CaptureVideo_Lavc_VideoFrame(-1);
+		SCR_CaptureVideo_Lavc_VideoFrames(-1);
 		SCR_CaptureVideo_Lavc_SoundFrame(NULL, 0);
 		qav_write_trailer(format->avf);
 		{
@@ -820,10 +863,13 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			return;
 		}
 		strlcpy(format->avf->filename, fn, sizeof(format->avf->filename));
-		if(qav_set_options_string(video_str->codec, cl_capturevideo_lavc_formatoptions.string, "=", " \t") < 0)
+		if(qav_set_options_string(format->avf, cl_capturevideo_lavc_formatoptions.string, "=", " \t") < 0)
 		{
 			Con_Printf("Failed to set format options\n");
 		}
+
+		format->avf->preload = 0.5 * AV_TIME_BASE;
+		format->avf->max_delay = 0.7 * AV_TIME_BASE;
 
 		video_str = qav_new_stream(format->avf, 0);
 		video_str->codec->codec_type = AVMEDIA_TYPE_VIDEO;
@@ -844,6 +890,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		FindFraction(cls.capturevideo.framerate / cls.capturevideo.framestep, &num, &denom, cls.capturevideo.framerate / cls.capturevideo.framestep * 1001 + 2);
 		video_str->codec->time_base.num = denom;
 		video_str->codec->time_base.den = num;
+		video_str->time_base = video_str->codec->time_base;
 		// FIXME supported_framerates
 
 		video_str->codec->width = cls.capturevideo.width;
@@ -855,9 +902,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		video_str->sample_aspect_ratio.den = denom;
 		video_str->codec->sample_aspect_ratio.num = num;
 		video_str->codec->sample_aspect_ratio.den = denom;
-
-		video_str->codec->preload = 0.5 * AV_TIME_BASE;
-		video_str->codec->max_delay = 0.7 * AV_TIME_BASE;
 
 		if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
 			video_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
