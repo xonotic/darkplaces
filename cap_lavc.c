@@ -607,25 +607,40 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 	AVFrame frame;
 	int size;
 
-	qavcodec_get_frame_defaults(&frame);
-	SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
-	frame.pts = format->vpts;
-	size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
-	if(size < 0)
-		Con_Printf("error encoding\n");
-	if(size > 0)
+	do
 	{
-		AVPacket packet;
-		qav_init_packet(&packet);
-		packet.stream_index = 0;
-		packet.data = format->buffer;
-		packet.size = size;
-		packet.pts = format->vpts;
-		if(qav_interleaved_write_frame(format->avf, &packet) < 0)
-			Con_Printf("error writing\n");
-	}
+		qavcodec_get_frame_defaults(&frame);
+		if(num > 0)
+		{
+			SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
+			frame.pts = format->vpts;
+			size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
+		}
+		else
+		{
+			size = qavcodec_encode_video(avc, format->buffer, format->bufsize, NULL);
+		}
 
-	format->vpts += num;
+		if(size < 0)
+			Con_Printf("error encoding\n");
+		if(size > 0)
+		{
+			AVPacket packet;
+			qav_init_packet(&packet);
+			packet.stream_index = 0;
+			packet.data = format->buffer;
+			packet.size = size;
+			if (avc->coded_frame->key_frame)
+				packet.flags |= AV_PKT_FLAG_KEY;
+			if (avc->coded_frame->pts != AV_NOPTS_VALUE)
+				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->time_base);
+			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
+				Con_Printf("error writing\n");
+		}
+
+		format->vpts += num;
+	}
+	while(num < 0 && size > 0);
 }
 
 // FIXME find the correct mappings for DP to ffmpeg
@@ -669,6 +684,27 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 	format->apts += avc->frame_size;
 	format->aframepos = 0;
 }
+static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
+{
+	do
+	{
+		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, NULL);
+		if(size < 0)
+			Con_Printf("error encoding\n");
+		if(size > 0)
+		{
+			AVPacket packet;
+			qav_init_packet(&packet);
+			packet.stream_index = 1;
+			packet.data = format->buffer;
+			packet.size = size;
+			packet.pts = format->apts;
+			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
+				Con_Printf("error writing\n");
+		}
+	}
+	while(size > 0);
+}
 
 static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paintbuffer, size_t length)
 {
@@ -711,6 +747,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 		{
 			memset(format->aframe + format->aframepos*cls.capturevideo.soundchannels, 0, sizeof(format->aframe[0]) * (format->aframesize - format->aframepos));
 			SCR_CaptureVideo_Lavc_SoundFrame_Encode();
+			SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd();
 		}
 	}
 }
@@ -721,6 +758,7 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 
 	if(format->buffer)
 	{
+		SCR_CaptureVideo_Lavc_VideoFrame(-1);
 		SCR_CaptureVideo_Lavc_SoundFrame(NULL, 0);
 		qav_write_trailer(format->avf);
 		{
@@ -754,7 +792,6 @@ static qint64_t lavc_seek(void *f, qint64_t offset, int whence)
 	return FS_Seek((qfile_t *) f, offset, whence);
 }
 
-// TODO error checking in this function
 void SCR_CaptureVideo_Lavc_BeginVideo(void)
 {
 	const char *fn;
@@ -804,9 +841,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			Con_Printf("Failed to set video options\n");
 		}
 
-		FindFraction(cls.capturevideo.framerate / cls.capturevideo.framestep, &num, &denom, 1001);
+		FindFraction(cls.capturevideo.framerate / cls.capturevideo.framestep, &num, &denom, cls.capturevideo.framerate / cls.capturevideo.framestep * 1001 + 2);
 		video_str->codec->time_base.num = denom;
 		video_str->codec->time_base.den = num;
+		// FIXME supported_framerates
 
 		video_str->codec->width = cls.capturevideo.width;
 		video_str->codec->height = cls.capturevideo.height;
@@ -817,6 +855,9 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		video_str->sample_aspect_ratio.den = denom;
 		video_str->codec->sample_aspect_ratio.num = num;
 		video_str->codec->sample_aspect_ratio.den = denom;
+
+		video_str->codec->preload = 0.5 * AV_TIME_BASE;
+		video_str->codec->max_delay = 0.7 * AV_TIME_BASE;
 
 		if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
 			video_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
