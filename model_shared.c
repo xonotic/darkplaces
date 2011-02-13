@@ -27,6 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_shadow.h"
 #include "polygon.h"
 
+cvar_t r_enableshadowvolumes = {CVAR_SAVE, "r_enableshadowvolumes", "1", "Enables use of Stencil Shadow Volume shadowing methods, saves some memory if turned off"};
 cvar_t r_mipskins = {CVAR_SAVE, "r_mipskins", "0", "mipmaps model skins so they render faster in the distance and do not display noise artifacts, can cause discoloration of skins if they contain undesirable border colors"};
 cvar_t r_mipnormalmaps = {CVAR_SAVE, "r_mipnormalmaps", "1", "mipmaps normalmaps (turning it off looks sharper but may have aliasing)"};
 cvar_t mod_generatelightmaps_unitspersample = {CVAR_SAVE, "mod_generatelightmaps_unitspersample", "8", "lightmap resolution"};
@@ -160,6 +161,7 @@ void Mod_Init (void)
 	Mod_AliasInit();
 	Mod_SpriteInit();
 
+	Cvar_RegisterVariable(&r_enableshadowvolumes);
 	Cvar_RegisterVariable(&r_mipskins);
 	Cvar_RegisterVariable(&r_mipnormalmaps);
 	Cvar_RegisterVariable(&mod_generatelightmaps_unitspersample);
@@ -198,9 +200,9 @@ void Mod_UnloadModel (dp_model_t *mod)
 	used = mod->used;
 	if (mod->mempool)
 	{
-		if (mod->surfmesh.vertexpositionbuffer)
-			R_Mesh_DestroyMeshBuffer(mod->surfmesh.vertexpositionbuffer);
-		mod->surfmesh.vertexpositionbuffer = NULL;
+		if (mod->surfmesh.vertex3fbuffer)
+			R_Mesh_DestroyMeshBuffer(mod->surfmesh.vertex3fbuffer);
+		mod->surfmesh.vertex3fbuffer = NULL;
 		if (mod->surfmesh.vertexmeshbuffer)
 			R_Mesh_DestroyMeshBuffer(mod->surfmesh.vertexmeshbuffer);
 		mod->surfmesh.vertexmeshbuffer = NULL;
@@ -1193,8 +1195,8 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 		return;
 
 	// build r_vertexmesh_t array
-	// (compressed interleaved array for faster rendering)
-	if (!mesh->vertexmesh && mesh->texcoord2f)
+	// (compressed interleaved array for D3D)
+	if (!mesh->vertexmesh && mesh->texcoord2f && vid.useinterleavedarrays)
 	{
 		int vertexindex;
 		int numvertices = mesh->numverts;
@@ -1210,24 +1212,13 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 		}
 	}
 
-	// build r_vertexposition_t array
-	if (!mesh->vertexposition)
-	{
-		int vertexindex;
-		int numvertices = mesh->numverts;
-		r_vertexposition_t *vertexposition;
-		mesh->vertexposition = vertexposition = (r_vertexposition_t*)Mem_Alloc(loadmodel->mempool, numvertices * sizeof(*mesh->vertexposition));
-		for (vertexindex = 0;vertexindex < numvertices;vertexindex++, vertexposition++)
-			VectorCopy(mesh->vertex3f + 3*vertexindex, vertexposition->vertex3f);
-	}
-
 	// upload r_vertexmesh_t array as a buffer
 	if (mesh->vertexmesh && !mesh->vertexmeshbuffer)
 		mesh->vertexmeshbuffer = R_Mesh_CreateMeshBuffer(mesh->vertexmesh, mesh->numverts * sizeof(*mesh->vertexmesh), loadmodel->name, false, false, false);
 
-	// upload r_vertexposition_t array as a buffer
-	if (mesh->vertexposition && !mesh->vertexpositionbuffer)
-		mesh->vertexpositionbuffer = R_Mesh_CreateMeshBuffer(mesh->vertexposition, mesh->numverts * sizeof(*mesh->vertexposition), loadmodel->name, false, false, false);
+	// upload vertex3f array as a buffer
+	if (mesh->vertex3f && !mesh->vertex3fbuffer)
+		mesh->vertex3fbuffer = R_Mesh_CreateMeshBuffer(mesh->vertex3f, mesh->numverts * sizeof(float[3]), loadmodel->name, false, false, false);
 
 	// upload short indices as a buffer
 	if (mesh->element3s && !mesh->element3s_indexbuffer)
@@ -1242,7 +1233,7 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 	// is this wise?  the texcoordtexture2f array is used with dynamic
 	// vertex/svector/tvector/normal when rendering animated models, on the
 	// other hand animated models don't use a lot of vertices anyway...
-	if (!mesh->vbo_vertexbuffer)
+	if (!mesh->vbo_vertexbuffer && !vid.useinterleavedarrays)
 	{
 		size_t size;
 		unsigned char *mem;
@@ -1347,8 +1338,8 @@ void Mod_ShadowMesh_Free(shadowmesh_t *mesh)
 	shadowmesh_t *nextmesh;
 	for (;mesh;mesh = nextmesh)
 	{
-		if (mesh->vertexpositionbuffer)
-			R_Mesh_DestroyMeshBuffer(mesh->vertexpositionbuffer);
+		if (mesh->vertex3fbuffer)
+			R_Mesh_DestroyMeshBuffer(mesh->vertex3fbuffer);
 		if (mesh->vertexmeshbuffer)
 			R_Mesh_DestroyMeshBuffer(mesh->vertexmeshbuffer);
 		if (mesh->element3i_indexbuffer)
@@ -1400,7 +1391,7 @@ void Mod_CreateCollisionMesh(dp_model_t *mod)
 			Mod_ShadowMesh_AddMesh(mempool, mod->brush.collisionmesh, NULL, NULL, NULL, mod->surfmesh.data_vertex3f, NULL, NULL, NULL, NULL, surface->num_triangles, (mod->surfmesh.data_element3i + 3 * surface->num_firsttriangle));
 		}
 	}
-	mod->brush.collisionmesh = Mod_ShadowMesh_Finish(mempool, mod->brush.collisionmesh, false, true, false);
+	mod->brush.collisionmesh = Mod_ShadowMesh_Finish(mempool, mod->brush.collisionmesh, false, false, false);
 }
 
 void Mod_GetTerrainVertex3fTexCoord2fFromBGRA(const unsigned char *imagepixels, int imagewidth, int imageheight, int ix, int iy, float *vertex3f, float *texcoord2f, matrix4x4_t *pixelstepmatrix, matrix4x4_t *pixeltexturestepmatrix)
@@ -2792,8 +2783,8 @@ void Mod_BuildVBOs(void)
 	}
 
 	// build r_vertexmesh_t array
-	// (compressed interleaved array for faster rendering)
-	if (!loadmodel->surfmesh.vertexmesh)
+	// (compressed interleaved array for D3D)
+	if (!loadmodel->surfmesh.vertexmesh && vid.useinterleavedarrays)
 	{
 		int vertexindex;
 		int numvertices = loadmodel->surfmesh.num_vertices;
@@ -2813,24 +2804,13 @@ void Mod_BuildVBOs(void)
 		}
 	}
 
-	// build r_vertexposition_t array
-	if (!loadmodel->surfmesh.vertexposition)
-	{
-		int vertexindex;
-		int numvertices = loadmodel->surfmesh.num_vertices;
-		r_vertexposition_t *vertexposition;
-		loadmodel->surfmesh.vertexposition = vertexposition = (r_vertexposition_t*)Mem_Alloc(loadmodel->mempool, numvertices * sizeof(*loadmodel->surfmesh.vertexposition));
-		for (vertexindex = 0;vertexindex < numvertices;vertexindex++, vertexposition++)
-			VectorCopy(loadmodel->surfmesh.data_vertex3f + 3*vertexindex, vertexposition->vertex3f);
-	}
-
 	// upload r_vertexmesh_t array as a buffer
 	if (loadmodel->surfmesh.vertexmesh && !loadmodel->surfmesh.vertexmeshbuffer)
 		loadmodel->surfmesh.vertexmeshbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.vertexmesh, loadmodel->surfmesh.num_vertices * sizeof(*loadmodel->surfmesh.vertexmesh), loadmodel->name, false, false, false);
 
-	// upload r_vertexposition_t array as a buffer
-	if (loadmodel->surfmesh.vertexposition && !loadmodel->surfmesh.vertexpositionbuffer)
-		loadmodel->surfmesh.vertexpositionbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.vertexposition, loadmodel->surfmesh.num_vertices * sizeof(*loadmodel->surfmesh.vertexposition), loadmodel->name, false, false, false);
+	// upload vertex3f array as a buffer
+	if (loadmodel->surfmesh.data_vertex3f && !loadmodel->surfmesh.vertex3fbuffer)
+		loadmodel->surfmesh.vertex3fbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_vertex3f, loadmodel->surfmesh.num_vertices * sizeof(float[3]), loadmodel->name, false, false, false);
 
 	// upload short indices as a buffer
 	if (loadmodel->surfmesh.data_element3s && !loadmodel->surfmesh.data_element3s_indexbuffer)
@@ -2846,7 +2826,7 @@ void Mod_BuildVBOs(void)
 	// is this wise?  the texcoordtexture2f array is used with dynamic
 	// vertex/svector/tvector/normal when rendering animated models, on the
 	// other hand animated models don't use a lot of vertices anyway...
-	if (!loadmodel->surfmesh.vbo_vertexbuffer)
+	if (!loadmodel->surfmesh.vbo_vertexbuffer && !vid.useinterleavedarrays)
 	{
 		size_t size;
 		unsigned char *mem;
@@ -3448,8 +3428,8 @@ static void Mod_GenerateLightmaps_LightPoint(dp_model_t *model, const vec3_t pos
 			continue;
 		lightiradius = 1.0f / lightradius;
 		dist = sqrt(dist2) * lightiradius;
-		intensity = dist < 1 ? ((1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist)) : 0;
-		if (intensity <= 0)
+		intensity = (1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist);
+		if (intensity <= 0.0f)
 			continue;
 		if (model && model->TraceLine)
 		{
@@ -3833,15 +3813,12 @@ static void Mod_GenerateLightmaps_UnweldTriangles(dp_model_t *model)
 	if (model->surfmesh.num_vertices > 65536)
 		model->surfmesh.data_element3s = NULL;
 
-	if (model->surfmesh.vertexposition)
-		Mem_Free(model->surfmesh.vertexposition);
-	model->surfmesh.vertexposition = NULL;
 	if (model->surfmesh.vertexmesh)
 		Mem_Free(model->surfmesh.vertexmesh);
 	model->surfmesh.vertexmesh = NULL;
-	if (model->surfmesh.vertexpositionbuffer)
-		R_Mesh_DestroyMeshBuffer(model->surfmesh.vertexpositionbuffer);
-	model->surfmesh.vertexpositionbuffer = NULL;
+	if (model->surfmesh.vertex3fbuffer)
+		R_Mesh_DestroyMeshBuffer(model->surfmesh.vertex3fbuffer);
+	model->surfmesh.vertex3fbuffer = NULL;
 	if (model->surfmesh.vertexmeshbuffer)
 		R_Mesh_DestroyMeshBuffer(model->surfmesh.vertexmeshbuffer);
 	model->surfmesh.vertexmeshbuffer = NULL;

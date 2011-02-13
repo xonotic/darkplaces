@@ -31,7 +31,7 @@ int		prvm_type_size[8] = {1,sizeof(string_t)/4,1,3,1,1,sizeof(func_t)/4,sizeof(v
 ddef_t *PRVM_ED_FieldAtOfs(int ofs);
 qboolean PRVM_ED_ParseEpair(prvm_edict_t *ent, ddef_t *key, const char *s, qboolean parsebackslash);
 
-cvar_t prvm_language = {0, "prvm_language", "", "when set, loads progs.dat.LANGUAGENAME.po for string translations; when set to dump, progs.dat.dump.po is written from the strings in the progs"};
+cvar_t prvm_language = {CVAR_SAVE, "prvm_language", "", "when set, loads progs.dat.LANGUAGENAME.po for string translations; when set to dump, progs.dat.pot is written from the strings in the progs"};
 // LordHavoc: prints every opcode as it executes - warning: this is significant spew
 cvar_t prvm_traceqc = {0, "prvm_traceqc", "0", "prints every QuakeC statement as it is executed (only for really thorough debugging!)"};
 // LordHavoc: counts usage of each QuakeC statement
@@ -2350,16 +2350,16 @@ void PRVM_LoadProgs (const char * filename, int numrequiredfunc, const char **re
 		}
 		if(!strcmp(prvm_language.string, "dump"))
 		{
-			qfile_t *f = FS_OpenRealFile(va("%s.%s.po", filename, prvm_language.string), "w", false);
-			Con_Printf("Dumping to %s.%s.po\n", filename, prvm_language.string);
+			qfile_t *f = FS_OpenRealFile(va("%s.pot", filename), "w", false);
+			Con_Printf("Dumping to %s.pot\n", filename);
 			if(f)
 			{
 				for (i=0 ; i<prog->progs->numglobaldefs ; i++)
 				{
 					const char *name;
 					name = PRVM_GetString(prog->globaldefs[i].s_name);
-					if((prog->globaldefs[i].type & ~DEF_SAVEGLOBAL) == ev_string)
 					if(deftrans ? (!name || strncmp(name, "notranslate_", 12)) : (name && !strncmp(name, "dotranslate_", 12)))
+					if((prog->globaldefs[i].type & ~DEF_SAVEGLOBAL) == ev_string)
 					{
 						prvm_eval_t *val = (prvm_eval_t *)(prog->globals.generic + prog->globaldefs[i].ofs);
 						const char *value = PRVM_GetString(val->string);

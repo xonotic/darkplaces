@@ -41,7 +41,8 @@ cvar_t scr_loadingscreen_scale_base = {0, "scr_loadingscreen_scale_base","0", "0
 cvar_t scr_loadingscreen_scale_limit = {0, "scr_loadingscreen_scale_limit","0", "0 = no limit, 1 = until first edge hits screen edge, 2 = until last edge hits screen edge, 3 = until width hits screen width, 4 = until height hits screen height"};
 cvar_t scr_loadingscreen_count = {0, "scr_loadingscreen_count","1", "number of loading screen files to use randomly (named loading.tga, loading2.tga, loading3.tga, ...)"};
 cvar_t scr_loadingscreen_barcolor = {0, "scr_loadingscreen_barcolor", "0 0 1", "rgb color of loadingscreen progress bar"};
-cvar_t scr_loadingscreen_barheight = {0, "scr_loadingscreen_barheight", "8", "a height loadingscreen progress bar"};
+cvar_t scr_loadingscreen_barheight = {0, "scr_loadingscreen_barheight", "8", "the height of the loadingscreen progress bar"};
+cvar_t scr_infobar_height = {0, "scr_infobar_height", "8", "the height of the infobar items"};
 cvar_t vid_conwidth = {CVAR_SAVE, "vid_conwidth", "640", "virtual width of 2D graphics system"};
 cvar_t vid_conheight = {CVAR_SAVE, "vid_conheight", "480", "virtual height of 2D graphics system"};
 cvar_t vid_pixelheight = {CVAR_SAVE, "vid_pixelheight", "1", "adjusts vertical field of vision to account for non-square pixels (1280x1024 on a CRT monitor for example)"};
@@ -489,7 +490,7 @@ static int SCR_DrawQWDownload(int offset)
 	// sync with SCR_InfobarHeight
 	int len;
 	float x, y;
-	float size = 8;
+	float size = scr_infobar_height.value;
 	char temp[256];
 
 	if (!cls.qw_downloadname[0])
@@ -514,7 +515,7 @@ static int SCR_DrawQWDownload(int offset)
 	y = vid_conheight.integer - size - offset;
 	DrawQ_Fill(0, y, vid_conwidth.integer, size, 0, 0, 0, cls.signon == SIGNONS ? 0.5 : 1, 0);
 	DrawQ_String(x, y, temp, len, size, size, 1, 1, 1, 1, 0, NULL, true, FONT_INFOBAR);
-	return 8;
+	return size;
 }
 /*
 ==============
@@ -525,14 +526,14 @@ static int SCR_DrawInfobarString(int offset)
 {
 	int len;
 	float x, y;
-	float size = 8;
+	float size = scr_infobar_height.value;
 
 	len = (int)strlen(scr_infobarstring);
 	x = (vid_conwidth.integer - DrawQ_TextWidth(scr_infobarstring, len, size, size, false, FONT_INFOBAR)) / 2;
 	y = vid_conheight.integer - size - offset;
 	DrawQ_Fill(0, y, vid_conwidth.integer, size, 0, 0, 0, cls.signon == SIGNONS ? 0.5 : 1, 0);
 	DrawQ_String(x, y, scr_infobarstring, len, size, size, 1, 1, 1, 1, 0, NULL, false, FONT_INFOBAR);
-	return 8;
+	return size;
 }
 
 /*
@@ -547,7 +548,7 @@ static int SCR_DrawCurlDownload(int offset)
 	int nDownloads;
 	int i;
 	float x, y;
-	float size = 8;
+	float size = scr_infobar_height.value;
 	Curl_downloadinfo_t *downinfo;
 	char temp[256];
 	const char *addinfo;
@@ -582,7 +583,7 @@ static int SCR_DrawCurlDownload(int offset)
 
 	Z_Free(downinfo);
 
-	return 8 * (nDownloads + (addinfo ? 1 : 0));
+	return size * (nDownloads + (addinfo ? 1 : 0));
 }
 
 /*
@@ -593,10 +594,10 @@ SCR_DrawInfobar
 static void SCR_DrawInfobar(void)
 {
 	int offset = 0;
-	if(scr_infobartime_off > 0)
-		offset += SCR_DrawInfobarString(offset);
 	offset += SCR_DrawQWDownload(offset);
 	offset += SCR_DrawCurlDownload(offset);
+	if(scr_infobartime_off > 0)
+		offset += SCR_DrawInfobarString(offset);
 	if(offset != scr_con_margin_bottom)
 		Con_DPrintf("broken console margin calculation: %d != %d\n", offset, scr_con_margin_bottom);
 }
@@ -612,16 +613,16 @@ static int SCR_InfobarHeight(void)
 		scr_infobartime_off -= cl.time - cl.oldtime;
 	if(scr_infobartime_off > 0)
 		offset += 8;
-
 	if(cls.qw_downloadname[0])
 		offset += 8;
 
 	downinfo = Curl_GetDownloadInfo(&nDownloads, &addinfo);
 	if(downinfo)
 	{
-		offset += 8 * (nDownloads + (addinfo ? 1 : 0));
+		offset += (nDownloads + (addinfo ? 1 : 0));
 		Z_Free(downinfo);
 	}
+	offset *= scr_infobar_height.value;
 
 	return offset;
 }
@@ -799,7 +800,7 @@ void R_TimeReport_EndFrame(void)
 "%5i viewleaf%5i cluster%2i area%4i brushes%4i surfaces(%7i triangles)\n"
 "%7i surfaces%7i triangles %5i entities (%7i surfaces%7i triangles)\n"
 "%5i leafs%5i portals%6i/%6i particles%6i/%6i decals %3i%% quality\n"
-"%7i lightmap updates (%7i pixels)\n"
+"%7i lightmap updates (%7i pixels)%8iKB/%8iKB framedata\n"
 "%4i lights%4i clears%4i scissored%7i light%7i shadow%7i dynamic\n"
 "%6i draws%8i vertices%8i triangles bloompixels%8i copied%8i drawn\n"
 "updated%5i indexbuffers%8i bytes%5i vertexbuffers%8i bytes\n"
@@ -809,7 +810,7 @@ void R_TimeReport_EndFrame(void)
 , viewleaf ? (int)(viewleaf - r_refdef.scene.worldmodel->brush.data_leafs) : -1, viewleaf ? viewleaf->clusterindex : -1, viewleaf ? viewleaf->areaindex : -1, viewleaf ? viewleaf->numleafbrushes : 0, viewleaf ? viewleaf->numleafsurfaces : 0, viewleaf ? R_CountLeafTriangles(r_refdef.scene.worldmodel, viewleaf) : 0
 , r_refdef.stats.world_surfaces, r_refdef.stats.world_triangles, r_refdef.stats.entities, r_refdef.stats.entities_surfaces, r_refdef.stats.entities_triangles
 , r_refdef.stats.world_leafs, r_refdef.stats.world_portals, r_refdef.stats.particles, cl.num_particles, r_refdef.stats.drawndecals, r_refdef.stats.totaldecals, (int)(100 * r_refdef.view.quality)
-, r_refdef.stats.lightmapupdates, r_refdef.stats.lightmapupdatepixels
+, r_refdef.stats.lightmapupdates, r_refdef.stats.lightmapupdatepixels, (r_refdef.stats.framedatacurrent+512) / 1024, (r_refdef.stats.framedatasize+512)/1024
 , r_refdef.stats.lights, r_refdef.stats.lights_clears, r_refdef.stats.lights_scissored, r_refdef.stats.lights_lighttriangles, r_refdef.stats.lights_shadowtriangles, r_refdef.stats.lights_dynamicshadowtriangles
 , r_refdef.stats.draws, r_refdef.stats.draws_vertices, r_refdef.stats.draws_elements / 3, r_refdef.stats.bloom_copypixels, r_refdef.stats.bloom_drawpixels
 , r_refdef.stats.indexbufferuploadcount, r_refdef.stats.indexbufferuploadsize, r_refdef.stats.vertexbufferuploadcount, r_refdef.stats.vertexbufferuploadsize
@@ -910,6 +911,7 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable (&scr_loadingscreen_count);
 	Cvar_RegisterVariable (&scr_loadingscreen_barcolor);
 	Cvar_RegisterVariable (&scr_loadingscreen_barheight);
+	Cvar_RegisterVariable (&scr_infobar_height);
 	Cvar_RegisterVariable (&scr_showram);
 	Cvar_RegisterVariable (&scr_showturtle);
 	Cvar_RegisterVariable (&scr_showpause);
@@ -2177,6 +2179,7 @@ static double cl_updatescreen_quality = 1;
 extern void Sbar_ShowFPS_Update(void);
 void CL_UpdateScreen(void)
 {
+	vec3_t vieworigin;
 	double rendertime1;
 	float conwidth, conheight;
 	float f;
@@ -2241,6 +2244,9 @@ void CL_UpdateScreen(void)
 		else
 			sb_lines = 24+16+8;
 	}
+
+	Matrix4x4_OriginFromMatrix(&r_refdef.view.matrix, vieworigin);
+	R_HDR_UpdateIrisAdaptation(vieworigin);
 
 	r_refdef.view.colormask[0] = 1;
 	r_refdef.view.colormask[1] = 1;

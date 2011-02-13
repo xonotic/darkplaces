@@ -874,7 +874,7 @@ void VM_ftoe(void)
 	VM_SAFEPARMCOUNT(1, VM_ftoe);
 
 	ent = (int)PRVM_G_FLOAT(OFS_PARM0);
-	if (ent < 0 || ent >= MAX_EDICTS || PRVM_PROG_TO_EDICT(ent)->priv.required->free)
+	if (ent < 0 || ent >= prog->max_edicts || PRVM_PROG_TO_EDICT(ent)->priv.required->free)
 		ent = 0; // return world instead of a free or invalid entity
 
 	PRVM_G_INT(OFS_RETURN) = ent;
@@ -3385,22 +3385,42 @@ void VM_drawstring(void)
 VM_drawcolorcodedstring
 
 float	drawcolorcodedstring(vector position, string text, vector scale, float alpha, float flag)
+/
+float	drawcolorcodedstring(vector position, string text, vector scale, vector rgb, float alpha, float flag)
 =========
 */
 void VM_drawcolorcodedstring(void)
 {
-	float *pos,*scale;
+	float *pos, *scale;
 	const char  *string;
 	int flag;
-	float sx, sy;
-	VM_SAFEPARMCOUNT(5,VM_drawstring);
+	vec3_t rgb;
+	float sx, sy, alpha;
 
-	string = PRVM_G_STRING(OFS_PARM1);
-	pos = PRVM_G_VECTOR(OFS_PARM0);
-	scale = PRVM_G_VECTOR(OFS_PARM2);
-	flag = (int)PRVM_G_FLOAT(OFS_PARM4);
+	VM_SAFEPARMCOUNTRANGE(5,6,VM_drawcolorcodedstring);
 
-	if(flag < DRAWFLAG_NORMAL || flag >=DRAWFLAG_NUMFLAGS)
+	if (prog->argc == 6) // full 6 parms, like normal drawstring
+	{
+		pos = PRVM_G_VECTOR(OFS_PARM0);
+		string = PRVM_G_STRING(OFS_PARM1);
+		scale = PRVM_G_VECTOR(OFS_PARM2);
+		VectorCopy(PRVM_G_VECTOR(OFS_PARM3), rgb); 
+		alpha = PRVM_G_FLOAT(OFS_PARM4);
+		flag = (int)PRVM_G_FLOAT(OFS_PARM5);
+	}
+	else
+	{
+		pos = PRVM_G_VECTOR(OFS_PARM0);
+		string = PRVM_G_STRING(OFS_PARM1);
+		scale = PRVM_G_VECTOR(OFS_PARM2);
+		rgb[0] = 1.0;
+		rgb[1] = 1.0;
+		rgb[2] = 1.0;
+		alpha = PRVM_G_FLOAT(OFS_PARM3);
+		flag = (int)PRVM_G_FLOAT(OFS_PARM4);
+	}
+
+	if(flag < DRAWFLAG_NORMAL || flag >= DRAWFLAG_NUMFLAGS)
 	{
 		PRVM_G_FLOAT(OFS_RETURN) = -2;
 		VM_Warning("VM_drawcolorcodedstring: %s: wrong DRAWFLAG %i !\n",PRVM_NAME,flag);
@@ -3418,8 +3438,11 @@ void VM_drawcolorcodedstring(void)
 		Con_Printf("VM_drawcolorcodedstring: z value%s from %s discarded\n",(pos[2] && scale[2]) ? "s" : " ",((pos[2] && scale[2]) ? "pos and scale" : (pos[2] ? "pos" : "scale")));
 
 	getdrawfontscale(&sx, &sy);
-	DrawQ_String_Scale(pos[0], pos[1], string, 0, scale[0], scale[1], sx, sy, 1, 1, 1, PRVM_G_FLOAT(OFS_PARM3), flag, NULL, false, getdrawfont());
-	PRVM_G_FLOAT(OFS_RETURN) = 1;
+	DrawQ_String_Scale(pos[0], pos[1], string, 0, scale[0], scale[1], sx, sy, rgb[0], rgb[1], rgb[2], alpha, flag, NULL, false, getdrawfont());
+	if (prog->argc == 6) // also return vector of last color
+		VectorCopy(DrawQ_Color, PRVM_G_VECTOR(OFS_RETURN));
+	else
+		PRVM_G_FLOAT(OFS_RETURN) = 1;
 }
 /*
 =========
@@ -4750,7 +4773,7 @@ void VM_buf_create (void)
 	for (i = 0;stringbuffer != Mem_ExpandableArray_RecordAtIndex(&prog->stringbuffersarray, i);i++);
 	stringbuffer->origin = PRVM_AllocationOrigin();
 	// optional flags parm
-	if(prog->argc == 2)
+	if (prog->argc >= 2)
 		stringbuffer->flags = (int)PRVM_G_FLOAT(OFS_PARM1) & 0xFF;
 	PRVM_G_FLOAT(OFS_RETURN) = i;
 }
@@ -4964,7 +4987,7 @@ void VM_bufstr_get (void)
 	strindex = (int)PRVM_G_FLOAT(OFS_PARM1);
 	if (strindex < 0)
 	{
-		VM_Warning("VM_bufstr_get: invalid string index %i used in %s\n", strindex, PRVM_NAME);
+		// VM_Warning("VM_bufstr_get: invalid string index %i used in %s\n", strindex, PRVM_NAME);
 		return;
 	}
 	if (strindex < stringbuffer->num_strings && stringbuffer->strings[strindex])
@@ -6379,8 +6402,11 @@ nolength:
 					if(flags & PRINTF_SPACEPOSITIVE) *f++ = ' ';
 					if(flags & PRINTF_SIGNPOSITIVE) *f++ = '+';
 					*f++ = '*';
-					*f++ = '.';
-					*f++ = '*';
+					if(precision >= 0)
+					{
+						*f++ = '.';
+						*f++ = '*';
+					}
 					*f++ = *s;
 					*f++ = 0;
 
@@ -6391,50 +6417,70 @@ nolength:
 					{
 						case 'd': case 'i':
 							if(precision < 0) // not set
-								precision = 1;
-							o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (int) GETARG_FLOAT(thisarg) : (int) GETARG_INT(thisarg)));
+								o += dpsnprintf(o, end - o, formatbuf, width, (isfloat ? (int) GETARG_FLOAT(thisarg) : (int) GETARG_INT(thisarg)));
+							else
+								o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (int) GETARG_FLOAT(thisarg) : (int) GETARG_INT(thisarg)));
 							break;
 						case 'o': case 'u': case 'x': case 'X':
 							if(precision < 0) // not set
-								precision = 1;
-							o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
+								o += dpsnprintf(o, end - o, formatbuf, width, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
+							else
+								o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
 							break;
 						case 'e': case 'E': case 'f': case 'F': case 'g': case 'G':
 							if(precision < 0) // not set
-								precision = 6;
-							o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (double) GETARG_FLOAT(thisarg) : (double) GETARG_INT(thisarg)));
+								o += dpsnprintf(o, end - o, formatbuf, width, (isfloat ? (double) GETARG_FLOAT(thisarg) : (double) GETARG_INT(thisarg)));
+							else
+								o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (double) GETARG_FLOAT(thisarg) : (double) GETARG_INT(thisarg)));
 							break;
 						case 'v': case 'V':
 							f[-2] += 'g' - 'v';
 							if(precision < 0) // not set
-								precision = 6;
-							o += dpsnprintf(o, end - o, va("%s %s %s", /* NESTED SPRINTF IS NESTED */ formatbuf, formatbuf, formatbuf),
-								width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[0] : (double) GETARG_INTVECTOR(thisarg)[0]),
-								width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[1] : (double) GETARG_INTVECTOR(thisarg)[1]),
-								width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[2] : (double) GETARG_INTVECTOR(thisarg)[2])
-							);
+								o += dpsnprintf(o, end - o, va("%s %s %s", /* NESTED SPRINTF IS NESTED */ formatbuf, formatbuf, formatbuf),
+									width, (isfloat ? (double) GETARG_VECTOR(thisarg)[0] : (double) GETARG_INTVECTOR(thisarg)[0]),
+									width, (isfloat ? (double) GETARG_VECTOR(thisarg)[1] : (double) GETARG_INTVECTOR(thisarg)[1]),
+									width, (isfloat ? (double) GETARG_VECTOR(thisarg)[2] : (double) GETARG_INTVECTOR(thisarg)[2])
+								);
+							else
+								o += dpsnprintf(o, end - o, va("%s %s %s", /* NESTED SPRINTF IS NESTED */ formatbuf, formatbuf, formatbuf),
+									width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[0] : (double) GETARG_INTVECTOR(thisarg)[0]),
+									width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[1] : (double) GETARG_INTVECTOR(thisarg)[1]),
+									width, precision, (isfloat ? (double) GETARG_VECTOR(thisarg)[2] : (double) GETARG_INTVECTOR(thisarg)[2])
+								);
 							break;
 						case 'c':
-							if(precision < 0) // not set
-								precision = end - o - 1;
 							if(flags & PRINTF_ALTERNATE)
-								o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
+							{
+								if(precision < 0) // not set
+									o += dpsnprintf(o, end - o, formatbuf, width, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
+								else
+									o += dpsnprintf(o, end - o, formatbuf, width, precision, (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg)));
+							}
 							else
 							{
 								unsigned int c = (isfloat ? (unsigned int) GETARG_FLOAT(thisarg) : (unsigned int) GETARG_INT(thisarg));
 								const char *buf = u8_encodech(c, NULL);
 								if(!buf)
 									buf = "";
+								if(precision < 0) // not set
+									precision = end - o - 1;
 								o += u8_strpad(o, end - o, buf, (flags & PRINTF_LEFT) != 0, width, precision);
 							}
 							break;
 						case 's':
-							if(precision < 0) // not set
-								precision = end - o - 1;
 							if(flags & PRINTF_ALTERNATE)
-								o += dpsnprintf(o, end - o, formatbuf, width, precision, GETARG_STRING(thisarg));
+							{
+								if(precision < 0) // not set
+									o += dpsnprintf(o, end - o, formatbuf, width, GETARG_STRING(thisarg));
+								else
+									o += dpsnprintf(o, end - o, formatbuf, width, precision, GETARG_STRING(thisarg));
+							}
 							else
+							{
+								if(precision < 0) // not set
+									precision = end - o - 1;
 								o += u8_strpad(o, end - o, GETARG_STRING(thisarg), (flags & PRINTF_LEFT) != 0, width, precision);
+							}
 							break;
 						default:
 							VM_Warning("VM_sprintf: invalid directive in %s: %s\n", PRVM_NAME, s0);

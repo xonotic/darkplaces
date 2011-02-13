@@ -113,8 +113,8 @@ extern char engineversion[128];
 #define	MAX_DECALSYSTEM_QUEUE	64
 #define	PAINTBUFFER_SIZE		512
 #define	MAX_BINDMAPS			8
-#define	MAX_PARTICLES_INITIAL	32768
-#define	MAX_PARTICLES			32768
+#define	MAX_PARTICLES_INITIAL	8192
+#define	MAX_PARTICLES			8192
 #define	MAX_DECALS_INITIAL		1024
 #define	MAX_DECALS				1024
 #define	MAX_ENITIES_INITIAL		256
@@ -449,15 +449,23 @@ extern cvar_t developer_loading;
 # if defined(__i386__)
 #  define DP_ARCH_STR		"686"
 #  define SSE_POSSIBLE
+#  ifdef __SSE__
+#   define SSE_PRESENT
+#  endif
+#  ifdef __SSE2__
+#   define SSE2_PRESENT
+#  endif
 # elif defined(__x86_64__)
 #  define DP_ARCH_STR		"x86_64"
 #  define SSE_PRESENT
+#  define SSE2_PRESENT
 # elif defined(__powerpc__)
 #  define DP_ARCH_STR		"ppc"
 # endif
 #elif defined(_WIN64)
 # define DP_ARCH_STR		"x86_64"
 # define SSE_PRESENT
+# define SSE2_PRESENT
 #elif defined(WIN32)
 # define DP_ARCH_STR		"x86"
 # define SSE_POSSIBLE
@@ -470,6 +478,7 @@ extern cvar_t developer_loading;
 #ifdef NO_SSE
 # undef SSE_PRESENT
 # undef SSE_POSSIBLE
+# undef SSE2_PRESENT
 #endif
 
 /// incremented every frame, never reset
