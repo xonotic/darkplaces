@@ -175,6 +175,8 @@ typedef struct AVFrame {
     qint8_t *ref_index[2];
     qint64_t reordered_opaque;
     void *hwaccel_picture_private;
+    qint64_t pkt_pts;
+    qint64_t pkt_dts;
     struct AVCodecContext *owner;
     void *thread_opaque;
 } AVFrame;
