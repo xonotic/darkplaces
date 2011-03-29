@@ -597,6 +597,14 @@ static void R_BuildFogHeightTexture(void)
 
 //=======================================================================================================================================================
 
+static const char *builtinshaderstring =
+#include "shader_glsl.h"
+;
+
+const char *builtinhlslshaderstring =
+#include "shader_hlsl.h"
+;
+
 char *glslshaderstring = NULL;
 char *hlslshaderstring = NULL;
 
