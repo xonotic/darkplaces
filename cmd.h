@@ -89,6 +89,11 @@ extern cmd_source_t cmd_source;
 void Cmd_Init (void);
 void Cmd_Shutdown (void);
 
+// called by Host_Init, this marks cvars, commands and aliases with their init values
+void Cmd_SaveInitState (void);
+// called by FS_GameDir_f, this restores cvars, commands and aliases to init values
+void Cmd_RestoreInitState (void);
+
 void Cmd_AddCommand_WithClientCommand (const char *cmd_name, xcommand_t consolefunction, xcommand_t clientfunction, const char *description);
 void Cmd_AddCommand (const char *cmd_name, xcommand_t function, const char *description);
 // called by the init functions of other parts of the program to
@@ -156,8 +161,9 @@ void Cmd_Print(const char *text);
 /// quoteset is a string that contains one or more of ", \, $ and specifies
 /// the characters to be quoted (you usually want to either pass "\"\\" or
 /// "\"\\$"). Returns true on success, and false on overrun (in which case out
-/// will contain a part of the quoted string).
-qboolean Cmd_QuoteString(char *out, size_t outlen, const char *in, const char *quoteset);
+/// will contain a part of the quoted string). If putquotes is set, the
+/// enclosing quote marks are also put.
+qboolean Cmd_QuoteString(char *out, size_t outlen, const char *in, const char *quoteset, qboolean putquotes);
 
 #endif
 

@@ -37,6 +37,12 @@ extern cvar_t r_shadow_texture3d;
 extern cvar_t gl_ext_separatestencil;
 extern cvar_t gl_ext_stenciltwoside;
 
+// used by shader for bouncegrid feature
+extern rtexture_t *r_shadow_bouncegridtexture;
+extern matrix4x4_t r_shadow_bouncegridmatrix;
+extern vec_t r_shadow_bouncegridintensity;
+extern qboolean r_shadow_bouncegriddirectional;
+
 void R_Shadow_Init(void);
 qboolean R_Shadow_ShadowMappingEnabled(void);
 void R_Shadow_VolumeFromList(int numverts, int numtris, const float *invertex3f, const int *elements, const int *neighbors, const vec3_t projectorigin, const vec3_t projectdirection, float projectdistance, int nummarktris, const int *marktris, vec3_t trismins, vec3_t trismaxs);
@@ -92,9 +98,10 @@ void R_Shadow_PrepareShadowSides(int numtris);
 
 void R_Shadow_PrepareModelShadows(void);
 
-#define LP_LIGHTMAP	1
-#define LP_RTWORLD	2
-#define LP_DYNLIGHT	4
+#define LP_LIGHTMAP		1
+#define LP_RTWORLD		2
+#define LP_DYNLIGHT		4
+void R_LightPoint(vec3_t color, const vec3_t p, const int flags);
 void R_CompleteLightPoint(vec3_t ambientcolor, vec3_t diffusecolor, vec3_t diffusenormal, const vec3_t p, const int flags);
 
 #endif

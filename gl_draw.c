@@ -516,7 +516,7 @@ cachepic_t *Draw_NewPic(const char *picname, int width, int height, int alpha, u
 	{
 		if (pic->tex && pic->width == width && pic->height == height)
 		{
-			R_UpdateTexture(pic->tex, pixels_bgra, 0, 0, width, height);
+			R_UpdateTexture(pic->tex, pixels_bgra, 0, 0, 0, width, height, 1);
 			return pic;
 		}
 	}
@@ -1026,7 +1026,6 @@ static void _DrawQ_Setup(void)
 	GL_PolygonOffset(0, 0);
 	GL_DepthTest(false);
 	GL_Color(1,1,1,1);
-	GL_AlphaTest(false);
 }
 
 qboolean r_draw2d_force = false;
@@ -1917,7 +1916,6 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
-	case RENDERPATH_CGGL:
 		CHECKGLERROR
 		qglBegin(GL_LINE_LOOP);
 		for (num = 0;num < mesh->num_vertices;num++)
@@ -1938,6 +1936,12 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 	case RENDERPATH_D3D11:
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_SOFT:
+		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_GLES2:
+		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		return;
 	}
 }
 
@@ -1955,7 +1959,6 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
-	case RENDERPATH_CGGL:
 		CHECKGLERROR
 
 		//qglLineWidth(width);CHECKGLERROR
@@ -1977,6 +1980,12 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 	case RENDERPATH_D3D11:
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_SOFT:
+		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_GLES2:
+		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		return;
 	}
 }
 
@@ -1998,7 +2007,6 @@ void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float 
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
-	case RENDERPATH_CGGL:
 		CHECKGLERROR
 
 		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1);
@@ -2019,6 +2027,12 @@ void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float 
 	case RENDERPATH_D3D11:
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_SOFT:
+		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_GLES2:
+		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		return;
 	}
 }
 
@@ -2033,7 +2047,25 @@ void DrawQ_SetClipArea(float x, float y, float width, float height)
 	iy = (int)(0.5 + y * ((float) vid.height / vid_conheight.integer));
 	iw = (int)(0.5 + (x+width) * ((float)vid.width / vid_conwidth.integer)) - ix;
 	ih = (int)(0.5 + (y+height) * ((float) vid.height / vid_conheight.integer)) - iy;
-	GL_Scissor(ix, vid.height - iy - ih, iw, ih);
+	switch(vid.renderpath)
+	{
+	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GL20:
+	case RENDERPATH_GLES2:
+	case RENDERPATH_SOFT:
+		GL_Scissor(ix, vid.height - iy - ih, iw, ih);
+		break;
+	case RENDERPATH_D3D9:
+		GL_Scissor(ix, iy, iw, ih);
+		break;
+	case RENDERPATH_D3D10:
+		Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_D3D11:
+		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	}
 
 	GL_ScissorTest(true);
 }
@@ -2062,10 +2094,10 @@ void R_DrawGamma(void)
 	switch(vid.renderpath)
 	{
 	case RENDERPATH_GL20:
-	case RENDERPATH_CGGL:
 	case RENDERPATH_D3D9:
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
+	case RENDERPATH_GLES2:
 		if (vid_usinghwgamma || v_glslgamma.integer)
 			return;
 		break;
@@ -2074,6 +2106,8 @@ void R_DrawGamma(void)
 		if (vid_usinghwgamma)
 			return;
 		break;
+	case RENDERPATH_SOFT:
+		return;
 	}
 	// all the blends ignore depth
 //	R_Mesh_ResetTextureState();

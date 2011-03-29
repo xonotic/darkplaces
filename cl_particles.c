@@ -682,7 +682,7 @@ particle_t *CL_NewParticle(const vec3_t sortorigin, unsigned short ptypeindex, i
 		part->typeindex = pt_spark;
 		part->bounce = 0;
 		VectorMA(part->org, lifetime, part->vel, endvec);
-		trace = CL_TraceLine(part->org, endvec, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_LIQUIDSMASK, true, false, NULL, false);
+		trace = CL_TraceLine(part->org, endvec, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_LIQUIDSMASK, true, false, NULL, false, false);
 		part->die = cl.time + lifetime * trace.fraction;
 		part2 = CL_NewParticle(endvec, pt_raindecal, pcolor1, pcolor2, tex_rainsplash, part->size, part->size * 20, part->alpha, part->alpha / 0.4, 0, 0, trace.endpos[0] + trace.plane.normal[0], trace.endpos[1] + trace.plane.normal[1], trace.endpos[2] + trace.plane.normal[2], trace.plane.normal[0], trace.plane.normal[1], trace.plane.normal[2], 0, 0, 0, 0, pqualityreduction, 0, 1, PBLEND_ADD, PARTICLE_ORIENTED_DOUBLESIDED, -1, -1, -1, 1, 1, 0, 0, NULL);
 		if (part2)
@@ -812,7 +812,7 @@ void CL_SpawnDecalParticleForPoint(const vec3_t org, float maxdist, float size, 
 	{
 		VectorRandom(org2);
 		VectorMA(org, maxdist, org2, org2);
-		trace = CL_TraceLine(org, org2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, true, false, &hitent, false);
+		trace = CL_TraceLine(org, org2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, true, false, &hitent, false, true);
 		// take the closest trace result that doesn't end up hitting a NOMARKS
 		// surface (sky for example)
 		if (bestfrac > trace.fraction && !(trace.hitq3surfaceflags & Q3SURFACEFLAG_NOMARKS))
@@ -1693,7 +1693,7 @@ void CL_ParticleExplosion (const vec3_t org)
 					{
 						VectorRandom(v2);
 						VectorMA(org, 128, v2, v);
-						trace = CL_TraceLine(org, v, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false);
+						trace = CL_TraceLine(org, v, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, false);
 					}
 					while (k < 16 && trace.fraction < 0.1f);
 					VectorSubtract(trace.endpos, org, v2);
@@ -2468,7 +2468,7 @@ void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtligh
 	float *v3f, *t2f, *c4f;
 	particletexture_t *tex;
 	float up2[3], v[3], right[3], up[3], fog, ifog, size, len, lenfactor, alpha;
-	float ambient[3], diffuse[3], diffusenormal[3];
+//	float ambient[3], diffuse[3], diffusenormal[3];
 	float palpha, spintime, spinrad, spincos, spinsin, spinm1, spinm2, spinm3, spinm4, baseright[3], baseup[3];
 	vec4_t colormultiplier;
 	float minparticledist_start, minparticledist_end;
@@ -2484,7 +2484,6 @@ void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtligh
 	GL_DepthRange(0, 1);
 	GL_PolygonOffset(0, 0);
 	GL_DepthTest(true);
-	GL_AlphaTest(false);
 	GL_CullFace(GL_NONE);
 
 	spintime = r_refdef.scene.time;
@@ -2538,12 +2537,7 @@ void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtligh
 			c4f[3] = alpha;
 			// note: lighting is not cheap!
 			if (particletype[p->typeindex].lighting)
-			{
-				R_CompleteLightPoint(ambient, diffuse, diffusenormal, p->org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
-				c4f[0] *= (ambient[0] + 0.5 * diffuse[0]);
-				c4f[1] *= (ambient[1] + 0.5 * diffuse[1]);
-				c4f[2] *= (ambient[2] + 0.5 * diffuse[2]);
-			}
+				R_LightPoint(c4f, p->org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
 			// mix in the fog color
 			if (r_refdef.fogenabled)
 			{
@@ -2798,7 +2792,7 @@ void R_DrawParticles (void)
 //				if (p->bounce && cl.time >= p->delayedcollisions)
 				if (p->bounce && cl_particles_collisions.integer && VectorLength(p->vel))
 				{
-					trace = CL_TraceLine(oldorg, p->org, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | ((p->typeindex == pt_rain || p->typeindex == pt_snow) ? SUPERCONTENTS_LIQUIDSMASK : 0), true, false, &hitent, false);
+					trace = CL_TraceLine(oldorg, p->org, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | ((p->typeindex == pt_rain || p->typeindex == pt_snow) ? SUPERCONTENTS_LIQUIDSMASK : 0), true, false, &hitent, false, false);
 					// if the trace started in or hit something of SUPERCONTENTS_NODROP
 					// or if the trace hit something flagged as NOIMPACT
 					// then remove the particle

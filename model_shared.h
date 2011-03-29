@@ -101,27 +101,20 @@ typedef struct blendweights_s
 }
 blendweights_t;
 
-typedef struct r_vertexposition_s
-{
-	// 12 bytes
-	float vertex3f[3];
-}
-r_vertexposition_t;
-
 typedef struct r_vertexgeneric_s
 {
-	// 24 bytes
+	// 36 bytes
 	float vertex3f[3];
-	unsigned char color4ub[4];
+	float color4f[4];
 	float texcoord2f[2];
 }
 r_vertexgeneric_t;
 
 typedef struct r_vertexmesh_s
 {
-	// 68 bytes
+	// 80 bytes
 	float vertex3f[3];
-	unsigned char color4ub[4];
+	float color4f[4];
 	float texcoordtexture2f[2];
 	float texcoordlightmap2f[2];
 	float svector3f[3];
@@ -190,9 +183,8 @@ typedef struct surfmesh_s
 	qboolean isanimated;
 
 	// vertex and index buffers for rendering
-	r_vertexposition_t *vertexposition;
 	r_vertexmesh_t *vertexmesh;
-	r_meshbuffer_t *vertexpositionbuffer;
+	r_meshbuffer_t *vertex3fbuffer;
 	r_meshbuffer_t *vertexmeshbuffer;
 }
 surfmesh_t;
@@ -244,9 +236,8 @@ typedef struct shadowmesh_s
 	size_t vbooffset_texcoord2f;
 	// vertex/index buffers for rendering
 	// (created by Mod_ShadowMesh_Finish if possible)
-	r_vertexposition_t *vertexposition;
 	r_vertexmesh_t *vertexmesh; // usually NULL
-	r_meshbuffer_t *vertexpositionbuffer;
+	r_meshbuffer_t *vertex3fbuffer;
 	r_meshbuffer_t *vertexmeshbuffer; // usually NULL
 }
 shadowmesh_t;
@@ -1031,6 +1022,8 @@ typedef struct model_s
 	void (*TracePoint)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask);
 	// find the supercontents value at a point in this model
 	int (*PointSuperContents)(struct model_s *model, int frame, const vec3_t point);
+	// trace a line against geometry in this model and report correct texture (used by r_shadow_bouncegrid)
+	void (*TraceLineAgainstSurfaces)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask);
 	// fields belonging to some types of model
 	model_sprite_t	sprite;
 	model_brush_t	brush;

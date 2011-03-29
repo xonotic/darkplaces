@@ -24,7 +24,7 @@
 #include "cl_video.h"
 #include "utf8lib.h"
 
-cvar_t con_closeontoggleconsole = {CVAR_SAVE, "con_closeontoggleconsole","1", "allows toggleconsole binds to close the console as well"};
+cvar_t con_closeontoggleconsole = {CVAR_SAVE, "con_closeontoggleconsole","1", "allows toggleconsole binds to close the console as well; when set to 2, this even works when not at the start of the line in console input; when set to 3, this works even if the toggleconsole key is the color tag"};
 
 /*
 key up events are sent even if in console mode
@@ -1485,7 +1485,7 @@ Key_PrintBindList(int j)
 		p = keybindings[j][i];
 		if (p)
 		{
-			Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\");
+			Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\", false);
 			if (j == 0)
 				Con_Printf("^2%s ^7= \"%s\"\n", Key_KeynumToString (i), bindbuf);
 			else
@@ -1578,7 +1578,7 @@ Key_WriteBindings (qfile_t *f)
 			p = keybindings[j][i];
 			if (p)
 			{
-				Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\"); // don't need to escape $ because cvars are not expanded inside bind
+				Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\", false); // don't need to escape $ because cvars are not expanded inside bind
 				if (j == 0)
 					FS_Printf(f, "bind %s \"%s\"\n", Key_KeynumToString (i), bindbuf);
 				else
@@ -1877,7 +1877,7 @@ Key_Event (int key, int ascii, qboolean down)
 		// con_closeontoggleconsole enables toggleconsole keys to close the
 		// console, as long as they are not the color prefix character
 		// (special exemption for german keyboard layouts)
-		if (con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && (key_consoleactive & KEY_CONSOLEACTIVE_USER) && ascii != STRING_COLOR_TAG)
+		if (con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && (key_consoleactive & KEY_CONSOLEACTIVE_USER) && (con_closeontoggleconsole.integer >= ((ascii != STRING_COLOR_TAG) ? 2 : 3) || key_linepos == 1))
 		{
 			Con_ToggleConsole_f ();
 			return;

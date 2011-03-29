@@ -22,12 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef QUAKEDEF_H
 #define QUAKEDEF_H
 
-/// on UNIX platforms we need to define this so that video saving does not cause a SIGFSZ (file size) signal when a video clip exceeds 2GB
-#define _FILE_OFFSET_BITS 64
-
-// for cd_linux.c
-#define __KERNEL_STRICT_NAMES
-
 #if defined(__GNUC__) && (__GNUC__ > 2)
 #define DP_FUNC_PRINTF(n) __attribute__ ((format (printf, n, n+1)))
 #define DP_FUNC_PURE      __attribute__ ((pure))
@@ -449,15 +443,23 @@ extern cvar_t developer_loading;
 # if defined(__i386__)
 #  define DP_ARCH_STR		"686"
 #  define SSE_POSSIBLE
+#  ifdef __SSE__
+#   define SSE_PRESENT
+#  endif
+#  ifdef __SSE2__
+#   define SSE2_PRESENT
+#  endif
 # elif defined(__x86_64__)
 #  define DP_ARCH_STR		"x86_64"
 #  define SSE_PRESENT
+#  define SSE2_PRESENT
 # elif defined(__powerpc__)
 #  define DP_ARCH_STR		"ppc"
 # endif
 #elif defined(_WIN64)
 # define DP_ARCH_STR		"x86_64"
 # define SSE_PRESENT
+# define SSE2_PRESENT
 #elif defined(WIN32)
 # define DP_ARCH_STR		"x86"
 # define SSE_POSSIBLE
@@ -470,6 +472,7 @@ extern cvar_t developer_loading;
 #ifdef NO_SSE
 # undef SSE_PRESENT
 # undef SSE_POSSIBLE
+# undef SSE2_PRESENT
 #endif
 
 /// incremented every frame, never reset

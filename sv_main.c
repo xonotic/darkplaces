@@ -95,7 +95,7 @@ cvar_t sv_fixedframeratesingleplayer = {0, "sv_fixedframeratesingleplayer", "1",
 cvar_t sv_freezenonclients = {CVAR_NOTIFY, "sv_freezenonclients", "0", "freezes time, except for players, allowing you to walk around and take screenshots of explosions"};
 cvar_t sv_friction = {CVAR_NOTIFY, "sv_friction","4", "how fast you slow down"};
 cvar_t sv_gameplayfix_blowupfallenzombies = {0, "sv_gameplayfix_blowupfallenzombies", "1", "causes findradius to detect SOLID_NOT entities such as zombies and corpses on the floor, allowing splash damage to apply to them"};
-cvar_t sv_gameplayfix_consistentplayerprethink = {0, "sv_gameplayfix_consistentplayerprethink", "0", "improves fairness in multiplayer by running all PlayerPreThink functions (which fire weapons) before performing physics, then runing all PlayerPostThink functions"};
+cvar_t sv_gameplayfix_consistentplayerprethink = {0, "sv_gameplayfix_consistentplayerprethink", "0", "improves fairness in multiplayer by running all PlayerPreThink functions (which fire weapons) before performing physics, then running all PlayerPostThink functions"};
 cvar_t sv_gameplayfix_delayprojectiles = {0, "sv_gameplayfix_delayprojectiles", "1", "causes entities to not move on the same frame they are spawned, meaning that projectiles wait until the next frame to perform their first move, giving proper interpolation and rocket trails, but making weapons harder to use at low framerates"};
 cvar_t sv_gameplayfix_droptofloorstartsolid = {0, "sv_gameplayfix_droptofloorstartsolid", "1", "prevents items and monsters that start in a solid area from falling out of the level (makes droptofloor treat trace_startsolid as an acceptable outcome)"};
 cvar_t sv_gameplayfix_droptofloorstartsolid_nudgetocorrect = {0, "sv_gameplayfix_droptofloorstartsolid_nudgetocorrect", "1", "tries to nudge stuck items and monsters out of walls before droptofloor is performed"};
@@ -487,29 +487,26 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&temp1);
 
 	// LordHavoc: Nehahra uses these to pass data around cutscene demos
-	if (gamemode == GAME_NEHAHRA)
-	{
-		Cvar_RegisterVariable (&nehx00);
-		Cvar_RegisterVariable (&nehx01);
-		Cvar_RegisterVariable (&nehx02);
-		Cvar_RegisterVariable (&nehx03);
-		Cvar_RegisterVariable (&nehx04);
-		Cvar_RegisterVariable (&nehx05);
-		Cvar_RegisterVariable (&nehx06);
-		Cvar_RegisterVariable (&nehx07);
-		Cvar_RegisterVariable (&nehx08);
-		Cvar_RegisterVariable (&nehx09);
-		Cvar_RegisterVariable (&nehx10);
-		Cvar_RegisterVariable (&nehx11);
-		Cvar_RegisterVariable (&nehx12);
-		Cvar_RegisterVariable (&nehx13);
-		Cvar_RegisterVariable (&nehx14);
-		Cvar_RegisterVariable (&nehx15);
-		Cvar_RegisterVariable (&nehx16);
-		Cvar_RegisterVariable (&nehx17);
-		Cvar_RegisterVariable (&nehx18);
-		Cvar_RegisterVariable (&nehx19);
-	}
+	Cvar_RegisterVariable (&nehx00);
+	Cvar_RegisterVariable (&nehx01);
+	Cvar_RegisterVariable (&nehx02);
+	Cvar_RegisterVariable (&nehx03);
+	Cvar_RegisterVariable (&nehx04);
+	Cvar_RegisterVariable (&nehx05);
+	Cvar_RegisterVariable (&nehx06);
+	Cvar_RegisterVariable (&nehx07);
+	Cvar_RegisterVariable (&nehx08);
+	Cvar_RegisterVariable (&nehx09);
+	Cvar_RegisterVariable (&nehx10);
+	Cvar_RegisterVariable (&nehx11);
+	Cvar_RegisterVariable (&nehx12);
+	Cvar_RegisterVariable (&nehx13);
+	Cvar_RegisterVariable (&nehx14);
+	Cvar_RegisterVariable (&nehx15);
+	Cvar_RegisterVariable (&nehx16);
+	Cvar_RegisterVariable (&nehx17);
+	Cvar_RegisterVariable (&nehx18);
+	Cvar_RegisterVariable (&nehx19);
 	Cvar_RegisterVariable (&cutscene); // for Nehahra but useful to other mods as well
 
 	Cvar_RegisterVariable (&sv_autodemo_perclient);
@@ -517,34 +514,6 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_autodemo_perclient_discardable);
 
 	Cvar_RegisterVariable (&halflifebsp);
-
-	// any special defaults for gamemodes go here
-	if (gamemode == GAME_NEHAHRA)
-	{
-		// Nehahra pushable crates malfunction in some levels if this is on
-		Cvar_SetValueQuick (&sv_gameplayfix_upwardvelocityclearsongroundflag, 0);
-		// Nehahra NPC AI is confused by this feature
-		Cvar_SetValueQuick (&sv_gameplayfix_blowupfallenzombies, 0);
-	}
-	if (gamemode == GAME_HIPNOTIC)
-	{
-		// hipnotic mission pack has issues in their 'friendly monster' ai, which seem to attempt to attack themselves for some reason when findradius() returns non-solid entities.
-		Cvar_SetValueQuick (&sv_gameplayfix_blowupfallenzombies, 0);
-		// hipnotic mission pack has issues with bobbing water entities 'jittering' between different heights on alternate frames at the default 0.0138889 ticrate, 0.02 avoids this issue
-		Cvar_SetValueQuick (&sys_ticrate, 0.02);
-		// hipnotic mission pack has issues in their proximity mine sticking code, which causes them to bounce off.
-		Cvar_SetValueQuick (&sv_gameplayfix_slidemoveprojectiles, 0);
-	}
-	if (gamemode == GAME_ROGUE)
-	{
-		// rogue mission pack has a guardian boss that does not wake up if findradius returns one of the entities around its spawn area
-		Cvar_SetValueQuick (&sv_gameplayfix_findradiusdistancetobox, 0);
-	}
-	if (gamemode == GAME_NEXUIZ)
-	{
-		Cvar_SetValueQuick (&sv_gameplayfix_q2airaccelerate, 1);
-		Cvar_SetValueQuick (&sv_gameplayfix_stepmultipletimes, 1);
-	}
 
 	sv_mempool = Mem_AllocPool("server", 0, NULL);
 }
@@ -3138,6 +3107,8 @@ void SV_SpawnServer (const char *server)
 		Con_Printf("Couldn't load map %s\n", modelname);
 		return;
 	}
+
+	Collision_Cache_Reset(true);
 
 	// let's not have any servers with no name
 	if (hostname.string[0] == 0)

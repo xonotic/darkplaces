@@ -96,12 +96,14 @@ cvar_t v_centerspeed = {0, "v_centerspeed","500", "how fast the view centers its
 
 cvar_t cl_stairsmoothspeed = {CVAR_SAVE, "cl_stairsmoothspeed", "160", "how fast your view moves upward/downward when running up/down stairs"};
 
+cvar_t cl_smoothviewheight = {CVAR_SAVE, "cl_smoothviewheight", "0", "time of the averaging to the viewheight value so that it creates a smooth transition. higher values = longer transition, 0 for instant transition."};
+
 cvar_t chase_back = {CVAR_SAVE, "chase_back", "48", "chase cam distance from the player"};
 cvar_t chase_up = {CVAR_SAVE, "chase_up", "24", "chase cam distance from the player"};
 cvar_t chase_active = {CVAR_SAVE, "chase_active", "0", "enables chase cam"};
 cvar_t chase_overhead = {CVAR_SAVE, "chase_overhead", "0", "chase cam looks straight down if this is not zero"};
 // GAME_GOODVSBAD2
-cvar_t chase_stevie = {0, "chase_stevie", "0", "chase cam view from above (used only by GoodVsBad2)"};
+cvar_t chase_stevie = {0, "chase_stevie", "0", "(GOODVSBAD2 only) chase cam view from above"};
 
 cvar_t v_deathtilt = {0, "v_deathtilt", "1", "whether to use sideways view when dead"};
 cvar_t v_deathtiltangle = {0, "v_deathtiltangle", "80", "what roll angle to use when tilting the view while dead"};
@@ -431,6 +433,9 @@ void V_CalcRefdef (void)
 	entity_t *ent;
 	float vieworg[3], viewangles[3], smoothtime;
 	float gunorg[3], gunangles[3];
+	
+	static float viewheightavg;
+	float viewheight;	
 #if 0
 // begin of chase camera bounding box size for proper collisions by Alexander Zubov
 	vec3_t camboxmins = {-3, -3, -3};
@@ -488,7 +493,10 @@ void V_CalcRefdef (void)
 			viewangles[PITCH] += cl.qw_weaponkick;
 
 			// apply the viewofs (even if chasecam is used)
-			vieworg[2] += cl.stats[STAT_VIEWHEIGHT];
+			// Samual: Lets add smoothing for this too so that things like crouching are done with a transition.
+			viewheight = bound(0, (cl.time - cl.oldtime) / max(0.0001, cl_smoothviewheight.value), 1);
+			viewheightavg = viewheightavg * (1 - viewheight) + cl.stats[STAT_VIEWHEIGHT] * viewheight;
+			vieworg[2] += viewheightavg;
 
 			if (chase_active.value)
 			{
@@ -527,7 +535,7 @@ void V_CalcRefdef (void)
 #else
 					// trace from first person view location to our chosen third person view location
 #if 1
-					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 #else
 					trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
 #endif
@@ -542,7 +550,7 @@ void V_CalcRefdef (void)
 							chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup + offset[1];
 							chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup + offset[2];
 #if 1
-							trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+							trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 #else
 							trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
 #endif
@@ -570,7 +578,7 @@ void V_CalcRefdef (void)
 					chase_dest[0] = vieworg[0] + forward[0] * dist;
 					chase_dest[1] = vieworg[1] + forward[1] * dist;
 					chase_dest[2] = vieworg[2] + forward[2] * dist + camup;
-					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 					VectorMAMAM(1, trace.endpos, 8, forward, 4, trace.plane.normal, vieworg);
 				}
 			}
@@ -595,8 +603,9 @@ void V_CalcRefdef (void)
 					float cycle;
 					vec_t frametime;
 
-					frametime = cl.realframetime * cl.movevars_timescale;
-
+					//frametime = cl.realframetime * cl.movevars_timescale;
+					frametime = (cl.time - cl.oldtime) * cl.movevars_timescale;
+					
 					// 1. if we teleported, clear the frametime... the lowpass will recover the previous value then
 					if(!ent->persistent.trail_allowed) // FIXME improve this check
 					{
@@ -1015,14 +1024,15 @@ void V_Init (void)
 	Cvar_RegisterVariable (&v_kickpitch);
 
 	Cvar_RegisterVariable (&cl_stairsmoothspeed);
+	
+	Cvar_RegisterVariable (&cl_smoothviewheight);
 
 	Cvar_RegisterVariable (&chase_back);
 	Cvar_RegisterVariable (&chase_up);
 	Cvar_RegisterVariable (&chase_active);
 	Cvar_RegisterVariable (&chase_overhead);
 	Cvar_RegisterVariable (&chase_pitchangle);
-	if (gamemode == GAME_GOODVSBAD2)
-		Cvar_RegisterVariable (&chase_stevie);
+	Cvar_RegisterVariable (&chase_stevie);
 
 	Cvar_RegisterVariable (&v_deathtilt);
 	Cvar_RegisterVariable (&v_deathtiltangle);

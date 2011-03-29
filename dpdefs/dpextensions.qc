@@ -596,6 +596,8 @@ float(float a) tan = #475; // returns tangent value (which is simply sin(a)/cos(
 //equivalent to the NULL value of the given data type, that is, the empty
 //string, 0, or '0 0 0'. However, when automatic cvar creation took place, a
 //warning is printed to the game console.
+//NOTE: to prevent an ambiguity with float names for vector types, autocvar
+//names MUST NOT end with _x, _y or _z!
 
 //DP_QC_CHANGEPITCH
 //idea: id Software
@@ -606,7 +608,7 @@ float(float a) tan = #475; // returns tangent value (which is simply sin(a)/cos(
 //builtin definitions:
 void(entity ent) changepitch = #63;
 //description:
-//equivilant to changeyaw, ent is normally self. (this was a Q2 builtin)
+//equivalent to changeyaw, ent is normally self. (this was a Q2 builtin)
 
 //DP_QC_COPYENTITY
 //idea: LordHavoc
@@ -1645,7 +1647,7 @@ void(entity ent, float colors) setcolor = #401;
 //engine called QC functions (optional):
 //void(float color) SV_ChangeTeam;
 //description:
-//setcolor sets the color on a client and updates internal color information accordingly (equivilant to stuffing a "color" command but immediate)
+//setcolor sets the color on a client and updates internal color information accordingly (equivalent to stuffing a "color" command but immediate)
 //SV_ChangeTeam is called by the engine whenever a "color" command is recieved, it may decide to do anything it pleases with the color passed by the client, including rejecting it (by doing nothing), or calling setcolor to apply it, preventing team changes is one use for this.
 //the color format is pants + shirt * 16 (0-255 potentially)
 
@@ -1680,7 +1682,7 @@ void(float to, string s, float sz) WritePicture = #501;
 void(float to, string s) WriteUnterminatedString = #456;
 //description:
 //like WriteString, but does not write a terminating 0 after the string. This means you can include things like a player's netname in the middle of a string sent over the network. Just be sure to end it up with either a call to WriteString (which includes the trailing 0) or WriteByte(0) to terminate it yourself.
-//A historical note: this extension was suggested by FrikaC years ago, more recently Shadowalker has been badmouthing LordHavoc and Spike for stealing 'his' extension writestring2 which does exactly the same thing but uses a different builtin number and name and extension string, this argument hinges on the idea that it was his idea in the first place, which is incorrect as FrikaC first suggested it and used a rough equivilant of it in his FrikBot mod years ago involving WriteByte calls on each character.
+//A historical note: this extension was suggested by FrikaC years ago, more recently Shadowalker has been badmouthing LordHavoc and Spike for stealing 'his' extension writestring2 which does exactly the same thing but uses a different builtin number and name and extension string, this argument hinges on the idea that it was his idea in the first place, which is incorrect as FrikaC first suggested it and used a rough equivalent of it in his FrikBot mod years ago involving WriteByte calls on each character.
 
 //DP_TE_BLOOD
 //idea: LordHavoc
@@ -1837,7 +1839,7 @@ void(vector org) te_explosionquad = #415;
 //protocol:
 //vector origin
 //description:
-//all of these just take a location, and are equivilant in function (but not appearance :) to the original TE_GUNSHOT, etc.
+//all of these just take a location, and are equivalent in function (but not appearance :) to the original TE_GUNSHOT, etc.
 
 //DP_TE_SMALLFLASH
 //idea: LordHavoc

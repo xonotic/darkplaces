@@ -34,7 +34,7 @@ typedef struct tridecal_s
 	// color and initial alpha value
 	float			texcoord2f[3][2];
 	float			vertex3f[3][3];
-	unsigned char	color4ub[3][4];
+	float			color4f[3][4];
 	// how long this decal has lived so far (the actual fade begins at cl_decals_time)
 	float			lived;
 	// if >= 0 this indicates the decal should follow an animated triangle
@@ -88,6 +88,13 @@ typedef struct beam_s
 	vec3_t	start, end;
 }
 beam_t;
+
+typedef struct rtlight_particle_s
+{
+	float origin[3];
+	float color[3];
+}
+rtlight_particle_t;
 
 typedef struct rtlight_s
 {
@@ -202,6 +209,11 @@ typedef struct rtlight_s
 	/// masks of all shadowmap sides that have any potential static receivers or casters
 	int static_shadowmap_receivers;
 	int static_shadowmap_casters;
+	/// particle-tracing cache for global illumination
+	int particlecache_numparticles;
+	int particlecache_maxparticles;
+	int particlecache_updateparticle;
+	rtlight_particle_t *particlecache_particles;
 }
 rtlight_t;
 
@@ -369,8 +381,7 @@ typedef struct entity_render_s
 	float *animcache_svector3f;
 	float *animcache_tvector3f;
 	// interleaved arrays for rendering and dynamic vertex buffers for them
-	r_vertexposition_t *animcache_vertexposition;
-	r_meshbuffer_t *animcache_vertexpositionbuffer;
+	r_meshbuffer_t *animcache_vertex3fbuffer;
 	r_vertexmesh_t *animcache_vertexmesh;
 	r_meshbuffer_t *animcache_vertexmeshbuffer;
 
@@ -1562,6 +1573,15 @@ typedef struct r_refdef_stats_s
 	int lights_lighttriangles;
 	int lights_shadowtriangles;
 	int lights_dynamicshadowtriangles;
+	int bouncegrid_lights;
+	int bouncegrid_particles;
+	int bouncegrid_traces;
+	int bouncegrid_hits;
+	int bouncegrid_splats;
+	int bouncegrid_bounces;
+	int collisioncache_animated;
+	int collisioncache_cached;
+	int collisioncache_traced;
 	int bloom;
 	int bloom_copypixels;
 	int bloom_drawpixels;
@@ -1569,6 +1589,8 @@ typedef struct r_refdef_stats_s
 	int indexbufferuploadsize;
 	int vertexbufferuploadcount;
 	int vertexbufferuploadsize;
+	int framedatacurrent;
+	int framedatasize;
 }
 r_refdef_stats_t;
 
@@ -1710,6 +1732,7 @@ typedef struct r_refdef_scene_s {
 	entity_render_t *tempentities;
 	int numtempentities;
 	int maxtempentities;
+	qboolean expandtempentities;
 
 	// renderable dynamic lights
 	rtlight_t *lights[MAX_DLIGHTS];
