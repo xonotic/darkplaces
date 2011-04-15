@@ -67,6 +67,7 @@ typedef struct viddef_support_s
 	qboolean ext_texture_compression_s3tc;
 	qboolean ext_texture_edge_clamp;
 	qboolean ext_texture_filter_anisotropic;
+	qboolean ext_texture_srgb;
 }
 viddef_support_t;
 
@@ -122,6 +123,8 @@ typedef struct viddef_s
 	//  blit to the window)
 	unsigned int *softpixels;
 	unsigned int *softdepthpixels;
+
+	int forcetextype; // always use GL_BGRA for D3D, always use GL_RGBA for GLES, etc
 } viddef_t;
 
 // global video state
@@ -134,6 +137,10 @@ extern qboolean vid_activewindow;
 extern cvar_t vid_hardwaregammasupported;
 extern qboolean vid_usinghwgamma;
 extern qboolean vid_supportrefreshrate;
+
+extern cvar_t vid_soft;
+extern cvar_t vid_soft_threads;
+extern cvar_t vid_soft_interlace;
 
 extern cvar_t vid_fullscreen;
 extern cvar_t vid_width;
@@ -246,5 +253,6 @@ typedef struct
 vid_mode_t;
 size_t VID_ListModes(vid_mode_t *modes, size_t maxcount);
 size_t VID_SortModes(vid_mode_t *modes, size_t count, qboolean usebpp, qboolean userefreshrate, qboolean useaspect);
+void VID_Soft_SharedSetup(void);
 #endif
 

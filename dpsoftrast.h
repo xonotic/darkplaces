@@ -14,13 +14,15 @@
 #define DPSOFTRAST_TEXTURE_FORMAT_DEPTH 1
 #define DPSOFTRAST_TEXTURE_FORMAT_RGBA8 2
 #define DPSOFTRAST_TEXTURE_FORMAT_ALPHA8 3
-#define DPSOFTRAST_TEXTURE_FORMAT_COMPAREMASK 3
+#define DPSOFTRAST_TEXTURE_FORMAT_RGBA16F 4
+#define DPSOFTRAST_TEXTURE_FORMAT_RGBA32F 5
+#define DPSOFTRAST_TEXTURE_FORMAT_COMPAREMASK 0x0F
 
 // modifier flags for texture (can not be changed after creation)
-#define DPSOFTRAST_TEXTURE_FLAG_MIPMAP 4
-#define DPSOFTRAST_TEXTURE_FLAG_CUBEMAP 8
-#define DPSOFTRAST_TEXTURE_FLAG_USEALPHA 16
-#define DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE 32
+#define DPSOFTRAST_TEXTURE_FLAG_MIPMAP 0x10
+#define DPSOFTRAST_TEXTURE_FLAG_CUBEMAP 0x20
+#define DPSOFTRAST_TEXTURE_FLAG_USEALPHA 0x40
+#define DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE 0x80
 
 typedef enum DPSOFTRAST_TEXTURE_FILTER_e
 {
@@ -54,6 +56,7 @@ void DPSOFTRAST_ColorMask(int r, int g, int b, int a);
 void DPSOFTRAST_DepthTest(int enable);
 void DPSOFTRAST_ScissorTest(int enable);
 void DPSOFTRAST_Scissor(float x, float y, float width, float height);
+void DPSOFTRAST_ClipPlane(float x, float y, float z, float w);
 
 void DPSOFTRAST_BlendFunc(int smodulate, int dmodulate);
 void DPSOFTRAST_BlendSubtract(int enable);
@@ -310,7 +313,7 @@ typedef enum DPSOFTRAST_UNIFORM_e
 }
 DPSOFTRAST_UNIFORM;
 
-void DPSOFTRAST_SetShader(int mode, int permutation);
+void DPSOFTRAST_SetShader(int mode, int permutation, int exactspecularmath);
 #define DPSOFTRAST_Uniform1f(index, v0) DPSOFTRAST_Uniform4f(index, v0, 0, 0, 0)
 #define DPSOFTRAST_Uniform2f(index, v0, v1) DPSOFTRAST_Uniform4f(index, v0, v1, 0, 0)
 #define DPSOFTRAST_Uniform3f(index, v0, v1, v2) DPSOFTRAST_Uniform4f(index, v0, v1, v2, 0)

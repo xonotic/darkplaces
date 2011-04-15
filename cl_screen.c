@@ -613,9 +613,9 @@ static int SCR_InfobarHeight(void)
 	if (cl.time > cl.oldtime)
 		scr_infobartime_off -= cl.time - cl.oldtime;
 	if(scr_infobartime_off > 0)
-		offset += 8;
+		offset += 1;
 	if(cls.qw_downloadname[0])
-		offset += 8;
+		offset += 1;
 
 	downinfo = Curl_GetDownloadInfo(&nDownloads, &addinfo);
 	if(downinfo)
@@ -735,8 +735,8 @@ void R_TimeReport(const char *desc)
 		return;
 
 	CHECKGLERROR
-	if (r_speeds.integer == 2 && qglFinish)
-		qglFinish();
+	if (r_speeds.integer == 2)
+		GL_Finish();
 	CHECKGLERROR
 	r_timereport_temp = r_timereport_current;
 	r_timereport_current = Sys_DoubleTime();
@@ -781,6 +781,8 @@ static int R_CountLeafTriangles(const dp_model_t *model, const mleaf_t *leaf)
 	return triangles;
 }
 
+extern cvar_t r_viewscale;
+extern float viewscalefpsadjusted;
 void R_TimeReport_EndFrame(void)
 {
 	int i, j, lines, y;
@@ -796,7 +798,7 @@ void R_TimeReport_EndFrame(void)
 		loc = CL_Locs_FindNearest(cl.movement_origin);
 		viewleaf = (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.PointInLeaf) ? r_refdef.scene.worldmodel->brush.PointInLeaf(r_refdef.scene.worldmodel, r_refdef.view.origin) : NULL;
 		dpsnprintf(string, sizeof(string),
-"%s%s\n"
+"%6.0fus rendertime %3.0f%% viewscale %s%s\n"
 "%3i renders org:'%+8.2f %+8.2f %+8.2f' dir:'%+2.3f %+2.3f %+2.3f'\n"
 "%5i viewleaf%5i cluster%2i area%4i brushes%4i surfaces(%7i triangles)\n"
 "%7i surfaces%7i triangles %5i entities (%7i surfaces%7i triangles)\n"
@@ -808,7 +810,7 @@ void R_TimeReport_EndFrame(void)
 "%6i draws%8i vertices%8i triangles bloompixels%8i copied%8i drawn\n"
 "updated%5i indexbuffers%8i bytes%5i vertexbuffers%8i bytes\n"
 "%s"
-, loc ? "Location: " : "", loc ? loc->name : ""
+, r_refdef.lastdrawscreentime * 1000000.0, r_viewscale.value * sqrt(viewscalefpsadjusted) * 100.0f, loc ? "Location: " : "", loc ? loc->name : ""
 , r_refdef.stats.renders, r_refdef.view.origin[0], r_refdef.view.origin[1], r_refdef.view.origin[2], r_refdef.view.forward[0], r_refdef.view.forward[1], r_refdef.view.forward[2]
 , viewleaf ? (int)(viewleaf - r_refdef.scene.worldmodel->brush.data_leafs) : -1, viewleaf ? viewleaf->clusterindex : -1, viewleaf ? viewleaf->areaindex : -1, viewleaf ? viewleaf->numleafbrushes : 0, viewleaf ? viewleaf->numleafsurfaces : 0, viewleaf ? R_CountLeafTriangles(r_refdef.scene.worldmodel, viewleaf) : 0
 , r_refdef.stats.world_surfaces, r_refdef.stats.world_triangles, r_refdef.stats.entities, r_refdef.stats.entities_surfaces, r_refdef.stats.entities_triangles
@@ -2030,6 +2032,7 @@ static void SCR_DrawLoadingScreen_SharedSetup (qboolean clear)
 //	CHECKGLERROR
 	r_refdef.draw2dstage = true;
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, 0, 0, vid.width, vid.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_ColorMask(1,1,1,1);
 	// when starting up a new video mode, make sure the screen is cleared to black
@@ -2195,6 +2198,7 @@ extern cvar_t cl_minfps_qualitymax;
 extern cvar_t cl_minfps_qualitymin;
 extern cvar_t cl_minfps_qualitypower;
 extern cvar_t cl_minfps_qualityscale;
+extern cvar_t r_viewscale_fpsscaling;
 static double cl_updatescreen_rendertime = 0;
 static double cl_updatescreen_quality = 1;
 extern void Sbar_ShowFPS_Update(void);
@@ -2202,6 +2206,7 @@ void CL_UpdateScreen(void)
 {
 	vec3_t vieworigin;
 	double rendertime1;
+	double drawscreenstart;
 	float conwidth, conheight;
 	float f;
 	r_viewport_t viewport;
@@ -2291,6 +2296,7 @@ void CL_UpdateScreen(void)
 	}
 
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, 0, 0, vid.width, vid.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_ScissorTest(false);
 	GL_ColorMask(1,1,1,1);
@@ -2329,6 +2335,9 @@ void CL_UpdateScreen(void)
 		}
 	}
 
+	if (r_viewscale_fpsscaling.integer)
+		GL_Finish();
+	drawscreenstart = Sys_DoubleTime();
 	if (R_Stereo_Active())
 	{
 		r_stereo_side = 0;
@@ -2361,6 +2370,9 @@ void CL_UpdateScreen(void)
 	}
 	else
 		SCR_DrawScreen();
+	if (r_viewscale_fpsscaling.integer)
+		GL_Finish();
+	r_refdef.lastdrawscreentime = Sys_DoubleTime() - drawscreenstart;
 
 	SCR_CaptureVideo();
 

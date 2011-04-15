@@ -35,6 +35,7 @@ typedef struct tridecal_s
 	float			texcoord2f[3][2];
 	float			vertex3f[3][3];
 	float			color4f[3][4];
+	float			plane[4]; // backface culling
 	// how long this decal has lived so far (the actual fade begins at cl_decals_time)
 	float			lived;
 	// if >= 0 this indicates the decal should follow an animated triangle
@@ -1656,7 +1657,7 @@ typedef struct r_refdef_view_s
 	int width;
 	int height;
 	int depth;
-	r_viewport_t viewport;
+	r_viewport_t viewport; // note: if r_viewscale is used, the viewport.width and viewport.height may be less than width and height
 
 	// which color components to allow (for anaglyph glasses)
 	int colormask[4];
@@ -1823,6 +1824,9 @@ typedef struct r_refdef_s
 	float polygonoffset;
 	float shadowpolygonfactor;
 	float shadowpolygonoffset;
+
+	// how long R_RenderView took on the previous frame
+	double lastdrawscreentime;
 
 	// rendering stats for r_speeds display
 	// (these are incremented in many places)

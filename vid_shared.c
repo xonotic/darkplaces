@@ -31,6 +31,11 @@ qboolean vid_hidden = true;
 // let go of the mouse, turn off sound, and restore system gamma ramps...
 qboolean vid_activewindow = true;
 
+// cvars for DPSOFTRAST
+cvar_t vid_soft = {CVAR_SAVE, "vid_soft", "0", "enables use of the DarkPlaces Software Rasterizer rather than OpenGL or Direct3D"};
+cvar_t vid_soft_threads = {CVAR_SAVE, "vid_soft_threads", "2", "the number of threads the DarkPlaces Software Rasterizer should use"}; 
+cvar_t vid_soft_interlace = {CVAR_SAVE, "vid_soft_interlace", "1", "whether the DarkPlaces Software Rasterizer should interlace the screen bands occupied by each thread"};
+
 // we don't know until we try it!
 cvar_t vid_hardwaregammasupported = {CVAR_READONLY,"vid_hardwaregammasupported","1", "indicates whether hardware gamma is supported (updated by attempts to set hardware gamma ramps)"};
 
@@ -87,7 +92,7 @@ cvar_t v_color_white_g = {CVAR_SAVE, "v_color_white_g", "1", "desired color of w
 cvar_t v_color_white_b = {CVAR_SAVE, "v_color_white_b", "1", "desired color of white"};
 cvar_t v_hwgamma = {CVAR_SAVE, "v_hwgamma", "1", "enables use of hardware gamma correction ramps if available (note: does not work very well on Windows2000 and above), values are 0 = off, 1 = attempt to use hardware gamma, 2 = use hardware gamma whether it works or not"};
 cvar_t v_glslgamma = {CVAR_SAVE, "v_glslgamma", "0", "enables use of GLSL to apply gamma correction ramps if available (note: overrides v_hwgamma)"};
-cvar_t v_psycho = {0, "v_psycho", "0", "easter egg (does not work on Windows2000 or above)"};
+cvar_t v_psycho = {0, "v_psycho", "0", "easter egg"};
 
 // brand of graphics chip
 const char *gl_vendor;
@@ -852,6 +857,9 @@ void VID_CheckExtensions(void)
 	else
 		Con_DPrintf("Using GLSL 1.00\n");
 
+	// GL drivers generally prefer GL_BGRA
+	vid.forcetextype = GL_BGRA;
+
 	vid.support.amd_texture_texture4 = GL_CheckExtension("GL_AMD_texture_texture4", NULL, "-notexture4", false);
 	vid.support.arb_depth_texture = GL_CheckExtension("GL_ARB_depth_texture", NULL, "-nodepthtexture", false);
 	vid.support.arb_draw_buffers = GL_CheckExtension("GL_ARB_draw_buffers", drawbuffersfuncs, "-nodrawbuffers", false);
@@ -874,6 +882,7 @@ void VID_CheckExtensions(void)
 	vid.support.ext_texture_compression_s3tc = GL_CheckExtension("GL_EXT_texture_compression_s3tc", NULL, "-nos3tc", false);
 	vid.support.ext_texture_edge_clamp = GL_CheckExtension("GL_EXT_texture_edge_clamp", NULL, "-noedgeclamp", false) || GL_CheckExtension("GL_SGIS_texture_edge_clamp", NULL, "-noedgeclamp", false);
 	vid.support.ext_texture_filter_anisotropic = GL_CheckExtension("GL_EXT_texture_filter_anisotropic", NULL, "-noanisotropy", false);
+	vid.support.ext_texture_srgb = GL_CheckExtension("GL_EXT_texture_sRGB", NULL, "-nosrgb", false);
 // COMMANDLINEOPTION: GL: -noshaders disables use of OpenGL 2.0 shaders (which allow pixel shader effects, can improve per pixel lighting performance and capabilities)
 // COMMANDLINEOPTION: GL: -noanisotropy disables GL_EXT_texture_filter_anisotropic (allows higher quality texturing)
 // COMMANDLINEOPTION: GL: -noblendminmax disables GL_EXT_blend_minmax
@@ -897,6 +906,7 @@ void VID_CheckExtensions(void)
 // COMMANDLINEOPTION: GL: -notexturegather disables GL_ARB_texture_gather (which provides fetch4 sampling)
 // COMMANDLINEOPTION: GL: -notexturenonpoweroftwo disables GL_ARB_texture_non_power_of_two (which saves video memory if it is supported, but crashes on some buggy drivers)
 // COMMANDLINEOPTION: GL: -novbo disables GL_ARB_vertex_buffer_object (which accelerates rendering)
+// COMMANDLINEOPTION: GL: -nosrgb disables GL_EXT_texture_sRGB (which is used for higher quality non-linear texture gamma)
 
 	if (vid.support.arb_draw_buffers)
 		qglGetIntegerv(GL_MAX_DRAW_BUFFERS_ARB, (GLint*)&vid.maxdrawbuffers);
@@ -1193,6 +1203,20 @@ void VID_RestoreSystemGamma(void)
 
 void VID_Shared_Init(void)
 {
+#ifdef SSE_POSSIBLE
+	if (Sys_HaveSSE2())
+	{
+		Con_Printf("DPSOFTRAST available (SSE2 instructions detected)\n");
+		Cvar_RegisterVariable(&vid_soft);
+		Cvar_RegisterVariable(&vid_soft_threads);
+		Cvar_RegisterVariable(&vid_soft_interlace);
+	}
+	else
+		Con_Printf("DPSOFTRAST not available (SSE2 disabled or not detected)\n");
+#else
+	Con_Printf("DPSOFTRAST not available (SSE2 not compiled in)\n");
+#endif
+
 	Cvar_RegisterVariable(&vid_hardwaregammasupported);
 	Cvar_RegisterVariable(&gl_info_vendor);
 	Cvar_RegisterVariable(&gl_info_renderer);
@@ -1271,6 +1295,7 @@ int VID_Mode(int fullscreen, int width, int height, int bpp, float refreshrate, 
 		vid.stereobuffer   = vid.mode.stereobuffer;
 		vid.samples        = vid.mode.samples;
 		vid.stencil        = vid.mode.bitsperpixel > 16;
+
 		Con_Printf("Video Mode: %s %dx%dx%dx%.2fhz%s%s\n", mode.fullscreen ? "fullscreen" : "window", mode.width, mode.height, mode.bitsperpixel, mode.refreshrate, mode.stereobuffer ? " stereo" : "", mode.samples > 1 ? va(" (%ix AA)", mode.samples) : "");
 
 		Cvar_SetValueQuick(&vid_fullscreen, vid.mode.fullscreen);
@@ -1457,4 +1482,68 @@ size_t VID_SortModes(vid_mode_t *modes, size_t count, qboolean usebpp, qboolean 
 		--count;
 	}
 	return count;
+}
+
+void VID_Soft_SharedSetup(void)
+{
+	gl_platform = "DPSOFTRAST";
+	gl_platformextensions = "";
+
+	gl_renderer = "DarkPlaces-Soft";
+	gl_vendor = "Forest Hale";
+	gl_version = "0.0";
+	gl_extensions = "";
+
+	// clear the extension flags
+	memset(&vid.support, 0, sizeof(vid.support));
+	Cvar_SetQuick(&gl_info_extensions, "");
+
+	// DPSOFTRAST requires BGRA
+	vid.forcetextype = TEXTYPE_BGRA;
+
+	vid.forcevbo = false;
+	vid.support.arb_depth_texture = true;
+	vid.support.arb_draw_buffers = true;
+	vid.support.arb_occlusion_query = true;
+	vid.support.arb_shadow = true;
+	//vid.support.arb_texture_compression = true;
+	vid.support.arb_texture_cube_map = true;
+	vid.support.arb_texture_non_power_of_two = false;
+	vid.support.arb_vertex_buffer_object = true;
+	vid.support.ext_blend_subtract = true;
+	vid.support.ext_draw_range_elements = true;
+	vid.support.ext_framebuffer_object = true;
+	vid.support.ext_texture_3d = true;
+	//vid.support.ext_texture_compression_s3tc = true;
+	vid.support.ext_texture_filter_anisotropic = true;
+	vid.support.ati_separate_stencil = true;
+	vid.support.ext_texture_srgb = false;
+
+	vid.maxtexturesize_2d = 16384;
+	vid.maxtexturesize_3d = 512;
+	vid.maxtexturesize_cubemap = 16384;
+	vid.texunits = 4;
+	vid.teximageunits = 32;
+	vid.texarrayunits = 8;
+	vid.max_anisotropy = 1;
+	vid.maxdrawbuffers = 4;
+
+	vid.texunits = bound(4, vid.texunits, MAX_TEXTUREUNITS);
+	vid.teximageunits = bound(16, vid.teximageunits, MAX_TEXTUREUNITS);
+	vid.texarrayunits = bound(8, vid.texarrayunits, MAX_TEXTUREUNITS);
+	Con_DPrintf("Using DarkPlaces Software Rasterizer rendering path\n");
+	vid.renderpath = RENDERPATH_SOFT;
+	vid.useinterleavedarrays = false;
+
+	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
+	Cvar_SetQuick(&gl_info_renderer, gl_renderer);
+	Cvar_SetQuick(&gl_info_version, gl_version);
+	Cvar_SetQuick(&gl_info_platform, gl_platform ? gl_platform : "");
+	Cvar_SetQuick(&gl_info_driver, gl_driver);
+
+	// LordHavoc: report supported extensions
+	Con_DPrintf("\nQuakeC extensions for server and client: %s\nQuakeC extensions for menu: %s\n", vm_sv_extensions, vm_m_extensions );
+
+	// clear to black (loading plaque will be seen over this)
+	GL_Clear(GL_COLOR_BUFFER_BIT, NULL, 1.0f, 128);
 }

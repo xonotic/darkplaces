@@ -131,21 +131,33 @@ cvar_t gl_skyclip = {0, "gl_skyclip", "4608", "nehahra farclip distance - the re
 cvar_t r_texture_dds_load = {CVAR_SAVE, "r_texture_dds_load", "0", "load compressed dds/filename.dds texture instead of filename.tga, if the file exists (requires driver support)"};
 cvar_t r_texture_dds_save = {CVAR_SAVE, "r_texture_dds_save", "0", "save compressed dds/filename.dds texture when filename.tga is loaded, so that it can be loaded instead next time"};
 
-cvar_t r_texture_convertsRGB_2d = {0, "r_texture_convertsRGB_2d", "0", "load textures as sRGB and convert to linear for proper shading"};
-cvar_t r_texture_convertsRGB_skin = {0, "r_texture_convertsRGB_skin", "0", "load textures as sRGB and convert to linear for proper shading"};
-cvar_t r_texture_convertsRGB_cubemap = {0, "r_texture_convertsRGB_cubemap", "0", "load textures as sRGB and convert to linear for proper shading"};
-cvar_t r_texture_convertsRGB_skybox = {0, "r_texture_convertsRGB_skybox", "0", "load textures as sRGB and convert to linear for proper shading"};
-cvar_t r_texture_convertsRGB_particles = {0, "r_texture_convertsRGB_particles", "0", "load textures as sRGB and convert to linear for proper shading"};
+cvar_t r_texture_sRGB_2d = {0, "r_texture_sRGB_2d", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_skin_diffuse = {0, "r_texture_sRGB_skin_diffuse", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_skin_gloss = {0, "r_texture_sRGB_skin_gloss", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_skin_glow = {0, "r_texture_sRGB_skin_glow", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_skin_reflect = {0, "r_texture_sRGB_skin_reflect", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_cubemap = {0, "r_texture_sRGB_cubemap", "0", "load textures as sRGB"};
+cvar_t r_texture_sRGB_skybox = {0, "r_texture_sRGB_skybox", "0", "load textures as sRGB"};
 
 cvar_t r_textureunits = {0, "r_textureunits", "32", "number of texture units to use in GL 1.1 and GL 1.3 rendering paths"};
 static cvar_t gl_combine = {CVAR_READONLY, "gl_combine", "1", "indicates whether the OpenGL 1.3 rendering path is active"};
 static cvar_t r_glsl = {CVAR_READONLY, "r_glsl", "1", "indicates whether the OpenGL 2.0 rendering path is active"};
+
+cvar_t r_viewfbo = {CVAR_SAVE, "r_viewfbo", "0", "enables use of an 8bit (1) or 16bit (2) or 32bit (3) per component float framebuffer render, which may be at a different resolution than the video mode"};
+cvar_t r_viewscale = {CVAR_SAVE, "r_viewscale", "1", "scaling factor for resolution of the fbo rendering method, must be > 0, can be above 1 for a costly antialiasing behavior, typical values are 0.5 for 1/4th as many pixels rendered, or 1 for normal rendering"};
+cvar_t r_viewscale_fpsscaling = {CVAR_SAVE, "r_viewscale_fpsscaling", "0", "change resolution based on framerate"};
+cvar_t r_viewscale_fpsscaling_min = {CVAR_SAVE, "r_viewscale_fpsscaling_min", "0.0625", "worst acceptable quality"};
+cvar_t r_viewscale_fpsscaling_multiply = {CVAR_SAVE, "r_viewscale_fpsscaling_multiply", "5", "adjust quality up or down by the frametime difference from 1.0/target, multiplied by this factor"};
+cvar_t r_viewscale_fpsscaling_stepsize = {CVAR_SAVE, "r_viewscale_fpsscaling_stepsize", "0.01", "smallest adjustment to hit the target framerate (this value prevents minute oscillations)"};
+cvar_t r_viewscale_fpsscaling_stepmax = {CVAR_SAVE, "r_viewscale_fpsscaling_stepmax", "1.00", "largest adjustment to hit the target framerate (this value prevents wild overshooting of the estimate)"};
+cvar_t r_viewscale_fpsscaling_target = {CVAR_SAVE, "r_viewscale_fpsscaling_target", "70", "desired framerate"};
 
 cvar_t r_glsl_deluxemapping = {CVAR_SAVE, "r_glsl_deluxemapping", "1", "use per pixel lighting on deluxemap-compiled q3bsp maps (or a value of 2 forces deluxemap shading even without deluxemaps)"};
 cvar_t r_glsl_offsetmapping = {CVAR_SAVE, "r_glsl_offsetmapping", "0", "offset mapping effect (also known as parallax mapping or virtual displacement mapping)"};
 cvar_t r_glsl_offsetmapping_steps = {CVAR_SAVE, "r_glsl_offsetmapping_steps", "2", "offset mapping steps (note: too high values may be not supported by your GPU)"};
 cvar_t r_glsl_offsetmapping_reliefmapping = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping", "0", "relief mapping effect (higher quality)"};
 cvar_t r_glsl_offsetmapping_reliefmapping_steps = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_steps", "10", "relief mapping steps (note: too high values may be not supported by your GPU)"};
+cvar_t r_glsl_offsetmapping_reliefmapping_refinesteps = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_refinesteps", "5", "relief mapping refine steps (these are a binary search executed as the last step as given by r_glsl_offsetmapping_reliefmapping_steps)"};
 cvar_t r_glsl_offsetmapping_scale = {CVAR_SAVE, "r_glsl_offsetmapping_scale", "0.04", "how deep the offset mapping effect is"};
 cvar_t r_glsl_postprocess = {CVAR_SAVE, "r_glsl_postprocess", "0", "use a GLSL postprocessing shader"};
 cvar_t r_glsl_postprocess_uservec1 = {CVAR_SAVE, "r_glsl_postprocess_uservec1", "0 0 0 0", "a 4-component vector to pass as uservec1 to the postprocessing shader (only useful if default.glsl has been customized)"};
@@ -221,6 +233,13 @@ static struct r_bloomstate_s
 	qboolean hdr;
 
 	int bloomwidth, bloomheight;
+
+	textype_t texturetype;
+	int viewfbo; // used to check if r_viewfbo cvar has changed
+
+	int fbo_framebuffer; // non-zero if r_viewfbo is enabled and working
+	rtexture_t *texture_framebuffercolor; // non-NULL if fbo_screen is non-zero
+	rtexture_t *texture_framebufferdepth; // non-NULL if fbo_screen is non-zero
 
 	int screentexturewidth, screentextureheight;
 	rtexture_t *texture_screen; /// \note also used for motion blur if enabled!
@@ -1772,7 +1791,7 @@ void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutatio
 
 void R_SetupShader_SetPermutationSoft(unsigned int mode, unsigned int permutation)
 {
-	DPSOFTRAST_SetShader(mode, permutation);
+	DPSOFTRAST_SetShader(mode, permutation, r_shadow_glossexact.integer);
 	DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewProjectionMatrixM1, 1, false, gl_modelviewprojection16f);
 	DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewMatrixM1, 1, false, gl_modelview16f);
 	DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_ClientTime, cl.time);
@@ -2111,23 +2130,18 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
 			permutation |= SHADERPERMUTATION_VERTEXTEXTUREBLEND;
 		// normalmap (deferred prepass), may use alpha test on diffuse
 		mode = SHADERMODE_DEFERREDGEOMETRY;
-		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
-			permutation |= SHADERPERMUTATION_VERTEXTEXTUREBLEND;
 		GL_BlendFunc(GL_ONE, GL_ZERO);
 		blendfuncflags = R_BlendFuncFlags(GL_ONE, GL_ZERO);
 	}
@@ -2135,23 +2149,18 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
 			permutation |= SHADERPERMUTATION_VERTEXTEXTUREBLEND;
 		// light source
 		mode = SHADERMODE_LIGHTSOURCE;
-		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
-			permutation |= SHADERPERMUTATION_VERTEXTEXTUREBLEND;
 		if (rsurface.rtlight->currentcubemap != r_texture_whitecube)
 			permutation |= SHADERPERMUTATION_CUBEFILTER;
 		if (diffusescale > 0)
@@ -2184,15 +2193,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
@@ -2229,15 +2235,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
@@ -2284,15 +2287,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
@@ -2336,15 +2336,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	{
 		if (r_glsl_offsetmapping.integer)
 		{
-			if (rsurface.texture->offsetmapping == OFFSETMAPPING_LINEAR)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-			else if (rsurface.texture->offsetmapping == OFFSETMAPPING_RELIEF)
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
-			else if (rsurface.texture->offsetmapping != OFFSETMAPPING_OFF)
+			switch(rsurface.texture->offsetmapping)
 			{
-				permutation |= SHADERPERMUTATION_OFFSETMAPPING;
-				if (r_glsl_offsetmapping_reliefmapping.integer)
-					permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;
+			case OFFSETMAPPING_LINEAR: permutation |= SHADERPERMUTATION_OFFSETMAPPING;break;
+			case OFFSETMAPPING_RELIEF: permutation |= SHADERPERMUTATION_OFFSETMAPPING | SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_DEFAULT: permutation |= SHADERPERMUTATION_OFFSETMAPPING;if (r_glsl_offsetmapping_reliefmapping.integer) permutation |= SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING;break;
+			case OFFSETMAPPING_OFF: break;
 			}
 		}
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_VERTEXTEXTUREBLEND)
@@ -2521,7 +2518,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		hlslPSSetParameter1f(D3DPSREGISTER_FogPlaneViewDist, rsurface.fogplaneviewdist);
 		hlslPSSetParameter1f(D3DPSREGISTER_FogRangeRecip, rsurface.fograngerecip);
 		hlslPSSetParameter1f(D3DPSREGISTER_FogHeightFade, rsurface.fogheightfade);
-		hlslPSSetParameter3f(D3DPSREGISTER_OffsetMapping_ScaleSteps, r_glsl_offsetmapping_scale.value, max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer), 1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer));
+		hlslPSSetParameter4f(D3DPSREGISTER_OffsetMapping_ScaleSteps,
+				r_glsl_offsetmapping_scale.value*rsurface.texture->offsetscale,
+				max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				max(1, r_glsl_offsetmapping_reliefmapping_refinesteps.integer)
+			);
 		hlslPSSetParameter2f(D3DPSREGISTER_ScreenToDepth, r_refdef.view.viewport.screentodepth[0], r_refdef.view.viewport.screentodepth[1]);
 		hlslPSSetParameter2f(D3DPSREGISTER_PixelToScreenTexCoord, 1.0f/vid.width, 1.0/vid.height);
 
@@ -2676,11 +2678,16 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		if (r_glsl_permutation->loc_FogPlaneViewDist >= 0) qglUniform1f(r_glsl_permutation->loc_FogPlaneViewDist, rsurface.fogplaneviewdist);
 		if (r_glsl_permutation->loc_FogRangeRecip >= 0) qglUniform1f(r_glsl_permutation->loc_FogRangeRecip, rsurface.fograngerecip);
 		if (r_glsl_permutation->loc_FogHeightFade >= 0) qglUniform1f(r_glsl_permutation->loc_FogHeightFade, rsurface.fogheightfade);
-		if (r_glsl_permutation->loc_OffsetMapping_ScaleSteps >= 0) qglUniform3f(r_glsl_permutation->loc_OffsetMapping_ScaleSteps, r_glsl_offsetmapping_scale.value*rsurface.texture->offsetscale, max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer), 1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer));
+		if (r_glsl_permutation->loc_OffsetMapping_ScaleSteps >= 0) qglUniform4f(r_glsl_permutation->loc_OffsetMapping_ScaleSteps,
+				r_glsl_offsetmapping_scale.value*rsurface.texture->offsetscale,
+				max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				max(1, r_glsl_offsetmapping_reliefmapping_refinesteps.integer)
+			);
 		if (r_glsl_permutation->loc_ScreenToDepth >= 0) qglUniform2f(r_glsl_permutation->loc_ScreenToDepth, r_refdef.view.viewport.screentodepth[0], r_refdef.view.viewport.screentodepth[1]);
 		if (r_glsl_permutation->loc_PixelToScreenTexCoord >= 0) qglUniform2f(r_glsl_permutation->loc_PixelToScreenTexCoord, 1.0f/vid.width, 1.0f/vid.height);
 		if (r_glsl_permutation->loc_BounceGridMatrix >= 0) {Matrix4x4_Concat(&tempmatrix, &r_shadow_bouncegridmatrix, &rsurface.matrix);Matrix4x4_ToArrayFloatGL(&tempmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_BounceGridMatrix, 1, false, m16f);}
-		if (r_glsl_permutation->loc_BounceGridIntensity >= 0) qglUniform1f(r_glsl_permutation->loc_BounceGridIntensity, r_shadow_bouncegridintensity);
+		if (r_glsl_permutation->loc_BounceGridIntensity >= 0) qglUniform1f(r_glsl_permutation->loc_BounceGridIntensity, r_shadow_bouncegridintensity*r_refdef.view.colorscale);
 
 		if (r_glsl_permutation->tex_Texture_First           >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First            , r_texture_white                                     );
 		if (r_glsl_permutation->tex_Texture_Second          >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Second           , r_texture_white                                     );
@@ -2815,7 +2822,12 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_FogPlaneViewDist, rsurface.fogplaneviewdist);
 		DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_FogRangeRecip, rsurface.fograngerecip);
 		DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_FogHeightFade, rsurface.fogheightfade);
-		DPSOFTRAST_Uniform3f(DPSOFTRAST_UNIFORM_OffsetMapping_ScaleSteps, r_glsl_offsetmapping_scale.value*rsurface.texture->offsetscale, max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer), 1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer));
+		DPSOFTRAST_Uniform4f(DPSOFTRAST_UNIFORM_OffsetMapping_ScaleSteps,
+				r_glsl_offsetmapping_scale.value*rsurface.texture->offsetscale,
+				max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				1.0 / max(1, (permutation & SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING) ? r_glsl_offsetmapping_reliefmapping_steps.integer : r_glsl_offsetmapping_steps.integer),
+				max(1, r_glsl_offsetmapping_reliefmapping_refinesteps.integer)
+			);
 		DPSOFTRAST_Uniform2f(DPSOFTRAST_UNIFORM_ScreenToDepth, r_refdef.view.viewport.screentodepth[0], r_refdef.view.viewport.screentodepth[1]);
 		DPSOFTRAST_Uniform2f(DPSOFTRAST_UNIFORM_PixelToScreenTexCoord, 1.0f/vid.width, 1.0f/vid.height);
 
@@ -2888,7 +2900,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 		permutation |= SHADERPERMUTATION_CUBEFILTER;
 	if (diffusescale > 0)
 		permutation |= SHADERPERMUTATION_DIFFUSE;
-	if (specularscale > 0)
+	if (specularscale > 0 && r_shadow_gloss.integer > 0)
 		permutation |= SHADERPERMUTATION_SPECULAR | SHADERPERMUTATION_DIFFUSE;
 	if (r_shadow_usingshadowmap2d)
 	{
@@ -3174,7 +3186,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	// check for DDS texture file first
 	if (!r_loaddds || !(ddsbase = R_LoadTextureDDSFile(r_main_texturepool, va("dds/%s.dds", basename), textureflags, &ddshasalpha, ddsavgcolor, miplevel)))
 	{
-		basepixels = loadimagepixelsbgra(name, complain, true, r_texture_convertsRGB_skin.integer != 0, &miplevel);
+		basepixels = loadimagepixelsbgra(name, complain, true, false, &miplevel);
 		if (basepixels == NULL)
 			return NULL;
 	}
@@ -3212,7 +3224,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	{
 		basepixels_width = image_width;
 		basepixels_height = image_height;
-		skinframe->base = R_LoadTexture2D (r_main_texturepool, skinframe->basename, basepixels_width, basepixels_height, basepixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), miplevel, NULL);
+		skinframe->base = R_LoadTexture2D (r_main_texturepool, skinframe->basename, basepixels_width, basepixels_height, basepixels, r_texture_sRGB_skin_diffuse.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), miplevel, NULL);
 		if (textureflags & TEXF_ALPHA)
 		{
 			for (j = 3;j < basepixels_width * basepixels_height * 4;j += 4)
@@ -3291,18 +3303,18 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	// _luma is supported only for tenebrae compatibility
 	// _glow is the preferred name
 	mymiplevel = savemiplevel;
-	if (skinframe->glow == NULL && ((pixels = loadimagepixelsbgra(va("%s_glow",  skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel)) || (pixels = loadimagepixelsbgra(va("%s_luma", skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel))))
+	if (skinframe->glow == NULL && ((pixels = loadimagepixelsbgra(va("%s_glow",  skinframe->basename), false, false, false, &mymiplevel)) || (pixels = loadimagepixelsbgra(va("%s_luma", skinframe->basename), false, false, false, &mymiplevel))))
 	{
-		skinframe->glow = R_LoadTexture2D (r_main_texturepool, va("%s_glow", skinframe->basename), image_width, image_height, pixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_glow.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+		skinframe->glow = R_LoadTexture2D (r_main_texturepool, va("%s_glow", skinframe->basename), image_width, image_height, pixels, r_texture_sRGB_skin_glow.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_glow.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->glow)
 			R_SaveTextureDDSFile(skinframe->glow, va("dds/%s_glow.dds", skinframe->basename), true, true);
 		Mem_Free(pixels);pixels = NULL;
 	}
 
 	mymiplevel = savemiplevel;
-	if (skinframe->gloss == NULL && r_loadgloss && (pixels = loadimagepixelsbgra(va("%s_gloss", skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel)))
+	if (skinframe->gloss == NULL && r_loadgloss && (pixels = loadimagepixelsbgra(va("%s_gloss", skinframe->basename), false, false, false, &mymiplevel)))
 	{
-		skinframe->gloss = R_LoadTexture2D (r_main_texturepool, va("%s_gloss", skinframe->basename), image_width, image_height, pixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_gloss.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+		skinframe->gloss = R_LoadTexture2D (r_main_texturepool, va("%s_gloss", skinframe->basename), image_width, image_height, pixels, r_texture_sRGB_skin_gloss.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_gloss.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->gloss)
 			R_SaveTextureDDSFile(skinframe->gloss, va("dds/%s_gloss.dds", skinframe->basename), true, true);
 		Mem_Free(pixels);
@@ -3310,9 +3322,9 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	}
 
 	mymiplevel = savemiplevel;
-	if (skinframe->pants == NULL && (pixels = loadimagepixelsbgra(va("%s_pants", skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel)))
+	if (skinframe->pants == NULL && (pixels = loadimagepixelsbgra(va("%s_pants", skinframe->basename), false, false, false, &mymiplevel)))
 	{
-		skinframe->pants = R_LoadTexture2D (r_main_texturepool, va("%s_pants", skinframe->basename), image_width, image_height, pixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+		skinframe->pants = R_LoadTexture2D (r_main_texturepool, va("%s_pants", skinframe->basename), image_width, image_height, pixels, r_texture_sRGB_skin_diffuse.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->pants)
 			R_SaveTextureDDSFile(skinframe->pants, va("dds/%s_pants.dds", skinframe->basename), true, false);
 		Mem_Free(pixels);
@@ -3320,9 +3332,9 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	}
 
 	mymiplevel = savemiplevel;
-	if (skinframe->shirt == NULL && (pixels = loadimagepixelsbgra(va("%s_shirt", skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel)))
+	if (skinframe->shirt == NULL && (pixels = loadimagepixelsbgra(va("%s_shirt", skinframe->basename), false, false, false, &mymiplevel)))
 	{
-		skinframe->shirt = R_LoadTexture2D (r_main_texturepool, va("%s_shirt", skinframe->basename), image_width, image_height, pixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+		skinframe->shirt = R_LoadTexture2D (r_main_texturepool, va("%s_shirt", skinframe->basename), image_width, image_height, pixels, r_texture_sRGB_skin_diffuse.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->shirt)
 			R_SaveTextureDDSFile(skinframe->shirt, va("dds/%s_shirt.dds", skinframe->basename), true, false);
 		Mem_Free(pixels);
@@ -3330,9 +3342,9 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	}
 
 	mymiplevel = savemiplevel;
-	if (skinframe->reflect == NULL && (pixels = loadimagepixelsbgra(va("%s_reflect", skinframe->basename), false, false, r_texture_convertsRGB_skin.integer != 0, &mymiplevel)))
+	if (skinframe->reflect == NULL && (pixels = loadimagepixelsbgra(va("%s_reflect", skinframe->basename), false, false, false, &mymiplevel)))
 	{
-		skinframe->reflect = R_LoadTexture2D (r_main_texturepool, va("%s_reflect", skinframe->basename), image_width, image_height, pixels, TEXTYPE_BGRA, textureflags & (gl_texturecompression_reflectmask.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+		skinframe->reflect = R_LoadTexture2D (r_main_texturepool, va("%s_reflect", skinframe->basename), image_width, image_height, pixels, r_texture_sRGB_skin_reflect.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_reflectmask.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->reflect)
 			R_SaveTextureDDSFile(skinframe->reflect, va("dds/%s_reflect.dds", skinframe->basename), true, true);
 		Mem_Free(pixels);
@@ -3346,7 +3358,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 }
 
 // this is only used by .spr32 sprites, HL .spr files, HL .bsp files
-skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, const unsigned char *skindata, int width, int height)
+skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, const unsigned char *skindata, int width, int height, qboolean sRGB)
 {
 	int i;
 	unsigned char *temp1, *temp2;
@@ -3387,7 +3399,7 @@ skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, co
 		skinframe->nmap = R_LoadTexture2D(r_main_texturepool, va("%s_nmap", skinframe->basename), width, height, temp2, TEXTYPE_BGRA, (textureflags | TEXF_ALPHA) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP), -1, NULL);
 		Mem_Free(temp1);
 	}
-	skinframe->base = skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, TEXTYPE_BGRA, textureflags, -1, NULL);
+	skinframe->base = skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, sRGB ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags, -1, NULL);
 	if (textureflags & TEXF_ALPHA)
 	{
 		for (i = 3;i < width * height * 4;i += 4)
@@ -3674,7 +3686,7 @@ rtexture_t *R_LoadCubemap(const char *basename)
 			// generate an image name based on the base and and suffix
 			dpsnprintf(name, sizeof(name), "%s%s", basename, suffix[j][i].suffix);
 			// load it
-			if ((image_buffer = loadimagepixelsbgra(name, false, false, r_texture_convertsRGB_cubemap.integer != 0, NULL)))
+			if ((image_buffer = loadimagepixelsbgra(name, false, false, false, NULL)))
 			{
 				// an image loaded, make sure width and height are equal
 				if (image_width == image_height && (!cubemappixels || image_width == cubemapsize))
@@ -3703,7 +3715,7 @@ rtexture_t *R_LoadCubemap(const char *basename)
 		if (developer_loading.integer)
 			Con_Printf("loading cubemap \"%s\"\n", basename);
 
-		cubemaptexture = R_LoadTextureCubeMap(r_main_texturepool, basename, cubemapsize, cubemappixels, TEXTYPE_BGRA, (gl_texturecompression_lightcubemaps.integer ? TEXF_COMPRESS : 0) | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
+		cubemaptexture = R_LoadTextureCubeMap(r_main_texturepool, basename, cubemapsize, cubemappixels, r_texture_sRGB_cubemap.integer != 0 ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, (gl_texturecompression_lightcubemaps.integer ? TEXF_COMPRESS : 0) | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
 		Mem_Free(cubemappixels);
 	}
 	else
@@ -3824,6 +3836,7 @@ void gl_main_start(void)
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES2:
 		Cvar_SetValueQuick(&r_textureunits, vid.texunits);
 		Cvar_SetValueQuick(&gl_combine, 1);
 		Cvar_SetValueQuick(&r_glsl, 1);
@@ -3846,14 +3859,6 @@ void gl_main_start(void)
 		r_loadnormalmap = false;
 		r_loadgloss = false;
 		r_loadfog = true;
-		break;
-	case RENDERPATH_GLES2:
-		Cvar_SetValueQuick(&r_textureunits, 1);
-		Cvar_SetValueQuick(&gl_combine, 1);
-		Cvar_SetValueQuick(&r_glsl, 1);
-		r_loadnormalmap = true;
-		r_loadgloss = false;
-		r_loadfog = false;
 		break;
 	}
 
@@ -4084,19 +4089,30 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_transparentdepthmasking);
 	Cvar_RegisterVariable(&r_texture_dds_load);
 	Cvar_RegisterVariable(&r_texture_dds_save);
-	Cvar_RegisterVariable(&r_texture_convertsRGB_2d);
-	Cvar_RegisterVariable(&r_texture_convertsRGB_skin);
-	Cvar_RegisterVariable(&r_texture_convertsRGB_cubemap);
-	Cvar_RegisterVariable(&r_texture_convertsRGB_skybox);
-	Cvar_RegisterVariable(&r_texture_convertsRGB_particles);
+	Cvar_RegisterVariable(&r_texture_sRGB_2d);
+	Cvar_RegisterVariable(&r_texture_sRGB_skin_diffuse);
+	Cvar_RegisterVariable(&r_texture_sRGB_skin_gloss);
+	Cvar_RegisterVariable(&r_texture_sRGB_skin_glow);
+	Cvar_RegisterVariable(&r_texture_sRGB_skin_reflect);
+	Cvar_RegisterVariable(&r_texture_sRGB_cubemap);
+	Cvar_RegisterVariable(&r_texture_sRGB_skybox);
 	Cvar_RegisterVariable(&r_textureunits);
 	Cvar_RegisterVariable(&gl_combine);
+	Cvar_RegisterVariable(&r_viewfbo);
+	Cvar_RegisterVariable(&r_viewscale);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling_min);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling_multiply);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling_stepsize);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling_stepmax);
+	Cvar_RegisterVariable(&r_viewscale_fpsscaling_target);
 	Cvar_RegisterVariable(&r_glsl);
 	Cvar_RegisterVariable(&r_glsl_deluxemapping);
 	Cvar_RegisterVariable(&r_glsl_offsetmapping);
 	Cvar_RegisterVariable(&r_glsl_offsetmapping_steps);
 	Cvar_RegisterVariable(&r_glsl_offsetmapping_reliefmapping);
 	Cvar_RegisterVariable(&r_glsl_offsetmapping_reliefmapping_steps);
+	Cvar_RegisterVariable(&r_glsl_offsetmapping_reliefmapping_refinesteps);
 	Cvar_RegisterVariable(&r_glsl_offsetmapping_scale);
 	Cvar_RegisterVariable(&r_glsl_postprocess);
 	Cvar_RegisterVariable(&r_glsl_postprocess_uservec1);
@@ -4906,11 +4922,11 @@ static void R_View_SetFrustum(const int *scissor)
 			case RENDERPATH_D3D9:
 			case RENDERPATH_D3D10:
 			case RENDERPATH_D3D11:
-			case RENDERPATH_SOFT:
 				// non-flipped y coordinates
 				fny = -1.0 + 2.0 * (vid.height - scissor[1] - scissor[3] - r_refdef.view.viewport.y) / (double) (r_refdef.view.viewport.height);
 				fpy = -1.0 + 2.0 * (vid.height - scissor[1]              - r_refdef.view.viewport.y) / (double) (r_refdef.view.viewport.height);
 				break;
+			case RENDERPATH_SOFT:
 			case RENDERPATH_GL11:
 			case RENDERPATH_GL13:
 			case RENDERPATH_GL20:
@@ -5108,10 +5124,29 @@ void R_View_Update(void)
 	R_View_UpdateEntityLighting();
 }
 
+float viewscalefpsadjusted = 1.0f;
+
+void R_GetScaledViewSize(int width, int height, int *outwidth, int *outheight)
+{
+	float scale = r_viewscale.value * sqrt(viewscalefpsadjusted);
+	scale = bound(0.03125f, scale, 1.0f);
+	*outwidth = (int)ceil(width * scale);
+	*outheight = (int)ceil(height * scale);
+}
+
+void R_Mesh_SetMainRenderTargets(void)
+{
+	if (r_bloomstate.fbo_framebuffer)
+		R_Mesh_SetRenderTargets(r_bloomstate.fbo_framebuffer, r_bloomstate.texture_framebufferdepth, r_bloomstate.texture_framebuffercolor, NULL, NULL, NULL);
+	else
+		R_Mesh_ResetRenderTargets();
+}
+
 void R_SetupView(qboolean allowwaterclippingplane)
 {
 	const float *customclipplane = NULL;
 	float plane[4];
+	int scaledwidth, scaledheight;
 	if (r_refdef.view.useclipplane && allowwaterclippingplane)
 	{
 		// LordHavoc: couldn't figure out how to make this approach the
@@ -5122,17 +5157,29 @@ void R_SetupView(qboolean allowwaterclippingplane)
 		plane[0] = r_refdef.view.clipplane.normal[0];
 		plane[1] = r_refdef.view.clipplane.normal[1];
 		plane[2] = r_refdef.view.clipplane.normal[2];
-		plane[3] = dist;
-		customclipplane = plane;
+		plane[3] = -dist;
+		if(vid.renderpath != RENDERPATH_SOFT) customclipplane = plane;
 	}
 
+	R_GetScaledViewSize(r_refdef.view.width, r_refdef.view.height, &scaledwidth, &scaledheight);
 	if (!r_refdef.view.useperspective)
-		R_Viewport_InitOrtho(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - r_refdef.view.height - r_refdef.view.y, r_refdef.view.width, r_refdef.view.height, -r_refdef.view.ortho_x, -r_refdef.view.ortho_y, r_refdef.view.ortho_x, r_refdef.view.ortho_y, -r_refdef.farclip, r_refdef.farclip, customclipplane);
+		R_Viewport_InitOrtho(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - scaledheight - r_refdef.view.y, scaledwidth, scaledheight, -r_refdef.view.ortho_x, -r_refdef.view.ortho_y, r_refdef.view.ortho_x, r_refdef.view.ortho_y, -r_refdef.farclip, r_refdef.farclip, customclipplane);
 	else if (vid.stencil && r_useinfinitefarclip.integer)
-		R_Viewport_InitPerspectiveInfinite(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - r_refdef.view.height - r_refdef.view.y, r_refdef.view.width, r_refdef.view.height, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, customclipplane);
+		R_Viewport_InitPerspectiveInfinite(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - scaledheight - r_refdef.view.y, scaledwidth, scaledheight, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, customclipplane);
 	else
-		R_Viewport_InitPerspective(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - r_refdef.view.height - r_refdef.view.y, r_refdef.view.width, r_refdef.view.height, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, r_refdef.farclip, customclipplane);
+		R_Viewport_InitPerspective(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, vid.height - scaledheight - r_refdef.view.y, scaledwidth, scaledheight, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, r_refdef.farclip, customclipplane);
+	R_Mesh_SetMainRenderTargets();
 	R_SetViewport(&r_refdef.view.viewport);
+	if (r_refdef.view.useclipplane && allowwaterclippingplane && vid.renderpath == RENDERPATH_SOFT)
+	{
+		matrix4x4_t mvpmatrix, invmvpmatrix, invtransmvpmatrix;
+		float screenplane[4];
+		Matrix4x4_Concat(&mvpmatrix, &r_refdef.view.viewport.projectmatrix, &r_refdef.view.viewport.viewmatrix);
+		Matrix4x4_Invert_Full(&invmvpmatrix, &mvpmatrix);
+		Matrix4x4_Transpose(&invtransmvpmatrix, &invmvpmatrix);
+		Matrix4x4_Transform4(&invtransmvpmatrix, plane, screenplane);
+		DPSOFTRAST_ClipPlane(screenplane[0], screenplane[1], screenplane[2], screenplane[3]);
+	}
 }
 
 void R_EntityMatrix(const matrix4x4_t *matrix)
@@ -5184,6 +5231,7 @@ void R_ResetViewRendering2D(void)
 
 	// GL is weird because it's bottom to top, r_refdef.view.y is top to bottom
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, r_refdef.view.x, vid.height - r_refdef.view.height - r_refdef.view.y, r_refdef.view.width, r_refdef.view.height, 0, 0, 1, 1, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_Scissor(viewport.x, viewport.y, viewport.width, viewport.height);
 	GL_Color(1, 1, 1, 1);
@@ -5626,6 +5674,7 @@ static void R_Water_ProcessPlanes(void)
 		}
 
 	}
+	if(vid.renderpath==RENDERPATH_SOFT) DPSOFTRAST_ClipPlane(0, 0, 0, 1);
 	r_waterstate.renderingscene = false;
 	r_refdef.view = originalview;
 	R_ResetViewRendering3D();
@@ -5643,6 +5692,27 @@ error:
 void R_Bloom_StartFrame(void)
 {
 	int bloomtexturewidth, bloomtextureheight, screentexturewidth, screentextureheight;
+	int viewwidth, viewheight;
+	textype_t textype;
+
+	if (r_viewscale_fpsscaling.integer)
+	{
+		double actualframetime;
+		double targetframetime;
+		double adjust;
+		actualframetime = r_refdef.lastdrawscreentime;
+		targetframetime = (1.0 / r_viewscale_fpsscaling_target.value);
+		adjust = (targetframetime - actualframetime) * r_viewscale_fpsscaling_multiply.value;
+		adjust = bound(-r_viewscale_fpsscaling_stepmax.value, adjust, r_viewscale_fpsscaling_stepmax.value);
+		if (r_viewscale_fpsscaling_stepsize.value > 0)
+			adjust = (int)(adjust / r_viewscale_fpsscaling_stepsize.value) * r_viewscale_fpsscaling_stepsize.value;
+		viewscalefpsadjusted += adjust;
+		viewscalefpsadjusted = bound(r_viewscale_fpsscaling_min.value, viewscalefpsadjusted, 1.0f);
+	}
+	else
+		viewscalefpsadjusted = 1.0f;
+
+	R_GetScaledViewSize(r_refdef.view.width, r_refdef.view.height, &viewwidth, &viewheight);
 
 	switch(vid.renderpath)
 	{
@@ -5669,8 +5739,8 @@ void R_Bloom_StartFrame(void)
 	// calculate desired texture sizes
 	if (vid.support.arb_texture_non_power_of_two)
 	{
-		screentexturewidth = r_refdef.view.width;
-		screentextureheight = r_refdef.view.height;
+		screentexturewidth = vid.width;
+		screentextureheight = vid.height;
 		bloomtexturewidth = r_bloomstate.bloomwidth;
 		bloomtextureheight = r_bloomstate.bloomheight;
 	}
@@ -5690,31 +5760,82 @@ void R_Bloom_StartFrame(void)
 		Cvar_SetValueQuick(&r_damageblur, 0);
 	}
 
-	if (!(r_glsl_postprocess.integer || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial)) && !r_bloom.integer && !r_hdr.integer && (R_Stereo_Active() || (r_motionblur.value <= 0 && r_damageblur.value <= 0)))
+	if (!(r_glsl_postprocess.integer || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial)) && !r_bloom.integer && !r_hdr.integer && (R_Stereo_Active() || (r_motionblur.value <= 0 && r_damageblur.value <= 0)) && r_viewfbo.integer < 1 && r_viewscale.value == 1.0f && !r_viewscale_fpsscaling.integer)
 		screentexturewidth = screentextureheight = 0;
 	if (!r_hdr.integer && !r_bloom.integer)
 		bloomtexturewidth = bloomtextureheight = 0;
 
-	// allocate textures as needed
-	if (r_bloomstate.screentexturewidth != screentexturewidth || r_bloomstate.screentextureheight != screentextureheight)
+	textype = TEXTYPE_COLORBUFFER;
+	switch (vid.renderpath)
 	{
-		if (r_bloomstate.texture_screen)
-			R_FreeTexture(r_bloomstate.texture_screen);
-		r_bloomstate.texture_screen = NULL;
-		r_bloomstate.screentexturewidth = screentexturewidth;
-		r_bloomstate.screentextureheight = screentextureheight;
-		if (r_bloomstate.screentexturewidth && r_bloomstate.screentextureheight)
-			r_bloomstate.texture_screen = R_LoadTexture2D(r_main_texturepool, "screen", r_bloomstate.screentexturewidth, r_bloomstate.screentextureheight, NULL, TEXTYPE_COLORBUFFER, TEXF_RENDERTARGET | TEXF_FORCENEAREST | TEXF_CLAMP, -1, NULL);
+	case RENDERPATH_GL20:
+	case RENDERPATH_GLES2:
+		if (vid.support.ext_framebuffer_object)
+		{
+			if (r_viewfbo.integer == 2) textype = TEXTYPE_COLORBUFFER16F;
+			if (r_viewfbo.integer == 3) textype = TEXTYPE_COLORBUFFER32F;
+		}
+		break;
+	case RENDERPATH_D3D9:
+	case RENDERPATH_D3D10:
+	case RENDERPATH_D3D11:
+	case RENDERPATH_SOFT:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GL11:
+		break;
 	}
-	if (r_bloomstate.bloomtexturewidth != bloomtexturewidth || r_bloomstate.bloomtextureheight != bloomtextureheight)
+
+	// allocate textures as needed
+	if (r_bloomstate.screentexturewidth != screentexturewidth
+	 || r_bloomstate.screentextureheight != screentextureheight
+	 || r_bloomstate.bloomtexturewidth != bloomtexturewidth
+	 || r_bloomstate.bloomtextureheight != bloomtextureheight
+	 || r_bloomstate.texturetype != textype
+	 || r_bloomstate.viewfbo != r_viewfbo.integer)
 	{
 		if (r_bloomstate.texture_bloom)
 			R_FreeTexture(r_bloomstate.texture_bloom);
 		r_bloomstate.texture_bloom = NULL;
+		if (r_bloomstate.texture_screen)
+			R_FreeTexture(r_bloomstate.texture_screen);
+		r_bloomstate.texture_screen = NULL;
+		if (r_bloomstate.fbo_framebuffer)
+			R_Mesh_DestroyFramebufferObject(r_bloomstate.fbo_framebuffer);
+		r_bloomstate.fbo_framebuffer = 0;
+		if (r_bloomstate.texture_framebuffercolor)
+			R_FreeTexture(r_bloomstate.texture_framebuffercolor);
+		r_bloomstate.texture_framebuffercolor = NULL;
+		if (r_bloomstate.texture_framebufferdepth)
+			R_FreeTexture(r_bloomstate.texture_framebufferdepth);
+		r_bloomstate.texture_framebufferdepth = NULL;
+		r_bloomstate.screentexturewidth = screentexturewidth;
+		r_bloomstate.screentextureheight = screentextureheight;
+		if (r_bloomstate.screentexturewidth && r_bloomstate.screentextureheight)
+			r_bloomstate.texture_screen = R_LoadTexture2D(r_main_texturepool, "screen", r_bloomstate.screentexturewidth, r_bloomstate.screentextureheight, NULL, textype, TEXF_RENDERTARGET | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
+		if (r_viewfbo.integer >= 1 && vid.support.ext_framebuffer_object)
+		{
+			// FIXME: choose depth bits based on a cvar
+			r_bloomstate.texture_framebufferdepth = R_LoadTextureShadowMap2D(r_main_texturepool, "framebufferdepth", r_bloomstate.screentexturewidth, r_bloomstate.screentextureheight, 24, false);
+			r_bloomstate.texture_framebuffercolor = R_LoadTexture2D(r_main_texturepool, "framebuffercolor", r_bloomstate.screentexturewidth, r_bloomstate.screentextureheight, NULL, textype, TEXF_RENDERTARGET | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
+			r_bloomstate.fbo_framebuffer = R_Mesh_CreateFramebufferObject(r_bloomstate.texture_framebufferdepth, r_bloomstate.texture_framebuffercolor, NULL, NULL, NULL);
+			R_Mesh_SetRenderTargets(r_bloomstate.fbo_framebuffer, r_bloomstate.texture_framebufferdepth, r_bloomstate.texture_framebuffercolor, NULL, NULL, NULL);
+			// render depth into one texture and normalmap into the other
+			if (qglDrawBuffer)
+			{
+				int status;
+				qglDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);CHECKGLERROR
+				qglReadBuffer(GL_COLOR_ATTACHMENT0_EXT);CHECKGLERROR
+				status = qglCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);CHECKGLERROR
+				if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
+					Con_Printf("R_Bloom_StartFrame: glCheckFramebufferStatusEXT returned %i\n", status);
+			}
+		}
 		r_bloomstate.bloomtexturewidth = bloomtexturewidth;
 		r_bloomstate.bloomtextureheight = bloomtextureheight;
 		if (r_bloomstate.bloomtexturewidth && r_bloomstate.bloomtextureheight)
-			r_bloomstate.texture_bloom = R_LoadTexture2D(r_main_texturepool, "bloom", r_bloomstate.bloomtexturewidth, r_bloomstate.bloomtextureheight, NULL, TEXTYPE_COLORBUFFER, TEXF_RENDERTARGET | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
+			r_bloomstate.texture_bloom = R_LoadTexture2D(r_main_texturepool, "bloom", r_bloomstate.bloomtexturewidth, r_bloomstate.bloomtextureheight, NULL, textype, TEXF_RENDERTARGET | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
+		r_bloomstate.viewfbo = r_viewfbo.integer;
+		r_bloomstate.texturetype = textype;
 	}
 
 	// when doing a reduced render (HDR) we want to use a smaller area
@@ -5727,10 +5848,10 @@ void R_Bloom_StartFrame(void)
 	// set up a texcoord array for the full resolution screen image
 	// (we have to keep this around to copy back during final render)
 	r_bloomstate.screentexcoord2f[0] = 0;
-	r_bloomstate.screentexcoord2f[1] = (float)r_refdef.view.height    / (float)r_bloomstate.screentextureheight;
-	r_bloomstate.screentexcoord2f[2] = (float)r_refdef.view.width     / (float)r_bloomstate.screentexturewidth;
-	r_bloomstate.screentexcoord2f[3] = (float)r_refdef.view.height    / (float)r_bloomstate.screentextureheight;
-	r_bloomstate.screentexcoord2f[4] = (float)r_refdef.view.width     / (float)r_bloomstate.screentexturewidth;
+	r_bloomstate.screentexcoord2f[1] = (float)viewheight    / (float)r_bloomstate.screentextureheight;
+	r_bloomstate.screentexcoord2f[2] = (float)viewwidth     / (float)r_bloomstate.screentexturewidth;
+	r_bloomstate.screentexcoord2f[3] = (float)viewheight    / (float)r_bloomstate.screentextureheight;
+	r_bloomstate.screentexcoord2f[4] = (float)viewwidth     / (float)r_bloomstate.screentexturewidth;
 	r_bloomstate.screentexcoord2f[5] = 0;
 	r_bloomstate.screentexcoord2f[6] = 0;
 	r_bloomstate.screentexcoord2f[7] = 0;
@@ -5770,13 +5891,16 @@ void R_Bloom_StartFrame(void)
 		break;
 	}
 
-	if (r_hdr.integer || r_bloom.integer)
+	if ((r_hdr.integer || r_bloom.integer) && r_bloomstate.bloomwidth)
 	{
 		r_bloomstate.enabled = true;
-		r_bloomstate.hdr = r_hdr.integer != 0;
+		r_bloomstate.hdr = r_hdr.integer != 0 && !r_bloomstate.fbo_framebuffer;
 	}
 
 	R_Viewport_InitOrtho(&r_bloomstate.viewport, &identitymatrix, r_refdef.view.x, vid.height - r_bloomstate.bloomheight - r_refdef.view.y, r_bloomstate.bloomwidth, r_bloomstate.bloomheight, 0, 0, 1, 1, -10, 100, NULL);
+
+	if (r_bloomstate.fbo_framebuffer)
+		r_refdef.view.clear = true;
 }
 
 void R_Bloom_CopyBloomTexture(float colorscale)
@@ -5785,6 +5909,7 @@ void R_Bloom_CopyBloomTexture(float colorscale)
 
 	// scale down screen texture to the bloom texture size
 	CHECKGLERROR
+	R_Mesh_SetMainRenderTargets();
 	R_SetViewport(&r_bloomstate.viewport);
 	GL_BlendFunc(GL_ONE, GL_ZERO);
 	GL_Color(colorscale, colorscale, colorscale, 1);
@@ -5852,7 +5977,7 @@ void R_Bloom_MakeTexture(void)
 
 	range = r_bloom_blur.integer * r_bloomstate.bloomwidth / 320;
 	brighten = r_bloom_brighten.value;
-	if (r_hdr.integer)
+	if (r_bloomstate.hdr)
 		brighten *= r_hdr_range.value;
 	brighten = sqrt(brighten);
 	if(range >= 1)
@@ -5987,6 +6112,7 @@ static void R_BlendView(void)
 			if (r_bloom_blur.value < 1) { Cvar_SetValueQuick(&r_bloom_blur, 1); }
 
 			R_ResetViewRendering2D();
+			R_Mesh_SetMainRenderTargets();
 
 			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0))
 			{
@@ -6152,7 +6278,7 @@ static void R_BlendView(void)
 			break;
 		}
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
-		r_refdef.stats.bloom_drawpixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
+		r_refdef.stats.bloom_drawpixels += r_refdef.view.width * r_refdef.view.height;
 		break;
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
@@ -6457,7 +6583,7 @@ void R_RenderView(void)
 	r_refdef.view.clear = true;
 
 	// this produces a bloom texture to be used in R_BlendView() later
-	if (r_hdr.integer && r_bloomstate.bloomwidth)
+	if (r_bloomstate.hdr)
 	{
 		R_HDR_RenderBloomTexture();
 		// we have to bump the texture frame again because r_refdef.view.colorscale is cached in the textures
@@ -9981,7 +10107,7 @@ static void R_ProcessWorldTextureSurfaceList(int texturenumsurfaces, const msurf
 		else
 			R_DrawWorldTextureSurfaceList(texturenumsurfaces, texturesurfacelist, writedepth, prepass);
 	}
-	else if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) && !r_showsurfaces.integer)
+	else if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) && (!r_showsurfaces.integer || r_showsurfaces.integer == 3))
 		R_DrawTextureSurfaceList_Sky(texturenumsurfaces, texturesurfacelist);
 	else if (!rsurface.texture->currentnumlayers)
 		return;
@@ -10059,7 +10185,7 @@ static void R_ProcessModelTextureSurfaceList(int texturenumsurfaces, const msurf
 		else
 			R_DrawModelTextureSurfaceList(texturenumsurfaces, texturesurfacelist, writedepth, prepass);
 	}
-	else if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) && !r_showsurfaces.integer)
+	else if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) && (!r_showsurfaces.integer || r_showsurfaces.integer == 3))
 		R_DrawTextureSurfaceList_Sky(texturenumsurfaces, texturesurfacelist);
 	else if (!rsurface.texture->currentnumlayers)
 		return;
@@ -10277,6 +10403,9 @@ static void R_DecalSystem_SpawnTriangle(decalsystem_t *decalsystem, const float 
 	decal->texcoord2f[1][1] = t1[1];
 	decal->texcoord2f[2][0] = t2[0];
 	decal->texcoord2f[2][1] = t2[1];
+	TriangleNormal(v0, v1, v2, decal->plane);
+	VectorNormalize(decal->plane);
+	decal->plane[3] = DotProduct(v0, decal->plane);
 }
 
 extern cvar_t cl_decals_bias;
@@ -10728,6 +10857,10 @@ static void R_DrawModelDecals_Entity(entity_render_t *ent)
 			continue;
 
 		if (surfacevisible && !surfacevisible[decal->surfaceindex])
+			continue;
+
+		// skip backfaces
+		if (decal->triangleindex < 0 && DotProduct(r_refdef.view.origin, decal->plane) < decal->plane[3])
 			continue;
 
 		// update color values for fading decals
