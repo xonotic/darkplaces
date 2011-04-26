@@ -70,6 +70,7 @@ cvar_t r_useinfinitefarclip = {CVAR_SAVE, "r_useinfinitefarclip", "1", "enables 
 cvar_t r_farclip_base = {0, "r_farclip_base", "65536", "farclip (furthest visible distance) for rendering when r_useinfinitefarclip is 0"};
 cvar_t r_farclip_world = {0, "r_farclip_world", "2", "adds map size to farclip multiplied by this value"};
 cvar_t r_nearclip = {0, "r_nearclip", "1", "distance from camera of nearclip plane" };
+cvar_t r_showoverdraw = {0, "r_showoverdraw", "0", "shows overlapping geometry"};
 cvar_t r_showbboxes = {0, "r_showbboxes", "0", "shows bounding boxes of server entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
 cvar_t r_showsurfaces = {0, "r_showsurfaces", "0", "1 shows surfaces as different colors, or a value of 2 shows triangle draw order (for analyzing whether meshes are optimized for vertex cache)"};
 cvar_t r_showtris = {0, "r_showtris", "0", "shows triangle outlines, value controls brightness (can be above 1)"};
@@ -1852,8 +1853,9 @@ void R_GLSL_Restart_f(void)
 			memset(r_glsl_permutationhash, 0, sizeof(r_glsl_permutationhash));
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_SOFT:
 		break;
@@ -1926,6 +1928,7 @@ void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemod
 		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Second, second);
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		R_Mesh_TexBind(0, first );
 		R_Mesh_TexCombine(0, GL_MODULATE, GL_MODULATE, 1, 1);
 		R_Mesh_TexBind(1, second);
@@ -1963,6 +1966,7 @@ void R_SetupShader_DepthOrShadow(void)
 		R_SetupShader_SetPermutationGLSL(SHADERMODE_DEPTH_OR_SHADOW, 0);
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		R_Mesh_TexBind(0, 0);
 		R_Mesh_TexBind(1, 0);
 		break;
@@ -1995,6 +1999,7 @@ void R_SetupShader_ShowDepth(void)
 		R_SetupShader_SetPermutationGLSL(SHADERMODE_SHOWDEPTH, 0);
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_GL11:
 		break;
@@ -2735,8 +2740,9 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		if (r_glsl_permutation->tex_Texture_BounceGrid  >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_BounceGrid, r_shadow_bouncegridtexture);
 		CHECKGLERROR
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_SOFT:
 		RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_ARRAY_NORMAL | BATCHNEED_ARRAY_VECTOR | (rsurface.modellightmapcolor4f ? BATCHNEED_ARRAY_VERTEXCOLOR : 0) | BATCHNEED_ARRAY_TEXCOORD | (rsurface.uselightmaptexture ? BATCHNEED_ARRAY_LIGHTMAP : 0), texturenumsurfaces, texturesurfacelist);
@@ -2970,8 +2976,9 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 		if (r_glsl_permutation->tex_Texture_ShadowMap2D       >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_ShadowMap2D        , r_shadow_shadowmap2dtexture                         );
 		if (r_glsl_permutation->tex_Texture_CubeProjection    >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_CubeProjection     , r_shadow_shadowmapvsdcttexture                      );
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_SOFT:
 		R_SetupShader_SetPermutationGLSL(mode, permutation);
@@ -3845,6 +3852,7 @@ void gl_main_start(void)
 		r_loadfog = false;
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		Cvar_SetValueQuick(&r_textureunits, vid.texunits);
 		Cvar_SetValueQuick(&gl_combine, 1);
 		Cvar_SetValueQuick(&r_glsl, 0);
@@ -3921,6 +3929,7 @@ void gl_main_shutdown(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (r_maxqueries)
 			qglDeleteQueriesARB(r_maxqueries, r_queries);
@@ -4042,6 +4051,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_farclip_base);
 	Cvar_RegisterVariable(&r_farclip_world);
 	Cvar_RegisterVariable(&r_nearclip);
+	Cvar_RegisterVariable(&r_showoverdraw);
 	Cvar_RegisterVariable(&r_showbboxes);
 	Cvar_RegisterVariable(&r_showsurfaces);
 	Cvar_RegisterVariable(&r_showtris);
@@ -4568,8 +4578,9 @@ void R_AnimCache_CacheVisibleEntities(void)
 	case RENDERPATH_D3D11:
 	case RENDERPATH_GLES2:
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		wanttangents = false;
 		break;
 	case RENDERPATH_SOFT:
@@ -4619,7 +4630,7 @@ static void R_View_UpdateEntityLighting (void)
 		VectorClear(ent->modellight_ambient);
 		VectorClear(ent->modellight_diffuse);
 		VectorClear(tempdiffusenormal);
-		if ((ent->flags & RENDER_LIGHT) && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.LightPoint)
+		if (ent->flags & RENDER_LIGHT)
 		{
 			vec3_t org;
 			Matrix4x4_OriginFromMatrix(&ent->matrix, org);
@@ -4761,24 +4772,6 @@ static void R_View_UpdateEntityVisible (void)
 			if ((ent->flags & (RENDER_NODEPTHTEST | RENDER_VIEWMODEL)) || r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.scene.worldmodel, r_refdef.viewcache.world_leafvisible, ent->mins, ent->maxs))
 				r_refdef.viewcache.entityvisible[i] = true;
 		}
-		if(r_cullentities_trace.integer && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane)
-			// sorry, this check doesn't work for portal/reflection/refraction renders as the view origin is not useful for culling
-		{
-			for (i = 0;i < r_refdef.scene.numentities;i++)
-			{
-				ent = r_refdef.scene.entities[i];
-				if(r_refdef.viewcache.entityvisible[i] && !(ent->flags & (RENDER_VIEWMODEL | RENDER_NOCULL | RENDER_NODEPTHTEST)) && !(ent->model && (ent->model->name[0] == '*')))
-				{
-					samples = ent->entitynumber ? r_cullentities_trace_samples.integer : r_cullentities_trace_tempentitysamples.integer;
-					if (samples < 0)
-						continue; // temp entities do pvs only
-					if(R_CanSeeBox(samples, r_cullentities_trace_enlarge.value, r_refdef.view.origin, ent->mins, ent->maxs))
-						ent->last_trace_visibility = realtime;
-					if(ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
-						r_refdef.viewcache.entityvisible[i] = 0;
-				}
-			}
-		}
 	}
 	else
 	{
@@ -4787,6 +4780,26 @@ static void R_View_UpdateEntityVisible (void)
 		{
 			ent = r_refdef.scene.entities[i];
 			r_refdef.viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
+		}
+	}
+	if(r_cullentities_trace.integer && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane)
+		// sorry, this check doesn't work for portal/reflection/refraction renders as the view origin is not useful for culling
+	{
+		for (i = 0;i < r_refdef.scene.numentities;i++)
+		{
+			if (!r_refdef.viewcache.entityvisible[i])
+				continue;
+			ent = r_refdef.scene.entities[i];
+			if(!(ent->flags & (RENDER_VIEWMODEL | RENDER_NOCULL | RENDER_NODEPTHTEST)) && !(ent->model && (ent->model->name[0] == '*')))
+			{
+				samples = ent->entitynumber ? r_cullentities_trace_samples.integer : r_cullentities_trace_tempentitysamples.integer;
+				if (samples < 0)
+					continue; // temp entities do pvs only
+				if(R_CanSeeBox(samples, r_cullentities_trace_enlarge.value, r_refdef.view.origin, ent->mins, ent->maxs))
+					ent->last_trace_visibility = realtime;
+				if(ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
+					r_refdef.viewcache.entityvisible[i] = 0;
+			}
 		}
 	}
 }
@@ -4930,6 +4943,7 @@ static void R_View_SetFrustum(const int *scissor)
 			case RENDERPATH_GL11:
 			case RENDERPATH_GL13:
 			case RENDERPATH_GL20:
+			case RENDERPATH_GLES1:
 			case RENDERPATH_GLES2:
 				// non-flipped y coordinates
 				fny = -1.0 + 2.0 * (scissor[1]              - r_refdef.view.viewport.y) / (double) (r_refdef.view.viewport.height);
@@ -5207,8 +5221,9 @@ void R_EntityMatrix(const matrix4x4_t *matrix)
 		case RENDERPATH_D3D11:
 			Con_DPrintf("FIXME D3D11 shader %s:%i\n", __FILE__, __LINE__);
 			break;
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			qglLoadMatrixf(gl_modelview16f);CHECKGLERROR
 			break;
 		case RENDERPATH_SOFT:
@@ -5251,6 +5266,7 @@ void R_ResetViewRendering2D(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		qglEnable(GL_POLYGON_OFFSET_FILL);CHECKGLERROR
 		break;
@@ -5286,6 +5302,7 @@ void R_ResetViewRendering3D(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		qglEnable(GL_POLYGON_OFFSET_FILL);CHECKGLERROR
 		break;
@@ -5335,8 +5352,9 @@ static void R_Water_StartFrame(void)
 	case RENDERPATH_SOFT:
 	case RENDERPATH_GLES2:
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		return;
 	}
 
@@ -5723,8 +5741,9 @@ void R_Bloom_StartFrame(void)
 	case RENDERPATH_SOFT:
 	case RENDERPATH_GLES2:
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		return;
 	}
 
@@ -5776,12 +5795,13 @@ void R_Bloom_StartFrame(void)
 			if (r_viewfbo.integer == 3) textype = TEXTYPE_COLORBUFFER32F;
 		}
 		break;
+	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_D3D9:
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
 	case RENDERPATH_SOFT:
-	case RENDERPATH_GL13:
-	case RENDERPATH_GL11:
 		break;
 	}
 
@@ -5873,6 +5893,7 @@ void R_Bloom_StartFrame(void)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -5919,8 +5940,9 @@ void R_Bloom_CopyBloomTexture(float colorscale)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
-	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
+	case RENDERPATH_SOFT:
 		R_Mesh_PrepareVertices_Generic_Arrays(4, r_screenvertex3f, NULL, r_bloomstate.screentexcoord2f);
 		break;
 	case RENDERPATH_D3D9:
@@ -6152,8 +6174,9 @@ static void R_BlendView(void)
 					case RENDERPATH_GL11:
 					case RENDERPATH_GL13:
 					case RENDERPATH_GL20:
-					case RENDERPATH_SOFT:
+					case RENDERPATH_GLES1:
 					case RENDERPATH_GLES2:
+					case RENDERPATH_SOFT:
 						R_Mesh_PrepareVertices_Generic_Arrays(4, r_screenvertex3f, NULL, r_bloomstate.screentexcoord2f);
 						break;
 					case RENDERPATH_D3D9:
@@ -6280,8 +6303,9 @@ static void R_BlendView(void)
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 		r_refdef.stats.bloom_drawpixels += r_refdef.view.width * r_refdef.view.height;
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (r_refdef.viewblend[3] >= (1.0f / 256.0f))
 		{
 			// apply a color tint to the whole view
@@ -6463,8 +6487,9 @@ void R_UpdateVariables(void)
 			// remove GLSL gamma texture
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		break;
 	}
 }
@@ -6846,7 +6871,7 @@ void R_RenderScene(void)
 	if (r_timereport_active)
 		R_TimeReport("drawtrans");
 
-	if (r_refdef.view.showdebug && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawDebug && (r_showtris.value > 0 || r_shownormals.value != 0 || r_showcollisionbrushes.value > 0))
+	if (r_refdef.view.showdebug && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawDebug && (r_showtris.value > 0 || r_shownormals.value != 0 || r_showcollisionbrushes.value > 0 || r_showoverdraw.value > 0))
 	{
 		r_refdef.scene.worldmodel->DrawDebug(r_refdef.scene.worldentity);
 		if (r_timereport_active)
@@ -7487,7 +7512,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		t->currentmaterialflags |= MATERIALFLAG_FULLBRIGHT;
 	else if (FAKELIGHT_ENABLED)
 	{
-			// no modellight if using fakelight for the map
+		// no modellight if using fakelight for the map
 	}
 	else if (rsurface.modeltexcoordlightmap2f == NULL && !(t->currentmaterialflags & MATERIALFLAG_FULLBRIGHT))
 	{
@@ -9887,6 +9912,7 @@ static void R_DrawWorldTextureSurfaceList(int texturenumsurfaces, const msurface
 		R_DrawTextureSurfaceList_GL20(texturenumsurfaces, texturesurfacelist, writedepth, prepass);
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		R_DrawTextureSurfaceList_GL13(texturenumsurfaces, texturesurfacelist, writedepth);
 		break;
 	case RENDERPATH_GL11:
@@ -9916,6 +9942,7 @@ static void R_DrawModelTextureSurfaceList(int texturenumsurfaces, const msurface
 		R_DrawTextureSurfaceList_GL20(texturenumsurfaces, texturesurfacelist, writedepth, prepass);
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		R_DrawTextureSurfaceList_GL13(texturenumsurfaces, texturesurfacelist, writedepth);
 		break;
 	case RENDERPATH_GL11:
@@ -9953,8 +9980,9 @@ static void R_DrawSurface_TransparentCallback(const entity_render_t *ent, const 
 		case RENDERPATH_GLES2:
 			RSurf_ActiveModelEntity(ent, true, true, false);
 			break;
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			RSurf_ActiveModelEntity(ent, true, false, false);
 			break;
 		}
@@ -10985,27 +11013,38 @@ void R_DrawDebugModel(void)
 	dp_model_t *model = ent->model;
 	vec3_t v;
 
-	switch(vid.renderpath)
+	if (!sv.active  && !cls.demoplayback && ent != r_refdef.scene.worldentity)
+		return;
+
+	if (r_showoverdraw.value > 0)
 	{
-	case RENDERPATH_GL11:
-	case RENDERPATH_GL13:
-	case RENDERPATH_GL20:
-		break;
-	case RENDERPATH_D3D9:
-		//Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-		return;
-	case RENDERPATH_D3D10:
-		Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-		return;
-	case RENDERPATH_D3D11:
-		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-		return;
-	case RENDERPATH_SOFT:
-		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-		return;
-	case RENDERPATH_GLES2:
-		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-		return;
+		float c = r_refdef.view.colorscale * r_showoverdraw.value * 0.125f;
+		flagsmask = MATERIALFLAG_SKY | MATERIALFLAG_WALL;
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1);
+		GL_DepthTest(false);
+		GL_DepthMask(false);
+		GL_DepthRange(0, 1);
+		GL_BlendFunc(GL_ONE, GL_ONE);
+		for (i = 0, j = model->firstmodelsurface, surface = model->data_surfaces + j;i < model->nummodelsurfaces;i++, j++, surface++)
+		{
+			if (ent == r_refdef.scene.worldentity && !r_refdef.viewcache.world_surfacevisible[j])
+				continue;
+			rsurface.texture = R_GetCurrentTexture(surface->texture);
+			if ((rsurface.texture->currentmaterialflags & flagsmask) && surface->num_triangles)
+			{
+				RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_NOGAPS, 1, &surface);
+				GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_refdef.view.cullface_back);
+				if (!rsurface.texture->currentlayers->depthmask)
+					GL_Color(c, 0, 0, 1.0f);
+				else if (ent == r_refdef.scene.worldentity)
+					GL_Color(c, c, c, 1.0f);
+				else
+					GL_Color(0, c, 0, 1.0f);
+				R_Mesh_PrepareVertices_Generic_Arrays(rsurface.batchnumvertices, rsurface.batchvertex3f, NULL, NULL);
+				RSurf_DrawBatch();
+			}
+		}
+		rsurface.texture = NULL;
 	}
 
 	flagsmask = MATERIALFLAG_SKY | MATERIALFLAG_WALL;
@@ -11067,7 +11106,42 @@ void R_DrawDebugModel(void)
 
 	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
 
-	if (r_showtris.integer || (r_shownormals.value != 0))
+	if (r_showtris.integer && qglPolygonMode)
+	{
+		if (r_showdisabledepthtest.integer)
+		{
+			GL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			GL_DepthMask(false);
+		}
+		else
+		{
+			GL_BlendFunc(GL_ONE, GL_ZERO);
+			GL_DepthMask(true);
+		}
+		qglPolygonMode(GL_FRONT_AND_BACK, GL_LINE);CHECKGLERROR
+		for (i = 0, j = model->firstmodelsurface, surface = model->data_surfaces + j;i < model->nummodelsurfaces;i++, j++, surface++)
+		{
+			if (ent == r_refdef.scene.worldentity && !r_refdef.viewcache.world_surfacevisible[j])
+				continue;
+			rsurface.texture = R_GetCurrentTexture(surface->texture);
+			if ((rsurface.texture->currentmaterialflags & flagsmask) && surface->num_triangles)
+			{
+				RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_ARRAY_NORMAL | BATCHNEED_ARRAY_VECTOR | BATCHNEED_NOGAPS, 1, &surface);
+				if (!rsurface.texture->currentlayers->depthmask)
+					GL_Color(r_refdef.view.colorscale, 0, 0, r_showtris.value);
+				else if (ent == r_refdef.scene.worldentity)
+					GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, r_showtris.value);
+				else
+					GL_Color(0, r_refdef.view.colorscale, 0, r_showtris.value);
+				R_Mesh_PrepareVertices_Generic_Arrays(rsurface.batchnumvertices, rsurface.batchvertex3f, NULL, NULL);
+				RSurf_DrawBatch();
+			}
+		}
+		qglPolygonMode(GL_FRONT_AND_BACK, GL_FILL);CHECKGLERROR
+		rsurface.texture = NULL;
+	}
+
+	if (r_shownormals.value != 0 && qglBegin)
 	{
 		if (r_showdisabledepthtest.integer)
 		{
@@ -11087,23 +11161,9 @@ void R_DrawDebugModel(void)
 			if ((rsurface.texture->currentmaterialflags & flagsmask) && surface->num_triangles)
 			{
 				RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_ARRAY_NORMAL | BATCHNEED_ARRAY_VECTOR | BATCHNEED_NOGAPS, 1, &surface);
-				if (r_showtris.value > 0)
-				{
-					if (!rsurface.texture->currentlayers->depthmask)
-						GL_Color(r_refdef.view.colorscale, 0, 0, r_showtris.value);
-					else if (ent == r_refdef.scene.worldentity)
-						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, r_showtris.value);
-					else
-						GL_Color(0, r_refdef.view.colorscale, 0, r_showtris.value);
-					R_Mesh_PrepareVertices_Generic_Arrays(rsurface.batchnumvertices, rsurface.batchvertex3f, NULL, NULL);
-					qglPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-					RSurf_DrawBatch();
-					qglPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-					CHECKGLERROR
-				}
+				qglBegin(GL_LINES);
 				if (r_shownormals.value < 0)
 				{
-					qglBegin(GL_LINES);
 					for (k = 0, l = rsurface.batchfirstvertex;k < rsurface.batchnumvertices;k++, l++)
 					{
 						VectorCopy(rsurface.batchvertex3f + l * 3, v);
@@ -11113,12 +11173,9 @@ void R_DrawDebugModel(void)
 						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
-					qglEnd();
-					CHECKGLERROR
 				}
 				if (r_shownormals.value > 0 && rsurface.batchsvector3f)
 				{
-					qglBegin(GL_LINES);
 					for (k = 0, l = rsurface.batchfirstvertex;k < rsurface.batchnumvertices;k++, l++)
 					{
 						VectorCopy(rsurface.batchvertex3f + l * 3, v);
@@ -11128,9 +11185,6 @@ void R_DrawDebugModel(void)
 						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
-					qglEnd();
-					CHECKGLERROR
-					qglBegin(GL_LINES);
 					for (k = 0, l = rsurface.batchfirstvertex;k < rsurface.batchnumvertices;k++, l++)
 					{
 						VectorCopy(rsurface.batchvertex3f + l * 3, v);
@@ -11140,9 +11194,6 @@ void R_DrawDebugModel(void)
 						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
-					qglEnd();
-					CHECKGLERROR
-					qglBegin(GL_LINES);
 					for (k = 0, l = rsurface.batchfirstvertex;k < rsurface.batchnumvertices;k++, l++)
 					{
 						VectorCopy(rsurface.batchvertex3f + l * 3, v);
@@ -11152,9 +11203,9 @@ void R_DrawDebugModel(void)
 						GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, 1);
 						qglVertex3f(v[0], v[1], v[2]);
 					}
-					qglEnd();
-					CHECKGLERROR
 				}
+				qglEnd();
+				CHECKGLERROR
 			}
 		}
 		rsurface.texture = NULL;
@@ -11298,8 +11349,9 @@ void R_DrawModelSurfaces(entity_render_t *ent, qboolean skysurfaces, qboolean wr
 		case RENDERPATH_GLES2:
 			RSurf_ActiveModelEntity(ent, model->wantnormals, model->wanttangents, false);
 			break;
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			RSurf_ActiveModelEntity(ent, model->wantnormals, false, false);
 			break;
 		}
@@ -11316,8 +11368,9 @@ void R_DrawModelSurfaces(entity_render_t *ent, qboolean skysurfaces, qboolean wr
 		case RENDERPATH_GLES2:
 			RSurf_ActiveModelEntity(ent, true, true, false);
 			break;
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			RSurf_ActiveModelEntity(ent, true, false, false);
 			break;
 		}

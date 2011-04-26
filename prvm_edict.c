@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "progsvm.h"
+#include "csprogs.h"
 
 prvm_prog_t *prog;
 
@@ -2335,6 +2336,7 @@ void PRVM_LoadProgs (const char * filename, int numrequiredfunc, const char **re
 	// later idea: include a list of authorized .po file checksums with the csprogs
 	{
 		qboolean deftrans = !!strcmp(PRVM_NAME, "client");
+		const char *realfilename = (strcmp(PRVM_NAME, "client") ? filename : csqc_progname.string);
 		if(deftrans) // once we have dotranslate_ strings, ALWAYS use the opt-in method!
 		{
 			for (i=0 ; i<prog->progs->numglobaldefs ; i++)
@@ -2351,8 +2353,8 @@ void PRVM_LoadProgs (const char * filename, int numrequiredfunc, const char **re
 		}
 		if(!strcmp(prvm_language.string, "dump"))
 		{
-			qfile_t *f = FS_OpenRealFile(va("%s.pot", filename), "w", false);
-			Con_Printf("Dumping to %s.pot\n", filename);
+			qfile_t *f = FS_OpenRealFile(va("%s.pot", realfilename), "w", false);
+			Con_Printf("Dumping to %s.pot\n", realfilename);
 			if(f)
 			{
 				for (i=0 ; i<prog->progs->numglobaldefs ; i++)
@@ -2377,7 +2379,7 @@ void PRVM_LoadProgs (const char * filename, int numrequiredfunc, const char **re
 		}
 		else
 		{
-			po_t *po = PRVM_PO_Load(va("%s.%s.po", filename, prvm_language.string), prog->progs_mempool);
+			po_t *po = PRVM_PO_Load(va("%s.%s.po", realfilename, prvm_language.string), prog->progs_mempool);
 			if(po)
 			{
 				for (i=0 ; i<prog->progs->numglobaldefs ; i++)

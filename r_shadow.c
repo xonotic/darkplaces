@@ -486,10 +486,9 @@ void R_Shadow_SetShadowMode(void)
 			r_shadow_shadowmappcf = 1;
 			r_shadow_shadowmode = R_SHADOW_SHADOWMODE_SHADOWMAP2D;
 			break;
-		case RENDERPATH_GL13:
-			break;
 		case RENDERPATH_GL11:
-			break;
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			break;
 		}
@@ -1988,8 +1987,9 @@ void R_Shadow_RenderMode_Begin(void)
 	case RENDERPATH_GLES2:
 		r_shadow_lightingrendermode = R_SHADOW_RENDERMODE_LIGHT_GLSL;
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (r_textureunits.integer >= 2 && vid.texunits >= 2 && r_shadow_texture3d.integer && r_shadow_attenuation3dtexture)
 			r_shadow_lightingrendermode = R_SHADOW_RENDERMODE_LIGHT_VERTEX3DATTEN;
 		else if (r_textureunits.integer >= 3 && vid.texunits >= 3)
@@ -2184,6 +2184,7 @@ init_done:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		GL_CullFace(r_refdef.view.cullface_back);
 		// OpenGL lets us scissor larger than the viewport, so go ahead and clear all views at once
@@ -2390,6 +2391,7 @@ static void R_Shadow_UpdateBounceGridTexture(void)
 		// these renderpaths do not currently have the code to display the bouncegrid, so disable it on them...
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_SOFT:
 	case RENDERPATH_D3D9:
 	case RENDERPATH_D3D10:
@@ -3358,6 +3360,7 @@ void R_Shadow_RenderLighting(int texturenumsurfaces, const msurface_t **textures
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			qglBlendEquationEXT(GL_FUNC_REVERSE_SUBTRACT_EXT);
 			break;
@@ -3404,6 +3407,7 @@ void R_Shadow_RenderLighting(int texturenumsurfaces, const msurface_t **textures
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			qglBlendEquationEXT(GL_FUNC_ADD_EXT);
 			break;
@@ -4657,8 +4661,9 @@ void R_Shadow_PrepareLights(void)
 			}
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		r_shadow_usingdeferredprepass = false;
 		break;
 	}
@@ -4985,6 +4990,7 @@ void R_DrawModelShadowMaps(void)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -5158,9 +5164,10 @@ void R_BeginCoronaQuery(rtlight_t *rtlight, float scale, qboolean usequery)
 
 		switch(vid.renderpath)
 		{
-		case RENDERPATH_GL20:
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			// NOTE: GL_DEPTH_TEST must be enabled or ATI won't count samples, so use GL_DepthFunc instead
@@ -5206,9 +5213,10 @@ void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 	{
 		switch(vid.renderpath)
 		{
-		case RENDERPATH_GL20:
-		case RENDERPATH_GL13:
 		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			qglGetQueryObjectivARB(rtlight->corona_queryindex_visiblepixels, GL_QUERY_RESULT_ARB, &visiblepixels);
@@ -5253,6 +5261,7 @@ void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 			case RENDERPATH_GL11:
 			case RENDERPATH_GL13:
 			case RENDERPATH_GL20:
+			case RENDERPATH_GLES1:
 			case RENDERPATH_GLES2:
 				qglBlendEquationEXT(GL_FUNC_REVERSE_SUBTRACT_EXT);
 				break;
@@ -5282,6 +5291,7 @@ void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 			case RENDERPATH_GL11:
 			case RENDERPATH_GL13:
 			case RENDERPATH_GL20:
+			case RENDERPATH_GLES1:
 			case RENDERPATH_GLES2:
 				qglBlendEquationEXT(GL_FUNC_ADD_EXT);
 				break;
@@ -5330,6 +5340,7 @@ void R_Shadow_DrawCoronas(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		usequery = vid.support.arb_occlusion_query && r_coronas_occlusionquery.integer;
 		if (usequery)
@@ -6760,26 +6771,29 @@ void R_LightPoint(vec3_t color, const vec3_t p, const int flags)
 	rtlight_t *light;
 	dlight_t *dlight;
 
-	VectorClear(color);
-
 	if (r_fullbright.integer)
 	{
 		VectorSet(color, 1, 1, 1);
 		return;
 	}
 
+	VectorClear(color);
+
 	if (flags & LP_LIGHTMAP)
 	{
-		if (!r_fullbright.integer && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.LightPoint)
+		if (!r_fullbright.integer && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->lit && r_refdef.scene.worldmodel->brush.LightPoint)
 		{
+			VectorClear(diffuse);
 			r_refdef.scene.worldmodel->brush.LightPoint(r_refdef.scene.worldmodel, p, color, diffuse, n);
-			color[0] += r_refdef.scene.ambient + diffuse[0];
-			color[1] += r_refdef.scene.ambient + diffuse[1];
-			color[2] += r_refdef.scene.ambient + diffuse[2];
+			VectorAdd(color, diffuse, color);
 		}
 		else
 			VectorSet(color, 1, 1, 1);
+		color[0] += r_refdef.scene.ambient;
+		color[1] += r_refdef.scene.ambient;
+		color[2] += r_refdef.scene.ambient;
 	}
+
 	if (flags & LP_RTWORLD)
 	{
 		flag = r_refdef.scene.rtworld ? LIGHTFLAG_REALTIMEMODE : LIGHTFLAG_NORMALMODE;
@@ -6857,15 +6871,17 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 		VectorSet(ambient, r_refdef.scene.ambient, r_refdef.scene.ambient, r_refdef.scene.ambient);
 		VectorClear(diffuse);
 		VectorClear(lightdir);
-		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.LightPoint)
+		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->lit && r_refdef.scene.worldmodel->brush.LightPoint)
 			r_refdef.scene.worldmodel->brush.LightPoint(r_refdef.scene.worldmodel, p, ambient, diffuse, lightdir);
+		else
+			VectorSet(ambient, 1, 1, 1);
 		return;
 	}
 
 	memset(sample, 0, sizeof(sample));
 	VectorSet(sample, r_refdef.scene.ambient, r_refdef.scene.ambient, r_refdef.scene.ambient);
 
-	if ((flags & LP_LIGHTMAP) && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.LightPoint)
+	if ((flags & LP_LIGHTMAP) && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->lit && r_refdef.scene.worldmodel->brush.LightPoint)
 	{
 		vec3_t tempambient;
 		VectorClear(tempambient);
