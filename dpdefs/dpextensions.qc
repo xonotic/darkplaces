@@ -476,6 +476,14 @@ void(entity e, entity tagentity, string tagname) setattachment = #443; // attach
 .float button6;
 .float button7;
 .float button8;
+.float button9;
+.float button10;
+.float button11;
+.float button12;
+.float button13;
+.float button14;
+.float button15;
+.float button16;
 //description:
 //set to the state of the +button3, +button4, +button5, +button6, +button7, and +button8 buttons from the client, this does not involve protocol changes (the extra 6 button bits were simply not used).
 //the exact mapping of protocol button bits on the server is:
@@ -583,11 +591,11 @@ float(float a) tan = #475; // returns tangent value (which is simply sin(a)/cos(
 //NOTE: copying a string-typed autocvar to another variable/field, and then
 //changing the cvar or returning from progs is UNDEFINED. Writing to autocvar
 //globals is UNDEFINED.  Accessing autocvar globals after cvar_set()ing that
-//cvar is IMPLEMENTATION DEFINED (an implementation may either yield the
-//previous, or the current, value). Whether autocvar globals, after restoring
-//a savegame, have the cvar's current value, or the original value at time of
-//saving, is UNDEFINED. Restoring a savegame however must not restore the
-//cvar values themselves.
+//cvar in the same frame is IMPLEMENTATION DEFINED (an implementation may
+//either yield the previous, or the current, value). Whether autocvar globals,
+//after restoring a savegame, have the cvar's current value, or the original
+//value at time of saving, is UNDEFINED. Restoring a savegame however must not
+//restore the cvar values themselves.
 //In case the cvar does NOT exist, then it is automatically created with the
 //value of the autocvar initializer, if given. This is possible with e.g.
 //frikqcc and fteqcc the following way:
@@ -596,6 +604,8 @@ float(float a) tan = #475; // returns tangent value (which is simply sin(a)/cos(
 //equivalent to the NULL value of the given data type, that is, the empty
 //string, 0, or '0 0 0'. However, when automatic cvar creation took place, a
 //warning is printed to the game console.
+//NOTE: to prevent an ambiguity with float names for vector types, autocvar
+//names MUST NOT end with _x, _y or _z!
 
 //DP_QC_CHANGEPITCH
 //idea: id Software
@@ -1590,6 +1600,18 @@ const float JOINTTYPE_SLIDER = 3;
 const float JOINTTYPE_UNIVERSAL = 4;
 const float JOINTTYPE_HINGE2 = 5;
 const float JOINTTYPE_FIXED = -1;
+// common joint properties:
+// .entity aiment, enemy; // connected objects
+// .vector movedir;
+//   for a spring:
+//     movedir_x = spring constant (force multiplier, must be > 0)
+//     movedir_y = spring dampening constant to prevent oscillation (must be > 0)
+//     movedir_z = spring stop position (+/-)
+//   for a motor:
+//     movedir_x = desired motor velocity
+//     movedir_y = -1 * max motor force to use
+//     movedir_z = stop position (+/-), set to 0 for no stop
+//   note that ODE does not support both in one anyway
 //field definitions:
 .float mass; // ODE mass, standart value is 1
 .float bouncefactor;
@@ -2390,38 +2412,6 @@ void(float pause) setpause = #531;
 
 
 // EXPERIMENTAL (not finalized) EXTENSIONS:
-
-//DP_PHYSICS
-//idea: LordHavoc
-//darkplaces implementation: LordHavoc, divVerent
-//constant definitions:
-float SOLID_PHYSICS_BOX = 32;
-float SOLID_PHYSICS_SPHERE = 33;
-float SOLID_PHYSICS_CAPSULE = 34;
-float MOVETYPE_PHYSICS = 32;
-float JOINTTYPE_POINT = 1; // point; uses origin (anchor)
-float JOINTTYPE_HINGE = 2; // hinge; uses origin (anchor) and angles (axis)
-float JOINTTYPE_SLIDER = 3; // slider; uses angles (axis)
-float JOINTTYPE_UNIVERSAL = 4; // universal; uses origin (anchor) and angles (forward is axis1, up is axis2)
-float JOINTTYPE_HINGE2 = 5; // hinge2; uses origin (anchor), angles (axis1), velocity (axis2)
-//field definitions:
-.float mass;
-.float jointtype; // see JOINTTYPE_ definitions above
-// common joint properties:
-// .entity aiment, enemy; // connected objects
-// .vector movedir;
-//   for a spring:
-//     movedir_x = spring constant (force multiplier, must be > 0)
-//     movedir_y = spring dampening constant to prevent oscillation (must be > 0)
-//     movedir_z = spring stop position (+/-)
-//   for a motor:
-//     movedir_x = desired motor velocity
-//     movedir_y = -1 * max motor force to use
-//     movedir_z = stop position (+/-), set to 0 for no stop
-//   note that ODE does not support both in one anyway
-//description:
-//various physics properties can be defined in an entity and are executed via
-//ODE
 
 //DP_CRYPTO
 //idea: divVerent

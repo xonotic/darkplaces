@@ -275,6 +275,7 @@ static void R_Mesh_SetUseVBO(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 		gl_state.usevbo_staticvertex = (vid.support.arb_vertex_buffer_object && gl_vbo.integer) || vid.forcevbo;
 		gl_state.usevbo_staticindex = (vid.support.arb_vertex_buffer_object && (gl_vbo.integer == 1 || gl_vbo.integer == 3)) || vid.forcevbo;
 		gl_state.usevbo_dynamicvertex = (vid.support.arb_vertex_buffer_object && gl_vbo_dynamicvertex.integer) || vid.forcevbo;
@@ -325,6 +326,7 @@ static void gl_backend_start(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		// fetch current fbo here (default fbo is not 0 on some GLES devices)
 		if (vid.support.ext_framebuffer_object)
@@ -357,6 +359,7 @@ static void gl_backend_shutdown(void)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -402,6 +405,7 @@ static void gl_backend_devicelost(void)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -429,6 +433,7 @@ static void gl_backend_devicelost(void)
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
 		case RENDERPATH_SOFT:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			break;
 		case RENDERPATH_D3D9:
@@ -461,6 +466,7 @@ static void gl_backend_devicerestored(void)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -541,6 +547,32 @@ void R_Viewport_TransformToScreen(const r_viewport_t *v, const vec4_t in, vec4_t
 	out[1] = v->y + (out[1] * iw + 1.0f) * v->height * 0.5f;
 
 	out[2] = v->z + (out[2] * iw + 1.0f) * v->depth * 0.5f;
+}
+
+void GL_Finish(void)
+{
+	switch(vid.renderpath)
+	{
+	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
+	case RENDERPATH_GLES2:
+		qglFinish();
+		break;
+	case RENDERPATH_D3D9:
+		//Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_D3D10:
+		Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_D3D11:
+		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_SOFT:
+		DPSOFTRAST_Finish();
+		break;
+	}
 }
 
 static int bboxedges[12][2] =
@@ -686,6 +718,7 @@ qboolean R_ScissorForBBox(const float *mins, const float *maxs, int *scissor)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	}
@@ -705,7 +738,7 @@ static void R_Viewport_ApplyNearClipPlaneFloatGL(const r_viewport_t *v, float *m
 
 	VectorSet(normal, normalx, normaly, normalz);
 	Matrix4x4_Transform3x3(&v->viewmatrix, normal, clipPlane);
-	VectorScale(normal, dist, v3);
+	VectorScale(normal, -dist, v3);
 	Matrix4x4_Transform(&v->viewmatrix, v3, v4);
 	// FIXME: LordHavoc: I think this can be done more efficiently somehow but I can't remember the technique
 	clipPlane[3] = -DotProduct(v4, clipPlane);
@@ -769,6 +802,7 @@ void R_Viewport_InitOrtho(r_viewport_t *v, const matrix4x4_t *cameramatrix, int 
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -1019,6 +1053,7 @@ void R_Viewport_InitRectSideView(r_viewport_t *v, const matrix4x4_t *cameramatri
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
 	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -1054,6 +1089,7 @@ void R_SetViewport(const r_viewport_t *v)
 	{
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GLES1:
 		CHECKGLERROR
 		qglViewport(v->x, v->y, v->width, v->height);CHECKGLERROR
 		// Load the projection matrix into OpenGL
@@ -1130,6 +1166,7 @@ int R_Mesh_CreateFramebufferObject(rtexture_t *depthtexture, rtexture_t *colorte
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (!vid.support.ext_framebuffer_object)
 			return 0;
@@ -1158,6 +1195,7 @@ void R_Mesh_DestroyFramebufferObject(int fbo)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (fbo)
 			qglDeleteFramebuffersEXT(1, (GLuint*)&fbo);
@@ -1214,6 +1252,7 @@ void R_Mesh_ResetRenderTargets(void)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (gl_state.framebufferobject)
 		{
@@ -1257,6 +1296,7 @@ void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colo
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (gl_state.framebufferobject != fbo)
 		{
@@ -1341,6 +1381,7 @@ static int d3dstencilopforglfunc(int f)
 }
 #endif
 
+extern cvar_t r_transparent_alphatocoverage;
 
 static void GL_Backend_ResetState(void)
 {
@@ -1389,13 +1430,14 @@ static void GL_Backend_ResetState(void)
 	case RENDERPATH_D3D11:
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		CHECKGLERROR
 
 		qglColorMask(1, 1, 1, 1);CHECKGLERROR
 		qglAlphaFunc(gl_state.alphafunc, gl_state.alphafuncvalue);CHECKGLERROR
-		qglDisable(GL_ALPHA_TEST);CHECKGLERROR
+		qglDisable((r_transparent_alphatocoverage.integer) ? GL_SAMPLE_ALPHA_TO_COVERAGE_ARB : GL_ALPHA_TEST);CHECKGLERROR
 		qglBlendFunc(gl_state.blendfunc1, gl_state.blendfunc2);CHECKGLERROR
 		qglDisable(GL_BLEND);CHECKGLERROR
 		qglCullFace(gl_state.cullface);CHECKGLERROR
@@ -1531,6 +1573,7 @@ void GL_ActiveTexture(unsigned int num)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			if (qglActiveTexture)
 			{
@@ -1558,6 +1601,7 @@ void GL_ClientActiveTexture(unsigned int num)
 		{
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			if (qglActiveTexture)
 			{
 				CHECKGLERROR
@@ -1591,6 +1635,7 @@ void GL_BlendFunc(int blendfunc1, int blendfunc2)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			qglBlendFunc(gl_state.blendfunc1, gl_state.blendfunc2);CHECKGLERROR
@@ -1664,6 +1709,7 @@ void GL_DepthMask(int state)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			qglDepthMask(gl_state.depthmask);CHECKGLERROR
@@ -1696,6 +1742,7 @@ void GL_DepthTest(int state)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			if (gl_state.depthtest)
@@ -1735,6 +1782,7 @@ void GL_DepthFunc(int state)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			qglDepthFunc(gl_state.depthfunc);CHECKGLERROR
@@ -1768,6 +1816,7 @@ void GL_DepthRange(float nearfrac, float farfrac)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			qglDepthRange(gl_state.depthrange[0], gl_state.depthrange[1]);
 			break;
@@ -1805,6 +1854,7 @@ void R_SetStencilSeparate(qboolean enable, int writemask, int frontfail, int fro
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 		if (enable)
@@ -1871,6 +1921,7 @@ void R_SetStencil(qboolean enable, int writemask, int fail, int zfail, int zpass
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 		if (enable)
@@ -1927,6 +1978,7 @@ void GL_PolygonOffset(float planeoffset, float depthoffset)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			qglPolygonOffset(gl_state.polygonoffset[0], gl_state.polygonoffset[1]);
 			break;
@@ -1965,6 +2017,7 @@ void GL_SetMirrorState(qboolean state)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			qglCullFace(gl_state.cullface);CHECKGLERROR
 			break;
@@ -2001,6 +2054,7 @@ void GL_CullFace(int state)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 
@@ -2066,6 +2120,35 @@ void GL_CullFace(int state)
 	}
 }
 
+void GL_MultiSampling(qboolean state)
+{
+	switch(vid.renderpath)
+	{
+		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
+		case RENDERPATH_GL20:
+		case RENDERPATH_GLES2:
+			if (vid.support.arb_multisample)
+			{
+				if (state)
+					qglEnable(GL_MULTISAMPLE_ARB);
+				else
+					qglDisable(GL_MULTISAMPLE_ARB);
+				CHECKGLERROR
+			}
+			break;
+		case RENDERPATH_D3D9:
+			break;
+		case RENDERPATH_D3D10:
+			break;
+		case RENDERPATH_D3D11:
+			break;
+		case RENDERPATH_SOFT:
+			break;
+	}
+}
+
 void GL_AlphaTest(int state)
 {
 	if (gl_state.alphatest != state)
@@ -2075,15 +2158,16 @@ void GL_AlphaTest(int state)
 		{
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			// only fixed function uses alpha test, other paths use pixel kill capability in shaders
 			CHECKGLERROR
 			if (gl_state.alphatest)
 			{
-				qglEnable(GL_ALPHA_TEST);CHECKGLERROR
+				qglEnable((r_transparent_alphatocoverage.integer) ? GL_SAMPLE_ALPHA_TO_COVERAGE_ARB : GL_ALPHA_TEST);CHECKGLERROR
 			}
 			else
 			{
-				qglDisable(GL_ALPHA_TEST);CHECKGLERROR
+				qglDisable((r_transparent_alphatocoverage.integer) ? GL_SAMPLE_ALPHA_TO_COVERAGE_ARB : GL_ALPHA_TEST);CHECKGLERROR
 			}
 			break;
 		case RENDERPATH_D3D9:
@@ -2100,6 +2184,14 @@ void GL_AlphaTest(int state)
 			break;
 		case RENDERPATH_GL20:
 		case RENDERPATH_GLES2:
+			if (vid_multisampling.integer)
+			{
+				if (gl_state.alphatest && r_transparent_alphatocoverage.integer)
+					qglEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+				else
+					qglDisable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
+				CHECKGLERROR
+			}
 			break;
 		}
 	}
@@ -2117,6 +2209,7 @@ void GL_ColorMask(int r, int g, int b, int a)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			qglColorMask((GLboolean)r, (GLboolean)g, (GLboolean)b, (GLboolean)a);CHECKGLERROR
@@ -2151,6 +2244,7 @@ void GL_Color(float cr, float cg, float cb, float ca)
 		{
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
+		case RENDERPATH_GLES1:
 			CHECKGLERROR
 			qglColor4f(gl_state.color4f[0], gl_state.color4f[1], gl_state.color4f[2], gl_state.color4f[3]);
 			CHECKGLERROR
@@ -2178,6 +2272,7 @@ void GL_Scissor (int x, int y, int width, int height)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 		qglScissor(x, y,width,height);
@@ -2217,6 +2312,7 @@ void GL_ScissorTest(int state)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			if(gl_state.scissortest)
@@ -2259,6 +2355,7 @@ void GL_Clear(int mask, const float *colorvalue, float depthvalue, int stencilva
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 		if (mask & GL_COLOR_BUFFER_BIT)
@@ -2302,6 +2399,7 @@ void GL_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpi
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		CHECKGLERROR
 		qglReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, outpixels);CHECKGLERROR
@@ -2419,6 +2517,8 @@ unsigned int GL_Backend_CompileProgram(int vertexstrings_count, const char **ver
 	qglBindAttribLocation(programobject, GLSLATTRIB_TEXCOORD5, "Attrib_TexCoord5");
 	qglBindAttribLocation(programobject, GLSLATTRIB_TEXCOORD6, "Attrib_TexCoord6");
 	qglBindAttribLocation(programobject, GLSLATTRIB_TEXCOORD7, "Attrib_TexCoord7");
+	if(vid.support.gl20shaders130)
+		qglBindFragDataLocation(programobject, 0, "dp_FragColor");
 
 	if (vertexstrings_count && !GL_Backend_CompileShader(programobject, GL_VERTEX_SHADER, "vertex", vertexstrings_count, vertexstrings_list))
 		goto cleanup;
@@ -2510,6 +2610,7 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		// check if the user specified to ignore static index buffers
 		if (!gl_state.usevbo_staticindex || (gl_vbo.integer == 3 && !vid.forcevbo && (element3i_bufferoffset || element3s_bufferoffset)))
@@ -2852,6 +2953,7 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 		case RENDERPATH_SOFT:
 			DPSOFTRAST_DrawTriangles(firstvertex, numvertices, numtriangles, element3i, element3s);
 			break;
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			// GLES does not have glDrawRangeElements, and generally
 			// underperforms with index buffers, so this code path is
@@ -2947,6 +3049,7 @@ void R_Mesh_UpdateMeshBuffer(r_meshbuffer_t *buffer, const void *data, size_t si
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (!buffer->bufferobject)
 			qglGenBuffersARB(1, (GLuint *)&buffer->bufferobject);
@@ -3028,6 +3131,7 @@ void R_Mesh_DestroyMeshBuffer(r_meshbuffer_t *buffer)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		qglDeleteBuffersARB(1, (GLuint *)&buffer->bufferobject);
 		break;
@@ -3083,6 +3187,7 @@ void R_Mesh_VertexPointer(int components, int gltype, size_t stride, const void 
 	{
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (gl_state.pointer_vertex_components != components || gl_state.pointer_vertex_gltype != gltype || gl_state.pointer_vertex_stride != stride || gl_state.pointer_vertex_pointer != pointer || gl_state.pointer_vertex_vertexbuffer != vertexbuffer || gl_state.pointer_vertex_offset != bufferoffset)
 		{
 			int bufferobject = vertexbuffer ? vertexbuffer->bufferobject : 0;
@@ -3129,6 +3234,7 @@ void R_Mesh_ColorPointer(int components, int gltype, size_t stride, const void *
 	{
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		CHECKGLERROR
 		if (pointer)
 		{
@@ -3223,6 +3329,7 @@ void R_Mesh_TexCoordPointer(unsigned int unitnum, int components, int gltype, si
 	{
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		CHECKGLERROR
 		if (pointer)
 		{
@@ -3323,6 +3430,7 @@ void R_Mesh_CopyToTexture(rtexture_t *tex, int tx, int ty, int sx, int sy, int w
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		R_Mesh_TexBind(0, tex);
 		GL_ActiveTexture(0);CHECKGLERROR
@@ -3371,6 +3479,23 @@ void R_Mesh_CopyToTexture(rtexture_t *tex, int tx, int ty, int sx, int sy, int w
 int d3drswrap[16] = {D3DRS_WRAP0, D3DRS_WRAP1, D3DRS_WRAP2, D3DRS_WRAP3, D3DRS_WRAP4, D3DRS_WRAP5, D3DRS_WRAP6, D3DRS_WRAP7, D3DRS_WRAP8, D3DRS_WRAP9, D3DRS_WRAP10, D3DRS_WRAP11, D3DRS_WRAP12, D3DRS_WRAP13, D3DRS_WRAP14, D3DRS_WRAP15};
 #endif
 
+void R_Mesh_ClearBindingsForTexture(int texnum)
+{
+	gltextureunit_t *unit;
+	unsigned int unitnum;
+	// this doesn't really unbind the texture, but it does prevent a mistaken "do nothing" behavior on the next time this same texnum is bound on the same unit as the same type (this mainly affects r_shadow_bouncegrid because 3D textures are so rarely used)
+	for (unitnum = 0;unitnum < vid.teximageunits;unitnum++)
+	{
+		unit = gl_state.units + unitnum;
+		if (unit->t2d == texnum)
+			unit->t2d = -1;
+		if (unit->t3d == texnum)
+			unit->t3d = -1;
+		if (unit->tcubemap == texnum)
+			unit->tcubemap = -1;
+	}
+}
+
 void R_Mesh_TexBind(unsigned int unitnum, rtexture_t *tex)
 {
 	gltextureunit_t *unit = gl_state.units + unitnum;
@@ -3399,8 +3524,9 @@ void R_Mesh_TexBind(unsigned int unitnum, rtexture_t *tex)
 		case GL_TEXTURE_CUBE_MAP_ARB: if (unit->tcubemap != texnum) {GL_ActiveTexture(unitnum);unit->tcubemap = texnum;qglBindTexture(GL_TEXTURE_CUBE_MAP_ARB, unit->tcubemap);CHECKGLERROR}break;
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		unit->texture = tex;
 		tex2d = 0;
 		tex3d = 0;
@@ -3547,6 +3673,7 @@ void R_Mesh_TexMatrix(unsigned int unitnum, const matrix4x4_t *matrix)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		if (matrix && matrix->m[3][3])
 		{
@@ -3599,6 +3726,7 @@ void R_Mesh_TexCombine(unsigned int unitnum, int combinergb, int combinealpha, i
 		// do nothing
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		// GL_ARB_texture_env_combine
 		if (!combinergb)
 			combinergb = GL_MODULATE;
@@ -3693,8 +3821,9 @@ void R_Mesh_ResetTextureState(void)
 	case RENDERPATH_D3D11:
 	case RENDERPATH_SOFT:
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		for (unitnum = 0;unitnum < vid.texunits;unitnum++)
 		{
 			R_Mesh_TexCombine(unitnum, GL_MODULATE, GL_MODULATE, 1, 1);
@@ -3720,7 +3849,7 @@ D3DVERTEXELEMENT9 r_vertex3f_d3d9elements[] =
 D3DVERTEXELEMENT9 r_vertexgeneric_d3d9elements[] =
 {
 	{0, (int)((size_t)&((r_vertexgeneric_t *)0)->vertex3f  ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
-	{0, (int)((size_t)&((r_vertexgeneric_t *)0)->color4ub  ), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+	{0, (int)((size_t)&((r_vertexgeneric_t *)0)->color4f   ), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
 	{0, (int)((size_t)&((r_vertexgeneric_t *)0)->texcoord2f), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 	D3DDECL_END()
 };
@@ -3728,7 +3857,7 @@ D3DVERTEXELEMENT9 r_vertexgeneric_d3d9elements[] =
 D3DVERTEXELEMENT9 r_vertexmesh_d3d9elements[] =
 {
 	{0, (int)((size_t)&((r_vertexmesh_t *)0)->vertex3f          ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
-	{0, (int)((size_t)&((r_vertexmesh_t *)0)->color4ub          ), D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+	{0, (int)((size_t)&((r_vertexmesh_t *)0)->color4f           ), D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
 	{0, (int)((size_t)&((r_vertexmesh_t *)0)->texcoordtexture2f ), D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
 	{0, (int)((size_t)&((r_vertexmesh_t *)0)->svector3f         ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
 	{0, (int)((size_t)&((r_vertexmesh_t *)0)->tvector3f         ), D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
@@ -3753,6 +3882,7 @@ static void R_Mesh_InitVertexDeclarations(void)
 	case RENDERPATH_GL20:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		break;
 	case RENDERPATH_D3D9:
@@ -3826,6 +3956,7 @@ void R_Mesh_PrepareVertices_Vertex3f(int numvertices, const float *vertex3f, con
 		}
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(3, GL_FLOAT, sizeof(float[3]), vertex3f, vertexbuffer, 0);
@@ -3929,8 +4060,9 @@ void R_Mesh_PrepareVertices_Generic_Arrays(int numvertices, const float *vertex3
 			return;
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (!vid.useinterleavedarrays)
 		{
 			R_Mesh_VertexPointer(3, GL_FLOAT, sizeof(float[3]), vertex3f, NULL, 0);
@@ -3965,19 +4097,12 @@ void R_Mesh_PrepareVertices_Generic_Arrays(int numvertices, const float *vertex3
 	if (color4f)
 	{
 		for (i = 0;i < numvertices;i++)
-			Vector4Scale(color4f + 4*i, 255.0f, vertex[i].color4ub);
+			Vector4Copy(color4f + 4*i, vertex[i].color4f);
 	}
 	else
 	{
-		float tempcolor4f[4];
-		unsigned char tempcolor4ub[4];
-		Vector4Scale(gl_state.color4f, 255.0f, tempcolor4f);
-		tempcolor4ub[0] = (unsigned char)bound(0.0f, tempcolor4f[0], 255.0f);
-		tempcolor4ub[1] = (unsigned char)bound(0.0f, tempcolor4f[1], 255.0f);
-		tempcolor4ub[2] = (unsigned char)bound(0.0f, tempcolor4f[2], 255.0f);
-		tempcolor4ub[3] = (unsigned char)bound(0.0f, tempcolor4f[3], 255.0f);
 		for (i = 0;i < numvertices;i++)
-			Vector4Copy(tempcolor4ub, vertex[i].color4ub);
+			Vector4Copy(gl_state.color4f, vertex[i].color4f);
 	}
 	if (texcoord2f)
 		for (i = 0;i < numvertices;i++)
@@ -4006,7 +4131,7 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , vertexbuffer, (int)((unsigned char *)vertex->texcoord2f         - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
 			R_Mesh_TexCoordPointer(2, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
@@ -4016,7 +4141,7 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , NULL, 0);
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
 			R_Mesh_TexCoordPointer(2, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
@@ -4025,17 +4150,18 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		}
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , vertexbuffer, (int)((unsigned char *)vertex->texcoord2f         - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
 		}
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , NULL, 0);
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT, sizeof(float[2]), NULL, NULL, 0);
 		}
@@ -4044,13 +4170,13 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , vertexbuffer, (int)((unsigned char *)vertex->texcoord2f         - (unsigned char *)vertex));
 		}
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoord2f        , NULL, 0);
 		}
 		break;
@@ -4074,7 +4200,7 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		break;
 	case RENDERPATH_SOFT:
 		DPSOFTRAST_SetVertexPointer(vertex->vertex3f, sizeof(*vertex));
-		DPSOFTRAST_SetColorPointer4ub(vertex->color4ub, sizeof(*vertex));
+		DPSOFTRAST_SetColorPointer(vertex->color4f, sizeof(*vertex));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(*vertex), vertex->texcoord2f);
 		DPSOFTRAST_SetTexCoordPointer(1, 2, sizeof(*vertex), NULL);
 		DPSOFTRAST_SetTexCoordPointer(2, 2, sizeof(*vertex), NULL);
@@ -4128,8 +4254,9 @@ void R_Mesh_PrepareVertices_Mesh_Arrays(int numvertices, const float *vertex3f, 
 			return;
 		}
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (!vid.useinterleavedarrays)
 		{
 			R_Mesh_VertexPointer(3, GL_FLOAT, sizeof(float[3]), vertex3f, NULL, 0);
@@ -4172,19 +4299,12 @@ void R_Mesh_PrepareVertices_Mesh_Arrays(int numvertices, const float *vertex3f, 
 	if (color4f)
 	{
 		for (i = 0;i < numvertices;i++)
-			Vector4Scale(color4f + 4*i, 255.0f, vertex[i].color4ub);
+			Vector4Copy(color4f + 4*i, vertex[i].color4f);
 	}
 	else
 	{
-		float tempcolor4f[4];
-		unsigned char tempcolor4ub[4];
-		Vector4Scale(gl_state.color4f, 255.0f, tempcolor4f);
-		tempcolor4ub[0] = (unsigned char)bound(0.0f, tempcolor4f[0], 255.0f);
-		tempcolor4ub[1] = (unsigned char)bound(0.0f, tempcolor4f[1], 255.0f);
-		tempcolor4ub[2] = (unsigned char)bound(0.0f, tempcolor4f[2], 255.0f);
-		tempcolor4ub[3] = (unsigned char)bound(0.0f, tempcolor4f[3], 255.0f);
 		for (i = 0;i < numvertices;i++)
-			Vector4Copy(tempcolor4ub, vertex[i].color4ub);
+			Vector4Copy(gl_state.color4f, vertex[i].color4f);
 	}
 	if (texcoordtexture2f)
 		for (i = 0;i < numvertices;i++)
@@ -4216,7 +4336,7 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , vertexbuffer, (int)((unsigned char *)vertex->texcoordtexture2f  - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(1, 3, GL_FLOAT        , sizeof(*vertex), vertex->svector3f         , vertexbuffer, (int)((unsigned char *)vertex->svector3f          - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(2, 3, GL_FLOAT        , sizeof(*vertex), vertex->tvector3f         , vertexbuffer, (int)((unsigned char *)vertex->tvector3f          - (unsigned char *)vertex));
@@ -4226,7 +4346,7 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , NULL, 0);
 			R_Mesh_TexCoordPointer(1, 3, GL_FLOAT        , sizeof(*vertex), vertex->svector3f         , NULL, 0);
 			R_Mesh_TexCoordPointer(2, 3, GL_FLOAT        , sizeof(*vertex), vertex->tvector3f         , NULL, 0);
@@ -4235,17 +4355,18 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		}
 		break;
 	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , vertexbuffer, (int)((unsigned char *)vertex->texcoordtexture2f  - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordlightmap2f, vertexbuffer, (int)((unsigned char *)vertex->texcoordlightmap2f - (unsigned char *)vertex));
 		}
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , NULL, 0);
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordlightmap2f, NULL, 0);
 		}
@@ -4254,13 +4375,13 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		if (vertexbuffer)
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , vertexbuffer, (int)((unsigned char *)vertex->vertex3f           - (unsigned char *)vertex));
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , vertexbuffer, (int)((unsigned char *)vertex->color4ub           - (unsigned char *)vertex));
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , vertexbuffer, (int)((unsigned char *)vertex->color4f            - (unsigned char *)vertex));
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , vertexbuffer, (int)((unsigned char *)vertex->texcoordtexture2f  - (unsigned char *)vertex));
 		}
 		else
 		{
 			R_Mesh_VertexPointer(     3, GL_FLOAT        , sizeof(*vertex), vertex->vertex3f          , NULL, 0);
-			R_Mesh_ColorPointer(      4, GL_UNSIGNED_BYTE, sizeof(*vertex), vertex->color4ub          , NULL, 0);
+			R_Mesh_ColorPointer(      4, GL_FLOAT        , sizeof(*vertex), vertex->color4f           , NULL, 0);
 			R_Mesh_TexCoordPointer(0, 2, GL_FLOAT        , sizeof(*vertex), vertex->texcoordtexture2f , NULL, 0);
 		}
 		break;
@@ -4284,7 +4405,7 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		break;
 	case RENDERPATH_SOFT:
 		DPSOFTRAST_SetVertexPointer(vertex->vertex3f, sizeof(*vertex));
-		DPSOFTRAST_SetColorPointer4ub(vertex->color4ub, sizeof(*vertex));
+		DPSOFTRAST_SetColorPointer(vertex->color4f, sizeof(*vertex));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(*vertex), vertex->texcoordtexture2f);
 		DPSOFTRAST_SetTexCoordPointer(1, 3, sizeof(*vertex), vertex->svector3f);
 		DPSOFTRAST_SetTexCoordPointer(2, 3, sizeof(*vertex), vertex->tvector3f);

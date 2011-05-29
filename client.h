@@ -34,7 +34,8 @@ typedef struct tridecal_s
 	// color and initial alpha value
 	float			texcoord2f[3][2];
 	float			vertex3f[3][3];
-	unsigned char	color4ub[3][4];
+	float			color4f[3][4];
+	float			plane[4]; // backface culling
 	// how long this decal has lived so far (the actual fade begins at cl_decals_time)
 	float			lived;
 	// if >= 0 this indicates the decal should follow an animated triangle
@@ -88,6 +89,13 @@ typedef struct beam_s
 	vec3_t	start, end;
 }
 beam_t;
+
+typedef struct rtlight_particle_s
+{
+	float origin[3];
+	float color[3];
+}
+rtlight_particle_t;
 
 typedef struct rtlight_s
 {
@@ -202,6 +210,11 @@ typedef struct rtlight_s
 	/// masks of all shadowmap sides that have any potential static receivers or casters
 	int static_shadowmap_receivers;
 	int static_shadowmap_casters;
+	/// particle-tracing cache for global illumination
+	int particlecache_numparticles;
+	int particlecache_maxparticles;
+	int particlecache_updateparticle;
+	rtlight_particle_t *particlecache_particles;
 }
 rtlight_t;
 
@@ -277,18 +290,6 @@ typedef struct dlight_s
 	rtlight_t rtlight;
 }
 dlight_t;
-
-#define MAX_FRAMEGROUPBLENDS 4
-typedef struct framegroupblend_s
-{
-	// animation number and blend factor
-	// (for most models this is the frame number)
-	int frame;
-	float lerp;
-	// time frame began playing (for framegroup animations)
-	double start;
-}
-framegroupblend_t;
 
 // this is derived from processing of the framegroupblend array
 // note: technically each framegroupblend can produce two of these, but that
@@ -1204,6 +1205,7 @@ typedef struct client_state_s
 	float movevars_maxairspeed;
 	float movevars_stepheight;
 	float movevars_airaccel_qw;
+	float movevars_airaccel_qw_stretchfactor;
 	float movevars_airaccel_sideways_friction;
 	float movevars_airstopaccelerate;
 	float movevars_airstrafeaccelerate;
@@ -1243,8 +1245,10 @@ typedef struct client_state_s
 	// server entity number corresponding to a clientside entity
 	unsigned short csqc_server2csqcentitynumber[MAX_EDICTS];
 	qboolean csqc_loaded;
-	vec3_t csqc_origin;
-	vec3_t csqc_angles;
+	vec3_t csqc_vieworigin;
+	vec3_t csqc_viewangles;
+	vec3_t csqc_vieworiginfromengine;
+	vec3_t csqc_viewanglesfromengine;
 	qboolean csqc_usecsqclistener;
 	matrix4x4_t csqc_listenermatrix;
 	char csqc_printtextbuf[MAX_INPUTLINE];
@@ -1262,6 +1266,9 @@ typedef struct client_state_s
 	// freed on each level change
 	size_t buildlightmapmemorysize;
 	unsigned char *buildlightmapmemory;
+
+	// used by EntityState5_ReadUpdate
+	skeleton_t *engineskeletonobjects;
 }
 client_state_t;
 
@@ -1562,6 +1569,15 @@ typedef struct r_refdef_stats_s
 	int lights_lighttriangles;
 	int lights_shadowtriangles;
 	int lights_dynamicshadowtriangles;
+	int bouncegrid_lights;
+	int bouncegrid_particles;
+	int bouncegrid_traces;
+	int bouncegrid_hits;
+	int bouncegrid_splats;
+	int bouncegrid_bounces;
+	int collisioncache_animated;
+	int collisioncache_cached;
+	int collisioncache_traced;
 	int bloom;
 	int bloom_copypixels;
 	int bloom_drawpixels;
@@ -1636,7 +1652,7 @@ typedef struct r_refdef_view_s
 	int width;
 	int height;
 	int depth;
-	r_viewport_t viewport;
+	r_viewport_t viewport; // note: if r_viewscale is used, the viewport.width and viewport.height may be less than width and height
 
 	// which color components to allow (for anaglyph glasses)
 	int colormask[4];
@@ -1712,6 +1728,7 @@ typedef struct r_refdef_scene_s {
 	entity_render_t *tempentities;
 	int numtempentities;
 	int maxtempentities;
+	qboolean expandtempentities;
 
 	// renderable dynamic lights
 	rtlight_t *lights[MAX_DLIGHTS];
@@ -1803,6 +1820,9 @@ typedef struct r_refdef_s
 	float shadowpolygonfactor;
 	float shadowpolygonoffset;
 
+	// how long R_RenderView took on the previous frame
+	double lastdrawscreentime;
+
 	// rendering stats for r_speeds display
 	// (these are incremented in many places)
 	r_refdef_stats_t stats;
@@ -1810,6 +1830,9 @@ typedef struct r_refdef_s
 r_refdef_t;
 
 extern r_refdef_t r_refdef;
+
+// warpzone prediction hack (CSQC builtin)
+void CL_RotateMoves(const matrix4x4_t *m);
 
 #endif
 

@@ -101,6 +101,7 @@ void R_Mesh_AddBrushMeshFromPlanes(rmesh_t *mesh, int numplanes, mplane_t *plane
 extern cvar_t r_nearclip;
 
 // forces all rendering to draw triangle outlines
+extern cvar_t r_showoverdraw;
 extern cvar_t r_showtris;
 extern cvar_t r_shownormals;
 extern cvar_t r_showlighting;
@@ -143,7 +144,7 @@ void R_SkinFrame_Purge(void);
 skinframe_t *R_SkinFrame_FindNextByName( skinframe_t *last, const char *name );
 skinframe_t *R_SkinFrame_Find(const char *name, int textureflags, int comparewidth, int compareheight, int comparecrc, qboolean add);
 skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboolean complain);
-skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, const unsigned char *skindata, int width, int height);
+skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, const unsigned char *skindata, int width, int height, qboolean sRGB);
 skinframe_t *R_SkinFrame_LoadInternalQuake(const char *name, int textureflags, int loadpantsandshirt, int loadglowtexture, const unsigned char *skindata, int width, int height);
 skinframe_t *R_SkinFrame_LoadInternal8bit(const char *name, int textureflags, const unsigned char *skindata, int width, int height, const unsigned int *palette, const unsigned int *alphapalette);
 skinframe_t *R_SkinFrame_LoadMissing(void);
@@ -198,12 +199,6 @@ extern cvar_t cl_deathfade;
 extern cvar_t r_smoothnormals_areaweighting;
 
 extern cvar_t r_test;
-
-extern cvar_t r_texture_convertsRGB_2d;
-extern cvar_t r_texture_convertsRGB_skin;
-extern cvar_t r_texture_convertsRGB_cubemap;
-extern cvar_t r_texture_convertsRGB_skybox;
-extern cvar_t r_texture_convertsRGB_particles;
 
 #include "gl_backend.h"
 
@@ -332,8 +327,8 @@ typedef struct rsurfacestate_s
 	int ent_skinnum;
 	int ent_qwskin;
 	int ent_flags;
-	float ent_shadertime;
 	int ent_alttextures; // used by q1bsp animated textures (pressed buttons)
+	double shadertime; // r_refdef.scene.time - ent->shadertime
 	// transform matrices to render this entity and effects on this entity
 	matrix4x4_t matrix;
 	matrix4x4_t inversematrix;

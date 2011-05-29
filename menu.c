@@ -362,8 +362,35 @@ void M_Menu_Main_f (void)
 {
 	const char *s;
 	s = "gfx/mainmenu";
+
 	if (gamemode == GAME_NEHAHRA)
 	{
+		if (FS_FileExists("maps/neh1m4.bsp"))
+		{
+			if (FS_FileExists("hearing.dem"))
+			{
+				Con_DPrint("Main menu: Nehahra movie and game detected.\n");
+				NehGameType = TYPE_BOTH;
+			}
+			else
+			{
+				Con_DPrint("Nehahra game detected.\n");
+				NehGameType = TYPE_GAME;
+			}
+		}
+		else
+		{
+			if (FS_FileExists("hearing.dem"))
+			{
+				Con_DPrint("Nehahra movie detected.\n");
+				NehGameType = TYPE_DEMO;
+			}
+			else
+			{
+				Con_DPrint("Nehahra not found.\n");
+				NehGameType = TYPE_GAME; // could just complain, but...
+			}
+		}
 		if (NehGameType == TYPE_DEMO)
 			MAIN_ITEMS = 4;
 		else if (NehGameType == TYPE_GAME)
@@ -2521,6 +2548,33 @@ void M_Menu_Keys_f (void)
 	key_dest = key_menu_grabbed;
 	m_state = m_keys;
 	m_entersound = true;
+
+	if (gamemode == GAME_TRANSFUSION)
+	{
+		numcommands = sizeof(transfusionbindnames) / sizeof(transfusionbindnames[0]);
+		bindnames = transfusionbindnames;
+	}
+	else if (gamemode == GAME_GOODVSBAD2)
+	{
+		numcommands = sizeof(goodvsbad2bindnames) / sizeof(goodvsbad2bindnames[0]);
+		bindnames = goodvsbad2bindnames;
+	}
+	else
+	{
+		numcommands = sizeof(quakebindnames) / sizeof(quakebindnames[0]);
+		bindnames = quakebindnames;
+	}
+
+	// Make sure "keys_cursor" doesn't start on a section in the binding list
+	keys_cursor = 0;
+	while (bindnames[keys_cursor][0][0] == '\0')
+	{
+		keys_cursor++;
+
+		// Only sections? There may be a problem somewhere...
+		if (keys_cursor >= numcommands)
+			Sys_Error ("M_Init: The key binding list only contains sections");
+	}
 }
 
 #define NUMKEYS 5
@@ -3879,26 +3933,9 @@ static gameinfo_t gamelist[] =
 	{GAME_OPENQUARTZ, &openquartzgame, &openquartzgame},
 	{GAME_DEFEATINDETAIL2, &defeatindetail2game, &defeatindetail2game},
 	{GAME_PRYDON, &prydongame, &prydongame},
-	{GAME_NORMAL, NULL, NULL} // terminator
 };
 
-static gamelevels_t *lookupgameinfo(void)
-{
-	int i = 0;
-	while (gamelist[i].gameid != gamemode)
-	{
-		if (gamelist[i].notregistered == NULL)
-		{
-			i = 0;
-			break;
-		}
-		i++;
-	}
-	if (registered.integer)
-		return gamelist[i].registered;
-	else
-		return gamelist[i].notregistered;
-}
+static gamelevels_t *gameoptions_levels  = NULL;
 
 static int	startepisode;
 static int	startlevel;
@@ -3908,6 +3945,7 @@ static double m_serverInfoMessageTime;
 
 void M_Menu_GameOptions_f (void)
 {
+	int i;
 	key_dest = key_menu;
 	m_state = m_gameoptions;
 	m_entersound = true;
@@ -3915,6 +3953,11 @@ void M_Menu_GameOptions_f (void)
 		maxplayers = svs.maxclients;
 	if (maxplayers < 2)
 		maxplayers = min(8, MAX_SCOREBOARD);
+	// pick game level list based on gamemode (use GAME_NORMAL if no matches)
+	gameoptions_levels = registered.integer ? gamelist[0].registered : gamelist[0].notregistered;
+	for (i = 0;i < (int)(sizeof(gamelist)/sizeof(gamelist[0]));i++)
+		if (gamelist[i].gameid == gamemode)
+			gameoptions_levels = registered.integer ? gamelist[i].registered : gamelist[i].notregistered;
 }
 
 
@@ -3926,7 +3969,6 @@ void M_GameOptions_Draw (void)
 {
 	cachepic_t	*p;
 	int		x;
-	gamelevels_t *g;
 
 	M_Background(320, 200);
 
@@ -4050,17 +4092,15 @@ void M_GameOptions_Draw (void)
 	M_DrawTextBox (0, 132, 38, 1);
 	M_Print(8, 140, hostname.string);
 
-	g = lookupgameinfo();
-
 	if (gamemode != GAME_GOODVSBAD2)
 	{
 		M_Print(0, 160, "         Episode");
-		M_Print(160, 160, g->episodes[startepisode].description);
+		M_Print(160, 160, gameoptions_levels->episodes[startepisode].description);
 	}
 
 	M_Print(0, 168, "           Level");
-	M_Print(160, 168, g->levels[g->episodes[startepisode].firstLevel + startlevel].description);
-	M_Print(160, 176, g->levels[g->episodes[startepisode].firstLevel + startlevel].name);
+	M_Print(160, 168, gameoptions_levels->levels[gameoptions_levels->episodes[startepisode].firstLevel + startlevel].description);
+	M_Print(160, 176, gameoptions_levels->levels[gameoptions_levels->episodes[startepisode].firstLevel + startlevel].name);
 
 // line cursor
 	if (gameoptions_cursor == 9)
@@ -4088,7 +4128,6 @@ void M_GameOptions_Draw (void)
 
 static void M_NetStart_Change (int dir)
 {
-	gamelevels_t *g;
 	int count;
 
 	switch (gameoptions_cursor)
@@ -4225,12 +4264,11 @@ static void M_NetStart_Change (int dir)
 		if (gamemode == GAME_GOODVSBAD2)
 			break;
 		startepisode += dir;
-		g = lookupgameinfo();
 
 		if (startepisode < 0)
-			startepisode = g->numepisodes - 1;
+			startepisode = gameoptions_levels->numepisodes - 1;
 
-		if (startepisode >= g->numepisodes)
+		if (startepisode >= gameoptions_levels->numepisodes)
 			startepisode = 0;
 
 		startlevel = 0;
@@ -4238,12 +4276,11 @@ static void M_NetStart_Change (int dir)
 
 	case 11:
 		startlevel += dir;
-		g = lookupgameinfo();
 
 		if (startlevel < 0)
-			startlevel = g->episodes[startepisode].levels - 1;
+			startlevel = gameoptions_levels->episodes[startepisode].levels - 1;
 
-		if (startlevel >= g->episodes[startepisode].levels)
+		if (startlevel >= gameoptions_levels->episodes[startepisode].levels)
 			startlevel = 0;
 		break;
 	}
@@ -4251,7 +4288,6 @@ static void M_NetStart_Change (int dir)
 
 static void M_GameOptions_Key (int key, int ascii)
 {
-	gamelevels_t *g;
 	int l;
 	char hostnamebuf[128];
 
@@ -4297,8 +4333,7 @@ static void M_GameOptions_Key (int key, int ascii)
 				Cbuf_AddText ("disconnect\n");
 			Cbuf_AddText ( va ("maxplayers %u\n", maxplayers) );
 
-			g = lookupgameinfo();
-			Cbuf_AddText ( va ("map %s\n", g->levels[g->episodes[startepisode].firstLevel + startlevel].name) );
+			Cbuf_AddText ( va ("map %s\n", gameoptions_levels->levels[gameoptions_levels->episodes[startepisode].firstLevel + startlevel].name) );
 			return;
 		}
 
@@ -4488,9 +4523,8 @@ void ModList_RebuildList(void)
 		if (modlist_count >= MODLIST_TOTALSIZE)	break;
 		// check all dirs to see if they "appear" to be mods
 		// reject any dirs that are part of the base game
-		// (such as "id1" and "hipnotic" when in GAME_HIPNOTIC mode)
 		if (gamedirname1 && !strcasecmp(gamedirname1, list.strings[i])) continue;
-		if (gamedirname2 && !strcasecmp(gamedirname2, list.strings[i])) continue;
+		//if (gamedirname2 && !strcasecmp(gamedirname2, list.strings[i])) continue;
 		if (FS_CheckNastyPath (list.strings[i], true)) continue;
 		if (!FS_CheckGameDir(list.strings[i])) continue;
 
@@ -4704,64 +4738,6 @@ void M_Init (void)
 	Cmd_AddCommand ("menu_transfusion_episode", M_Menu_Transfusion_Episode_f, "open the transfusion episode select menu");
 	Cmd_AddCommand ("menu_transfusion_skill", M_Menu_Transfusion_Skill_f, "open the transfusion skill select menu");
 	Cmd_AddCommand ("menu_credits", M_Menu_Credits_f, "open the credits menu");
-
-	if (gamemode == GAME_TRANSFUSION)
-	{
-		numcommands = sizeof(transfusionbindnames) / sizeof(transfusionbindnames[0]);
-		bindnames = transfusionbindnames;
-	}
-	else if (gamemode == GAME_GOODVSBAD2)
-	{
-		numcommands = sizeof(goodvsbad2bindnames) / sizeof(goodvsbad2bindnames[0]);
-		bindnames = goodvsbad2bindnames;
-	}
-	else
-	{
-		numcommands = sizeof(quakebindnames) / sizeof(quakebindnames[0]);
-		bindnames = quakebindnames;
-	}
-
-	// Make sure "keys_cursor" doesn't start on a section in the binding list
-	keys_cursor = 0;
-	while (bindnames[keys_cursor][0][0] == '\0')
-	{
-		keys_cursor++;
-
-		// Only sections? There may be a problem somewhere...
-		if (keys_cursor >= numcommands)
-			Sys_Error ("M_Init: The key binding list only contains sections");
-	}
-
-
-	if (gamemode == GAME_NEHAHRA)
-	{
-		if (FS_FileExists("maps/neh1m4.bsp"))
-		{
-			if (FS_FileExists("hearing.dem"))
-			{
-				Con_Print("Nehahra movie and game detected.\n");
-				NehGameType = TYPE_BOTH;
-			}
-			else
-			{
-				Con_Print("Nehahra game detected.\n");
-				NehGameType = TYPE_GAME;
-			}
-		}
-		else
-		{
-			if (FS_FileExists("hearing.dem"))
-			{
-				Con_Print("Nehahra movie detected.\n");
-				NehGameType = TYPE_DEMO;
-			}
-			else
-			{
-				Con_Print("Nehahra not found.\n");
-				NehGameType = TYPE_GAME; // could just complain, but...
-			}
-		}
-	}
 }
 
 void M_Draw (void)
@@ -5026,10 +5002,6 @@ void M_Shutdown(void)
 	key_dest = key_game;
 }
 
-void M_Restart(void)
-{
-}
-
 //============================================================================
 // Menu prog handling
 
@@ -5042,6 +5014,164 @@ static const char *m_required_func[] = {
 };
 
 static int m_numrequiredfunc = sizeof(m_required_func) / sizeof(char*);
+
+static prvm_required_field_t m_required_fields[] =
+{
+#define PRVM_DECLARE_serverglobalfloat(x)
+#define PRVM_DECLARE_serverglobalvector(x)
+#define PRVM_DECLARE_serverglobalstring(x)
+#define PRVM_DECLARE_serverglobaledict(x)
+#define PRVM_DECLARE_serverglobalfunction(x)
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x)
+#define PRVM_DECLARE_menuglobalvector(x)
+#define PRVM_DECLARE_menuglobalstring(x)
+#define PRVM_DECLARE_menuglobaledict(x)
+#define PRVM_DECLARE_menuglobalfunction(x)
+#define PRVM_DECLARE_serverfieldfloat(x)
+#define PRVM_DECLARE_serverfieldvector(x)
+#define PRVM_DECLARE_serverfieldstring(x)
+#define PRVM_DECLARE_serverfieldedict(x)
+#define PRVM_DECLARE_serverfieldfunction(x)
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_menufieldvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_menufieldstring(x) {ev_string, #x},
+#define PRVM_DECLARE_menufieldedict(x) {ev_entity, #x},
+#define PRVM_DECLARE_menufieldfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
+};
+
+static int m_numrequiredfields = sizeof(m_required_fields) / sizeof(m_required_fields[0]);
+
+static prvm_required_field_t m_required_globals[] =
+{
+#define PRVM_DECLARE_serverglobalfloat(x)
+#define PRVM_DECLARE_serverglobalvector(x)
+#define PRVM_DECLARE_serverglobalstring(x)
+#define PRVM_DECLARE_serverglobaledict(x)
+#define PRVM_DECLARE_serverglobalfunction(x)
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_menuglobalvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_menuglobalstring(x) {ev_string, #x},
+#define PRVM_DECLARE_menuglobaledict(x) {ev_entity, #x},
+#define PRVM_DECLARE_menuglobalfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_serverfieldfloat(x)
+#define PRVM_DECLARE_serverfieldvector(x)
+#define PRVM_DECLARE_serverfieldstring(x)
+#define PRVM_DECLARE_serverfieldedict(x)
+#define PRVM_DECLARE_serverfieldfunction(x)
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x)
+#define PRVM_DECLARE_menufieldvector(x)
+#define PRVM_DECLARE_menufieldstring(x)
+#define PRVM_DECLARE_menufieldedict(x)
+#define PRVM_DECLARE_menufieldfunction(x)
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
+};
+
+static int m_numrequiredglobals = sizeof(m_required_globals) / sizeof(m_required_globals[0]);
 
 void MR_SetRouting (qboolean forceold);
 
@@ -5090,9 +5220,9 @@ void MP_KeyEvent (int key, int ascii, qboolean downevent)
 	prog->globals.generic[OFS_PARM0] = (float) key;
 	prog->globals.generic[OFS_PARM1] = (float) ascii;
 	if (downevent)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_keydown,"m_keydown(float key, float ascii) required");
-	else if (prog->funcoffsets.m_keyup)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_keyup,"m_keyup(float key, float ascii) required");
+		PRVM_ExecuteProgram(PRVM_menufunction(m_keydown),"m_keydown(float key, float ascii) required");
+	else if (PRVM_menufunction(m_keyup))
+		PRVM_ExecuteProgram(PRVM_menufunction(m_keyup),"m_keyup(float key, float ascii) required");
 
 	PRVM_End;
 }
@@ -5119,7 +5249,7 @@ void MP_Draw (void)
 
 	// FIXME: this really shouldnt error out lest we have a very broken refdef state...?
 	// or does it kill the server too?
-	PRVM_ExecuteProgram(prog->funcoffsets.m_draw,"m_draw() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_draw),"m_draw() required");
 
 	PRVM_End;
 
@@ -5135,7 +5265,7 @@ void MP_ToggleMenu(int mode)
 	PRVM_SetProg(PRVM_MENUPROG);
 
 	prog->globals.generic[OFS_PARM0] = (float) mode;
-	PRVM_ExecuteProgram(prog->funcoffsets.m_toggle,"m_toggle() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_toggle),"m_toggle() required");
 
 	PRVM_End;
 }
@@ -5144,8 +5274,8 @@ void MP_NewMap(void)
 {
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
-	if (prog->funcoffsets.m_newmap)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_newmap,"m_newmap() required");
+	if (PRVM_menufunction(m_newmap))
+		PRVM_ExecuteProgram(PRVM_menufunction(m_newmap),"m_newmap() required");
 	PRVM_End;
 }
 
@@ -5154,7 +5284,7 @@ void MP_Shutdown (void)
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
 
-	PRVM_ExecuteProgram(prog->funcoffsets.m_shutdown,"m_shutdown() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_shutdown),"m_shutdown() required");
 
 	// reset key_dest
 	key_dest = key_game;
@@ -5186,7 +5316,7 @@ void MP_Init (void)
 	// allocate the mempools
 	prog->progs_mempool = Mem_AllocPool(M_PROG_FILENAME, 0, NULL);
 
-	PRVM_LoadProgs(M_PROG_FILENAME, m_numrequiredfunc, m_required_func, 0, NULL, 0, NULL);
+	PRVM_LoadProgs(M_PROG_FILENAME, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
 
 	// note: OP_STATE is not supported by menu qc, we don't even try to detect
 	// it here
@@ -5194,14 +5324,9 @@ void MP_Init (void)
 	in_client_mouse = true;
 
 	// call the prog init
-	PRVM_ExecuteProgram(prog->funcoffsets.m_init,"m_init() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_init),"m_init() required");
 
 	PRVM_End;
-}
-
-void MP_Restart(void)
-{
-	MP_Init();
 }
 
 //============================================================================
@@ -5215,8 +5340,6 @@ void (*MR_NewMap) (void);
 
 void MR_SetRouting(qboolean forceold)
 {
-	static qboolean m_init = FALSE, mp_init = FALSE;
-
 	// if the menu prog isnt available or forceqmenu ist set, use the old menu
 	if(!FS_FileExists(M_PROG_FILENAME) || forceqmenu.integer || forceold)
 	{
@@ -5226,15 +5349,7 @@ void MR_SetRouting(qboolean forceold)
 		MR_ToggleMenu = M_ToggleMenu;
 		MR_Shutdown = M_Shutdown;
 		MR_NewMap = M_NewMap;
-
-		// init
-		if(!m_init)
-		{
-			M_Init();
-			m_init = TRUE;
-		}
-		else
-			M_Restart();
+		M_Init();
 	}
 	else
 	{
@@ -5244,20 +5359,14 @@ void MR_SetRouting(qboolean forceold)
 		MR_ToggleMenu = MP_ToggleMenu;
 		MR_Shutdown = MP_Shutdown;
 		MR_NewMap = MP_NewMap;
-
-		if(!mp_init)
-		{
-			MP_Init();
-			mp_init = TRUE;
-		}
-		else
-			MP_Restart();
+		MP_Init();
 	}
 }
 
 void MR_Restart(void)
 {
-	MR_Shutdown ();
+	if(MR_Shutdown)
+		MR_Shutdown ();
 	MR_SetRouting (FALSE);
 }
 

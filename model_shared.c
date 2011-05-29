@@ -1605,6 +1605,7 @@ static void Q3Shader_AddToHash (q3shaderinfo_t* shader)
 	memcpy (&entry->shader, shader, sizeof (q3shaderinfo_t));
 }
 
+extern cvar_t mod_noshader_default_offsetmapping;
 extern cvar_t mod_q3shader_default_offsetmapping;
 extern cvar_t mod_q3shader_default_polygonoffset;
 extern cvar_t mod_q3shader_default_polygonfactor;
@@ -2072,6 +2073,8 @@ void Mod_LoadQ3Shaders(void)
 					shader.dpshadow = true;
 				else if (!strcasecmp(parameter[0], "dpnoshadow"))
 					shader.dpnoshadow = true;
+				else if (!strcasecmp(parameter[0], "dpnortlight"))
+					shader.dpnortlight = true;
 				else if (!strcasecmp(parameter[0], "dpreflectcube"))
 					strlcpy(shader.dpreflectcube, parameter[1], sizeof(shader.dpreflectcube));
 				else if (!strcasecmp(parameter[0], "dpmeshcollisions"))
@@ -2281,7 +2284,7 @@ qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qbool
 	if(defaulttexflags & TEXF_ISSPRITE)
 		texflagsor |= TEXF_ISSPRITE;
 	// unless later loaded from the shader
-	texture->offsetmapping = (mod_q3shader_default_offsetmapping.value) ? OFFSETMAPPING_DEFAULT : OFFSETMAPPING_OFF;
+	texture->offsetmapping = (mod_noshader_default_offsetmapping.value) ? OFFSETMAPPING_DEFAULT : OFFSETMAPPING_OFF;
 	texture->offsetscale = 1;
 	texture->specularscalemod = 1;
 	texture->specularpowermod = 1; 
@@ -2419,6 +2422,8 @@ nothing                GL_ZERO GL_ONE
 			texture->basematerialflags &= ~MATERIALFLAG_NOSHADOW;
 		if (shader->dpnoshadow)
 			texture->basematerialflags |= MATERIALFLAG_NOSHADOW;
+		if (shader->dpnortlight)
+			texture->basematerialflags |= MATERIALFLAG_NORTLIGHT;
 		memcpy(texture->deforms, shader->deforms, sizeof(texture->deforms));
 		texture->reflectmin = shader->reflectmin;
 		texture->reflectmax = shader->reflectmax;
@@ -2797,7 +2802,7 @@ void Mod_BuildVBOs(void)
 			VectorScale(loadmodel->surfmesh.data_tvector3f + 3*vertexindex, 1.0f, vertexmesh->tvector3f);
 			VectorScale(loadmodel->surfmesh.data_normal3f + 3*vertexindex, 1.0f, vertexmesh->normal3f);
 			if (loadmodel->surfmesh.data_lightmapcolor4f)
-				Vector4Scale(loadmodel->surfmesh.data_lightmapcolor4f + 4*vertexindex, 255.0f, vertexmesh->color4ub);
+				Vector4Copy(loadmodel->surfmesh.data_lightmapcolor4f + 4*vertexindex, vertexmesh->color4f);
 			Vector2Copy(loadmodel->surfmesh.data_texcoordtexture2f + 2*vertexindex, vertexmesh->texcoordtexture2f);
 			if (loadmodel->surfmesh.data_texcoordlightmap2f)
 				Vector2Scale(loadmodel->surfmesh.data_texcoordlightmap2f + 2*vertexindex, 1.0f, vertexmesh->texcoordlightmap2f);

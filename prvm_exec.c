@@ -124,7 +124,7 @@ PRVM_PrintStatement
 */
 extern cvar_t prvm_statementprofiling;
 extern cvar_t prvm_timeprofiling;
-void PRVM_PrintStatement (dstatement_t *s)
+void PRVM_PrintStatement(mstatement_t *s)
 {
 	size_t i;
 	int opnum = (int)(s - prog->statements);
@@ -146,46 +146,10 @@ void PRVM_PrintStatement (dstatement_t *s)
 		for ( ; i<10 ; i++)
 			Con_Print(" ");
 	}
-	if (s->op == OP_IF || s->op == OP_IFNOT)
-		Con_Printf("%s, s%i",PRVM_GlobalString((unsigned short) s->a),(signed short)s->b + opnum);
-	else if (s->op == OP_GOTO)
-		Con_Printf("s%i",(signed short)s->a + opnum);
-	else if ( (unsigned)(s->op - OP_STORE_F) < 6)
-	{
-		Con_Print(PRVM_GlobalString((unsigned short) s->a));
-		Con_Print(", ");
-		Con_Print(PRVM_GlobalStringNoContents((unsigned short) s->b));
-	}
-	else if (s->op == OP_ADDRESS || (unsigned)(s->op - OP_LOAD_F) < 6)
-	{
-		if (s->a)
-			Con_Print(PRVM_GlobalString((unsigned short) s->a));
-		if (s->b)
-		{
-			Con_Print(", ");
-			Con_Print(PRVM_GlobalStringNoContents((unsigned short) s->b));
-		}
-		if (s->c)
-		{
-			Con_Print(", ");
-			Con_Print(PRVM_GlobalStringNoContents((unsigned short) s->c));
-		}
-	}
-	else
-	{
-		if (s->a)
-			Con_Print(PRVM_GlobalString((unsigned short) s->a));
-		if (s->b)
-		{
-			Con_Print(", ");
-			Con_Print(PRVM_GlobalString((unsigned short) s->b));
-		}
-		if (s->c)
-		{
-			Con_Print(", ");
-			Con_Print(PRVM_GlobalStringNoContents((unsigned short) s->c));
-		}
-	}
+	if (s->operand[0] >= 0) Con_Printf(  "%s", PRVM_GlobalString(s->operand[0]));
+	if (s->operand[1] >= 0) Con_Printf(", %s", PRVM_GlobalString(s->operand[1]));
+	if (s->operand[2] >= 0) Con_Printf(", %s", PRVM_GlobalString(s->operand[2]));
+	if (s->jumpabsolute >= 0) Con_Printf(", statement %i", s->jumpabsolute);
 	Con_Print("\n");
 }
 
@@ -207,8 +171,8 @@ void PRVM_PrintFunctionStatements (const char *name)
 	}
 
 	// find the end statement
-	endstatement = prog->progs->numstatements;
-	for (i = 0;i < prog->progs->numfunctions;i++)
+	endstatement = prog->numstatements;
+	for (i = 0;i < prog->numfunctions;i++)
 		if (endstatement > prog->functions[i].first_statement && firststatement < prog->functions[i].first_statement)
 			endstatement = prog->functions[i].first_statement;
 
@@ -313,7 +277,7 @@ void PRVM_CallProfile (void)
 	{
 		max = 0;
 		best = NULL;
-		for (i=0 ; i<prog->progs->numfunctions ; i++)
+		for (i=0 ; i<prog->numfunctions ; i++)
 		{
 			f = &prog->functions[i];
 			if (max < f->totaltime)
@@ -357,7 +321,7 @@ void PRVM_Profile (int maxfunctions, double mintime, int sortby)
 	{
 		max = 0;
 		best = NULL;
-		for (i=0 ; i<prog->progs->numfunctions ; i++)
+		for (i=0 ; i<prog->numfunctions ; i++)
 		{
 			f = &prog->functions[i];
 			if(prvm_timeprofiling.integer)
@@ -559,7 +523,7 @@ void PRVM_Crash(void)
 	if (prog == NULL)
 		return;
 
-	prog->funcoffsets.SV_Shutdown = 0; // don't call SV_Shutdown on crash
+	PRVM_serverfunction(SV_Shutdown) = 0; // don't call SV_Shutdown on crash
 
 	if( prog->depth > 0 )
 	{
@@ -701,9 +665,9 @@ void PRVM_Init_Exec(void)
 	// nothing here yet
 }
 
-#define OPA ((prvm_eval_t *)&prog->globals.generic[(unsigned short) st->a])
-#define OPB ((prvm_eval_t *)&prog->globals.generic[(unsigned short) st->b])
-#define OPC ((prvm_eval_t *)&prog->globals.generic[(unsigned short) st->c])
+#define OPA ((prvm_eval_t *)&prog->globals.generic[st->operand[0]])
+#define OPB ((prvm_eval_t *)&prog->globals.generic[st->operand[1]])
+#define OPC ((prvm_eval_t *)&prog->globals.generic[st->operand[2]])
 extern cvar_t prvm_traceqc;
 extern cvar_t prvm_statementprofiling;
 extern sizebuf_t vm_tempstringsbuf;
@@ -717,7 +681,7 @@ MVM_ExecuteProgram
 */
 void MVM_ExecuteProgram (func_t fnum, const char *errormessage)
 {
-	dstatement_t	*st, *startst;
+	mstatement_t	*st, *startst;
 	mfunction_t	*f, *newf;
 	prvm_edict_t	*ed;
 	prvm_eval_t	*ptr;
@@ -728,10 +692,10 @@ void MVM_ExecuteProgram (func_t fnum, const char *errormessage)
 
 	calltime = Sys_DoubleTime();
 
-	if (!fnum || fnum >= (unsigned int)prog->progs->numfunctions)
+	if (!fnum || fnum >= (unsigned int)prog->numfunctions)
 	{
-		if (prog->globaloffsets.self >= 0 && PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict)
-			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict), NULL);
+		if (PRVM_allglobaledict(self))
+			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_allglobaledict(self)), NULL);
 		PRVM_ERROR ("MVM_ExecuteProgram: %s", errormessage);
 	}
 
@@ -806,7 +770,7 @@ CLVM_ExecuteProgram
 */
 void CLVM_ExecuteProgram (func_t fnum, const char *errormessage)
 {
-	dstatement_t	*st, *startst;
+	mstatement_t	*st, *startst;
 	mfunction_t	*f, *newf;
 	prvm_edict_t	*ed;
 	prvm_eval_t	*ptr;
@@ -817,10 +781,10 @@ void CLVM_ExecuteProgram (func_t fnum, const char *errormessage)
 
 	calltime = Sys_DoubleTime();
 
-	if (!fnum || fnum >= (unsigned int)prog->progs->numfunctions)
+	if (!fnum || fnum >= (unsigned int)prog->numfunctions)
 	{
-		if (prog->globaloffsets.self >= 0 && PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict)
-			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict), NULL);
+		if (PRVM_allglobaledict(self))
+			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_allglobaledict(self)), NULL);
 		PRVM_ERROR ("CLVM_ExecuteProgram: %s", errormessage);
 	}
 
@@ -896,7 +860,7 @@ SVVM_ExecuteProgram
 */
 void SVVM_ExecuteProgram (func_t fnum, const char *errormessage)
 {
-	dstatement_t	*st, *startst;
+	mstatement_t	*st, *startst;
 	mfunction_t	*f, *newf;
 	prvm_edict_t	*ed;
 	prvm_eval_t	*ptr;
@@ -907,10 +871,10 @@ void SVVM_ExecuteProgram (func_t fnum, const char *errormessage)
 
 	calltime = Sys_DoubleTime();
 
-	if (!fnum || fnum >= (unsigned int)prog->progs->numfunctions)
+	if (!fnum || fnum >= (unsigned int)prog->numfunctions)
 	{
-		if (prog->globaloffsets.self >= 0 && PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict)
-			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_GLOBALFIELDVALUE(prog->globaloffsets.self)->edict), NULL);
+		if (PRVM_allglobaledict(self))
+			PRVM_ED_Print(PRVM_PROG_TO_EDICT(PRVM_allglobaledict(self)), NULL);
 		PRVM_ERROR ("SVVM_ExecuteProgram: %s", errormessage);
 	}
 

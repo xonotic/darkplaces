@@ -234,10 +234,8 @@ static void VM_CL_spawn (void)
 
 void CL_VM_SetTraceGlobals(const trace_t *trace, int svent)
 {
-	prvm_eval_t *val;
 	VM_SetTraceGlobals(trace);
-	if ((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.trace_networkentity)))
-		val->_float = svent;
+	PRVM_clientglobalfloat(trace_networkentity) = svent;
 }
 
 #define CL_HitNetworkBrushModels(move) !((move) == MOVE_WORLDONLY)
@@ -265,7 +263,7 @@ static void VM_CL_traceline (void)
 	if (IS_NAN(v1[0]) || IS_NAN(v1[1]) || IS_NAN(v1[2]) || IS_NAN(v2[0]) || IS_NAN(v2[1]) || IS_NAN(v2[2]))
 		PRVM_ERROR("%s: NAN errors detected in traceline('%f %f %f', '%f %f %f', %i, entity %i)\n", PRVM_NAME, v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], move, PRVM_EDICT_TO_PROG(ent));
 
-	trace = CL_TraceLine(v1, v2, move, ent, CL_GenericHitSuperContentsMask(ent), CL_HitNetworkBrushModels(move), CL_HitNetworkPlayers(move), &svent, true);
+	trace = CL_TraceLine(v1, v2, move, ent, CL_GenericHitSuperContentsMask(ent), CL_HitNetworkBrushModels(move), CL_HitNetworkPlayers(move), &svent, true, false);
 
 	CL_VM_SetTraceGlobals(&trace, svent);
 //	R_TimeReport("traceline");
@@ -320,7 +318,6 @@ trace_t CL_Trace_Toss (prvm_edict_t *tossent, prvm_edict_t *ignore, int *svent)
 	vec3_t original_velocity;
 	vec3_t original_angles;
 	vec3_t original_avelocity;
-	prvm_eval_t *val;
 	trace_t trace;
 
 	VectorCopy(tossent->fields.client->origin   , original_origin   );
@@ -328,11 +325,9 @@ trace_t CL_Trace_Toss (prvm_edict_t *tossent, prvm_edict_t *ignore, int *svent)
 	VectorCopy(tossent->fields.client->angles   , original_angles   );
 	VectorCopy(tossent->fields.client->avelocity, original_avelocity);
 
-	val = PRVM_EDICTFIELDVALUE(tossent, prog->fieldoffsets.gravity);
-	if (val != NULL && val->_float != 0)
-		gravity = val->_float;
-	else
-		gravity = 1.0;
+	gravity = PRVM_clientedictfloat(tossent, gravity);
+	if (!gravity)
+		gravity = 1.0f;
 	gravity *= cl.movevars_gravity * 0.05;
 
 	for (i = 0;i < 200;i++) // LordHavoc: sanity check; never trace more than 10 seconds
@@ -493,7 +488,7 @@ static void VM_CL_findradius (void)
 			VectorMAMAM(1, eorg, -0.5f, ent->fields.client->mins, -0.5f, ent->fields.client->maxs, eorg);
 		if (DotProduct(eorg, eorg) < radius2)
 		{
-			PRVM_EDICTFIELDVALUE(ent, chainfield)->edict = PRVM_EDICT_TO_PROG(chain);
+			PRVM_EDICTFIELDEDICT(ent, chainfield) = PRVM_EDICT_TO_PROG(chain);
 			chain = ent;
 		}
 	}
@@ -505,7 +500,6 @@ static void VM_CL_findradius (void)
 static void VM_CL_droptofloor (void)
 {
 	prvm_edict_t		*ent;
-	prvm_eval_t			*val;
 	vec3_t				end;
 	trace_t				trace;
 
@@ -535,8 +529,7 @@ static void VM_CL_droptofloor (void)
 	{
 		VectorCopy (trace.endpos, ent->fields.client->origin);
 		ent->fields.client->flags = (int)ent->fields.client->flags | FL_ONGROUND;
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.groundentity)))
-			val->edict = PRVM_EDICT_TO_PROG(trace.ent);
+		PRVM_clientedictedict(ent, groundentity) = PRVM_EDICT_TO_PROG(trace.ent);
 		PRVM_G_FLOAT(OFS_RETURN) = 1;
 		// if support is destroyed, keep suspended (gross hack for floating items in various maps)
 //		ent->priv.server->suspendedinairflag = true;
@@ -608,7 +601,7 @@ realcheck:
 	start[0] = stop[0] = (mins[0] + maxs[0])*0.5;
 	start[1] = stop[1] = (mins[1] + maxs[1])*0.5;
 	stop[2] = start[2] - 2*sv_stepheight.value;
-	trace = CL_TraceLine(start, stop, MOVE_NORMAL, ent, CL_GenericHitSuperContentsMask(ent), true, true, NULL, true);
+	trace = CL_TraceLine(start, stop, MOVE_NORMAL, ent, CL_GenericHitSuperContentsMask(ent), true, true, NULL, true, false);
 
 	if (trace.fraction == 1.0)
 		return;
@@ -622,7 +615,7 @@ realcheck:
 			start[0] = stop[0] = x ? maxs[0] : mins[0];
 			start[1] = stop[1] = y ? maxs[1] : mins[1];
 
-			trace = CL_TraceLine(start, stop, MOVE_NORMAL, ent, CL_GenericHitSuperContentsMask(ent), true, true, NULL, true);
+			trace = CL_TraceLine(start, stop, MOVE_NORMAL, ent, CL_GenericHitSuperContentsMask(ent), true, true, NULL, true, false);
 
 			if (trace.fraction != 1.0 && trace.endpos[2] > bottom)
 				bottom = trace.endpos[2];
@@ -693,8 +686,8 @@ extern qboolean CSQC_AddRenderEdict (prvm_edict_t *ed, int edictnum);//csprogs.c
 static void CSQC_R_RecalcView (void)
 {
 	extern matrix4x4_t viewmodelmatrix;
-	Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], 1);
-	Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], cl_viewmodel_scale.value);
+	Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.csqc_vieworigin[0], cl.csqc_vieworigin[1], cl.csqc_vieworigin[2], cl.csqc_viewangles[0], cl.csqc_viewangles[1], cl.csqc_viewangles[2], 1);
+	Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix, cl.csqc_vieworigin[0], cl.csqc_vieworigin[1], cl.csqc_vieworigin[2], cl.csqc_viewangles[0], cl.csqc_viewangles[1], cl.csqc_viewangles[2], cl_viewmodel_scale.value);
 }
 
 void CL_RelinkLightFlashes(void);
@@ -722,8 +715,8 @@ void VM_CL_R_ClearScene (void)
 	r_refdef.view.ortho_y = scr_fov.value * (3.0 / 4.0);
 	r_refdef.view.clear = true;
 	r_refdef.view.isoverlay = false;
-	// FIXME: restore cl.csqc_origin
-	// FIXME: restore cl.csqc_angles
+	VectorCopy(cl.csqc_vieworiginfromengine, cl.csqc_vieworigin);
+	VectorCopy(cl.csqc_viewanglesfromengine, cl.csqc_viewangles);
 	cl.csqc_vidvars.drawworld = r_drawworld.integer != 0;
 	cl.csqc_vidvars.drawenginesbar = false;
 	cl.csqc_vidvars.drawcrosshair = false;
@@ -763,7 +756,7 @@ void VM_CL_R_AddEntities (void)
 	}
 
 	// callprofile fixing hack: do not include this time in what is counted for CSQC_UpdateView
-	prog->functions[prog->funcoffsets.CSQC_UpdateView].totaltime -= Sys_DoubleTime() - t;
+	prog->functions[PRVM_clientfunction(CSQC_UpdateView)].totaltime -= Sys_DoubleTime() - t;
 }
 
 //#302 void(entity ent) addentity (EXT_CSQC)
@@ -772,7 +765,7 @@ void VM_CL_R_AddEntity (void)
 	double t = Sys_DoubleTime();
 	VM_SAFEPARMCOUNT(1, VM_CL_R_AddEntity);
 	CSQC_AddRenderEdict(PRVM_G_EDICT(OFS_PARM0), 0);
-	prog->functions[prog->funcoffsets.CSQC_UpdateView].totaltime -= Sys_DoubleTime() - t;
+	prog->functions[PRVM_clientfunction(CSQC_UpdateView)].totaltime -= Sys_DoubleTime() - t;
 }
 
 //#303 float(float property, ...) setproperty (EXT_CSQC)
@@ -825,28 +818,28 @@ void VM_CL_R_SetView (void)
 			PRVM_G_FLOAT(OFS_RETURN) = r_refdef.view.ortho_y;
 			break;
 		case VF_ORIGIN:
-			VectorCopy(cl.csqc_origin, PRVM_G_VECTOR(OFS_RETURN));
+			VectorCopy(cl.csqc_vieworigin, PRVM_G_VECTOR(OFS_RETURN));
 			break;
 		case VF_ORIGIN_X:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_origin[0];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_vieworigin[0];
 			break;
 		case VF_ORIGIN_Y:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_origin[1];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_vieworigin[1];
 			break;
 		case VF_ORIGIN_Z:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_origin[2];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_vieworigin[2];
 			break;
 		case VF_ANGLES:
-			VectorCopy(cl.csqc_angles, PRVM_G_VECTOR(OFS_RETURN));
+			VectorCopy(cl.csqc_viewangles, PRVM_G_VECTOR(OFS_RETURN));
 			break;
 		case VF_ANGLES_X:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_angles[0];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_viewangles[0];
 			break;
 		case VF_ANGLES_Y:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_angles[1];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_viewangles[1];
 			break;
 		case VF_ANGLES_Z:
-			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_angles[2];
+			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_viewangles[2];
 			break;
 		case VF_DRAWWORLD:
 			PRVM_G_FLOAT(OFS_RETURN) = cl.csqc_vidvars.drawworld;
@@ -932,35 +925,35 @@ void VM_CL_R_SetView (void)
 		r_refdef.view.frustum_y = tan(k * M_PI / 360.0);r_refdef.view.ortho_y = k;
 		break;
 	case VF_ORIGIN:
-		VectorCopy(f, cl.csqc_origin);
+		VectorCopy(f, cl.csqc_vieworigin);
 		CSQC_R_RecalcView();
 		break;
 	case VF_ORIGIN_X:
-		cl.csqc_origin[0] = k;
+		cl.csqc_vieworigin[0] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_ORIGIN_Y:
-		cl.csqc_origin[1] = k;
+		cl.csqc_vieworigin[1] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_ORIGIN_Z:
-		cl.csqc_origin[2] = k;
+		cl.csqc_vieworigin[2] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_ANGLES:
-		VectorCopy(f, cl.csqc_angles);
+		VectorCopy(f, cl.csqc_viewangles);
 		CSQC_R_RecalcView();
 		break;
 	case VF_ANGLES_X:
-		cl.csqc_angles[0] = k;
+		cl.csqc_viewangles[0] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_ANGLES_Y:
-		cl.csqc_angles[1] = k;
+		cl.csqc_viewangles[1] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_ANGLES_Z:
-		cl.csqc_angles[2] = k;
+		cl.csqc_viewangles[2] = k;
 		CSQC_R_RecalcView();
 		break;
 	case VF_DRAWWORLD:
@@ -1048,7 +1041,7 @@ void VM_CL_R_AddDynamicLight (void)
 
 	R_RTLight_Update(&r_refdef.scene.templights[r_refdef.scene.numlights], false, &matrix, col, style, cubemapname, castshadow, coronaintensity, coronasizescale, ambientscale, diffusescale, specularscale, LIGHTFLAG_NORMALMODE | LIGHTFLAG_REALTIMEMODE);
 	r_refdef.scene.lights[r_refdef.scene.numlights] = &r_refdef.scene.templights[r_refdef.scene.numlights];r_refdef.scene.numlights++;
-	prog->functions[prog->funcoffsets.CSQC_UpdateView].totaltime -= Sys_DoubleTime() - t;
+	prog->functions[PRVM_clientfunction(CSQC_UpdateView)].totaltime -= Sys_DoubleTime() - t;
 }
 
 //============================================================================
@@ -1266,7 +1259,6 @@ static void VM_CL_boxparticles (void)
 	float count;
 	int flags;
 	float tintmins[4], tintmaxs[4];
-	prvm_eval_t *val;
 	VM_SAFEPARMCOUNTRANGE(7, 8, VM_CL_boxparticles);
 
 	effectnum = (int)PRVM_G_FLOAT(OFS_PARM0);
@@ -1284,17 +1276,13 @@ static void VM_CL_boxparticles (void)
 	Vector4Set(tintmaxs, 1, 1, 1, 1);
 	if(flags & 1) // read alpha
 	{
-		if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.particles_alphamin)))
-			tintmins[3] = val->_float;
-		if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.particles_alphamax)))
-			tintmaxs[3] = val->_float;
+		tintmins[3] = PRVM_clientglobalfloat(particles_alphamin);
+		tintmaxs[3] = PRVM_clientglobalfloat(particles_alphamax);
 	}
 	if(flags & 2) // read color
 	{
-		if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.particles_colormin)))
-			VectorCopy(val->vector, tintmins);
-		if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.particles_colormax)))
-			VectorCopy(val->vector, tintmaxs);
+		VectorCopy(PRVM_clientglobalvector(particles_colormin), tintmins);
+		VectorCopy(PRVM_clientglobalvector(particles_colormax), tintmaxs);
 	}
 	if (effectnum < 0)
 		return;
@@ -1426,6 +1414,20 @@ static void VM_CL_getplayerkey (void)
 	else
 		if(!strcasecmp(c, "viewentity"))
 			dpsnprintf(t, sizeof(t), "%i", i+1);
+	else
+		if(gamemode == GAME_XONOTIC && !strcasecmp(c, "TEMPHACK_origin"))
+		{
+			// PLEASE REMOVE THIS once deltalisten() of EXT_CSQC_1
+			// is implemented, or Xonotic uses CSQC-networked
+			// players, whichever comes first
+			entity_t *e = cl.entities + (i+1);
+			if(e->state_current.active)
+			{
+				vec3_t origin;
+				Matrix4x4_OriginFromMatrix(&e->render.matrix, origin);
+				dpsnprintf(t, sizeof(t), "%.9g %.9g %.9g", origin[0], origin[1], origin[2]);
+			}
+		}
 	if(!t[0])
 		return;
 	PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(t);
@@ -1586,7 +1588,6 @@ static void VM_CL_makestatic (void)
 	if (cl.num_static_entities < cl.max_static_entities)
 	{
 		int renderflags;
-		prvm_eval_t *val;
 		entity_t *staticent = &cl.static_entities[cl.num_static_entities++];
 
 		// copy it to the current state
@@ -1598,19 +1599,22 @@ static void VM_CL_makestatic (void)
 		staticent->render.framegroupblend[0].start = lhrandom(-10, -1);
 		staticent->render.skinnum = (int)ent->fields.client->skin;
 		staticent->render.effects = (int)ent->fields.client->effects;
-		staticent->render.alpha = 1;
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.alpha)) && val->_float) staticent->render.alpha = val->_float;
-		staticent->render.scale = 1;
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.scale)) && val->_float) staticent->render.scale = val->_float;
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.colormod)) && VectorLength2(val->vector)) VectorCopy(val->vector, staticent->render.colormod);
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.glowmod)) && VectorLength2(val->vector)) VectorCopy(val->vector, staticent->render.glowmod);
+		staticent->render.alpha = PRVM_clientedictfloat(ent, alpha);
+		staticent->render.scale = PRVM_clientedictfloat(ent, scale);
+		VectorCopy(PRVM_clientedictvector(ent, colormod), staticent->render.colormod);
+		VectorCopy(PRVM_clientedictvector(ent, glowmod), staticent->render.glowmod);
+
+		// sanitize values
+		if (!staticent->render.alpha)
+			staticent->render.alpha = 1.0f;
+		if (!staticent->render.scale)
+			staticent->render.scale = 1.0f;
 		if (!VectorLength2(staticent->render.colormod))
 			VectorSet(staticent->render.colormod, 1, 1, 1);
 		if (!VectorLength2(staticent->render.glowmod))
 			VectorSet(staticent->render.glowmod, 1, 1, 1);
 
-		renderflags = 0;
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.renderflags)) && val->_float) renderflags = (int)val->_float;
+		renderflags = (int)PRVM_clientedictfloat(ent, renderflags);
 		if (renderflags & RF_USEAXIS)
 		{
 			vec3_t left;
@@ -1686,7 +1690,7 @@ static void VM_CL_copyentity (void)
 		VM_Warning("copyentity: can not modify free entity\n");
 		return;
 	}
-	memcpy(out->fields.vp, in->fields.vp, prog->progs->entityfields * 4);
+	memcpy(out->fields.vp, in->fields.vp, prog->entityfields * 4);
 	CL_LinkEdict(out);
 }
 
@@ -2100,8 +2104,8 @@ void VM_CL_setattachment (void)
 	prvm_edict_t *e;
 	prvm_edict_t *tagentity;
 	const char *tagname;
-	prvm_eval_t *v;
 	int modelindex;
+	int tagindex;
 	dp_model_t *model;
 	VM_SAFEPARMCOUNT(3, VM_CL_setattachment);
 
@@ -2123,26 +2127,23 @@ void VM_CL_setattachment (void)
 	if (tagentity == NULL)
 		tagentity = prog->edicts;
 
-	v = PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.tag_entity);
-	if (v)
-		v->edict = PRVM_EDICT_TO_PROG(tagentity);
-
-	v = PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.tag_index);
-	if (v)
-		v->_float = 0;
+	tagindex = 0;
 	if (tagentity != NULL && tagentity != prog->edicts && tagname && tagname[0])
 	{
 		modelindex = (int)tagentity->fields.client->modelindex;
 		model = CL_GetModelByIndex(modelindex);
 		if (model)
 		{
-			v->_float = Mod_Alias_GetTagIndexForName(model, (int)tagentity->fields.client->skin, tagname);
-			if (v->_float == 0)
+			tagindex = Mod_Alias_GetTagIndexForName(model, (int)tagentity->fields.client->skin, tagname);
+			if (tagindex == 0)
 				Con_DPrintf("setattachment(edict %i, edict %i, string \"%s\"): tried to find tag named \"%s\" on entity %i (model \"%s\") but could not find it\n", PRVM_NUM_FOR_EDICT(e), PRVM_NUM_FOR_EDICT(tagentity), tagname, tagname, PRVM_NUM_FOR_EDICT(tagentity), model->name);
 		}
 		else
 			Con_DPrintf("setattachment(edict %i, edict %i, string \"%s\"): tried to find tag named \"%s\" on entity %i but it has no model\n", PRVM_NUM_FOR_EDICT(e), PRVM_NUM_FOR_EDICT(tagentity), tagname, tagname, PRVM_NUM_FOR_EDICT(tagentity));
 	}
+
+	PRVM_clientedictedict(e, tag_entity) = PRVM_EDICT_TO_PROG(tagentity);
+	PRVM_clientedictfloat(e, tag_index) = tagindex;
 }
 
 /////////////////////////////////////////
@@ -2191,18 +2192,27 @@ int CL_GetPitchSign(prvm_edict_t *ent)
 
 void CL_GetEntityMatrix (prvm_edict_t *ent, matrix4x4_t *out, qboolean viewmatrix)
 {
-	prvm_eval_t *val;
 	float scale;
 	float pitchsign = 1;
 
-	scale = 1;
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.scale);
-	if (val && val->_float != 0)
-		scale = val->_float;
+	scale = PRVM_clientedictfloat(ent, scale);
+	if (!scale)
+		scale = 1.0f;
 
-	// TODO do we need the same weird angle inverting logic here as in the server side case?
 	if(viewmatrix)
-		Matrix4x4_CreateFromQuakeEntity(out, cl.csqc_origin[0], cl.csqc_origin[1], cl.csqc_origin[2], cl.csqc_angles[0], cl.csqc_angles[1], cl.csqc_angles[2], scale * cl_viewmodel_scale.value);
+		*out = r_refdef.view.matrix;
+	else if ((int)PRVM_clientedictfloat(ent, renderflags) & RF_USEAXIS)
+	{
+		vec3_t forward;
+		vec3_t left;
+		vec3_t up;
+		vec3_t origin;
+		VectorScale(prog->globals.client->v_forward, scale, forward);
+		VectorScale(prog->globals.client->v_right, -scale, left);
+		VectorScale(prog->globals.client->v_up, scale, up);
+		VectorCopy(ent->fields.client->origin, origin);
+		Matrix4x4_FromVectors(out, forward, left, up, origin);
+	}
 	else
 	{
 		pitchsign = CL_GetPitchSign(ent);
@@ -2239,7 +2249,6 @@ extern cvar_t cl_bobup;
 int CL_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 {
 	int ret;
-	prvm_eval_t *val;
 	int attachloop;
 	matrix4x4_t entitymatrix, tagmatrix, attachmatrix;
 	dp_model_t *model;
@@ -2270,10 +2279,10 @@ int CL_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 		Matrix4x4_Concat(&tagmatrix, &attachmatrix, out);
 		Matrix4x4_Concat(out, &entitymatrix, &tagmatrix);
 		// next iteration we process the parent entity
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_entity)) && val->edict)
+		if (PRVM_clientedictedict(ent, tag_entity))
 		{
-			tagindex = (int)PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_index)->_float;
-			ent = PRVM_EDICT_NUM(val->edict);
+			tagindex = (int)PRVM_clientedictfloat(ent, tag_index);
+			ent = PRVM_EDICT_NUM(PRVM_clientedictedict(ent, tag_entity));
 		}
 		else
 			break;
@@ -2281,7 +2290,7 @@ int CL_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 	}
 
 	// RENDER_VIEWMODEL magic
-	if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.renderflags)) && (RF_VIEWMODEL & (int)val->_float))
+	if ((int)PRVM_clientedictfloat(ent, renderflags) & RF_VIEWMODEL)
 	{
 		Matrix4x4_Copy(&tagmatrix, out);
 
@@ -2358,7 +2367,6 @@ void VM_CL_gettaginfo (void)
 	int parentindex;
 	const char *tagname;
 	int returncode;
-	prvm_eval_t *val;
 	vec3_t fo, le, up, trans;
 	const dp_model_t *model;
 
@@ -2376,18 +2384,12 @@ void VM_CL_gettaginfo (void)
 	CL_GetExtendedTagInfo(e, tagindex, &parentindex, &tagname, &tag_localmatrix);
 	Matrix4x4_ToVectors(&tag_localmatrix, fo, le, up, trans);
 
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_parent)))
-		val->_float = parentindex;
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_name)))
-		val->string = tagname ? PRVM_SetTempString(tagname) : 0;
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_offset)))
-		VectorCopy(trans, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_forward)))
-		VectorCopy(fo, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_right)))
-		VectorScale(le, -1, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_up)))
-		VectorCopy(up, val->vector);
+	PRVM_clientglobalfloat(gettaginfo_parent) = parentindex;
+	PRVM_clientglobalstring(gettaginfo_name) = tagname ? PRVM_SetTempString(tagname) : 0;
+	VectorCopy(trans, PRVM_clientglobalvector(gettaginfo_offset));
+	VectorCopy(fo, PRVM_clientglobalvector(gettaginfo_forward));
+	VectorScale(le, -1, PRVM_clientglobalvector(gettaginfo_right));
+	VectorCopy(up, PRVM_clientglobalvector(gettaginfo_up));
 
 	switch(returncode)
 	{
@@ -2494,8 +2496,6 @@ vmparticlespawner_t vmpartspawner;
 // TODO: automatic max_themes grow
 static void VM_InitParticleSpawner (int maxthemes)
 {
-	prvm_eval_t *val;
-
 	// bound max themes to not be an insane value
 	if (maxthemes < 4)
 		maxthemes = 4;
@@ -2513,37 +2513,35 @@ static void VM_InitParticleSpawner (int maxthemes)
 	vmpartspawner.initialized = true;
 	vmpartspawner.verified = true;
 	// get field addresses for fast querying (we can do 1000 calls of spawnparticle in a frame)
-	#define getglobal(v,s) val = PRVM_GLOBALFIELDVALUE(PRVM_ED_FindGlobalOffset(s)); if (val) { vmpartspawner.v = &val->_float; } else { VM_Warning("VM_InitParticleSpawner: missing global '%s', spawner cannot work\n", s); vmpartspawner.verified = false; }
-	#define getglobalvector(v,s) val = PRVM_GLOBALFIELDVALUE(PRVM_ED_FindGlobalOffset(s)); if (val) { vmpartspawner.v = (float *)val->vector; } else { VM_Warning("VM_InitParticleSpawner: missing global '%s', spawner cannot work\n", s); vmpartspawner.verified = false; }
-	getglobal(particle_type, "particle_type");
-	getglobal(particle_blendmode, "particle_blendmode");
-	getglobal(particle_orientation, "particle_orientation");
-	getglobalvector(particle_color1, "particle_color1");
-	getglobalvector(particle_color2, "particle_color2");
-	getglobal(particle_tex, "particle_tex");
-	getglobal(particle_size, "particle_size");
-	getglobal(particle_sizeincrease, "particle_sizeincrease");
-	getglobal(particle_alpha, "particle_alpha");
-	getglobal(particle_alphafade, "particle_alphafade");
-	getglobal(particle_time, "particle_time");
-	getglobal(particle_gravity, "particle_gravity");
-	getglobal(particle_bounce, "particle_bounce");
-	getglobal(particle_airfriction, "particle_airfriction");
-	getglobal(particle_liquidfriction, "particle_liquidfriction");
-	getglobal(particle_originjitter, "particle_originjitter");
-	getglobal(particle_velocityjitter, "particle_velocityjitter");
-	getglobal(particle_qualityreduction, "particle_qualityreduction");
-	getglobal(particle_stretch, "particle_stretch");
-	getglobalvector(particle_staincolor1, "particle_staincolor1");
-	getglobalvector(particle_staincolor2, "particle_staincolor2");
-	getglobal(particle_stainalpha, "particle_stainalpha");
-	getglobal(particle_stainsize, "particle_stainsize");
-	getglobal(particle_staintex, "particle_staintex");
-	getglobal(particle_staintex, "particle_staintex");
-	getglobal(particle_delayspawn, "particle_delayspawn");
-	getglobal(particle_delaycollision, "particle_delaycollision");
-	getglobal(particle_angle, "particle_angle");
-	getglobal(particle_spin, "particle_spin");
+	vmpartspawner.particle_type = &PRVM_clientglobalfloat(particle_type);
+	vmpartspawner.particle_blendmode = &PRVM_clientglobalfloat(particle_blendmode);
+	vmpartspawner.particle_orientation = &PRVM_clientglobalfloat(particle_orientation);
+	vmpartspawner.particle_color1 = PRVM_clientglobalvector(particle_color1);
+	vmpartspawner.particle_color2 = PRVM_clientglobalvector(particle_color2);
+	vmpartspawner.particle_tex = &PRVM_clientglobalfloat(particle_tex);
+	vmpartspawner.particle_size = &PRVM_clientglobalfloat(particle_size);
+	vmpartspawner.particle_sizeincrease = &PRVM_clientglobalfloat(particle_sizeincrease);
+	vmpartspawner.particle_alpha = &PRVM_clientglobalfloat(particle_alpha);
+	vmpartspawner.particle_alphafade = &PRVM_clientglobalfloat(particle_alphafade);
+	vmpartspawner.particle_time = &PRVM_clientglobalfloat(particle_time);
+	vmpartspawner.particle_gravity = &PRVM_clientglobalfloat(particle_gravity);
+	vmpartspawner.particle_bounce = &PRVM_clientglobalfloat(particle_bounce);
+	vmpartspawner.particle_airfriction = &PRVM_clientglobalfloat(particle_airfriction);
+	vmpartspawner.particle_liquidfriction = &PRVM_clientglobalfloat(particle_liquidfriction);
+	vmpartspawner.particle_originjitter = &PRVM_clientglobalfloat(particle_originjitter);
+	vmpartspawner.particle_velocityjitter = &PRVM_clientglobalfloat(particle_velocityjitter);
+	vmpartspawner.particle_qualityreduction = &PRVM_clientglobalfloat(particle_qualityreduction);
+	vmpartspawner.particle_stretch = &PRVM_clientglobalfloat(particle_stretch);
+	vmpartspawner.particle_staincolor1 = PRVM_clientglobalvector(particle_staincolor1);
+	vmpartspawner.particle_staincolor2 = PRVM_clientglobalvector(particle_staincolor2);
+	vmpartspawner.particle_stainalpha = &PRVM_clientglobalfloat(particle_stainalpha);
+	vmpartspawner.particle_stainsize = &PRVM_clientglobalfloat(particle_stainsize);
+	vmpartspawner.particle_staintex = &PRVM_clientglobalfloat(particle_staintex);
+	vmpartspawner.particle_staintex = &PRVM_clientglobalfloat(particle_staintex);
+	vmpartspawner.particle_delayspawn = &PRVM_clientglobalfloat(particle_delayspawn);
+	vmpartspawner.particle_delaycollision = &PRVM_clientglobalfloat(particle_delaycollision);
+	vmpartspawner.particle_angle = &PRVM_clientglobalfloat(particle_angle);
+	vmpartspawner.particle_spin = &PRVM_clientglobalfloat(particle_spin);
 	#undef getglobal
 	#undef getglobalvector
 }
@@ -3022,7 +3020,7 @@ void VM_CL_R_RenderScene (void)
 	polys->progstarttime = prog->starttime;
 
 	// callprofile fixing hack: do not include this time in what is counted for CSQC_UpdateView
-	prog->functions[prog->funcoffsets.CSQC_UpdateView].totaltime -= Sys_DoubleTime() - t;
+	prog->functions[PRVM_clientfunction(CSQC_UpdateView)].totaltime -= Sys_DoubleTime() - t;
 }
 
 static void VM_ResizePolygons(vmpolygons_t *polys)
@@ -3394,7 +3392,7 @@ realcheck:
 	start[0] = stop[0] = (mins[0] + maxs[0])*0.5;
 	start[1] = stop[1] = (mins[1] + maxs[1])*0.5;
 	stop[2] = start[2] - 2*sv_stepheight.value;
-	trace = CL_TraceLine(start, stop, MOVE_NOMONSTERS, ent, CL_GenericHitSuperContentsMask(ent), true, false, NULL, true);
+	trace = CL_TraceLine(start, stop, MOVE_NOMONSTERS, ent, CL_GenericHitSuperContentsMask(ent), true, false, NULL, true, false);
 
 	if (trace.fraction == 1.0)
 		return false;
@@ -3407,7 +3405,7 @@ realcheck:
 			start[0] = stop[0] = x ? maxs[0] : mins[0];
 			start[1] = stop[1] = y ? maxs[1] : mins[1];
 
-			trace = CL_TraceLine(start, stop, MOVE_NOMONSTERS, ent, CL_GenericHitSuperContentsMask(ent), true, false, NULL, true);
+			trace = CL_TraceLine(start, stop, MOVE_NOMONSTERS, ent, CL_GenericHitSuperContentsMask(ent), true, false, NULL, true, false);
 
 			if (trace.fraction != 1.0 && trace.endpos[2] > bottom)
 				bottom = trace.endpos[2];
@@ -3434,7 +3432,6 @@ qboolean CL_movestep (prvm_edict_t *ent, vec3_t move, qboolean relink, qboolean 
 	trace_t		trace;
 	int			i, svent;
 	prvm_edict_t		*enemy;
-	prvm_eval_t	*val;
 
 // try the move
 	VectorCopy (ent->fields.client->origin, oldorg);
@@ -3531,8 +3528,7 @@ qboolean CL_movestep (prvm_edict_t *ent, vec3_t move, qboolean relink, qboolean 
 	if ( (int)ent->fields.client->flags & FL_PARTIALGROUND )
 		ent->fields.client->flags = (int)ent->fields.client->flags & ~FL_PARTIALGROUND;
 
-	if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.groundentity)))
-		val->edict = PRVM_EDICT_TO_PROG(trace.ent);
+	PRVM_clientedictedict(ent, groundentity) = PRVM_EDICT_TO_PROG(trace.ent);
 
 // the move is ok
 	if (relink)
@@ -3990,6 +3986,54 @@ static void VM_CL_frameduration(void)
 		PRVM_G_FLOAT(OFS_RETURN) = model->animscenes[framenum].framecount / model->animscenes[framenum].framerate;
 }
 
+void VM_CL_RotateMoves(void)
+{
+	/*
+	 * Obscure builtin used by GAME_XONOTIC.
+	 *
+	 * Edits the input history of cl_movement by rotating all move commands
+	 * currently in the queue using the given transform.
+	 *
+	 * The vector passed is an "angles transform" as used by warpzonelib, i.e.
+	 * v_angle-like (non-inverted) euler angles that perform the rotation
+	 * of the space that is to be done.
+	 *
+	 * This is meant to be used as a fixangle replacement after passing
+	 * through a warpzone/portal: the client is told about the warp transform,
+	 * and calls this function in the same frame as the one on which the
+	 * client's origin got changed by the serverside teleport. Then this code
+	 * transforms the pre-warp input (which matches the empty space behind
+	 * the warp plane) into post-warp input (which matches the target area
+	 * of the warp). Also, at the same time, the client has to use
+	 * R_SetView to adjust VF_CL_VIEWANGLES according to the same transform.
+	 *
+	 * This together allows warpzone motion to be perfectly predicted by
+	 * the client!
+	 *
+	 * Furthermore, for perfect warpzone behaviour, the server side also
+	 * has to detect input the client sent before it received the origin
+	 * update, but after the warp occurred on the server, and has to adjust
+	 * input appropriately.
+    */
+	matrix4x4_t m;
+	vec3_t v = {0, 0, 0};
+	vec3_t x, y, z;
+	VM_SAFEPARMCOUNT(1, VM_CL_RotateMoves);
+	AngleVectorsFLU(PRVM_G_VECTOR(OFS_PARM0), x, y, z);
+	Matrix4x4_FromVectors(&m, x, y, z, v);
+	CL_RotateMoves(&m);
+}
+
+// #358 void(string cubemapname) loadcubemap
+static void VM_CL_loadcubemap(void)
+{
+	const char *name;
+
+	VM_SAFEPARMCOUNT(1, VM_CL_loadcubemap);
+	name = PRVM_G_STRING(OFS_PARM0);
+	R_GetCubemap(name);
+}
+
 //============================================================================
 
 // To create a almost working builtin file from this replace:
@@ -4361,7 +4405,7 @@ VM_CL_serverkey,				// #354 string(string key) serverkey (EXT_CSQC)
 VM_CL_videoplaying,				// #355
 VM_findfont,					// #356 float(string fontname) loadfont (DP_GFX_FONTS)
 VM_loadfont,					// #357 float(string fontname, string fontmaps, string sizes, float slot) loadfont (DP_GFX_FONTS)
-NULL,							// #358
+VM_CL_loadcubemap,				// #358 void(string cubemapname) loadcubemap (DP_GFX_)
 NULL,							// #359
 VM_CL_ReadByte,					// #360 float() readbyte (EXT_CSQC)
 VM_CL_ReadChar,					// #361 float() readchar (EXT_CSQC)
@@ -4638,6 +4682,12 @@ VM_setkeybind,						// #630 float(float key, string bind[, float bindmap]) setke
 VM_getbindmaps,						// #631 vector(void) getbindmap
 VM_setbindmaps,						// #632 float(vector bm) setbindmap
 NULL,							// #633
+NULL,							// #634
+NULL,							// #635
+NULL,							// #636
+NULL,							// #637
+VM_CL_RotateMoves,					// #638
+NULL,							// #639
 };
 
 const int vm_cl_numbuiltins = sizeof(vm_cl_builtins) / sizeof(prvm_builtin_t);

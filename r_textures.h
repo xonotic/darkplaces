@@ -43,8 +43,6 @@ typedef enum textype_e
 	TEXTYPE_RGBA,
 	// 32bit BGRA (preferred format due to faster uploads on most hardware)
 	TEXTYPE_BGRA,
-	// 16bit D16 (16bit depth) or 32bit S8D24 (24bit depth, 8bit stencil unused)
-	TEXTYPE_SHADOWMAP,
 	// 8bit ALPHA (used for freetype fonts)
 	TEXTYPE_ALPHA,
 	// 4x4 block compressed 15bit color (4 bits per pixel)
@@ -55,8 +53,30 @@ typedef enum textype_e
 	TEXTYPE_DXT3,
 	// 4x4 block compressed 15bit color plus 8bit alpha (8 bits per pixel)
 	TEXTYPE_DXT5,
+
+	// 8bit paletted in sRGB colorspace
+	TEXTYPE_SRGB_PALETTE,
+	// 32bit RGBA in sRGB colorspace
+	TEXTYPE_SRGB_RGBA,
+	// 32bit BGRA (preferred format due to faster uploads on most hardware) in sRGB colorspace
+	TEXTYPE_SRGB_BGRA,
+	// 4x4 block compressed 15bit color (4 bits per pixel) in sRGB colorspace
+	TEXTYPE_SRGB_DXT1,
+	// 4x4 block compressed 15bit color plus 1bit alpha (4 bits per pixel) in sRGB colorspace
+	TEXTYPE_SRGB_DXT1A,
+	// 4x4 block compressed 15bit color plus 8bit alpha (8 bits per pixel) in sRGB colorspace
+	TEXTYPE_SRGB_DXT3,
+	// 4x4 block compressed 15bit color plus 8bit alpha (8 bits per pixel) in sRGB colorspace
+	TEXTYPE_SRGB_DXT5,
+
 	// this represents the same format as the framebuffer, for fast copies
-	TEXTYPE_COLORBUFFER
+	TEXTYPE_COLORBUFFER,
+	// this represents an RGBA half_float texture (4 16bit floats)
+	TEXTYPE_COLORBUFFER16F,
+	// this represents an RGBA float texture (4 32bit floats)
+	TEXTYPE_COLORBUFFER32F,
+	// 16bit D16 (16bit depth) or 32bit S8D24 (24bit depth, 8bit stencil unused)
+	TEXTYPE_SHADOWMAP
 }
 textype_t;
 
@@ -123,6 +143,8 @@ extern cvar_t gl_texturecompression_q3bspdeluxemaps;
 extern cvar_t gl_texturecompression_sky;
 extern cvar_t gl_texturecompression_lightcubemaps;
 extern cvar_t gl_texturecompression_reflectmask;
+extern cvar_t r_texture_dds_load;
+extern cvar_t r_texture_dds_save;
 
 // add a texture to a pool and optionally precache (upload) it
 // (note: data == NULL is perfectly acceptable)
@@ -142,7 +164,7 @@ void R_FreeTexture(rtexture_t *rt);
 // update a portion of the image data of a texture, used by lightmap updates
 // and procedural textures such as video playback, actual uploads may be
 // delayed by gl_nopartialtextureupdates cvar until R_Mesh_TexBind uses it
-void R_UpdateTexture(rtexture_t *rt, const unsigned char *data, int x, int y, int width, int height);
+void R_UpdateTexture(rtexture_t *rt, const unsigned char *data, int x, int y, int z, int width, int height, int depth);
 
 // returns the renderer dependent texture slot number (call this before each
 // use, as a texture might not have been precached)

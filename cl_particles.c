@@ -602,6 +602,12 @@ particle_t *CL_NewParticle(const vec3_t sortorigin, unsigned short ptypeindex, i
 	part->color[0] = ((((pcolor1 >> 16) & 0xFF) * l1 + ((pcolor2 >> 16) & 0xFF) * l2) >> 8) & 0xFF;
 	part->color[1] = ((((pcolor1 >>  8) & 0xFF) * l1 + ((pcolor2 >>  8) & 0xFF) * l2) >> 8) & 0xFF;
 	part->color[2] = ((((pcolor1 >>  0) & 0xFF) * l1 + ((pcolor2 >>  0) & 0xFF) * l2) >> 8) & 0xFF;
+	if (vid.sRGB3D)
+	{
+		part->color[0] = (unsigned char)(Image_LinearFloatFromsRGB(part->color[0]) * 256.0f);
+		part->color[1] = (unsigned char)(Image_LinearFloatFromsRGB(part->color[1]) * 256.0f);
+		part->color[2] = (unsigned char)(Image_LinearFloatFromsRGB(part->color[2]) * 256.0f);
+	}
 	part->alpha = palpha;
 	part->alphafade = palphafade;
 	part->staintexnum = staintex;
@@ -682,7 +688,7 @@ particle_t *CL_NewParticle(const vec3_t sortorigin, unsigned short ptypeindex, i
 		part->typeindex = pt_spark;
 		part->bounce = 0;
 		VectorMA(part->org, lifetime, part->vel, endvec);
-		trace = CL_TraceLine(part->org, endvec, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_LIQUIDSMASK, true, false, NULL, false);
+		trace = CL_TraceLine(part->org, endvec, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_LIQUIDSMASK, true, false, NULL, false, false);
 		part->die = cl.time + lifetime * trace.fraction;
 		part2 = CL_NewParticle(endvec, pt_raindecal, pcolor1, pcolor2, tex_rainsplash, part->size, part->size * 20, part->alpha, part->alpha / 0.4, 0, 0, trace.endpos[0] + trace.plane.normal[0], trace.endpos[1] + trace.plane.normal[1], trace.endpos[2] + trace.plane.normal[2], trace.plane.normal[0], trace.plane.normal[1], trace.plane.normal[2], 0, 0, 0, 0, pqualityreduction, 0, 1, PBLEND_ADD, PARTICLE_ORIENTED_DOUBLESIDED, -1, -1, -1, 1, 1, 0, 0, NULL);
 		if (part2)
@@ -758,7 +764,10 @@ void CL_SpawnDecalParticleForSurface(int hitent, const vec3_t org, const vec3_t 
 
 	if (cl_decals_newsystem.integer)
 	{
-		R_DecalSystem_SplatEntities(org, normal, color[0]*(1.0f/255.0f), color[1]*(1.0f/255.0f), color[2]*(1.0f/255.0f), alpha*(1.0f/255.0f), particletexture[texnum].s1, particletexture[texnum].t1, particletexture[texnum].s2, particletexture[texnum].t2, size);
+		if (vid.sRGB3D)
+			R_DecalSystem_SplatEntities(org, normal, Image_LinearFloatFromsRGB(color[0]), Image_LinearFloatFromsRGB(color[1]), Image_LinearFloatFromsRGB(color[2]), alpha*(1.0f/255.0f), particletexture[texnum].s1, particletexture[texnum].t1, particletexture[texnum].s2, particletexture[texnum].t2, size);
+		else
+			R_DecalSystem_SplatEntities(org, normal, color[0]*(1.0f/255.0f), color[1]*(1.0f/255.0f), color[2]*(1.0f/255.0f), alpha*(1.0f/255.0f), particletexture[texnum].s1, particletexture[texnum].t1, particletexture[texnum].s2, particletexture[texnum].t2, size);
 		return;
 	}
 
@@ -780,6 +789,12 @@ void CL_SpawnDecalParticleForSurface(int hitent, const vec3_t org, const vec3_t 
 	decal->color[0] = color[0];
 	decal->color[1] = color[1];
 	decal->color[2] = color[2];
+	if (vid.sRGB3D)
+	{
+		decal->color[0] = (unsigned char)(Image_LinearFloatFromsRGB(decal->color[0]) * 256.0f);
+		decal->color[1] = (unsigned char)(Image_LinearFloatFromsRGB(decal->color[1]) * 256.0f);
+		decal->color[2] = (unsigned char)(Image_LinearFloatFromsRGB(decal->color[2]) * 256.0f);
+	}
 	decal->owner = hitent;
 	decal->clusterindex = -1000; // no vis culling unless we're sure
 	if (hitent)
@@ -812,7 +827,7 @@ void CL_SpawnDecalParticleForPoint(const vec3_t org, float maxdist, float size, 
 	{
 		VectorRandom(org2);
 		VectorMA(org, maxdist, org2, org2);
-		trace = CL_TraceLine(org, org2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, true, false, &hitent, false);
+		trace = CL_TraceLine(org, org2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, true, false, &hitent, false, true);
 		// take the closest trace result that doesn't end up hitting a NOMARKS
 		// surface (sky for example)
 		if (bestfrac > trace.fraction && !(trace.hitq3surfaceflags & Q3SURFACEFLAG_NOMARKS))
@@ -1693,7 +1708,7 @@ void CL_ParticleExplosion (const vec3_t org)
 					{
 						VectorRandom(v2);
 						VectorMA(org, 128, v2, v);
-						trace = CL_TraceLine(org, v, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false);
+						trace = CL_TraceLine(org, v, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, false);
 					}
 					while (k < 16 && trace.fraction < 0.1f);
 					VectorSubtract(trace.endpos, org, v2);
@@ -1824,11 +1839,11 @@ void CL_ParticleRain (const vec3_t mins, const vec3_t maxs, const vec3_t dir, in
 	}
 }
 
-static cvar_t r_drawparticles = {0, "r_drawparticles", "1", "enables drawing of particles"};
+cvar_t r_drawparticles = {0, "r_drawparticles", "1", "enables drawing of particles"};
 static cvar_t r_drawparticles_drawdistance = {CVAR_SAVE, "r_drawparticles_drawdistance", "2000", "particles further than drawdistance*size will not be drawn"};
 static cvar_t r_drawparticles_nearclip_min = {CVAR_SAVE, "r_drawparticles_nearclip_min", "4", "particles closer than drawnearclip_min will not be drawn"};
 static cvar_t r_drawparticles_nearclip_max = {CVAR_SAVE, "r_drawparticles_nearclip_max", "4", "particles closer than drawnearclip_min will be faded"};
-static cvar_t r_drawdecals = {0, "r_drawdecals", "1", "enables drawing of decals"};
+cvar_t r_drawdecals = {0, "r_drawdecals", "1", "enables drawing of decals"};
 static cvar_t r_drawdecals_drawdistance = {CVAR_SAVE, "r_drawdecals_drawdistance", "500", "decals further than drawdistance*size will not be drawn"};
 
 #define PARTICLETEXTURESIZE 64
@@ -2140,7 +2155,7 @@ static void R_InitParticleTexture (void)
 		Image_WriteTGABGRA ("particles/particlefont.tga", PARTICLEFONTSIZE, PARTICLEFONTSIZE, particletexturedata);
 #endif
 
-		decalskinframe = R_SkinFrame_LoadInternalBGRA("particlefont", TEXF_ALPHA | TEXF_FORCELINEAR | TEXF_RGBMULTIPLYBYALPHA, particletexturedata, PARTICLEFONTSIZE, PARTICLEFONTSIZE);
+		decalskinframe = R_SkinFrame_LoadInternalBGRA("particlefont", TEXF_ALPHA | TEXF_FORCELINEAR | TEXF_RGBMULTIPLYBYALPHA, particletexturedata, PARTICLEFONTSIZE, PARTICLEFONTSIZE, false);
 		particlefonttexture = decalskinframe->base;
 
 		Mem_Free(particletexturedata);
@@ -2159,7 +2174,7 @@ static void R_InitParticleTexture (void)
 	}
 
 #ifndef DUMPPARTICLEFONT
-	particletexture[tex_beam].texture = loadtextureimage(particletexturepool, "particles/nexbeam.tga", false, TEXF_ALPHA | TEXF_FORCELINEAR | TEXF_RGBMULTIPLYBYALPHA, true, r_texture_convertsRGB_particles.integer != 0);
+	particletexture[tex_beam].texture = loadtextureimage(particletexturepool, "particles/nexbeam.tga", false, TEXF_ALPHA | TEXF_FORCELINEAR | TEXF_RGBMULTIPLYBYALPHA, true, vid.sRGB3D);
 	if (!particletexture[tex_beam].texture)
 #endif
 	{
@@ -2281,14 +2296,13 @@ static void r_part_newmap(void)
 	CL_Particles_LoadEffectInfo();
 }
 
-#define BATCHSIZE 256
-unsigned short particle_elements[BATCHSIZE*6];
-float particle_vertex3f[BATCHSIZE*12], particle_texcoord2f[BATCHSIZE*8], particle_color4f[BATCHSIZE*16];
+unsigned short particle_elements[MESHQUEUE_TRANSPARENT_BATCHSIZE*6];
+float particle_vertex3f[MESHQUEUE_TRANSPARENT_BATCHSIZE*12], particle_texcoord2f[MESHQUEUE_TRANSPARENT_BATCHSIZE*8], particle_color4f[MESHQUEUE_TRANSPARENT_BATCHSIZE*16];
 
 void R_Particles_Init (void)
 {
 	int i;
-	for (i = 0;i < BATCHSIZE;i++)
+	for (i = 0;i < MESHQUEUE_TRANSPARENT_BATCHSIZE;i++)
 	{
 		particle_elements[i*6+0] = i*4+0;
 		particle_elements[i*6+1] = i*4+1;
@@ -2468,7 +2482,7 @@ void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtligh
 	float *v3f, *t2f, *c4f;
 	particletexture_t *tex;
 	float up2[3], v[3], right[3], up[3], fog, ifog, size, len, lenfactor, alpha;
-	float ambient[3], diffuse[3], diffusenormal[3];
+//	float ambient[3], diffuse[3], diffusenormal[3];
 	float palpha, spintime, spinrad, spincos, spinsin, spinm1, spinm2, spinm3, spinm4, baseright[3], baseup[3];
 	vec4_t colormultiplier;
 	float minparticledist_start, minparticledist_end;
@@ -2537,12 +2551,7 @@ void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtligh
 			c4f[3] = alpha;
 			// note: lighting is not cheap!
 			if (particletype[p->typeindex].lighting)
-			{
-				R_CompleteLightPoint(ambient, diffuse, diffusenormal, p->org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
-				c4f[0] *= (ambient[0] + 0.5 * diffuse[0]);
-				c4f[1] *= (ambient[1] + 0.5 * diffuse[1]);
-				c4f[2] *= (ambient[2] + 0.5 * diffuse[2]);
-			}
+				R_LightPoint(c4f, p->org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
 			// mix in the fog color
 			if (r_refdef.fogenabled)
 			{
@@ -2797,7 +2806,7 @@ void R_DrawParticles (void)
 //				if (p->bounce && cl.time >= p->delayedcollisions)
 				if (p->bounce && cl_particles_collisions.integer && VectorLength(p->vel))
 				{
-					trace = CL_TraceLine(oldorg, p->org, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | ((p->typeindex == pt_rain || p->typeindex == pt_snow) ? SUPERCONTENTS_LIQUIDSMASK : 0), true, false, &hitent, false);
+					trace = CL_TraceLine(oldorg, p->org, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | ((p->typeindex == pt_rain || p->typeindex == pt_snow) ? SUPERCONTENTS_LIQUIDSMASK : 0), true, false, &hitent, false, false);
 					// if the trace started in or hit something of SUPERCONTENTS_NODROP
 					// or if the trace hit something flagged as NOIMPACT
 					// then remove the particle

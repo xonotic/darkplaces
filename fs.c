@@ -60,6 +60,7 @@
 
 // largefile support for Win32
 #ifdef WIN32
+#undef lseek
 # define lseek _lseeki64
 #endif
 
@@ -411,7 +412,46 @@ static dllfunction_t shfolderfuncs[] =
 	{"SHGetFolderPathA", (void **) &qSHGetFolderPath},
 	{NULL, NULL}
 };
+static const char* shfolderdllnames [] =
+{
+	"shfolder.dll",  // IE 4, or Win NT and higher
+	NULL
+};
 static dllhandle_t shfolder_dll = NULL;
+
+const GUID qFOLDERID_SavedGames = {0x4C5C32FF, 0xBB9D, 0x43b0, {0xB5, 0xB4, 0x2D, 0x72, 0xE5, 0x4E, 0xAA, 0xA4}}; 
+#define qREFKNOWNFOLDERID const GUID *
+#define qKF_FLAG_CREATE 0x8000
+#define qKF_FLAG_NO_ALIAS 0x1000
+static HRESULT (WINAPI *qSHGetKnownFolderPath) (qREFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken, PWSTR *ppszPath);
+static dllfunction_t shell32funcs[] =
+{
+	{"SHGetKnownFolderPath", (void **) &qSHGetKnownFolderPath},
+	{NULL, NULL}
+};
+static const char* shell32dllnames [] =
+{
+	"shell32.dll",  // Vista and higher
+	NULL
+};
+static dllhandle_t shell32_dll = NULL;
+
+static HRESULT (WINAPI *qCoInitializeEx)(LPVOID pvReserved, DWORD dwCoInit);
+static void (WINAPI *qCoUninitialize)(void);
+static void (WINAPI *qCoTaskMemFree)(LPVOID pv);
+static dllfunction_t ole32funcs[] =
+{
+	{"CoInitializeEx", (void **) &qCoInitializeEx},
+	{"CoUninitialize", (void **) &qCoUninitialize},
+	{"CoTaskMemFree", (void **) &qCoTaskMemFree},
+	{NULL, NULL}
+};
+static const char* ole32dllnames [] =
+{
+	"ole32.dll", // 2000 and higher
+	NULL
+};
+static dllhandle_t ole32_dll = NULL;
 #endif
 
 /*
@@ -636,9 +676,9 @@ int PK3_BuildFileList (pack_t *pack, const pk3_endOfCentralDir_t *eocd)
 					flags = PACKFILE_FLAG_DEFLATED;
 				else
 					flags = 0;
-				offset = BuffLittleLong (&ptr[42]) + eocd->prepended_garbage;
-				packsize = BuffLittleLong (&ptr[20]);
-				realsize = BuffLittleLong (&ptr[24]);
+				offset = (unsigned int)(BuffLittleLong (&ptr[42]) + eocd->prepended_garbage);
+				packsize = (unsigned int)BuffLittleLong (&ptr[20]);
+				realsize = (unsigned int)BuffLittleLong (&ptr[24]);
 
 				switch(ptr[5]) // C_VERSION_MADE_BY_1
 				{
@@ -965,8 +1005,8 @@ pack_t *FS_LoadPackPAK (const char *packfile)
 	// parse the directory
 	for (i = 0;i < numpackfiles;i++)
 	{
-		fs_offset_t offset = LittleLong (info[i].filepos);
-		fs_offset_t size = LittleLong (info[i].filelen);
+		fs_offset_t offset = (unsigned int)LittleLong (info[i].filepos);
+		fs_offset_t size = (unsigned int)LittleLong (info[i].filelen);
 
 		FS_AddFileToPack (info[i].name, pack, offset, size, size, PACKFILE_FLAG_TRUEOFFS);
 	}
@@ -1309,19 +1349,29 @@ void FS_Rescan (void)
 {
 	int i;
 	qboolean fs_modified = false;
+	qboolean reset = false;
 	char gamedirbuf[MAX_INPUTLINE];
 
+	if (fs_searchpaths)
+		reset = true;
 	FS_ClearSearchPath();
+
+	// automatically activate gamemode for the gamedirs specified
+	if (reset)
+		COM_ChangeGameTypeForGameDirs();
 
 	// add the game-specific paths
 	// gamedirname1 (typically id1)
 	FS_AddGameHierarchy (gamedirname1);
 	// update the com_modname (used for server info)
-	strlcpy(com_modname, gamedirname1, sizeof(com_modname));
+	if (gamedirname2 && gamedirname2[0])
+		strlcpy(com_modname, gamedirname2, sizeof(com_modname));
+	else
+		strlcpy(com_modname, gamedirname1, sizeof(com_modname));
 
 	// add the game-specific path, if any
 	// (only used for mission packs and the like, which should set fs_modified)
-	if (gamedirname2)
+	if (gamedirname2 && gamedirname2[0])
 	{
 		fs_modified = true;
 		FS_AddGameHierarchy (gamedirname2);
@@ -1406,6 +1456,8 @@ FS_ChangeGameDirs
 */
 extern void Host_SaveConfig (void);
 extern void Host_LoadConfig_f (void);
+extern qboolean vid_opened;
+extern void VID_Stop(void);
 qboolean FS_ChangeGameDirs(int numgamedirs, char gamedirs[][MAX_QPATH], qboolean complain, qboolean failmissing)
 {
 	int i;
@@ -1454,14 +1506,21 @@ qboolean FS_ChangeGameDirs(int numgamedirs, char gamedirs[][MAX_QPATH], qboolean
 	// reinitialize filesystem to detect the new paks
 	FS_Rescan();
 
-	// exec the new config
-	Host_LoadConfig_f();
+	if (cls.demoplayback)
+	{
+		CL_Disconnect_f();
+		cls.demonum = 0;
+	}
 
 	// unload all sounds so they will be reloaded from the new files as needed
 	S_UnloadAllSounds_f();
 
-	// reinitialize renderer (this reloads hud/console background/etc)
-	R_Modules_Restart();
+	// close down the video subsystem, it will start up again when the config finishes...
+	VID_Stop();
+	vid_opened = false;
+
+	// restart the video subsystem after the config is executed
+	Cbuf_InsertText("\nloadconfig\nvid_restart\n\n");
 
 	return true;
 }
@@ -1625,6 +1684,13 @@ static void FS_ListGameDirs(void)
 }
 
 /*
+#ifdef WIN32
+#pragma comment(lib, "shell32.lib")
+#include <ShlObj.h>
+#endif
+*/
+
+/*
 ================
 FS_Init_SelfPack
 ================
@@ -1676,6 +1742,160 @@ void FS_Init_SelfPack (void)
 	}
 }
 
+int FS_ChooseUserDir(userdirmode_t userdirmode, char *userdir, size_t userdirsize)
+{
+#if defined(__IPHONEOS__)
+	if (userdirmode == USERDIRMODE_HOME)
+	{
+		// fs_basedir is "" by default, to utilize this you can simply add your gamedir to the Resources in xcode
+		// fs_userdir stores configurations to the Documents folder of the app
+		strlcpy(userdir, maxlength, "../Documents/");
+		return 1;
+	}
+	return -1;
+
+#elif defined(WIN32)
+	char *homedir;
+#if _MSC_VER >= 1400
+	size_t homedirlen;
+#endif
+	TCHAR mydocsdir[MAX_PATH + 1];
+	wchar_t *savedgamesdirw;
+	char savedgamesdir[MAX_OSPATH];
+	int fd;
+	
+	userdir[0] = 0;
+	switch(userdirmode)
+	{
+	default:
+		return -1;
+	case USERDIRMODE_NOHOME:
+		strlcpy(userdir, fs_basedir, userdirsize);
+		break;
+	case USERDIRMODE_MYGAMES:
+		if (!shfolder_dll)
+			Sys_LoadLibrary(shfolderdllnames, &shfolder_dll, shfolderfuncs);
+		mydocsdir[0] = 0;
+		if (qSHGetFolderPath && qSHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, mydocsdir) == S_OK)
+		{
+			dpsnprintf(userdir, userdirsize, "%s/My Games/%s/", mydocsdir, gameuserdirname);
+			break;
+		}
+#if _MSC_VER >= 1400
+		_dupenv_s(&homedir, &homedirlen, "USERPROFILE");
+		if(homedir)
+		{
+			dpsnprintf(userdir, userdirsize, "%s/.%s/", homedir, gameuserdirname);
+			free(homedir);
+			break;
+		}
+#else
+		homedir = getenv("USERPROFILE");
+		if(homedir)
+		{
+			dpsnprintf(userdir, userdirsize, "%s/.%s/", homedir, gameuserdirname);
+			break;
+		}
+#endif
+		return -1;
+	case USERDIRMODE_SAVEDGAMES:
+		if (!shell32_dll)
+			Sys_LoadLibrary(shell32dllnames, &shell32_dll, shell32funcs);
+		if (!ole32_dll)
+			Sys_LoadLibrary(ole32dllnames, &ole32_dll, ole32funcs);
+		if (qSHGetKnownFolderPath && qCoInitializeEx && qCoTaskMemFree && qCoUninitialize)
+		{
+			savedgamesdir[0] = 0;
+			qCoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+/*
+#ifdef __cplusplus
+			if (SHGetKnownFolderPath(FOLDERID_SavedGames, KF_FLAG_CREATE | KF_FLAG_NO_ALIAS, NULL, &savedgamesdirw) == S_OK)
+#else
+			if (SHGetKnownFolderPath(&FOLDERID_SavedGames, KF_FLAG_CREATE | KF_FLAG_NO_ALIAS, NULL, &savedgamesdirw) == S_OK)
+#endif
+*/
+			if (qSHGetKnownFolderPath(&qFOLDERID_SavedGames, qKF_FLAG_CREATE | qKF_FLAG_NO_ALIAS, NULL, &savedgamesdirw) == S_OK)
+			{
+				memset(savedgamesdir, 0, sizeof(savedgamesdir));
+#if _MSC_VER >= 1400
+				wcstombs_s(NULL, savedgamesdir, sizeof(savedgamesdir), savedgamesdirw, sizeof(savedgamesdir)-1);
+#else
+				wcstombs(savedgamesdir, savedgamesdirw, sizeof(savedgamesdir)-1);
+#endif
+				qCoTaskMemFree(savedgamesdirw);
+			}
+			qCoUninitialize();
+			if (savedgamesdir[0])
+			{
+				dpsnprintf(userdir, userdirsize, "%s/%s/", savedgamesdir, gameuserdirname);
+				break;
+			}
+		}
+		return -1;
+	}
+#else
+	int fd;
+	char *homedir;
+	userdir[0] = 0;
+	switch(userdirmode)
+	{
+	default:
+		return -1;
+	case USERDIRMODE_NOHOME:
+		strlcpy(userdir, fs_basedir, userdirsize);
+		break;
+	case USERDIRMODE_HOME:
+		homedir = getenv("HOME");
+		if(homedir)
+		{
+			dpsnprintf(userdir, userdirsize, "%s/.%s/", homedir, gameuserdirname);
+			break;
+		}
+		return -1;
+	case USERDIRMODE_SAVEDGAMES:
+		homedir = getenv("HOME");
+		if(homedir)
+		{
+#ifdef MACOSX
+			dpsnprintf(userdir, userdirsize, "%s/Library/Application Support/%s/", homedir, gameuserdirname);
+#else
+			// the XDG say some files would need to go in:
+			// XDG_CONFIG_HOME (or ~/.config/%s/)
+			// XDG_DATA_HOME (or ~/.local/share/%s/)
+			// XDG_CACHE_HOME (or ~/.cache/%s/)
+			// and also search the following global locations if defined:
+			// XDG_CONFIG_DIRS (normally /etc/xdg/%s/)
+			// XDG_DATA_DIRS (normally /usr/share/%s/)
+			// this would be too complicated...
+			return -1;
+#endif
+			break;
+		}
+		return -1;
+	}
+#endif
+
+
+#ifdef WIN32
+	// historical behavior...
+	if (userdirmode == USERDIRMODE_NOHOME && strcmp(gamedirname1, "id1"))
+		return 0; // don't bother checking if the basedir folder is writable, it's annoying...  unless it is Quake on Windows where NOHOME is the default preferred and we have to check for an error case
+#endif
+	// see if we can write to this path (note: won't create path)
+#if _MSC_VER >= 1400
+	_sopen_s(&fd, va("%s%s/config.cfg", userdir, gamedirname1), O_WRONLY | O_CREAT, _SH_DENYNO, _S_IREAD | _S_IWRITE); // note: no O_TRUNC here!
+#else
+	fd = open (va("%s%s/config.cfg", userdir, gamedirname1), O_WRONLY | O_CREAT, 0666); // note: no O_TRUNC here!
+#endif
+	if(fd >= 0)
+	{
+		close(fd);
+		return 1; // good choice - the path exists and is writable
+	}
+	else
+		return 0; // probably good - failed to write but maybe we need to create path
+}
+
 /*
 ================
 FS_Init
@@ -1685,123 +1905,10 @@ void FS_Init (void)
 {
 	const char *p;
 	int i;
-#ifdef WIN32
-	TCHAR mydocsdir[MAX_PATH + 1];
-#if _MSC_VER >= 1400
-	size_t homedirlen;
-#endif
-#endif
-#ifndef __IPHONEOS__
-	char *homedir;
-#endif
-
-#ifdef WIN32
-	const char* dllnames [] =
-	{
-		"shfolder.dll",  // IE 4, or Win NT and higher
-		NULL
-	};
-	Sys_LoadLibrary(dllnames, &shfolder_dll, shfolderfuncs);
-	// don't care for the result; if it fails, %USERPROFILE% will be used instead
-#endif
 
 	*fs_basedir = 0;
 	*fs_userdir = 0;
 	*fs_gamedir = 0;
-
-#ifdef __IPHONEOS__
-	// fs_basedir is "" by default, to utilize this you can simply add your gamedir to the Resources in xcode
-	// fs_userdir stores configurations to the Documents folder of the app
-	strlcpy(fs_userdir, "../Documents/", sizeof(fs_userdir));
-#else
-	// Add the personal game directory
-	if((i = COM_CheckParm("-userdir")) && i < com_argc - 1)
-	{
-		dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/", com_argv[i+1]);
-	}
-	else if(COM_CheckParm("-nohome"))
-	{
-		*fs_userdir = 0;
-	}
-	else
-	{
-#ifdef WIN32
-		if(qSHGetFolderPath && (qSHGetFolderPath(NULL, CSIDL_PERSONAL, NULL, 0, mydocsdir) == S_OK))
-		{
-			dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/My Games/%s/", mydocsdir, gameuserdirname);
-			Con_DPrintf("Obtained personal directory %s from SHGetFolderPath\n", fs_userdir);
-		}
-		else
-		{
-			// use the environment
-#if _MSC_VER >= 1400
-			_dupenv_s (&homedir, &homedirlen, "USERPROFILE");
-#else
-			homedir = getenv("USERPROFILE");
-#endif
-
-			if(homedir)
-			{
-				dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/My Documents/My Games/%s/", homedir, gameuserdirname);
-#if _MSC_VER >= 1400
-				free(homedir);
-#endif
-				Con_DPrintf("Obtained personal directory %s from environment\n", fs_userdir);
-			}
-		}
-
-		if(!*fs_userdir)
-			Con_DPrintf("Could not obtain home directory; not supporting -mygames\n");
-#else
-		homedir = getenv ("HOME");
-		if(homedir)
-			dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/.%s/", homedir, gameuserdirname);
-
-		if(!*fs_userdir)
-			Con_DPrintf("Could not obtain home directory; assuming -nohome\n");
-#endif
-
-#ifdef WIN32
-		if(!COM_CheckParm("-mygames"))
-		{
-#if _MSC_VER >= 1400
-			int fd;
-			_sopen_s(&fd, va("%s%s/config.cfg", fs_basedir, gamedirname1), O_WRONLY | O_CREAT, _SH_DENYNO, _S_IREAD | _S_IWRITE); // note: no O_TRUNC here!
-#else
-			int fd = open (va("%s%s/config.cfg", fs_basedir, gamedirname1), O_WRONLY | O_CREAT, 0666); // note: no O_TRUNC here!
-#endif
-			if(fd >= 0)
-			{
-				close(fd);
-				*fs_userdir = 0; // we have write access to the game dir, so let's use it
-			}
-		}
-#endif
-	}
-
-	strlcpy(fs_gamedir, "", sizeof(fs_gamedir));
-
-// If the base directory is explicitly defined by the compilation process
-#ifdef DP_FS_BASEDIR
-	strlcpy(fs_basedir, DP_FS_BASEDIR, sizeof(fs_basedir));
-#else
-	*fs_basedir = 0;
-
-#ifdef MACOSX
-	// FIXME: is there a better way to find the directory outside the .app?
-	if (strstr(com_argv[0], ".app/"))
-	{
-		char *split;
-
-		split = strstr(com_argv[0], ".app/");
-		while (split > com_argv[0] && *split != '/')
-			split--;
-		strlcpy(fs_basedir, com_argv[0], sizeof(fs_basedir));
-		fs_basedir[split - com_argv[0]] = 0;
-	}
-#endif
-#endif
-#endif
 
 	// -basedir <path>
 	// Overrides the system supplied base directory (under GAMENAME)
@@ -1814,10 +1921,100 @@ void FS_Init (void)
 		if (i > 0 && (fs_basedir[i-1] == '\\' || fs_basedir[i-1] == '/'))
 			fs_basedir[i-1] = 0;
 	}
+	else
+	{
+// If the base directory is explicitly defined by the compilation process
+#ifdef DP_FS_BASEDIR
+		strlcpy(fs_basedir, DP_FS_BASEDIR, sizeof(fs_basedir));
+#elif defined(MACOSX)
+		// FIXME: is there a better way to find the directory outside the .app, without using Objective-C?
+		if (strstr(com_argv[0], ".app/"))
+		{
+			char *split;
+			strlcpy(fs_basedir, com_argv[0], sizeof(fs_basedir));
+			split = strstr(fs_basedir, ".app/");
+			if (split)
+			{
+				struct stat statresult;
+				// truncate to just after the .app/
+				split[5] = 0;
+				// see if gamedir exists in Resources
+				if (stat(va("%s/Contents/Resources/%s", fs_basedir, gamedirname1), &statresult) == 0)
+				{
+					// found gamedir inside Resources, use it
+					strlcat(fs_basedir, "Contents/Resources/", sizeof(fs_basedir));
+				}
+				else
+				{
+					// no gamedir found in Resources, gamedir is probably
+					// outside the .app, remove .app part of path
+					while (split > fs_basedir && *split != '/')
+						split--;
+					*split = 0;
+				}
+			}
+		}
+#endif
+	}
 
+	// make sure the appending of a path separator won't create an unterminated string
+	memset(fs_basedir + sizeof(fs_basedir) - 2, 0, 2);
 	// add a path separator to the end of the basedir if it lacks one
 	if (fs_basedir[0] && fs_basedir[strlen(fs_basedir) - 1] != '/' && fs_basedir[strlen(fs_basedir) - 1] != '\\')
 		strlcat(fs_basedir, "/", sizeof(fs_basedir));
+
+	// Add the personal game directory
+	if((i = COM_CheckParm("-userdir")) && i < com_argc - 1)
+		dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/", com_argv[i+1]);
+	else if (COM_CheckParm("-nohome"))
+		*fs_userdir = 0; // user wants roaming installation, no userdir
+	else
+	{
+		int dirmode;
+		int highestuserdirmode = USERDIRMODE_COUNT - 1;
+		int preferreduserdirmode = USERDIRMODE_COUNT - 1;
+		int userdirstatus[USERDIRMODE_COUNT];
+#ifdef WIN32
+		// historical behavior...
+		if (!strcmp(gamedirname1, "id1"))
+			preferreduserdirmode = USERDIRMODE_NOHOME;
+#endif
+		// check what limitations the user wants to impose
+		if (COM_CheckParm("-home")) preferreduserdirmode = USERDIRMODE_HOME;
+		if (COM_CheckParm("-mygames")) preferreduserdirmode = USERDIRMODE_MYGAMES;
+		if (COM_CheckParm("-savedgames")) preferreduserdirmode = USERDIRMODE_SAVEDGAMES;
+		// gather the status of the possible userdirs
+		for (dirmode = 0;dirmode < USERDIRMODE_COUNT;dirmode++)
+		{
+			userdirstatus[dirmode] = FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir));
+			if (userdirstatus[dirmode] == 1)
+				Con_DPrintf("userdir %i = %s (writable)\n", dirmode, fs_userdir);
+			else if (userdirstatus[dirmode] == 0)
+				Con_DPrintf("userdir %i = %s (not writable or does not exist)\n", dirmode, fs_userdir);
+			else
+				Con_DPrintf("userdir %i (not applicable)\n", dirmode);
+		}
+		// some games may prefer writing to basedir, but if write fails we
+		// have to search for a real userdir...
+		if (preferreduserdirmode == 0 && userdirstatus[0] < 1)
+			preferreduserdirmode = highestuserdirmode;
+		// check for an existing userdir and continue using it if possible...
+		for (dirmode = USERDIRMODE_COUNT - 1;dirmode > 0;dirmode--)
+			if (userdirstatus[dirmode] == 1)
+				break;
+		// if no existing userdir found, make a new one...
+		if (dirmode == 0 && preferreduserdirmode > 0)
+			for (dirmode = preferreduserdirmode;dirmode > 0;dirmode--)
+				if (userdirstatus[dirmode] >= 0)
+					break;
+		// and finally, we picked one...
+		FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir));
+		Con_DPrintf("userdir %i is the winner\n", dirmode);
+	}
+
+	// if userdir equal to basedir, clear it to avoid confusion later
+	if (!strcmp(fs_basedir, fs_userdir))
+		fs_userdir[0] = 0;
 
 	FS_ListGameDirs();
 
@@ -1886,6 +2083,8 @@ void FS_Shutdown (void)
 
 #ifdef WIN32
 	Sys_UnloadLibrary (&shfolder_dll);
+	Sys_UnloadLibrary (&shell32_dll);
+	Sys_UnloadLibrary (&ole32_dll);
 #endif
 }
 
@@ -2010,8 +2209,8 @@ qfile_t *FS_OpenPackedFile (pack_t* pack, int pack_ind)
 	// the dup() call to avoid having to close the dup_handle on error here
 	if (lseek (pack->handle, pfile->offset, SEEK_SET) == -1)
 	{
-		Con_Printf ("FS_OpenPackedFile: can't lseek to %s in %s (offset: %d)\n",
-					pfile->name, pack->filename, (int) pfile->offset);
+		Con_Printf ("FS_OpenPackedFile: can't lseek to %s in %s (offset: %08x%08x)\n",
+					pfile->name, pack->filename, (unsigned int)(pfile->offset >> 32), (unsigned int)(pfile->offset));
 		return NULL;
 	}
 

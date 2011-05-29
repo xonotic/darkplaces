@@ -53,7 +53,7 @@ static cachepic_t *cachepichash[CACHEPICHASHSIZE];
 static cachepic_t cachepics[MAX_CACHED_PICS];
 static int numcachepics;
 
-static rtexturepool_t *drawtexturepool;
+rtexturepool_t *drawtexturepool;
 
 static const unsigned char concharimage[FONT_FILESIZE] =
 {
@@ -302,6 +302,7 @@ static rtexture_t *draw_generatepic(const char *name, qboolean quiet)
 	return r_texture_notexture;
 }
 
+int draw_frame = 1;
 
 /*
 ================
@@ -312,18 +313,21 @@ Draw_CachePic
 cachepic_t *Draw_CachePic_Flags(const char *path, unsigned int cachepicflags)
 {
 	int crc, hashkey;
-	unsigned char *pixels;
+	unsigned char *pixels = NULL;
 	cachepic_t *pic;
 	fs_offset_t lmpsize;
 	unsigned char *lmpdata;
 	char lmpname[MAX_QPATH];
 	int texflags;
 	int j;
+	qboolean ddshasalpha;
+	float ddsavgcolor[4];
+	qboolean loaded = false;
 
 	texflags = TEXF_ALPHA;
 	if (!(cachepicflags & CACHEPICFLAG_NOCLAMP))
 		texflags |= TEXF_CLAMP;
-	if (!(cachepicflags & CACHEPICFLAG_NOCOMPRESSION) && gl_texturecompression_2d.integer)
+	if (!(cachepicflags & CACHEPICFLAG_NOCOMPRESSION) && gl_texturecompression_2d.integer && gl_texturecompression.integer)
 		texflags |= TEXF_COMPRESS;
 
 	// check whether the picture has already been cached
@@ -369,13 +373,20 @@ reload:
 	pic->hasalpha = true; // assume alpha unless we know it has none
 	pic->texflags = texflags;
 	pic->autoload = (cachepicflags & CACHEPICFLAG_NOTPERSISTENT);
+	pic->lastusedframe = draw_frame;
 
 	// load a high quality image from disk if possible
-	pixels = loadimagepixelsbgra(path, false, true, r_texture_convertsRGB_2d.integer != 0, NULL);
-	if (pixels == NULL && !strncmp(path, "gfx/", 4))
-		pixels = loadimagepixelsbgra(path+4, false, true, r_texture_convertsRGB_2d.integer != 0, NULL);
-	if (pixels)
+	if (!loaded && r_texture_dds_load.integer != 0 && (pic->tex = R_LoadTextureDDSFile(drawtexturepool, va("dds/%s.dds", pic->name), pic->texflags, &ddshasalpha, ddsavgcolor, 0)))
 	{
+		// note this loads even if autoload is true, otherwise we can't get the width/height
+		loaded = true;
+		pic->hasalpha = ddshasalpha;
+		pic->width = R_TextureWidth(pic->tex);
+		pic->height = R_TextureHeight(pic->tex);
+	}
+	if (!loaded && ((pixels = loadimagepixelsbgra(pic->name, false, true, false, NULL)) || (!strncmp(pic->name, "gfx/", 4) && (pixels = loadimagepixelsbgra(pic->name+4, false, true, false, NULL)))))
+	{
+		loaded = true;
 		pic->hasalpha = false;
 		if (pic->texflags & TEXF_ALPHA)
 		{
@@ -392,9 +403,13 @@ reload:
 		pic->width = image_width;
 		pic->height = image_height;
 		if (!pic->autoload)
-			pic->tex = R_LoadTexture2D(drawtexturepool, path, image_width, image_height, pixels, TEXTYPE_BGRA, pic->texflags & (pic->hasalpha ? ~0 : ~TEXF_ALPHA), -1, NULL);
+		{
+			pic->tex = R_LoadTexture2D(drawtexturepool, pic->name, image_width, image_height, pixels, vid.sRGB2D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, pic->texflags & (pic->hasalpha ? ~0 : ~TEXF_ALPHA), -1, NULL);
+			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
+				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+		}
 	}
-	else
+	if (!loaded)
 	{
 		pic->autoload = false;
 		// never compress the fallback images
@@ -405,43 +420,52 @@ reload:
 	// size from that even if we don't upload the texture, this way the pics
 	// show up the right size in the menu even if they were replaced with
 	// higher or lower resolution versions
-	dpsnprintf(lmpname, sizeof(lmpname), "%s.lmp", path);
-	if (!strncmp(path, "gfx/", 4) && (lmpdata = FS_LoadFile(lmpname, tempmempool, false, &lmpsize)))
+	dpsnprintf(lmpname, sizeof(lmpname), "%s.lmp", pic->name);
+	if (!strncmp(pic->name, "gfx/", 4) && (lmpdata = FS_LoadFile(lmpname, tempmempool, false, &lmpsize)))
 	{
 		if (developer_loading.integer)
-			Con_Printf("loading lump \"%s\"\n", path);
+			Con_Printf("loading lump \"%s\"\n", pic->name);
 
 		if (lmpsize >= 9)
 		{
 			pic->width = lmpdata[0] + lmpdata[1] * 256 + lmpdata[2] * 65536 + lmpdata[3] * 16777216;
 			pic->height = lmpdata[4] + lmpdata[5] * 256 + lmpdata[6] * 65536 + lmpdata[7] * 16777216;
 			// if no high quality replacement image was found, upload the original low quality texture
-			if (!pixels)
-				pic->tex = R_LoadTexture2D(drawtexturepool, path, pic->width, pic->height, lmpdata + 8, TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_transparent);
+			if (!loaded)
+			{
+				loaded = true;
+				pic->tex = R_LoadTexture2D(drawtexturepool, pic->name, pic->width, pic->height, lmpdata + 8, vid.sRGB2D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_transparent);
+			}
 		}
 		Mem_Free(lmpdata);
 	}
-	else if ((lmpdata = W_GetLumpName (path + 4)))
+	else if ((lmpdata = W_GetLumpName (pic->name + 4)))
 	{
 		if (developer_loading.integer)
-			Con_Printf("loading gfx.wad lump \"%s\"\n", path + 4);
+			Con_Printf("loading gfx.wad lump \"%s\"\n", pic->name + 4);
 
-		if (!strcmp(path, "gfx/conchars"))
+		if (!strcmp(pic->name, "gfx/conchars"))
 		{
 			// conchars is a raw image and with color 0 as transparent instead of 255
 			pic->width = 128;
 			pic->height = 128;
 			// if no high quality replacement image was found, upload the original low quality texture
-			if (!pixels)
-				pic->tex = R_LoadTexture2D(drawtexturepool, path, 128, 128, lmpdata, TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_font);
+			if (!loaded)
+			{
+				loaded = true;
+				pic->tex = R_LoadTexture2D(drawtexturepool, pic->name, 128, 128, lmpdata, vid.sRGB2D != 0 ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_font);
+			}
 		}
 		else
 		{
 			pic->width = lmpdata[0] + lmpdata[1] * 256 + lmpdata[2] * 65536 + lmpdata[3] * 16777216;
 			pic->height = lmpdata[4] + lmpdata[5] * 256 + lmpdata[6] * 65536 + lmpdata[7] * 16777216;
 			// if no high quality replacement image was found, upload the original low quality texture
-			if (!pixels)
-				pic->tex = R_LoadTexture2D(drawtexturepool, path, pic->width, pic->height, lmpdata + 8, TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_transparent);
+			if (!loaded)
+			{
+				loaded = true;
+				pic->tex = R_LoadTexture2D(drawtexturepool, pic->name, pic->width, pic->height, lmpdata + 8, vid.sRGB2D != 0 ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, pic->texflags, -1, palette_bgra_transparent);
+			}
 		}
 	}
 
@@ -450,10 +474,10 @@ reload:
 		Mem_Free(pixels);
 		pixels = NULL;
 	}
-	else if (pic->tex == NULL)
+	if (!loaded)
 	{
 		// if it's not found on disk, generate an image
-		pic->tex = draw_generatepic(path, (cachepicflags & CACHEPICFLAG_QUIET) != 0);
+		pic->tex = draw_generatepic(pic->name, (cachepicflags & CACHEPICFLAG_QUIET) != 0);
 		pic->width = R_TextureWidth(pic->tex);
 		pic->height = R_TextureHeight(pic->tex);
 	}
@@ -466,15 +490,28 @@ cachepic_t *Draw_CachePic (const char *path)
 	return Draw_CachePic_Flags (path, 0); // default to persistent!
 }
 
-int draw_frame = 1;
-
 rtexture_t *Draw_GetPicTexture(cachepic_t *pic)
 {
 	if (pic->autoload && !pic->tex)
 	{
-		pic->tex = loadtextureimage(drawtexturepool, pic->name, false, pic->texflags, true, r_texture_convertsRGB_2d.integer != 0);
+		if (pic->tex == NULL && r_texture_dds_load.integer != 0)
+		{
+			qboolean ddshasalpha;
+			float ddsavgcolor[4];
+			pic->tex = R_LoadTextureDDSFile(drawtexturepool, va("dds/%s.dds", pic->name), pic->texflags, &ddshasalpha, ddsavgcolor, 0);
+		}
+		if (pic->tex == NULL)
+		{
+			pic->tex = loadtextureimage(drawtexturepool, pic->name, false, pic->texflags, true, vid.sRGB2D);
+			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
+				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+		}
 		if (pic->tex == NULL && !strncmp(pic->name, "gfx/", 4))
-			pic->tex = loadtextureimage(drawtexturepool, pic->name+4, false, pic->texflags, true, r_texture_convertsRGB_2d.integer != 0);
+		{
+			pic->tex = loadtextureimage(drawtexturepool, pic->name+4, false, pic->texflags, true, vid.sRGB2D);
+			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
+				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+		}
 		if (pic->tex == NULL)
 			pic->tex = draw_generatepic(pic->name, true);
 	}
@@ -516,7 +553,7 @@ cachepic_t *Draw_NewPic(const char *picname, int width, int height, int alpha, u
 	{
 		if (pic->tex && pic->width == width && pic->height == height)
 		{
-			R_UpdateTexture(pic->tex, pixels_bgra, 0, 0, width, height);
+			R_UpdateTexture(pic->tex, pixels_bgra, 0, 0, 0, width, height, 1);
 			return pic;
 		}
 	}
@@ -1015,6 +1052,7 @@ static void _DrawQ_Setup(void)
 	r_refdef.draw2dstage = 1;
 	CHECKGLERROR
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, r_refdef.view.x, vid.height - r_refdef.view.y - r_refdef.view.height, r_refdef.view.width, r_refdef.view.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_ColorMask(r_refdef.view.colormask[0], r_refdef.view.colormask[1], r_refdef.view.colormask[2], 1);
 	GL_DepthFunc(GL_LEQUAL);
@@ -1720,7 +1758,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 							break;
 						}
 					}
-					R_SetupShader_Generic(map->texture, NULL, GL_MODULATE, 1);
+					R_SetupShader_Generic(map->pic->tex, NULL, GL_MODULATE, 1);
 				}
 
 				mapch = ch - map->start;
@@ -1939,6 +1977,7 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 	case RENDERPATH_SOFT:
 		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		return;
@@ -1983,6 +2022,7 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 	case RENDERPATH_SOFT:
 		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		return;
@@ -2030,6 +2070,7 @@ void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float 
 	case RENDERPATH_SOFT:
 		//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
+	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
 		//Con_DPrintf("FIXME GLES2 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		return;
@@ -2047,7 +2088,26 @@ void DrawQ_SetClipArea(float x, float y, float width, float height)
 	iy = (int)(0.5 + y * ((float) vid.height / vid_conheight.integer));
 	iw = (int)(0.5 + (x+width) * ((float)vid.width / vid_conwidth.integer)) - ix;
 	ih = (int)(0.5 + (y+height) * ((float) vid.height / vid_conheight.integer)) - iy;
-	GL_Scissor(ix, vid.height - iy - ih, iw, ih);
+	switch(vid.renderpath)
+	{
+	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GL20:
+	case RENDERPATH_GLES1:
+	case RENDERPATH_GLES2:
+	case RENDERPATH_SOFT:
+		GL_Scissor(ix, vid.height - iy - ih, iw, ih);
+		break;
+	case RENDERPATH_D3D9:
+		GL_Scissor(ix, iy, iw, ih);
+		break;
+	case RENDERPATH_D3D10:
+		Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_D3D11:
+		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	}
 
 	GL_ScissorTest(true);
 }
@@ -2083,11 +2143,12 @@ void R_DrawGamma(void)
 		if (vid_usinghwgamma || v_glslgamma.integer)
 			return;
 		break;
-	case RENDERPATH_GL13:
 	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
 		if (vid_usinghwgamma)
 			return;
 		break;
+	case RENDERPATH_GLES1:
 	case RENDERPATH_SOFT:
 		return;
 	}

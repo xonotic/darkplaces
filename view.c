@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "cl_collision.h"
+#include "image.h"
 
 void CL_VM_UpdateDmgGlobals (int dmg_take, int dmg_save, vec3_t dmg_origin);
 
@@ -103,7 +104,7 @@ cvar_t chase_up = {CVAR_SAVE, "chase_up", "24", "chase cam distance from the pla
 cvar_t chase_active = {CVAR_SAVE, "chase_active", "0", "enables chase cam"};
 cvar_t chase_overhead = {CVAR_SAVE, "chase_overhead", "0", "chase cam looks straight down if this is not zero"};
 // GAME_GOODVSBAD2
-cvar_t chase_stevie = {0, "chase_stevie", "0", "chase cam view from above (used only by GoodVsBad2)"};
+cvar_t chase_stevie = {0, "chase_stevie", "0", "(GOODVSBAD2 only) chase cam view from above"};
 
 cvar_t v_deathtilt = {0, "v_deathtilt", "1", "whether to use sideways view when dead"};
 cvar_t v_deathtiltangle = {0, "v_deathtiltangle", "80", "what roll angle to use when tilting the view while dead"};
@@ -535,7 +536,7 @@ void V_CalcRefdef (void)
 #else
 					// trace from first person view location to our chosen third person view location
 #if 1
-					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 #else
 					trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
 #endif
@@ -550,7 +551,7 @@ void V_CalcRefdef (void)
 							chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup + offset[1];
 							chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup + offset[2];
 #if 1
-							trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+							trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 #else
 							trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
 #endif
@@ -578,7 +579,7 @@ void V_CalcRefdef (void)
 					chase_dest[0] = vieworg[0] + forward[0] * dist;
 					chase_dest[1] = vieworg[1] + forward[1] * dist;
 					chase_dest[2] = vieworg[2] + forward[2] * dist + camup;
-					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+					trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
 					VectorMAMAM(1, trace.endpos, 8, forward, 4, trace.plane.normal, vieworg);
 				}
 			}
@@ -603,8 +604,9 @@ void V_CalcRefdef (void)
 					float cycle;
 					vec_t frametime;
 
-					frametime = cl.realframetime * cl.movevars_timescale;
-
+					//frametime = cl.realframetime * cl.movevars_timescale;
+					frametime = (cl.time - cl.oldtime) * cl.movevars_timescale;
+					
 					// 1. if we teleported, clear the frametime... the lowpass will recover the previous value then
 					if(!ent->persistent.trail_allowed) // FIXME improve this check
 					{
@@ -797,8 +799,8 @@ void V_CalcRefdef (void)
 				Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, vieworg[0], vieworg[1], vieworg[2], viewangles[0], viewangles[1], viewangles[2], 1);
 			// calculate a viewmodel matrix for use in view-attached entities
 			Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix, gunorg[0], gunorg[1], gunorg[2], gunangles[0], gunangles[1], gunangles[2], cl_viewmodel_scale.value);
-			VectorCopy(vieworg, cl.csqc_origin);
-			VectorCopy(viewangles, cl.csqc_angles);
+			VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
+			VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
 		}
 	}
 }
@@ -922,10 +924,22 @@ void V_CalcViewBlend(void)
 			a2 = 1 / r_refdef.viewblend[3];
 			VectorScale(r_refdef.viewblend, a2, r_refdef.viewblend);
 		}
-		r_refdef.viewblend[0] = bound(0.0f, r_refdef.viewblend[0] * (1.0f/255.0f), 1.0f);
-		r_refdef.viewblend[1] = bound(0.0f, r_refdef.viewblend[1] * (1.0f/255.0f), 1.0f);
-		r_refdef.viewblend[2] = bound(0.0f, r_refdef.viewblend[2] * (1.0f/255.0f), 1.0f);
+		r_refdef.viewblend[0] = bound(0.0f, r_refdef.viewblend[0], 255.0f);
+		r_refdef.viewblend[1] = bound(0.0f, r_refdef.viewblend[1], 255.0f);
+		r_refdef.viewblend[2] = bound(0.0f, r_refdef.viewblend[2], 255.0f);
 		r_refdef.viewblend[3] = bound(0.0f, r_refdef.viewblend[3] * gl_polyblend.value, 1.0f);
+		if (vid.sRGB3D)
+		{
+			r_refdef.viewblend[0] = Image_LinearFloatFromsRGB(r_refdef.viewblend[0]);
+			r_refdef.viewblend[1] = Image_LinearFloatFromsRGB(r_refdef.viewblend[1]);
+			r_refdef.viewblend[2] = Image_LinearFloatFromsRGB(r_refdef.viewblend[2]);
+		}
+		else
+		{
+			r_refdef.viewblend[0] *= (1.0f/256.0f);
+			r_refdef.viewblend[1] *= (1.0f/256.0f);
+			r_refdef.viewblend[2] *= (1.0f/256.0f);
+		}
 		
 		// Samual: Ugly hack, I know. But it's the best we can do since
 		// there is no way to detect client states from the engine.
@@ -1031,8 +1045,7 @@ void V_Init (void)
 	Cvar_RegisterVariable (&chase_active);
 	Cvar_RegisterVariable (&chase_overhead);
 	Cvar_RegisterVariable (&chase_pitchangle);
-	if (gamemode == GAME_GOODVSBAD2)
-		Cvar_RegisterVariable (&chase_stevie);
+	Cvar_RegisterVariable (&chase_stevie);
 
 	Cvar_RegisterVariable (&v_deathtilt);
 	Cvar_RegisterVariable (&v_deathtiltangle);

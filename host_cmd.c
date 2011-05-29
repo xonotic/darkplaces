@@ -114,9 +114,9 @@ void Host_Status_f (void)
 	print ("players:  %i active (%i max)\n\n", players, svs.maxclients);
 
 	if (in == 1)
-		print ("^2IP                   %%pl ping  time   frags  no   name\n");
+		print ("^2IP                                             %%pl ping  time   frags  no   name\n");
 	else if (in == 2)
-		print ("^5IP                    no   name\n");
+		print ("^5IP                                              no   name\n");
 
 	for (i = 0, k = 0, client = svs.clients;i < svs.maxclients;i++, client++)
 	{
@@ -149,15 +149,16 @@ void Host_Status_f (void)
 		}
 
 		if(sv_status_privacy.integer && cmd_source != src_command)
-			strlcpy(ip, client->netconnection ? "hidden" : "botclient" , 22);
+			strlcpy(ip, client->netconnection ? "hidden" : "botclient", 48);
 		else
-			strlcpy(ip, (client->netconnection && client->netconnection->address) ? client->netconnection->address : "botclient", 22);
+			strlcpy(ip, (client->netconnection && client->netconnection->address) ? client->netconnection->address : "botclient", 48);
 
 		frags = client->frags;
 
-		if(sv_status_show_qcstatus.integer && prog->fieldoffsets.clientstatus >= 0)
+		if(sv_status_show_qcstatus.integer)
 		{
-			const char *str = PRVM_E_STRING(PRVM_EDICT_NUM(i + 1), prog->fieldoffsets.clientstatus);
+			prvm_edict_t *ed = PRVM_EDICT_NUM(i + 1);
+			const char *str = PRVM_GetString(PRVM_serveredictstring(ed, clientstatus));
 			if(str && *str)
 			{
 				char *p;
@@ -943,7 +944,7 @@ void Host_Loadgame_f (void)
 			while (entnum >= prog->max_edicts)
 				PRVM_MEM_IncreaseEdicts();
 			ent = PRVM_EDICT_NUM(entnum);
-			memset (ent->fields.server, 0, prog->progs->entityfields * 4);
+			memset (ent->fields.server, 0, prog->entityfields * 4);
 			ent->priv.server->free = false;
 
 			if(developer_entityparsing.integer)
@@ -1254,8 +1255,7 @@ void Host_Playermodel_f (void)
 
 	// point the string back at updateclient->name to keep it safe
 	strlcpy (host_client->playermodel, newPath, sizeof (host_client->playermodel));
-	if( prog->fieldoffsets.playermodel >= 0 )
-		PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playermodel)->string = PRVM_SetEngineString(host_client->playermodel);
+	PRVM_serveredictstring(host_client->edict, playermodel) = PRVM_SetEngineString(host_client->playermodel);
 	if (strcmp(host_client->old_model, host_client->playermodel))
 	{
 		strlcpy(host_client->old_model, host_client->playermodel, sizeof(host_client->old_model));
@@ -1311,8 +1311,7 @@ void Host_Playerskin_f (void)
 
 	// point the string back at updateclient->name to keep it safe
 	strlcpy (host_client->playerskin, newPath, sizeof (host_client->playerskin));
-	if( prog->fieldoffsets.playerskin >= 0 )
-		PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playerskin)->string = PRVM_SetEngineString(host_client->playerskin);
+	PRVM_serveredictstring(host_client->edict, playerskin) = PRVM_SetEngineString(host_client->playerskin);
 	if (strcmp(host_client->old_skin, host_client->playerskin))
 	{
 		//if (host_client->spawned)
@@ -1573,21 +1572,19 @@ void Host_Color(int changetop, int changebottom)
 	if (cls.protocol == PROTOCOL_QUAKEWORLD)
 		return;
 
-	if (host_client->edict && prog->funcoffsets.SV_ChangeTeam)
+	if (host_client->edict && PRVM_clientfunction(SV_ChangeTeam))
 	{
 		Con_DPrint("Calling SV_ChangeTeam\n");
 		prog->globals.server->time = sv.time;
 		prog->globals.generic[OFS_PARM0] = playercolor;
 		prog->globals.server->self = PRVM_EDICT_TO_PROG(host_client->edict);
-		PRVM_ExecuteProgram(prog->funcoffsets.SV_ChangeTeam, "QC function SV_ChangeTeam is missing");
+		PRVM_ExecuteProgram(PRVM_clientfunction(SV_ChangeTeam), "QC function SV_ChangeTeam is missing");
 	}
 	else
 	{
-		prvm_eval_t *val;
 		if (host_client->edict)
 		{
-			if ((val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.clientcolors)))
-				val->_float = playercolor;
+			PRVM_serveredictfloat(host_client->edict, clientcolors) = playercolor;
 			host_client->edict->fields.server->team = bottom + 1;
 		}
 		host_client->colors = playercolor;
@@ -1719,7 +1716,6 @@ cvar_t cl_pmodel = {CVAR_SAVE | CVAR_NQUSERINFOHACK, "_cl_pmodel", "0", "interna
 static void Host_PModel_f (void)
 {
 	int i;
-	prvm_eval_t *val;
 
 	if (Cmd_Argc () == 1)
 	{
@@ -1738,8 +1734,7 @@ static void Host_PModel_f (void)
 		return;
 	}
 
-	if (host_client->edict && (val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.pmodel)))
-		val->_float = i;
+	PRVM_serveredictfloat(host_client->edict, pmodel) = i;
 }
 
 //===========================================================================
@@ -1800,12 +1795,12 @@ void Host_Spawn_f (void)
 	if (sv.loadgame)
 	{
 		// loaded games are fully initialized already
-		if (prog->funcoffsets.RestoreGame)
+		if (PRVM_serverfunction(RestoreGame))
 		{
 			Con_DPrint("Calling RestoreGame\n");
 			prog->globals.server->time = sv.time;
 			prog->globals.server->self = PRVM_EDICT_TO_PROG(host_client->edict);
-			PRVM_ExecuteProgram(prog->funcoffsets.RestoreGame, "QC function RestoreGame is missing");
+			PRVM_ExecuteProgram(PRVM_serverfunction(RestoreGame), "QC function RestoreGame is missing");
 		}
 	}
 	else
@@ -2029,7 +2024,6 @@ void Host_Give_f (void)
 {
 	const char *t;
 	int v;
-	prvm_eval_t *val;
 
 	if (!allowcheats)
 	{
@@ -2077,20 +2071,17 @@ void Host_Give_f (void)
 		break;
 
 	case 's':
-		if (gamemode == GAME_ROGUE && (val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_shells1)))
-			val->_float = v;
+		if (gamemode == GAME_ROGUE)
+			PRVM_serveredictfloat(host_client->edict, ammo_shells1) = v;
 
 		host_client->edict->fields.server->ammo_shells = v;
 		break;
 	case 'n':
 		if (gamemode == GAME_ROGUE)
 		{
-			if ((val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_nails1)))
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_nails = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_nails1) = v;
+			if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_nails = v;
 		}
 		else
 		{
@@ -2100,25 +2091,17 @@ void Host_Give_f (void)
 	case 'l':
 		if (gamemode == GAME_ROGUE)
 		{
-			val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_lava_nails);
-			if (val)
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_nails = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_lava_nails) = v;
+			if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_nails = v;
 		}
 		break;
 	case 'r':
 		if (gamemode == GAME_ROGUE)
 		{
-			val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_rockets1);
-			if (val)
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_rockets = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_rockets1) = v;
+			if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_rockets = v;
 		}
 		else
 		{
@@ -2128,13 +2111,9 @@ void Host_Give_f (void)
 	case 'm':
 		if (gamemode == GAME_ROGUE)
 		{
-			val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_multi_rockets);
-			if (val)
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_rockets = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_multi_rockets) = v;
+			if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_rockets = v;
 		}
 		break;
 	case 'h':
@@ -2143,13 +2122,9 @@ void Host_Give_f (void)
 	case 'c':
 		if (gamemode == GAME_ROGUE)
 		{
-			val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_cells1);
-			if (val)
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_cells = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_cells1) = v;
+			if (host_client->edict->fields.server->weapon <= IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_cells = v;
 		}
 		else
 		{
@@ -2159,13 +2134,9 @@ void Host_Give_f (void)
 	case 'p':
 		if (gamemode == GAME_ROGUE)
 		{
-			val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.ammo_plasma);
-			if (val)
-			{
-				val->_float = v;
-				if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
-					host_client->edict->fields.server->ammo_cells = v;
-			}
+			PRVM_serveredictfloat(host_client->edict, ammo_plasma) = v;
+			if (host_client->edict->fields.server->weapon > IT_LIGHTNING)
+				host_client->edict->fields.server->ammo_cells = v;
 		}
 		break;
 	}
@@ -2407,7 +2378,7 @@ void Host_SendCvar_f (void)
 			Cmd_ForwardStringToServer(va("sentcvar %s \"%s\"", c->name, c->string));
 		return;
 	}
-	if(!sv.active)// || !prog->funcoffsets.SV_ParseClientCommand)
+	if(!sv.active)// || !PRVM_serverfunction(SV_ParseClientCommand))
 		return;
 
 	old = host_client;
@@ -2910,22 +2881,11 @@ void Host_InitCommands (void)
 
 	Cmd_AddCommand_WithClientCommand ("status", Host_Status_f, Host_Status_f, "print server status information");
 	Cmd_AddCommand ("quit", Host_Quit_f, "quit the game");
-	if (gamemode == GAME_NEHAHRA)
-	{
-		Cmd_AddCommand_WithClientCommand ("max", NULL, Host_God_f, "god mode (invulnerability)");
-		Cmd_AddCommand_WithClientCommand ("monster", NULL, Host_Notarget_f, "notarget mode (monsters do not see you)");
-		Cmd_AddCommand_WithClientCommand ("scrag", NULL, Host_Fly_f, "fly mode (flight)");
-		Cmd_AddCommand_WithClientCommand ("wraith", NULL, Host_Noclip_f, "noclip mode (flight without collisions, move through walls)");
-		Cmd_AddCommand_WithClientCommand ("gimme", NULL, Host_Give_f, "alter inventory");
-	}
-	else
-	{
-		Cmd_AddCommand_WithClientCommand ("god", NULL, Host_God_f, "god mode (invulnerability)");
-		Cmd_AddCommand_WithClientCommand ("notarget", NULL, Host_Notarget_f, "notarget mode (monsters do not see you)");
-		Cmd_AddCommand_WithClientCommand ("fly", NULL, Host_Fly_f, "fly mode (flight)");
-		Cmd_AddCommand_WithClientCommand ("noclip", NULL, Host_Noclip_f, "noclip mode (flight without collisions, move through walls)");
-		Cmd_AddCommand_WithClientCommand ("give", NULL, Host_Give_f, "alter inventory");
-	}
+	Cmd_AddCommand_WithClientCommand ("god", NULL, Host_God_f, "god mode (invulnerability)");
+	Cmd_AddCommand_WithClientCommand ("notarget", NULL, Host_Notarget_f, "notarget mode (monsters do not see you)");
+	Cmd_AddCommand_WithClientCommand ("fly", NULL, Host_Fly_f, "fly mode (flight)");
+	Cmd_AddCommand_WithClientCommand ("noclip", NULL, Host_Noclip_f, "noclip mode (flight without collisions, move through walls)");
+	Cmd_AddCommand_WithClientCommand ("give", NULL, Host_Give_f, "alter inventory");
 	Cmd_AddCommand ("map", Host_Map_f, "kick everyone off the server and start a new level");
 	Cmd_AddCommand ("restart", Host_Restart_f, "restart current level");
 	Cmd_AddCommand ("changelevel", Host_Changelevel_f, "change to another level, bringing along all connected clients");
@@ -2957,11 +2917,8 @@ void Host_InitCommands (void)
 	Cmd_AddCommand_WithClientCommand ("color", Host_Color_f, Host_Color_f, "change your player shirt and pants colors");
 	Cvar_RegisterVariable (&cl_rate);
 	Cmd_AddCommand_WithClientCommand ("rate", Host_Rate_f, Host_Rate_f, "change your network connection speed");
-	if (gamemode == GAME_NEHAHRA)
-	{
-		Cvar_RegisterVariable (&cl_pmodel);
-		Cmd_AddCommand_WithClientCommand ("pmodel", Host_PModel_f, Host_PModel_f, "change your player model choice (Nehahra specific)");
-	}
+	Cvar_RegisterVariable (&cl_pmodel);
+	Cmd_AddCommand_WithClientCommand ("pmodel", Host_PModel_f, Host_PModel_f, "(Nehahra-only) change your player model choice");
 
 	// BLACK: This isnt game specific anymore (it was GAME_NEXUIZ at first)
 	Cvar_RegisterVariable (&cl_playermodel);

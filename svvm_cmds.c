@@ -27,6 +27,7 @@ const char *vm_sv_extensions =
 "DP_CSQC_BOXPARTICLES "
 "DP_CSQC_SPAWNPARTICLE "
 "DP_CSQC_QUERYRENDERENTITY "
+"DP_CSQC_ROTATEMOVES "
 "DP_CSQC_SETPAUSE "
 "DP_EF_ADDITIVE "
 "DP_EF_BLUE "
@@ -666,7 +667,6 @@ static trace_t SV_Trace_Toss (prvm_edict_t *tossent, prvm_edict_t *ignore)
 	vec3_t original_velocity;
 	vec3_t original_angles;
 	vec3_t original_avelocity;
-	prvm_eval_t *val;
 	trace_t trace;
 
 	VectorCopy(tossent->fields.server->origin   , original_origin   );
@@ -674,11 +674,9 @@ static trace_t SV_Trace_Toss (prvm_edict_t *tossent, prvm_edict_t *ignore)
 	VectorCopy(tossent->fields.server->angles   , original_angles   );
 	VectorCopy(tossent->fields.server->avelocity, original_avelocity);
 
-	val = PRVM_EDICTFIELDVALUE(tossent, prog->fieldoffsets.gravity);
-	if (val != NULL && val->_float != 0)
-		gravity = val->_float;
-	else
-		gravity = 1.0;
+	gravity = PRVM_serveredictfloat(tossent, gravity);
+	if (!gravity)
+		gravity = 1.0f;
 	gravity *= sv_gravity.value * 0.025;
 
 	for (i = 0;i < 200;i++) // LordHavoc: sanity check; never trace more than 10 seconds
@@ -994,7 +992,7 @@ static void VM_SV_findradius (void)
 			VectorMAMAM(1, eorg, -0.5f, ent->fields.server->mins, -0.5f, ent->fields.server->maxs, eorg);
 		if (DotProduct(eorg, eorg) < radius2)
 		{
-			PRVM_EDICTFIELDVALUE(ent,chainfield)->edict = PRVM_EDICT_TO_PROG(chain);
+			PRVM_EDICTFIELDEDICT(ent,chainfield) = PRVM_EDICT_TO_PROG(chain);
 			chain = ent;
 		}
 	}
@@ -1712,7 +1710,7 @@ static void VM_SV_copyentity (void)
 		VM_Warning("copyentity: can not modify free entity\n");
 		return;
 	}
-	memcpy(out->fields.vp, in->fields.vp, prog->progs->entityfields * 4);
+	memcpy(out->fields.vp, in->fields.vp, prog->entityfields * 4);
 	SV_LinkEdict(out);
 }
 
@@ -1730,7 +1728,6 @@ static void VM_SV_setcolor (void)
 {
 	client_t *client;
 	int entnum, i;
-	prvm_eval_t *val;
 
 	VM_SAFEPARMCOUNT(2, VM_SV_setcolor);
 	entnum = PRVM_G_EDICTNUM(OFS_PARM0);
@@ -1745,8 +1742,7 @@ static void VM_SV_setcolor (void)
 	client = svs.clients + entnum-1;
 	if (client->edict)
 	{
-		if ((val = PRVM_EDICTFIELDVALUE(client->edict, prog->fieldoffsets.clientcolors)))
-			val->_float = i;
+		PRVM_serveredictfloat(client->edict, clientcolors) = i;
 		client->edict->fields.server->team = (i & 15) + 1;
 	}
 	client->colors = i;
@@ -2295,8 +2291,8 @@ static void VM_SV_setattachment (void)
 	prvm_edict_t *e = PRVM_G_EDICT(OFS_PARM0);
 	prvm_edict_t *tagentity = PRVM_G_EDICT(OFS_PARM1);
 	const char *tagname = PRVM_G_STRING(OFS_PARM2);
-	prvm_eval_t *v;
 	dp_model_t *model;
+	int tagindex;
 	VM_SAFEPARMCOUNT(3, VM_SV_setattachment);
 
 	if (e == prog->edicts)
@@ -2313,25 +2309,23 @@ static void VM_SV_setattachment (void)
 	if (tagentity == NULL)
 		tagentity = prog->edicts;
 
-	v = PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.tag_entity);
-	if (v)
-		v->edict = PRVM_EDICT_TO_PROG(tagentity);
+	tagindex = 0;
 
-	v = PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.tag_index);
-	if (v)
-		v->_float = 0;
 	if (tagentity != NULL && tagentity != prog->edicts && tagname && tagname[0])
 	{
 		model = SV_GetModelFromEdict(tagentity);
 		if (model)
 		{
-			v->_float = Mod_Alias_GetTagIndexForName(model, (int)tagentity->fields.server->skin, tagname);
-			if (v->_float == 0)
+			tagindex = Mod_Alias_GetTagIndexForName(model, (int)tagentity->fields.server->skin, tagname);
+			if (tagindex == 0)
 				Con_DPrintf("setattachment(edict %i, edict %i, string \"%s\"): tried to find tag named \"%s\" on entity %i (model \"%s\") but could not find it\n", PRVM_NUM_FOR_EDICT(e), PRVM_NUM_FOR_EDICT(tagentity), tagname, tagname, PRVM_NUM_FOR_EDICT(tagentity), model->name);
 		}
 		else
 			Con_DPrintf("setattachment(edict %i, edict %i, string \"%s\"): tried to find tag named \"%s\" on entity %i but it has no model\n", PRVM_NUM_FOR_EDICT(e), PRVM_NUM_FOR_EDICT(tagentity), tagname, tagname, PRVM_NUM_FOR_EDICT(tagentity));
 	}
+
+	PRVM_serveredictedict(e, tag_entity) = PRVM_EDICT_TO_PROG(tagentity);
+	PRVM_serveredictfloat(e, tag_index) = tagindex;
 }
 
 /////////////////////////////////////////
@@ -2372,14 +2366,12 @@ int SV_GetExtendedTagInfo (prvm_edict_t *e, int tagindex, int *parentindex, cons
 
 void SV_GetEntityMatrix (prvm_edict_t *ent, matrix4x4_t *out, qboolean viewmatrix)
 {
-	prvm_eval_t *val;
 	float scale;
 	float pitchsign = 1;
 
-	scale = 1;
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.scale);
-	if (val && val->_float != 0)
-		scale = val->_float;
+	scale = PRVM_serveredictfloat(ent, scale);
+	if (!scale)
+		scale = 1.0f;
 	
 	if (viewmatrix)
 		Matrix4x4_CreateFromQuakeEntity(out, ent->fields.server->origin[0], ent->fields.server->origin[1], ent->fields.server->origin[2] + ent->fields.server->view_ofs[2], ent->fields.server->v_angle[0], ent->fields.server->v_angle[1], ent->fields.server->v_angle[2], scale * cl_viewmodel_scale.value);
@@ -2417,7 +2409,6 @@ extern cvar_t cl_bobup;
 int SV_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 {
 	int ret;
-	prvm_eval_t *val;
 	int modelindex, attachloop;
 	matrix4x4_t entitymatrix, tagmatrix, attachmatrix;
 	dp_model_t *model;
@@ -2455,10 +2446,10 @@ int SV_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 		Matrix4x4_Concat(&tagmatrix, &attachmatrix, out);
 		Matrix4x4_Concat(out, &entitymatrix, &tagmatrix);
 		// next iteration we process the parent entity
-		if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_entity)) && val->edict)
+		if (PRVM_serveredictedict(ent, tag_entity))
 		{
-			tagindex = (int)PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_index)->_float;
-			ent = PRVM_EDICT_NUM(val->edict);
+			tagindex = (int)PRVM_serveredictfloat(ent, tag_index);
+			ent = PRVM_EDICT_NUM(PRVM_serveredictedict(ent, tag_entity));
 		}
 		else
 			break;
@@ -2466,10 +2457,10 @@ int SV_GetTagMatrix (matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 	}
 
 	// RENDER_VIEWMODEL magic
-	if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.viewmodelforclient)) && val->edict)
+	if (PRVM_serveredictedict(ent, viewmodelforclient))
 	{
 		Matrix4x4_Copy(&tagmatrix, out);
-		ent = PRVM_EDICT_NUM(val->edict);
+		ent = PRVM_EDICT_NUM(PRVM_serveredictedict(ent, viewmodelforclient));
 
 		SV_GetEntityMatrix(ent, &entitymatrix, true);
 		Matrix4x4_Concat(out, &entitymatrix, &tagmatrix);
@@ -2547,7 +2538,6 @@ static void VM_SV_gettaginfo (void)
 	int parentindex;
 	const char *tagname;
 	int returncode;
-	prvm_eval_t *val;
 	vec3_t fo, le, up, trans;
 	const dp_model_t *model;
 
@@ -2566,18 +2556,12 @@ static void VM_SV_gettaginfo (void)
 	SV_GetExtendedTagInfo(e, tagindex, &parentindex, &tagname, &tag_localmatrix);
 	Matrix4x4_ToVectors(&tag_localmatrix, fo, le, up, trans);
 
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_parent)))
-		val->_float = parentindex;
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_name)))
-		val->string = tagname ? PRVM_SetTempString(tagname) : 0;
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_offset)))
-		VectorCopy(trans, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_forward)))
-		VectorCopy(fo, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_right)))
-		VectorScale(le, -1, val->vector);
-	if((val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.gettaginfo_up)))
-		VectorCopy(up, val->vector);
+	PRVM_serverglobalfloat(gettaginfo_parent) = parentindex;
+	PRVM_serverglobalstring(gettaginfo_name) = tagname ? PRVM_SetTempString(tagname) : 0;
+	VectorCopy(trans, PRVM_serverglobalvector(gettaginfo_offset));
+	VectorCopy(fo, PRVM_serverglobalvector(gettaginfo_forward));
+	VectorScale(le, -1, PRVM_serverglobalvector(gettaginfo_right));
+	VectorCopy(up, PRVM_serverglobalvector(gettaginfo_up));
 
 	switch(returncode)
 	{
@@ -3783,10 +3767,10 @@ void VM_SV_Cmd_Init(void)
 void VM_SV_Cmd_Reset(void)
 {
 	World_End(&sv.world);
-	if(prog->funcoffsets.SV_Shutdown)
+	if(PRVM_serverfunction(SV_Shutdown))
 	{
-		func_t s = prog->funcoffsets.SV_Shutdown;
-		prog->funcoffsets.SV_Shutdown = 0; // prevent it from getting called again
+		func_t s = PRVM_serverfunction(SV_Shutdown);
+		PRVM_serverfunction(SV_Shutdown) = 0; // prevent it from getting called again
 		PRVM_ExecuteProgram(s,"SV_Shutdown() required");
 	}
 

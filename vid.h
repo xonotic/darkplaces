@@ -37,6 +37,7 @@ typedef enum renderpath_e
 	RENDERPATH_D3D10,
 	RENDERPATH_D3D11,
 	RENDERPATH_SOFT,
+	RENDERPATH_GLES1,
 	RENDERPATH_GLES2
 }
 renderpath_t;
@@ -44,6 +45,7 @@ renderpath_t;
 typedef struct viddef_support_s
 {
 	qboolean gl20shaders;
+	qboolean gl20shaders130;
 	qboolean amd_texture_texture4;
 	qboolean arb_depth_texture;
 	qboolean arb_draw_buffers;
@@ -66,6 +68,8 @@ typedef struct viddef_support_s
 	qboolean ext_texture_compression_s3tc;
 	qboolean ext_texture_edge_clamp;
 	qboolean ext_texture_filter_anisotropic;
+	qboolean ext_texture_srgb;
+	qboolean arb_multisample;
 }
 viddef_support_t;
 
@@ -96,6 +100,10 @@ typedef struct viddef_s
 	qboolean stereobuffer;
 	int samples;
 	qboolean stencil;
+	qboolean sRGB2D; // whether 2D rendering is sRGB corrected (based on sRGBcapable2D)
+	qboolean sRGB3D; // whether 3D rendering is sRGB corrected (based on sRGBcapable3D)
+	qboolean sRGBcapable2D; // whether 2D rendering can be sRGB corrected (renderpath, v_hwgamma)
+	qboolean sRGBcapable3D; // whether 3D rendering can be sRGB corrected (renderpath, v_hwgamma)
 
 	renderpath_t renderpath;
 	qboolean forcevbo; // some renderpaths can not operate without it
@@ -121,6 +129,8 @@ typedef struct viddef_s
 	//  blit to the window)
 	unsigned int *softpixels;
 	unsigned int *softdepthpixels;
+
+	int forcetextype; // always use GL_BGRA for D3D, always use GL_RGBA for GLES, etc
 } viddef_t;
 
 // global video state
@@ -128,22 +138,55 @@ extern viddef_t vid;
 extern void (*vid_menudrawfn)(void);
 extern void (*vid_menukeyfn)(int key);
 
+#define MAXJOYAXIS 16
+// if this is changed, the corresponding code in vid_shared.c must be updated
+#define MAXJOYBUTTON 36
+typedef struct vid_joystate_s
+{
+	float axis[MAXJOYAXIS]; // -1 to +1
+	unsigned char button[MAXJOYBUTTON]; // 0 or 1
+	qboolean is360; // indicates this joystick is a Microsoft Xbox 360 Controller For Windows
+}
+vid_joystate_t;
+
+extern vid_joystate_t vid_joystate;
+
+extern cvar_t joy_index;
+extern cvar_t joy_enable;
+extern cvar_t joy_detected;
+extern cvar_t joy_active;
+
+float VID_JoyState_GetAxis(const vid_joystate_t *joystate, int axis, float sensitivity, float deadzone);
+void VID_ApplyJoyState(vid_joystate_t *joystate);
+void VID_BuildJoyState(vid_joystate_t *joystate);
+void VID_Shared_BuildJoyState_Begin(vid_joystate_t *joystate);
+void VID_Shared_BuildJoyState_Finish(vid_joystate_t *joystate);
+int VID_Shared_SetJoystick(int index);
+qboolean VID_JoyBlockEmulatedKeys(int keycode);
+void VID_EnableJoystick(qboolean enable);
+
 extern qboolean vid_hidden;
 extern qboolean vid_activewindow;
 extern cvar_t vid_hardwaregammasupported;
 extern qboolean vid_usinghwgamma;
 extern qboolean vid_supportrefreshrate;
 
+extern cvar_t vid_soft;
+extern cvar_t vid_soft_threads;
+extern cvar_t vid_soft_interlace;
+
 extern cvar_t vid_fullscreen;
 extern cvar_t vid_width;
 extern cvar_t vid_height;
 extern cvar_t vid_bitsperpixel;
 extern cvar_t vid_samples;
+extern cvar_t vid_multisampling;
 extern cvar_t vid_refreshrate;
 extern cvar_t vid_userefreshrate;
 extern cvar_t vid_vsync;
 extern cvar_t vid_mouse;
 extern cvar_t vid_grabkeyboard;
+extern cvar_t vid_touchscreen;
 extern cvar_t vid_stick_mouse;
 extern cvar_t vid_resizable;
 extern cvar_t vid_minwidth;
@@ -244,5 +287,6 @@ typedef struct
 vid_mode_t;
 size_t VID_ListModes(vid_mode_t *modes, size_t maxcount);
 size_t VID_SortModes(vid_mode_t *modes, size_t count, qboolean usebpp, qboolean userefreshrate, qboolean useaspect);
+void VID_Soft_SharedSetup(void);
 #endif
 

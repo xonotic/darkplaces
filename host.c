@@ -290,6 +290,20 @@ void Host_SaveConfig_f(void)
 	Host_SaveConfig_to(file);
 }
 
+void Host_AddConfigText(void)
+{
+	// set up the default startmap_sp and startmap_dm aliases (mods can
+	// override these) and then execute the quake.rc startup script
+	if (gamemode == GAME_NEHAHRA)
+		Cbuf_InsertText("alias startmap_sp \"map nehstart\"\nalias startmap_dm \"map nehstart\"\nexec " STARTCONFIGFILENAME "\n");
+	else if (gamemode == GAME_TRANSFUSION)
+		Cbuf_InsertText("alias startmap_sp \"map e1m1\"\n""alias startmap_dm \"map bb1\"\nexec " STARTCONFIGFILENAME "\n");
+	else if (gamemode == GAME_TEU)
+		Cbuf_InsertText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec teu.rc\n");
+	else
+		Cbuf_InsertText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec " STARTCONFIGFILENAME "\n");
+}
+
 /*
 ===============
 Host_LoadConfig_f
@@ -299,10 +313,12 @@ Resets key bindings and cvars to defaults and then reloads scripts
 */
 void Host_LoadConfig_f(void)
 {
-	// unlock the cvar default strings so they can be updated by the new default.cfg
-	Cvar_UnlockDefaults();
+	// reset all cvars, commands and aliases to init values
+	Cmd_RestoreInitState();
+	// prepend a menu restart command to execute after the config
+	Cbuf_InsertText("\nmenu_restart\n");
 	// reset cvars to their defaults, and then exec startup scripts again
-	Cbuf_InsertText("cvar_resettodefaults_all;exec " STARTCONFIGFILENAME "\n");
+	Host_AddConfigText();
 }
 
 /*
@@ -429,7 +445,7 @@ void SV_DropClient(qboolean crash)
 
 	if (host_client->netconnection)
 	{
-		// free the client (the body stays around)
+		// tell the client to be gone
 		if (!crash)
 		{
 			// LordHavoc: no opportunity for resending, so use unreliable 3 times
@@ -443,9 +459,6 @@ void SV_DropClient(qboolean crash)
 			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, false);
 			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, false);
 		}
-		// break the net connection
-		NetConn_Close(host_client->netconnection);
-		host_client->netconnection = NULL;
 	}
 
 	// call qc ClientDisconnect function
@@ -460,6 +473,13 @@ void SV_DropClient(qboolean crash)
 		prog->globals.server->self = PRVM_EDICT_TO_PROG(host_client->edict);
 		PRVM_ExecuteProgram(prog->globals.server->ClientDisconnect, "QC function ClientDisconnect is missing");
 		prog->globals.server->self = saveSelf;
+	}
+
+	if (host_client->netconnection)
+	{
+		// break the net connection
+		NetConn_Close(host_client->netconnection);
+		host_client->netconnection = NULL;
 	}
 
 	// if a download is active, close it
@@ -547,10 +567,10 @@ void Host_ShutdownServer(void)
 	SV_VM_Begin();
 	World_End(&sv.world);
 	if(prog->loaded)
-		if(prog->funcoffsets.SV_Shutdown)
+		if(PRVM_serverfunction(SV_Shutdown))
 		{
-			func_t s = prog->funcoffsets.SV_Shutdown;
-			prog->funcoffsets.SV_Shutdown = 0; // prevent it from getting called again
+			func_t s = PRVM_serverfunction(SV_Shutdown);
+			PRVM_serverfunction(SV_Shutdown) = 0; // prevent it from getting called again
 			PRVM_ExecuteProgram(s,"SV_Shutdown() required");
 		}
 	for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
@@ -770,6 +790,9 @@ void Host_Main(void)
 			double advancetime, aborttime = 0;
 			float offset;
 
+			if (cls.state == ca_dedicated)
+				Collision_Cache_NewFrame();
+
 			// run the world state
 			// don't allow simulation to run too fast or too slow or logic glitches can occur
 
@@ -838,7 +861,7 @@ void Host_Main(void)
 			
 			if (sv.paused == 1 && realtime > sv.pausedstart && sv.pausedstart > 0) {
 				prog->globals.generic[OFS_PARM0] = realtime - sv.pausedstart;
-				PRVM_ExecuteProgram(prog->funcoffsets.SV_PausedTic, "QC function SV_PausedTic is missing");
+				PRVM_ExecuteProgram(PRVM_serverfunction(SV_PausedTic), "QC function SV_PausedTic is missing");
 			}
 
 			// end the server VM frame
@@ -864,6 +887,8 @@ void Host_Main(void)
 		if (cls.state != ca_dedicated && (cl_timer > 0 || cls.timedemo || ((vid_activewindow ? cl_maxfps : cl_maxidlefps).value < 1)))
 		{
 			R_TimeReport("---");
+			Collision_Cache_NewFrame();
+			R_TimeReport("collisioncache");
 			// decide the simulation time
 			if (cls.capturevideo.active)
 			{
@@ -1151,16 +1176,19 @@ static void Host_Init (void)
 		CL_Init();
 	}
 
-	// set up the default startmap_sp and startmap_dm aliases (mods can
-	// override these) and then execute the quake.rc startup script
-	if (gamemode == GAME_NEHAHRA)
-		Cbuf_AddText("alias startmap_sp \"map nehstart\"\nalias startmap_dm \"map nehstart\"\nexec " STARTCONFIGFILENAME "\n");
-	else if (gamemode == GAME_TRANSFUSION)
-		Cbuf_AddText("alias startmap_sp \"map e1m1\"\n""alias startmap_dm \"map bb1\"\nexec " STARTCONFIGFILENAME "\n");
-	else if (gamemode == GAME_TEU)
-		Cbuf_AddText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec teu.rc\n");
-	else
-		Cbuf_AddText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec " STARTCONFIGFILENAME "\n");
+	// save off current state of aliases, commands and cvars for later restore if FS_GameDir_f is called
+	// NOTE: menu commands are freed by Cmd_RestoreInitState
+	Cmd_SaveInitState();
+
+	// FIXME: put this into some neat design, but the menu should be allowed to crash
+	// without crashing the whole game, so this should just be a short-time solution
+
+	// here comes the not so critical stuff
+	if (setjmp(host_abortframe)) {
+		return;
+	}
+
+	Host_AddConfigText();
 	Cbuf_Execute();
 
 	// if stuffcmds wasn't run, then quake.rc is probably missing, use default
@@ -1172,14 +1200,6 @@ static void Host_Init (void)
 
 	// put up the loading image so the user doesn't stare at a black screen...
 	SCR_BeginLoadingPlaque();
-
-	// FIXME: put this into some neat design, but the menu should be allowed to crash
-	// without crashing the whole game, so this should just be a short-time solution
-
-	// here comes the not so critical stuff
-	if (setjmp(host_abortframe)) {
-		return;
-	}
 
 	if (cls.state != ca_dedicated)
 	{

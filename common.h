@@ -251,6 +251,16 @@ extern int dpvsnprintf (char *buffer, size_t buffersize, const char *format, va_
 extern	struct cvar_s	registered;
 extern	struct cvar_s	cmdline;
 
+typedef enum userdirmode_e
+{
+	USERDIRMODE_NOHOME, // basedir only
+	USERDIRMODE_HOME, // Windows basedir, general POSIX (~/.)
+	USERDIRMODE_MYGAMES, // pre-Vista (My Documents/My Games/), general POSIX (~/.)
+	USERDIRMODE_SAVEDGAMES, // Vista (%USERPROFILE%/Saved Games/), OSX (~/Library/Application Support/), Linux (~/.config)
+	USERDIRMODE_COUNT
+}
+userdirmode_t;
+
 typedef enum gamemode_e
 {
 	GAME_NORMAL,
@@ -292,6 +302,8 @@ extern const char *gamedirname2;
 extern const char *gamescreenshotname;
 extern const char *gameuserdirname;
 extern char com_modname[MAX_OSPATH];
+
+void COM_ChangeGameTypeForGameDirs(void);
 
 void COM_ToLowerString (const char *in, char *out, size_t size_out);
 void COM_ToUpperString (const char *in, char *out, size_t size_out);

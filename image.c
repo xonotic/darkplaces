@@ -804,7 +804,7 @@ void Image_MakeLinearColorsFromsRGB(unsigned char *pout, const unsigned char *pi
 	// this math from http://www.opengl.org/registry/specs/EXT/texture_sRGB.txt
 	if (!image_linearfromsrgb[255])
 		for (i = 0;i < 256;i++)
-			image_linearfromsrgb[i] = i < 11 ? (int)(i / 12.92f) : (int)(pow((i/256.0f + 0.055f)/1.0555f, 2.4f)*256.0f);
+			image_linearfromsrgb[i] = (unsigned char)(Image_LinearFloatFromsRGB(i) * 256.0f);
 	for (i = 0;i < numpixels;i++)
 	{
 		pout[i*4+0] = image_linearfromsrgb[pin[i*4+0]];
@@ -1004,14 +1004,14 @@ unsigned char *loadimagepixelsbgra (const char *filename, qboolean complain, qbo
 }
 
 extern cvar_t gl_picmip;
-rtexture_t *loadtextureimage (rtexturepool_t *pool, const char *filename, qboolean complain, int flags, qboolean allowFixtrans, qboolean convertsRGB)
+rtexture_t *loadtextureimage (rtexturepool_t *pool, const char *filename, qboolean complain, int flags, qboolean allowFixtrans, qboolean sRGB)
 {
 	unsigned char *data;
 	rtexture_t *rt;
 	int miplevel = R_PicmipForFlags(flags);
-	if (!(data = loadimagepixelsbgra (filename, complain, allowFixtrans, convertsRGB, &miplevel)))
+	if (!(data = loadimagepixelsbgra (filename, complain, allowFixtrans, false, &miplevel)))
 		return 0;
-	rt = R_LoadTexture2D(pool, filename, image_width, image_height, data, TEXTYPE_BGRA, flags, miplevel, NULL);
+	rt = R_LoadTexture2D(pool, filename, image_width, image_height, data, sRGB ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, flags, miplevel, NULL);
 	Mem_Free(data);
 	return rt;
 }

@@ -265,31 +265,32 @@ static void Cvar_UpdateAutoCvar(cvar_t *var)
 		// MUST BE SYNCED WITH prvm_edict.c PRVM_LoadProgs
 		int j;
 		const char *s;
-		prvm_eval_t *val = (prvm_eval_t *)(prog->globals.generic + prog->globaldefs[var->globaldefindex[i]].ofs);
+		vec3_t v;
 		switch(prog->globaldefs[var->globaldefindex[i]].type & ~DEF_SAVEGLOBAL)
 		{
 			case ev_float:
-				val->_float = var->value;
+				PRVM_GLOBALFIELDFLOAT(prog->globaldefs[var->globaldefindex[i]].ofs) = var->value;
 				break;
 			case ev_vector:
 				s = var->string;
-				VectorClear(val->vector);
+				VectorClear(v);
 				for (j = 0;j < 3;j++)
 				{
 					while (*s && ISWHITESPACE(*s))
 						s++;
 					if (!*s)
 						break;
-					val->vector[j] = atof(s);
+					v[j] = atof(s);
 					while (!ISWHITESPACE(*s))
 						s++;
 					if (!*s)
 						break;
 				}
+				VectorCopy(v, PRVM_GLOBALFIELDVECTOR(prog->globaldefs[var->globaldefindex[i]].ofs));
 				break;
 			case ev_string:
 				PRVM_ChangeEngineString(var->globaldefindex_stringno[i], var->string);
-				val->string = var->globaldefindex_stringno[i];
+				PRVM_GLOBALFIELDSTRING(prog->globaldefs[var->globaldefindex[i]].ofs) = var->globaldefindex_stringno[i];
 				break;
 		}
 	}
@@ -557,7 +558,6 @@ cvar_t *Cvar_Get (const char *name, const char *value, int flags, const char *ne
 {
 	int hashindex;
 	cvar_t *current, *next, *cvar;
-	size_t alloclen;
 
 	if (developer_extra.integer)
 		Con_DPrintf("Cvar_Get(\"%s\", \"%s\", %i);\n", name, value, flags);
@@ -574,11 +574,7 @@ cvar_t *Cvar_Get (const char *name, const char *value, int flags, const char *ne
 				Z_Free((char *)cvar->description);
 
 			if(*newdescription)
-			{
-				alloclen = strlen(newdescription) + 1;
-				cvar->description = (char *)Z_Malloc(alloclen);
-				memcpy((char *)cvar->description, newdescription, alloclen);
-			}
+				cvar->description = (char *)Mem_strdup(zonemempool, newdescription);
 			else
 				cvar->description = cvar_dummy_description;
 		}
@@ -604,23 +600,14 @@ cvar_t *Cvar_Get (const char *name, const char *value, int flags, const char *ne
 // FIXME: these never get Z_Free'd
 	cvar = (cvar_t *)Z_Malloc(sizeof(cvar_t));
 	cvar->flags = flags | CVAR_ALLOCATED;
-	alloclen = strlen(name) + 1;
-	cvar->name = (char *)Z_Malloc(alloclen);
-	memcpy((char *)cvar->name, name, alloclen);
-	alloclen = strlen(value) + 1;
-	cvar->string = (char *)Z_Malloc(alloclen);
-	memcpy((char *)cvar->string, value, alloclen);
-	cvar->defstring = (char *)Z_Malloc(alloclen);
-	memcpy((char *)cvar->defstring, value, alloclen);
+	cvar->name = (char *)Mem_strdup(zonemempool, name);
+	cvar->string = (char *)Mem_strdup(zonemempool, value);
+	cvar->defstring = (char *)Mem_strdup(zonemempool, value);
 	cvar->value = atof (cvar->string);
 	cvar->integer = (int) cvar->value;
 
 	if(newdescription && *newdescription)
-	{
-		alloclen = strlen(newdescription) + 1;
-		cvar->description = (char *)Z_Malloc(alloclen);
-		memcpy((char *)cvar->description, newdescription, alloclen);
-	}
+		cvar->description = (char *)Mem_strdup(zonemempool, newdescription);
 	else
 		cvar->description = cvar_dummy_description; // actually checked by VM_cvar_type
 
@@ -710,6 +697,84 @@ void Cvar_LockDefaults_f (void)
 	}
 }
 
+void Cvar_SaveInitState(void)
+{
+	cvar_t *c;
+	for (c = cvar_vars;c;c = c->next)
+	{
+		c->initstate = true;
+		c->initflags = c->flags;
+		c->initdefstring = Mem_strdup(zonemempool, c->defstring);
+		c->initstring = Mem_strdup(zonemempool, c->string);
+		c->initvalue = c->value;
+		c->initinteger = c->integer;
+		VectorCopy(c->vector, c->initvector);
+	}
+}
+
+void Cvar_RestoreInitState(void)
+{
+	int hashindex;
+	cvar_t *c, **cp;
+	cvar_t *c2, **cp2;
+	for (cp = &cvar_vars;(c = *cp);)
+	{
+		if (c->initstate)
+		{
+			// restore this cvar, it existed at init
+			if (((c->flags ^ c->initflags) & CVAR_MAXFLAGSVAL)
+			 || strcmp(c->defstring ? c->defstring : "", c->initdefstring ? c->initdefstring : "")
+			 || strcmp(c->string ? c->string : "", c->initstring ? c->initstring : ""))
+			{
+				Con_DPrintf("Cvar_RestoreInitState: Restoring cvar \"%s\"\n", c->name);
+				if (c->defstring)
+					Z_Free((char *)c->defstring);
+				c->defstring = Mem_strdup(zonemempool, c->initdefstring);
+				if (c->string)
+					Z_Free((char *)c->string);
+				c->string = Mem_strdup(zonemempool, c->initstring);
+			}
+			c->flags = c->initflags;
+			c->value = c->initvalue;
+			c->integer = c->initinteger;
+			VectorCopy(c->initvector, c->vector);
+			cp = &c->next;
+		}
+		else
+		{
+			if (!(c->flags & CVAR_ALLOCATED))
+			{
+				Con_DPrintf("Cvar_RestoreInitState: Unable to destroy cvar \"%s\", it was registered after init!\n", c->name);
+				continue;
+			}
+			// remove this cvar, it did not exist at init
+			Con_DPrintf("Cvar_RestoreInitState: Destroying cvar \"%s\"\n", c->name);
+			// unlink struct from hash
+			hashindex = CRC_Block((const unsigned char *)c->name, strlen(c->name)) % CVAR_HASHSIZE;
+			for (cp2 = &cvar_hashtable[hashindex];(c2 = *cp2);)
+			{
+				if (c2 == c)
+				{
+					*cp2 = c2->nextonhashchain;
+					break;
+				}
+				else
+					cp2 = &c2->nextonhashchain;
+			}
+			// unlink struct from main list
+			*cp = c->next;
+			// free strings
+			if (c->defstring)
+				Z_Free((char *)c->defstring);
+			if (c->string)
+				Z_Free((char *)c->string);
+			if (c->description && c->description != cvar_dummy_description)
+				Z_Free((char *)c->description);
+			// free struct
+			Z_Free(c);
+		}
+	}
+}
 
 void Cvar_ResetToDefaults_All_f (void)
 {
@@ -758,8 +823,8 @@ void Cvar_WriteVariables (qfile_t *f)
 	for (var = cvar_vars ; var ; var = var->next)
 		if ((var->flags & CVAR_SAVE) && (strcmp(var->string, var->defstring) || !(var->flags & CVAR_DEFAULTSET)))
 		{
-			Cmd_QuoteString(buf1, sizeof(buf1), var->name, "\"\\$");
-			Cmd_QuoteString(buf2, sizeof(buf2), var->string, "\"\\$");
+			Cmd_QuoteString(buf1, sizeof(buf1), var->name, "\"\\$", false);
+			Cmd_QuoteString(buf2, sizeof(buf2), var->string, "\"\\$", false);
 			FS_Printf(f, "%s\"%s\" \"%s\"\n", var->flags & CVAR_ALLOCATED ? "seta " : "", buf1, buf2);
 		}
 }

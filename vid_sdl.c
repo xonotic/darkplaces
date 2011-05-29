@@ -66,229 +66,342 @@ int cl_available = true;
 
 qboolean vid_supportrefreshrate = false;
 
-cvar_t vid_soft = {CVAR_SAVE, "vid_soft", "0", "enables use of the DarkPlaces Software Rasterizer rather than OpenGL or Direct3D"};
-cvar_t vid_soft_threads = {CVAR_SAVE, "vid_soft_threads", "2", "the number of threads the DarkPlaces Software Rasterizer should use"}; 
-cvar_t vid_soft_interlace = {CVAR_SAVE, "vid_soft_interlace", "1", "whether the DarkPlaces Software Rasterizer shoud interlace the screen bands occupied by each thread"};
-cvar_t joy_detected = {CVAR_READONLY, "joy_detected", "0", "number of joysticks detected by engine"};
-cvar_t joy_enable = {CVAR_SAVE, "joy_enable", "0", "enables joystick support"};
-cvar_t joy_index = {0, "joy_index", "0", "selects which joystick to use if you have multiple"};
-cvar_t joy_axisforward = {0, "joy_axisforward", "1", "which joystick axis to query for forward/backward movement"};
-cvar_t joy_axisside = {0, "joy_axisside", "0", "which joystick axis to query for right/left movement"};
-cvar_t joy_axisup = {0, "joy_axisup", "-1", "which joystick axis to query for up/down movement"};
-cvar_t joy_axispitch = {0, "joy_axispitch", "3", "which joystick axis to query for looking up/down"};
-cvar_t joy_axisyaw = {0, "joy_axisyaw", "2", "which joystick axis to query for looking right/left"};
-cvar_t joy_axisroll = {0, "joy_axisroll", "-1", "which joystick axis to query for tilting head right/left"};
-cvar_t joy_deadzoneforward = {0, "joy_deadzoneforward", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneside = {0, "joy_deadzoneside", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneup = {0, "joy_deadzoneup", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzonepitch = {0, "joy_deadzonepitch", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneyaw = {0, "joy_deadzoneyaw", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneroll = {0, "joy_deadzoneroll", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_sensitivityforward = {0, "joy_sensitivityforward", "-1", "movement multiplier"};
-cvar_t joy_sensitivityside = {0, "joy_sensitivityside", "1", "movement multiplier"};
-cvar_t joy_sensitivityup = {0, "joy_sensitivityup", "1", "movement multiplier"};
-cvar_t joy_sensitivitypitch = {0, "joy_sensitivitypitch", "1", "movement multiplier"};
-cvar_t joy_sensitivityyaw = {0, "joy_sensitivityyaw", "-1", "movement multiplier"};
-cvar_t joy_sensitivityroll = {0, "joy_sensitivityroll", "1", "movement multiplier"};
-cvar_t joy_axiskeyevents = {CVAR_SAVE, "joy_axiskeyevents", "0", "generate uparrow/leftarrow etc. keyevents for joystick axes, use if your joystick driver is not generating them"};
+#ifdef USE_GLES2
+# define SETVIDEOMODE 0
+#else
+# if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+#  define SETVIDEOMODE 1
+# else
+// LordHavoc: SDL 1.3's SDL_CreateWindow API is not finished enough to use yet, but you can set this to 0 if you want to try it...
+#  ifndef SETVIDEOMODE
+#   define SETVIDEOMODE 1
+#  endif
+# endif
+#endif
 
 static qboolean vid_usingmouse = false;
 static qboolean vid_usinghidecursor = false;
+static qboolean vid_hasfocus = false;
 static qboolean vid_isfullscreen;
-#if !(SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2)
+#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+#else
 static qboolean vid_usingvsync = false;
 #endif
-static int vid_numjoysticks = 0;
-#define MAX_JOYSTICKS 8
-static SDL_Joystick *vid_joysticks[MAX_JOYSTICKS];
+static SDL_Joystick *vid_sdljoystick = NULL;
 
 static int win_half_width = 50;
 static int win_half_height = 50;
-static int video_bpp, video_flags;
+static int video_bpp;
 
+#if SETVIDEOMODE
 static SDL_Surface *screen;
+static int video_flags;
+#else
+static SDL_GLContext *context;
+static SDL_Window *window;
+static int window_flags;
+#endif
 static SDL_Surface *vid_softsurface;
-
-// joystick axes state
-#define MAX_JOYSTICK_AXES	16
-typedef struct
-{
-	float oldmove;
-	float move;
-	double keytime;
-}joy_axiscache_t;
-static joy_axiscache_t joy_axescache[MAX_JOYSTICK_AXES];
 
 /////////////////////////
 // Input handling
 ////
-//TODO: Add joystick support
 //TODO: Add error checking
 
-
-//keysym to quake keysym mapping
-#define tenoh	0,0,0,0,0, 0,0,0,0,0
-#define fiftyoh tenoh, tenoh, tenoh, tenoh, tenoh
-#define hundredoh fiftyoh, fiftyoh
-static unsigned int tbl_sdltoquake[] =
-{
-	0,0,0,0,		//SDLK_UNKNOWN		= 0,
-	0,0,0,0,		//SDLK_FIRST		= 0,
-	K_BACKSPACE,	//SDLK_BACKSPACE	= 8,
-	K_TAB,			//SDLK_TAB			= 9,
-	0,0,
-	0,				//SDLK_CLEAR		= 12,
-	K_ENTER,		//SDLK_RETURN		= 13,
-    0,0,0,0,0,
-	K_PAUSE,		//SDLK_PAUSE		= 19,
-	0,0,0,0,0,0,0,
-	K_ESCAPE,		//SDLK_ESCAPE		= 27,
-	0,0,0,0,
-	K_SPACE,		//SDLK_SPACE		= 32,
-	'!',			//SDLK_EXCLAIM		= 33,
-	'"',			//SDLK_QUOTEDBL		= 34,
-	'#',			//SDLK_HASH			= 35,
-	'$',			//SDLK_DOLLAR		= 36,
-	0,
-	'&',			//SDLK_AMPERSAND	= 38,
-	'\'',			//SDLK_QUOTE		= 39,
-	'(',			//SDLK_LEFTPAREN	= 40,
-	')',			//SDLK_RIGHTPAREN	= 41,
-	'*',			//SDLK_ASTERISK		= 42,
-	'+',			//SDLK_PLUS			= 43,
-	',',			//SDLK_COMMA		= 44,
-	'-',			//SDLK_MINUS		= 45,
-	'.',			//SDLK_PERIOD		= 46,
-	'/',			//SDLK_SLASH		= 47,
-	'0',			//SDLK_0			= 48,
-	'1',			//SDLK_1			= 49,
-	'2',			//SDLK_2			= 50,
-	'3',			//SDLK_3			= 51,
-	'4',			//SDLK_4			= 52,
-	'5',			//SDLK_5			= 53,
-	'6',			//SDLK_6			= 54,
-	'7',			//SDLK_7			= 55,
-	'8',			//SDLK_8			= 56,
-	'9',			//SDLK_9			= 57,
-	':',			//SDLK_COLON		= 58,
-	';',			//SDLK_SEMICOLON	= 59,
-	'<',			//SDLK_LESS			= 60,
-	'=',			//SDLK_EQUALS		= 61,
-	'>',			//SDLK_GREATER		= 62,
-	'?',			//SDLK_QUESTION		= 63,
-	'@',			//SDLK_AT			= 64,
-	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-	'[',		//SDLK_LEFTBRACKET	= 91,
-	'\\',		//SDLK_BACKSLASH	= 92,
-	']',		//SDLK_RIGHTBRACKET	= 93,
-	'^',		//SDLK_CARET		= 94,
-	'_',		//SDLK_UNDERSCORE	= 95,
-	'`',		//SDLK_BACKQUOTE	= 96,
-	'a',		//SDLK_a			= 97,
-	'b',		//SDLK_b			= 98,
-	'c',		//SDLK_c			= 99,
-	'd',		//SDLK_d			= 100,
-	'e',		//SDLK_e			= 101,
-	'f',		//SDLK_f			= 102,
-	'g',		//SDLK_g			= 103,
-	'h',		//SDLK_h			= 104,
-	'i',		//SDLK_i			= 105,
-	'j',		//SDLK_j			= 106,
-	'k',		//SDLK_k			= 107,
-	'l',		//SDLK_l			= 108,
-	'm',		//SDLK_m			= 109,
-	'n',		//SDLK_n			= 110,
-	'o',		//SDLK_o			= 111,
-	'p',		//SDLK_p			= 112,
-	'q',		//SDLK_q			= 113,
-	'r',		//SDLK_r			= 114,
-	's',		//SDLK_s			= 115,
-	't',		//SDLK_t			= 116,
-	'u',		//SDLK_u			= 117,
-	'v',		//SDLK_v			= 118,
-	'w',		//SDLK_w			= 119,
-	'x',		//SDLK_x			= 120,
-	'y',		//SDLK_y			= 121,
-	'z',		//SDLK_z			= 122,
-	0,0,0,0,
-	K_DEL, 		//SDLK_DELETE		= 127,
-	hundredoh /*227*/, tenoh, tenoh, 0,0,0,0,0,0,0,0,
-	K_KP_0,		//SDLK_KP0		= 256,
-	K_KP_1,		//SDLK_KP1		= 257,
-	K_KP_2,		//SDLK_KP2		= 258,
-	K_KP_3,		//SDLK_KP3		= 259,
-	K_KP_4,		//SDLK_KP4		= 260,
-	K_KP_5,		//SDLK_KP5		= 261,
-	K_KP_6,		//SDLK_KP6		= 262,
-	K_KP_7,		//SDLK_KP7		= 263,
-	K_KP_8,		//SDLK_KP8		= 264,
-	K_KP_9,		//SDLK_KP9		= 265,
-	K_KP_PERIOD,//SDLK_KP_PERIOD	= 266,
-	K_KP_DIVIDE,//SDLK_KP_DIVIDE	= 267,
-	K_KP_MULTIPLY,//SDLK_KP_MULTIPLY= 268,
-	K_KP_MINUS,	//SDLK_KP_MINUS		= 269,
-	K_KP_PLUS,	//SDLK_KP_PLUS		= 270,
-	K_KP_ENTER,	//SDLK_KP_ENTER		= 271,
-	K_KP_EQUALS,//SDLK_KP_EQUALS	= 272,
-	K_UPARROW,	//SDLK_UP		= 273,
-	K_DOWNARROW,//SDLK_DOWN		= 274,
-	K_RIGHTARROW,//SDLK_RIGHT	= 275,
-	K_LEFTARROW,//SDLK_LEFT		= 276,
-	K_INS,		//SDLK_INSERT	= 277,
-	K_HOME,		//SDLK_HOME		= 278,
-	K_END,		//SDLK_END		= 279,
-	K_PGUP, 	//SDLK_PAGEUP	= 280,
-	K_PGDN,		//SDLK_PAGEDOWN	= 281,
-	K_F1,		//SDLK_F1		= 282,
-	K_F2,		//SDLK_F2		= 283,
-	K_F3,		//SDLK_F3		= 284,
-	K_F4,		//SDLK_F4		= 285,
-	K_F5,		//SDLK_F5		= 286,
-	K_F6,		//SDLK_F6		= 287,
-	K_F7,		//SDLK_F7		= 288,
-	K_F8,		//SDLK_F8		= 289,
-	K_F9,		//SDLK_F9		= 290,
-	K_F10,		//SDLK_F10		= 291,
-	K_F11,		//SDLK_F11		= 292,
-	K_F12,		//SDLK_F12		= 293,
-	0,			//SDLK_F13		= 294,
-	0,			//SDLK_F14		= 295,
-	0,			//SDLK_F15		= 296,
-	0,0,0,
-	K_NUMLOCK,	//SDLK_NUMLOCK	= 300,
-	K_CAPSLOCK,	//SDLK_CAPSLOCK	= 301,
-	K_SCROLLOCK,//SDLK_SCROLLOCK= 302,
-	K_SHIFT,	//SDLK_RSHIFT	= 303,
-	K_SHIFT,	//SDLK_LSHIFT	= 304,
-	K_CTRL,		//SDLK_RCTRL	= 305,
-	K_CTRL,		//SDLK_LCTRL	= 306,
-	K_ALT,		//SDLK_RALT		= 307,
-	K_ALT,		//SDLK_LALT		= 308,
-	0,			//SDLK_RMETA	= 309,
-	0,			//SDLK_LMETA	= 310,
-	0,			//SDLK_LSUPER	= 311,		/* Left "Windows" key */
-	0,			//SDLK_RSUPER	= 312,		/* Right "Windows" key */
-	K_ALT,			//SDLK_MODE		= 313,		/* "Alt Gr" key */
-	0,			//SDLK_COMPOSE	= 314,		/* Multi-key compose key */
-	0,			//SDLK_HELP		= 315,
-	0,			//SDLK_PRINT	= 316,
-	0,			//SDLK_SYSREQ	= 317,
-	K_PAUSE,	//SDLK_BREAK	= 318,
-	0,			//SDLK_MENU		= 319,
-	0,			//SDLK_POWER	= 320,		/* Power Macintosh power key */
-	'e',		//SDLK_EURO		= 321,		/* Some european keyboards */
-	0			//SDLK_UNDO		= 322,		/* Atari keyboard has Undo */
-};
-#undef tenoh
-#undef fiftyoh
-#undef hundredoh
+#ifndef SDLK_PERCENT
+#define SDLK_PERCENT '%'
+#define SDLK_PRINTSCREEN SDLK_PRINT
+#define SDLK_SCROLLLOCK SDLK_SCROLLOCK
+#define SDLK_NUMLOCKCLEAR SDLK_NUMLOCK
+#define SDLK_KP_1 SDLK_KP1
+#define SDLK_KP_2 SDLK_KP2
+#define SDLK_KP_3 SDLK_KP3
+#define SDLK_KP_4 SDLK_KP4
+#define SDLK_KP_5 SDLK_KP5
+#define SDLK_KP_6 SDLK_KP6
+#define SDLK_KP_7 SDLK_KP7
+#define SDLK_KP_8 SDLK_KP8
+#define SDLK_KP_9 SDLK_KP9
+#define SDLK_KP_0 SDLK_KP0
+#endif
 
 static int MapKey( unsigned int sdlkey )
 {
-	if( sdlkey > sizeof(tbl_sdltoquake)/ sizeof(int) )
-		return 0;
-    return tbl_sdltoquake[ sdlkey ];
+	switch(sdlkey)
+	{
+	default: return 0;
+//	case SDLK_UNKNOWN:            return K_UNKNOWN;
+	case SDLK_RETURN:             return K_ENTER;
+	case SDLK_ESCAPE:             return K_ESCAPE;
+	case SDLK_BACKSPACE:          return K_BACKSPACE;
+	case SDLK_TAB:                return K_TAB;
+	case SDLK_SPACE:              return K_SPACE;
+	case SDLK_EXCLAIM:            return '!';
+	case SDLK_QUOTEDBL:           return '"';
+	case SDLK_HASH:               return '#';
+	case SDLK_PERCENT:            return '%';
+	case SDLK_DOLLAR:             return '$';
+	case SDLK_AMPERSAND:          return '&';
+	case SDLK_QUOTE:              return '\'';
+	case SDLK_LEFTPAREN:          return '(';
+	case SDLK_RIGHTPAREN:         return ')';
+	case SDLK_ASTERISK:           return '*';
+	case SDLK_PLUS:               return '+';
+	case SDLK_COMMA:              return ',';
+	case SDLK_MINUS:              return '-';
+	case SDLK_PERIOD:             return '.';
+	case SDLK_SLASH:              return '/';
+	case SDLK_0:                  return '0';
+	case SDLK_1:                  return '1';
+	case SDLK_2:                  return '2';
+	case SDLK_3:                  return '3';
+	case SDLK_4:                  return '4';
+	case SDLK_5:                  return '5';
+	case SDLK_6:                  return '6';
+	case SDLK_7:                  return '7';
+	case SDLK_8:                  return '8';
+	case SDLK_9:                  return '9';
+	case SDLK_COLON:              return ':';
+	case SDLK_SEMICOLON:          return ';';
+	case SDLK_LESS:               return '<';
+	case SDLK_EQUALS:             return '=';
+	case SDLK_GREATER:            return '>';
+	case SDLK_QUESTION:           return '?';
+	case SDLK_AT:                 return '@';
+	case SDLK_LEFTBRACKET:        return '[';
+	case SDLK_BACKSLASH:          return '\\';
+	case SDLK_RIGHTBRACKET:       return ']';
+	case SDLK_CARET:              return '^';
+	case SDLK_UNDERSCORE:         return '_';
+	case SDLK_BACKQUOTE:          return '`';
+	case SDLK_a:                  return 'a';
+	case SDLK_b:                  return 'b';
+	case SDLK_c:                  return 'c';
+	case SDLK_d:                  return 'd';
+	case SDLK_e:                  return 'e';
+	case SDLK_f:                  return 'f';
+	case SDLK_g:                  return 'g';
+	case SDLK_h:                  return 'h';
+	case SDLK_i:                  return 'i';
+	case SDLK_j:                  return 'j';
+	case SDLK_k:                  return 'k';
+	case SDLK_l:                  return 'l';
+	case SDLK_m:                  return 'm';
+	case SDLK_n:                  return 'n';
+	case SDLK_o:                  return 'o';
+	case SDLK_p:                  return 'p';
+	case SDLK_q:                  return 'q';
+	case SDLK_r:                  return 'r';
+	case SDLK_s:                  return 's';
+	case SDLK_t:                  return 't';
+	case SDLK_u:                  return 'u';
+	case SDLK_v:                  return 'v';
+	case SDLK_w:                  return 'w';
+	case SDLK_x:                  return 'x';
+	case SDLK_y:                  return 'y';
+	case SDLK_z:                  return 'z';
+	case SDLK_CAPSLOCK:           return K_CAPSLOCK;
+	case SDLK_F1:                 return K_F1;
+	case SDLK_F2:                 return K_F2;
+	case SDLK_F3:                 return K_F3;
+	case SDLK_F4:                 return K_F4;
+	case SDLK_F5:                 return K_F5;
+	case SDLK_F6:                 return K_F6;
+	case SDLK_F7:                 return K_F7;
+	case SDLK_F8:                 return K_F8;
+	case SDLK_F9:                 return K_F9;
+	case SDLK_F10:                return K_F10;
+	case SDLK_F11:                return K_F11;
+	case SDLK_F12:                return K_F12;
+	case SDLK_PRINTSCREEN:        return K_PRINTSCREEN;
+	case SDLK_SCROLLLOCK:         return K_SCROLLOCK;
+	case SDLK_PAUSE:              return K_PAUSE;
+	case SDLK_INSERT:             return K_INS;
+	case SDLK_HOME:               return K_HOME;
+	case SDLK_PAGEUP:             return K_PGUP;
+#ifdef __IPHONEOS__
+	case SDLK_DELETE:             return K_BACKSPACE;
+#else
+	case SDLK_DELETE:             return K_DEL;
+#endif
+	case SDLK_END:                return K_END;
+	case SDLK_PAGEDOWN:           return K_PGDN;
+	case SDLK_RIGHT:              return K_RIGHTARROW;
+	case SDLK_LEFT:               return K_LEFTARROW;
+	case SDLK_DOWN:               return K_DOWNARROW;
+	case SDLK_UP:                 return K_UPARROW;
+	case SDLK_NUMLOCKCLEAR:       return K_NUMLOCK;
+	case SDLK_KP_DIVIDE:          return K_KP_DIVIDE;
+	case SDLK_KP_MULTIPLY:        return K_KP_MULTIPLY;
+	case SDLK_KP_MINUS:           return K_KP_MINUS;
+	case SDLK_KP_PLUS:            return K_KP_PLUS;
+	case SDLK_KP_ENTER:           return K_KP_ENTER;
+	case SDLK_KP_1:               return K_KP_1;
+	case SDLK_KP_2:               return K_KP_2;
+	case SDLK_KP_3:               return K_KP_3;
+	case SDLK_KP_4:               return K_KP_4;
+	case SDLK_KP_5:               return K_KP_5;
+	case SDLK_KP_6:               return K_KP_6;
+	case SDLK_KP_7:               return K_KP_7;
+	case SDLK_KP_8:               return K_KP_8;
+	case SDLK_KP_9:               return K_KP_9;
+	case SDLK_KP_0:               return K_KP_0;
+	case SDLK_KP_PERIOD:          return K_KP_PERIOD;
+//	case SDLK_APPLICATION:        return K_APPLICATION;
+//	case SDLK_POWER:              return K_POWER;
+	case SDLK_KP_EQUALS:          return K_KP_EQUALS;
+//	case SDLK_F13:                return K_F13;
+//	case SDLK_F14:                return K_F14;
+//	case SDLK_F15:                return K_F15;
+//	case SDLK_F16:                return K_F16;
+//	case SDLK_F17:                return K_F17;
+//	case SDLK_F18:                return K_F18;
+//	case SDLK_F19:                return K_F19;
+//	case SDLK_F20:                return K_F20;
+//	case SDLK_F21:                return K_F21;
+//	case SDLK_F22:                return K_F22;
+//	case SDLK_F23:                return K_F23;
+//	case SDLK_F24:                return K_F24;
+//	case SDLK_EXECUTE:            return K_EXECUTE;
+//	case SDLK_HELP:               return K_HELP;
+//	case SDLK_MENU:               return K_MENU;
+//	case SDLK_SELECT:             return K_SELECT;
+//	case SDLK_STOP:               return K_STOP;
+//	case SDLK_AGAIN:              return K_AGAIN;
+//	case SDLK_UNDO:               return K_UNDO;
+//	case SDLK_CUT:                return K_CUT;
+//	case SDLK_COPY:               return K_COPY;
+//	case SDLK_PASTE:              return K_PASTE;
+//	case SDLK_FIND:               return K_FIND;
+//	case SDLK_MUTE:               return K_MUTE;
+//	case SDLK_VOLUMEUP:           return K_VOLUMEUP;
+//	case SDLK_VOLUMEDOWN:         return K_VOLUMEDOWN;
+//	case SDLK_KP_COMMA:           return K_KP_COMMA;
+//	case SDLK_KP_EQUALSAS400:     return K_KP_EQUALSAS400;
+//	case SDLK_ALTERASE:           return K_ALTERASE;
+//	case SDLK_SYSREQ:             return K_SYSREQ;
+//	case SDLK_CANCEL:             return K_CANCEL;
+//	case SDLK_CLEAR:              return K_CLEAR;
+//	case SDLK_PRIOR:              return K_PRIOR;
+//	case SDLK_RETURN2:            return K_RETURN2;
+//	case SDLK_SEPARATOR:          return K_SEPARATOR;
+//	case SDLK_OUT:                return K_OUT;
+//	case SDLK_OPER:               return K_OPER;
+//	case SDLK_CLEARAGAIN:         return K_CLEARAGAIN;
+//	case SDLK_CRSEL:              return K_CRSEL;
+//	case SDLK_EXSEL:              return K_EXSEL;
+//	case SDLK_KP_00:              return K_KP_00;
+//	case SDLK_KP_000:             return K_KP_000;
+//	case SDLK_THOUSANDSSEPARATOR: return K_THOUSANDSSEPARATOR;
+//	case SDLK_DECIMALSEPARATOR:   return K_DECIMALSEPARATOR;
+//	case SDLK_CURRENCYUNIT:       return K_CURRENCYUNIT;
+//	case SDLK_CURRENCYSUBUNIT:    return K_CURRENCYSUBUNIT;
+//	case SDLK_KP_LEFTPAREN:       return K_KP_LEFTPAREN;
+//	case SDLK_KP_RIGHTPAREN:      return K_KP_RIGHTPAREN;
+//	case SDLK_KP_LEFTBRACE:       return K_KP_LEFTBRACE;
+//	case SDLK_KP_RIGHTBRACE:      return K_KP_RIGHTBRACE;
+//	case SDLK_KP_TAB:             return K_KP_TAB;
+//	case SDLK_KP_BACKSPACE:       return K_KP_BACKSPACE;
+//	case SDLK_KP_A:               return K_KP_A;
+//	case SDLK_KP_B:               return K_KP_B;
+//	case SDLK_KP_C:               return K_KP_C;
+//	case SDLK_KP_D:               return K_KP_D;
+//	case SDLK_KP_E:               return K_KP_E;
+//	case SDLK_KP_F:               return K_KP_F;
+//	case SDLK_KP_XOR:             return K_KP_XOR;
+//	case SDLK_KP_POWER:           return K_KP_POWER;
+//	case SDLK_KP_PERCENT:         return K_KP_PERCENT;
+//	case SDLK_KP_LESS:            return K_KP_LESS;
+//	case SDLK_KP_GREATER:         return K_KP_GREATER;
+//	case SDLK_KP_AMPERSAND:       return K_KP_AMPERSAND;
+//	case SDLK_KP_DBLAMPERSAND:    return K_KP_DBLAMPERSAND;
+//	case SDLK_KP_VERTICALBAR:     return K_KP_VERTICALBAR;
+//	case SDLK_KP_DBLVERTICALBAR:  return K_KP_DBLVERTICALBAR;
+//	case SDLK_KP_COLON:           return K_KP_COLON;
+//	case SDLK_KP_HASH:            return K_KP_HASH;
+//	case SDLK_KP_SPACE:           return K_KP_SPACE;
+//	case SDLK_KP_AT:              return K_KP_AT;
+//	case SDLK_KP_EXCLAM:          return K_KP_EXCLAM;
+//	case SDLK_KP_MEMSTORE:        return K_KP_MEMSTORE;
+//	case SDLK_KP_MEMRECALL:       return K_KP_MEMRECALL;
+//	case SDLK_KP_MEMCLEAR:        return K_KP_MEMCLEAR;
+//	case SDLK_KP_MEMADD:          return K_KP_MEMADD;
+//	case SDLK_KP_MEMSUBTRACT:     return K_KP_MEMSUBTRACT;
+//	case SDLK_KP_MEMMULTIPLY:     return K_KP_MEMMULTIPLY;
+//	case SDLK_KP_MEMDIVIDE:       return K_KP_MEMDIVIDE;
+//	case SDLK_KP_PLUSMINUS:       return K_KP_PLUSMINUS;
+//	case SDLK_KP_CLEAR:           return K_KP_CLEAR;
+//	case SDLK_KP_CLEARENTRY:      return K_KP_CLEARENTRY;
+//	case SDLK_KP_BINARY:          return K_KP_BINARY;
+//	case SDLK_KP_OCTAL:           return K_KP_OCTAL;
+//	case SDLK_KP_DECIMAL:         return K_KP_DECIMAL;
+//	case SDLK_KP_HEXADECIMAL:     return K_KP_HEXADECIMAL;
+	case SDLK_LCTRL:              return K_CTRL;
+	case SDLK_LSHIFT:             return K_SHIFT;
+	case SDLK_LALT:               return K_ALT;
+//	case SDLK_LGUI:               return K_LGUI;
+	case SDLK_RCTRL:              return K_CTRL;
+	case SDLK_RSHIFT:             return K_SHIFT;
+	case SDLK_RALT:               return K_ALT;
+//	case SDLK_RGUI:               return K_RGUI;
+//	case SDLK_MODE:               return K_MODE;
+//	case SDLK_AUDIONEXT:          return K_AUDIONEXT;
+//	case SDLK_AUDIOPREV:          return K_AUDIOPREV;
+//	case SDLK_AUDIOSTOP:          return K_AUDIOSTOP;
+//	case SDLK_AUDIOPLAY:          return K_AUDIOPLAY;
+//	case SDLK_AUDIOMUTE:          return K_AUDIOMUTE;
+//	case SDLK_MEDIASELECT:        return K_MEDIASELECT;
+//	case SDLK_WWW:                return K_WWW;
+//	case SDLK_MAIL:               return K_MAIL;
+//	case SDLK_CALCULATOR:         return K_CALCULATOR;
+//	case SDLK_COMPUTER:           return K_COMPUTER;
+//	case SDLK_AC_SEARCH:          return K_AC_SEARCH;
+//	case SDLK_AC_HOME:            return K_AC_HOME;
+//	case SDLK_AC_BACK:            return K_AC_BACK;
+//	case SDLK_AC_FORWARD:         return K_AC_FORWARD;
+//	case SDLK_AC_STOP:            return K_AC_STOP;
+//	case SDLK_AC_REFRESH:         return K_AC_REFRESH;
+//	case SDLK_AC_BOOKMARKS:       return K_AC_BOOKMARKS;
+//	case SDLK_BRIGHTNESSDOWN:     return K_BRIGHTNESSDOWN;
+//	case SDLK_BRIGHTNESSUP:       return K_BRIGHTNESSUP;
+//	case SDLK_DISPLAYSWITCH:      return K_DISPLAYSWITCH;
+//	case SDLK_KBDILLUMTOGGLE:     return K_KBDILLUMTOGGLE;
+//	case SDLK_KBDILLUMDOWN:       return K_KBDILLUMDOWN;
+//	case SDLK_KBDILLUMUP:         return K_KBDILLUMUP;
+//	case SDLK_EJECT:              return K_EJECT;
+//	case SDLK_SLEEP:              return K_SLEEP;
+	}
 }
+
+#ifdef __IPHONEOS__
+int SDL_iPhoneKeyboardShow(SDL_Window * window);  // reveals the onscreen keyboard.  Returns 0 on success and -1 on error.
+int SDL_iPhoneKeyboardHide(SDL_Window * window);  // hides the onscreen keyboard.  Returns 0 on success and -1 on error.
+SDL_bool SDL_iPhoneKeyboardIsShown(SDL_Window * window);  // returns whether or not the onscreen keyboard is currently visible.
+int SDL_iPhoneKeyboardToggle(SDL_Window * window); // toggles the visibility of the onscreen keyboard.  Returns 0 on success and -1 on error.
+#endif
+
+void VID_ShowKeyboard(qboolean show)
+{
+#ifdef __IPHONEOS__
+	if (show)
+	{
+		if (!SDL_iPhoneKeyboardIsShown(window))
+			SDL_iPhoneKeyboardShow(window);
+	}
+	else
+	{
+		if (SDL_iPhoneKeyboardIsShown(window))
+			SDL_iPhoneKeyboardHide(window);
+	}
+#endif
+}
+
+#ifdef __IPHONEOS__
+qboolean VID_ShowingKeyboard(void)
+{
+	return SDL_iPhoneKeyboardIsShown(window);
+}
+#endif
 
 void VID_SetMouse(qboolean fullscreengrab, qboolean relative, qboolean hidecursor)
 {
@@ -298,13 +411,15 @@ void VID_SetMouse(qboolean fullscreengrab, qboolean relative, qboolean hidecurso
 		if(vid_usingmouse && (vid_usingnoaccel != !!apple_mouse_noaccel.integer))
 			VID_SetMouse(false, false, false); // ungrab first!
 #endif
-#endif
 	if (vid_usingmouse != relative)
 	{
 		vid_usingmouse = relative;
 		cl_ignoremousemoves = 2;
+#if SETVIDEOMODE
 		SDL_WM_GrabInput( relative ? SDL_GRAB_ON : SDL_GRAB_OFF );
-#ifndef __IPHONEOS__
+#else
+		SDL_SetRelativeMouseMode(relative ? SDL_TRUE : SDL_FALSE);
+#endif
 #ifdef MACOSX
 		if(relative)
 		{
@@ -357,87 +472,98 @@ void VID_SetMouse(qboolean fullscreengrab, qboolean relative, qboolean hidecurso
 			}
 		}
 #endif
-#endif
 	}
 	if (vid_usinghidecursor != hidecursor)
 	{
 		vid_usinghidecursor = hidecursor;
 		SDL_ShowCursor( hidecursor ? SDL_DISABLE : SDL_ENABLE);
 	}
+#endif
 }
 
-static double IN_JoystickGetAxis(SDL_Joystick *joy, int axis, double sensitivity, double deadzone)
+// multitouch[10][] represents the mouse pointer
+// X and Y coordinates are 0-32767 as per SDL spec
+#define MAXFINGERS 11
+int multitouch[MAXFINGERS][3];
+
+qboolean VID_TouchscreenArea(int corner, float px, float py, float pwidth, float pheight, const char *icon, float *resultmove, qboolean *resultbutton, keynum_t key)
 {
-	double value;
-	if (axis < 0 || axis >= SDL_JoystickNumAxes(joy))
-		return 0; // no such axis on this joystick
-	value = SDL_JoystickGetAxis(joy, axis) * (1.0 / 32767.0);
-	value = bound(-1, value, 1);
-	if (fabs(value) < deadzone)
-		return 0; // within deadzone around center
-	return value * sensitivity;
-}
-
-/////////////////////
-// Joystick axis keyevents
-// a sort of hack emulating Arrow keys for joystick axises
-// as some drives dont send such keyevents for them
-// additionally we should block drivers that do send arrow keyevents to prevent double events
-////
-
-static void IN_JoystickKeyeventForAxis(SDL_Joystick *joy, int axis, int key_pos, int key_neg)
-{
-	double joytime;
-
-	if (axis < 0 || axis >= SDL_JoystickNumAxes(joy))
-		return; // no such axis on this joystick
-
-	joytime = Sys_DoubleTime();
-	// no key event, continuous keydown event
-	if (joy_axescache[axis].move == joy_axescache[axis].oldmove)
+	int finger;
+	float fx, fy, fwidth, fheight;
+	float rel[3];
+	qboolean button = false;
+	VectorClear(rel);
+	if (pwidth > 0 && pheight > 0)
+#ifdef __IPHONEOS__
+	if (!VID_ShowingKeyboard())
+#endif
 	{
-		if (joy_axescache[axis].move != 0 && joytime > joy_axescache[axis].keytime)
+		if (corner & 1) px += vid_conwidth.value;
+		if (corner & 2) py += vid_conheight.value;
+		if (corner & 4) px += vid_conwidth.value * 0.5f;
+		if (corner & 8) py += vid_conheight.value * 0.5f;
+		if (corner & 16) {px *= vid_conwidth.value * (1.0f / 640.0f);py *= vid_conheight.value * (1.0f / 480.0f);pwidth *= vid_conwidth.value * (1.0f / 640.0f);pheight *= vid_conheight.value * (1.0f / 480.0f);}
+		fx = px * 32768.0f / vid_conwidth.value;
+		fy = py * 32768.0f / vid_conheight.value;
+		fwidth = pwidth * 32768.0f / vid_conwidth.value;
+		fheight = pheight * 32768.0f / vid_conheight.value;
+		for (finger = 0;finger < MAXFINGERS;finger++)
 		{
-			//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-			Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-			joy_axescache[axis].keytime = joytime + 0.5 / 20;
+			if (multitouch[finger][0] && multitouch[finger][1] >= fx && multitouch[finger][2] >= fy && multitouch[finger][1] < fx + fwidth && multitouch[finger][2] < fy + fheight)
+			{
+				rel[0] = (multitouch[finger][1] - (fx + 0.5f * fwidth)) * (2.0f / fwidth);
+				rel[1] = (multitouch[finger][2] - (fy + 0.5f * fheight)) * (2.0f / fheight);
+				rel[2] = 0;
+				button = true;
+				break;
+			}
 		}
-		return;
+		if (scr_numtouchscreenareas < 16)
+		{
+			scr_touchscreenareas[scr_numtouchscreenareas].pic = icon;
+			scr_touchscreenareas[scr_numtouchscreenareas].rect[0] = px;
+			scr_touchscreenareas[scr_numtouchscreenareas].rect[1] = py;
+			scr_touchscreenareas[scr_numtouchscreenareas].rect[2] = pwidth;
+			scr_touchscreenareas[scr_numtouchscreenareas].rect[3] = pheight;
+			scr_touchscreenareas[scr_numtouchscreenareas].active = button;
+			scr_numtouchscreenareas++;
+		}
 	}
-	// generate key up event
-	if (joy_axescache[axis].oldmove)
+	if (resultmove)
 	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg, 0, 0);
+		if (button)
+			VectorCopy(rel, resultmove);
+		else
+			VectorClear(resultmove);
 	}
-	// generate key down event
-	if (joy_axescache[axis].move)
+	if (resultbutton)
 	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-		joy_axescache[axis].keytime = joytime + 0.5;
+		if (*resultbutton != button && (int)key > 0)
+			Key_Event(key, 0, button);
+		*resultbutton = button;
 	}
+	return button;
 }
 
-static qboolean IN_JoystickBlockDoubledKeyEvents(int keycode)
+void VID_BuildJoyState(vid_joystate_t *joystate)
 {
-	if (!joy_axiskeyevents.integer)
-		return false;
+	VID_Shared_BuildJoyState_Begin(joystate);
 
-	// block keyevent if it's going to be provided by joystick keyevent system
-	if (vid_numjoysticks && joy_enable.integer && joy_index.integer >= 0 && joy_index.integer < vid_numjoysticks)
+	if (vid_sdljoystick)
 	{
-		SDL_Joystick *joy = vid_joysticks[joy_index.integer];
-
-		if (keycode == K_UPARROW || keycode == K_DOWNARROW)
-			if (IN_JoystickGetAxis(joy, joy_axisforward.integer, 1, 0.01) || joy_axescache[joy_axisforward.integer].move || joy_axescache[joy_axisforward.integer].oldmove)
-				return true;
-		if (keycode == K_RIGHTARROW || keycode == K_LEFTARROW)
-			if (IN_JoystickGetAxis(joy, joy_axisside.integer, 1, 0.01) || joy_axescache[joy_axisside.integer].move || joy_axescache[joy_axisside.integer].oldmove)
-				return true;
+		SDL_Joystick *joy = vid_sdljoystick;
+		int j;
+		int numaxes;
+		int numbuttons;
+		numaxes = SDL_JoystickNumAxes(joy);
+		for (j = 0;j < numaxes;j++)
+			joystate->axis[j] = SDL_JoystickGetAxis(joy, j) * (1.0f / 32767.0f);
+		numbuttons = SDL_JoystickNumButtons(joy);
+		for (j = 0;j < numbuttons;j++)
+			joystate->button[j] = SDL_JoystickGetButton(joy, j);
 	}
 
-	return false;
+	VID_Shared_BuildJoyState_Finish(joystate);
 }
 
 /////////////////////
@@ -446,101 +572,149 @@ static qboolean IN_JoystickBlockDoubledKeyEvents(int keycode)
 
 void IN_Move( void )
 {
-	int j;
 	static int old_x = 0, old_y = 0;
 	static int stuck = 0;
-	int x, y, numaxes, numballs;
+	int x, y;
+	vid_joystate_t joystate;
 
-	if (vid_usingmouse)
+	scr_numtouchscreenareas = 0;
+	if (vid_touchscreen.integer)
 	{
-		if(vid_stick_mouse.integer)
+		vec3_t move, aim, click;
+		static qboolean buttons[16];
+		static keydest_t oldkeydest;
+		keydest_t keydest = (key_consoleactive & KEY_CONSOLEACTIVE_USER) ? key_console : key_dest;
+		multitouch[MAXFINGERS-1][0] = SDL_GetMouseState(&x, &y);
+		multitouch[MAXFINGERS-1][1] = x * 32768 / vid.width;
+		multitouch[MAXFINGERS-1][2] = y * 32768 / vid.height;
+		if (oldkeydest != keydest)
 		{
-			// have the mouse stuck in the middle, example use: prevent expose effect of beryl during the game when not using
-			// window grabbing. --blub
-
-			// we need 2 frames to initialize the center position
-			if(!stuck)
+			switch(keydest)
 			{
-				SDL_WarpMouse(win_half_width, win_half_height);
-				SDL_GetMouseState(&x, &y);
-				SDL_GetRelativeMouseState(&x, &y);
-				++stuck;
-			} else {
-				SDL_GetRelativeMouseState(&x, &y);
-				in_mouse_x = x + old_x;
-				in_mouse_y = y + old_y;
-				SDL_GetMouseState(&x, &y);
-				old_x = x - win_half_width;
-				old_y = y - win_half_height;
-				SDL_WarpMouse(win_half_width, win_half_height);
+			case key_game: VID_ShowKeyboard(false);break;
+			case key_console: VID_ShowKeyboard(true);break;
+			case key_message: VID_ShowKeyboard(true);break;
+			default: break;
 			}
-		} else {
-			SDL_GetRelativeMouseState( &x, &y );
-			in_mouse_x = x;
-			in_mouse_y = y;
 		}
+		oldkeydest = keydest;
+		// top of screen is toggleconsole and K_ESCAPE
+		switch(keydest)
+		{
+		case key_console:
+#ifdef __IPHONEOS__
+			VID_TouchscreenArea( 0,   0,   0,  64,  64, NULL                         , NULL, &buttons[13], (keynum_t)'`');
+			VID_TouchscreenArea( 0,  64,   0,  64,  64, "gfx/touch_menu.tga"         , NULL, &buttons[14], K_ESCAPE);
+			if (!VID_ShowingKeyboard())
+			{
+				// user entered a command, close the console now
+				Con_ToggleConsole_f();
+			}
+#endif
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[15], (keynum_t)0);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , move, &buttons[0], K_MOUSE4);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , aim,  &buttons[1], K_MOUSE5);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , click,&buttons[2], K_MOUSE1);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[3], K_SPACE);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[4], K_MOUSE2);
+			break;
+		case key_game:
+#ifdef __IPHONEOS__
+			VID_TouchscreenArea( 0,   0,   0,  64,  64, NULL                         , NULL, &buttons[13], (keynum_t)'`');
+			VID_TouchscreenArea( 0,  64,   0,  64,  64, "gfx/touch_menu.tga"         , NULL, &buttons[14], K_ESCAPE);
+#endif
+			VID_TouchscreenArea( 2,   0,-128, 128, 128, "gfx/touch_movebutton.tga"   , move, &buttons[0], K_MOUSE4);
+			VID_TouchscreenArea( 3,-128,-128, 128, 128, "gfx/touch_aimbutton.tga"    , aim,  &buttons[1], K_MOUSE5);
+			VID_TouchscreenArea( 2,   0,-160,  64,  32, "gfx/touch_jumpbutton.tga"   , NULL, &buttons[3], K_SPACE);
+			VID_TouchscreenArea( 3,-128,-160,  64,  32, "gfx/touch_attackbutton.tga" , NULL, &buttons[2], K_MOUSE1);
+			VID_TouchscreenArea( 3, -64,-160,  64,  32, "gfx/touch_attack2button.tga", NULL, &buttons[4], K_MOUSE2);
+			buttons[15] = false;
+			break;
+		default:
+#ifdef __IPHONEOS__
+			VID_TouchscreenArea( 0,   0,   0,  64,  64, NULL                         , NULL, &buttons[13], (keynum_t)'`');
+			VID_TouchscreenArea( 0,  64,   0,  64,  64, "gfx/touch_menu.tga"         , NULL, &buttons[14], K_ESCAPE);
+			// in menus, an icon in the corner activates keyboard
+			VID_TouchscreenArea( 2,   0, -32,  32,  32, "gfx/touch_keyboard.tga"     , NULL, &buttons[15], (keynum_t)0);
+			if (buttons[15])
+				VID_ShowKeyboard(true);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , move, &buttons[0], K_MOUSE4);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , aim,  &buttons[1], K_MOUSE5);
+			VID_TouchscreenArea(16, -320,-480,640, 960, NULL                         , click,&buttons[2], K_MOUSE1);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[3], K_SPACE);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[4], K_MOUSE2);
+			if (buttons[2])
+			{
+				in_windowmouse_x = x;
+				in_windowmouse_y = y;
+			}
+#else
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[15], (keynum_t)0);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , move, &buttons[0], K_MOUSE4);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , aim,  &buttons[1], K_MOUSE5);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , click,&buttons[2], K_MOUSE1);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[3], K_SPACE);
+			VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , NULL, &buttons[4], K_MOUSE2);
+#endif
+			break;
+		}
+		cl.cmd.forwardmove -= move[1] * cl_forwardspeed.value;
+		cl.cmd.sidemove += move[0] * cl_sidespeed.value;
+		cl.viewangles[0] += aim[1] * cl_pitchspeed.value * cl.realframetime;
+		cl.viewangles[1] -= aim[0] * cl_yawspeed.value * cl.realframetime;
 	}
-
-	SDL_GetMouseState(&x, &y);
-	in_windowmouse_x = x;
-	in_windowmouse_y = y;
-
-	if (vid_numjoysticks && joy_enable.integer && joy_index.integer >= 0 && joy_index.integer < vid_numjoysticks)
+	else
 	{
-		SDL_Joystick *joy = vid_joysticks[joy_index.integer];
-
-		// balls convert to mousemove
-		numballs = SDL_JoystickNumBalls(joy);
-		for (j = 0;j < numballs;j++)
+		if (vid_usingmouse)
 		{
-			SDL_JoystickGetBall(joy, j, &x, &y);
-			in_mouse_x += x;
-			in_mouse_y += y;
-		}
-
-		// axes
-		cl.cmd.forwardmove += IN_JoystickGetAxis(joy, joy_axisforward.integer, joy_sensitivityforward.value, joy_deadzoneforward.value) * cl_forwardspeed.value;
-		cl.cmd.sidemove    += IN_JoystickGetAxis(joy, joy_axisside.integer, joy_sensitivityside.value, joy_deadzoneside.value) * cl_sidespeed.value;
-		cl.cmd.upmove      += IN_JoystickGetAxis(joy, joy_axisup.integer, joy_sensitivityup.value, joy_deadzoneup.value) * cl_upspeed.value;
-		cl.viewangles[0]   += IN_JoystickGetAxis(joy, joy_axispitch.integer, joy_sensitivitypitch.value, joy_deadzonepitch.value) * cl.realframetime * cl_pitchspeed.value;
-		cl.viewangles[1]   += IN_JoystickGetAxis(joy, joy_axisyaw.integer, joy_sensitivityyaw.value, joy_deadzoneyaw.value) * cl.realframetime * cl_yawspeed.value;
-		//cl.viewangles[2]   += IN_JoystickGetAxis(joy, joy_axisroll.integer, joy_sensitivityroll.value, joy_deadzoneroll.value) * cl.realframetime * cl_rollspeed.value;
+			if (vid_stick_mouse.integer)
+			{
+				// have the mouse stuck in the middle, example use: prevent expose effect of beryl during the game when not using
+				// window grabbing. --blub
 	
-		// cache state of axes to emulate button events for them
-		numaxes = min(MAX_JOYSTICK_AXES, SDL_JoystickNumAxes(joy));
-		for (j = 0; j < numaxes; j++)
-		{
-			joy_axescache[j].oldmove = joy_axescache[j].move;
-			joy_axescache[j].move = IN_JoystickGetAxis(joy, j, 1, 0.01);
+				// we need 2 frames to initialize the center position
+				if(!stuck)
+				{
+#if SETVIDEOMODE
+					SDL_WarpMouse(win_half_width, win_half_height);
+#else
+					SDL_WarpMouseInWindow(window, win_half_width, win_half_height);
+#endif
+					SDL_GetMouseState(&x, &y);
+					SDL_GetRelativeMouseState(&x, &y);
+					++stuck;
+				} else {
+					SDL_GetRelativeMouseState(&x, &y);
+					in_mouse_x = x + old_x;
+					in_mouse_y = y + old_y;
+					SDL_GetMouseState(&x, &y);
+					old_x = x - win_half_width;
+					old_y = y - win_half_height;
+#if SETVIDEOMODE
+					SDL_WarpMouse(win_half_width, win_half_height);
+#else
+					SDL_WarpMouseInWindow(window, win_half_width, win_half_height);
+#endif
+				}
+			} else {
+				SDL_GetRelativeMouseState( &x, &y );
+				in_mouse_x = x;
+				in_mouse_y = y;
+			}
 		}
 
-		// run keyevents
-		if (joy_axiskeyevents.integer)
-		{
-			IN_JoystickKeyeventForAxis(joy, joy_axisforward.integer, K_DOWNARROW, K_UPARROW);
-			IN_JoystickKeyeventForAxis(joy, joy_axisside.integer, K_RIGHTARROW, K_LEFTARROW);
-		}
+		SDL_GetMouseState(&x, &y);
+		in_windowmouse_x = x;
+		in_windowmouse_y = y;
 	}
+
+	VID_BuildJoyState(&joystate);
+	VID_ApplyJoyState(&joystate);
 }
 
 /////////////////////
 // Message Handling
 ////
-
-#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
-static int Sys_EventFilter( SDL_Event *event )
-{
-	//TODO: Add a quit query in linux, too - though linux user are more likely to know what they do
-	if (event->type == SDL_QUIT)
-	{
-#ifdef WIN32
-		if (MessageBox( NULL, "Are you sure you want to quit?", "Confirm Exit", MB_YESNO | MB_SETFOREGROUND | MB_ICONQUESTION ) == IDNO)
-			return 0;
-#endif
-	}
-	return 1;
-}
-#endif
 
 #ifdef SDL_R_RESTART
 static qboolean sdl_needs_restart;
@@ -556,6 +730,7 @@ static void sdl_newmap(void)
 }
 #endif
 
+#ifndef __IPHONEOS__
 static keynum_t buttonremap[18] =
 {
 	K_MOUSE1,
@@ -577,28 +752,27 @@ static keynum_t buttonremap[18] =
 	K_MOUSE15,
 	K_MOUSE16,
 };
+#endif
 
+#if SETVIDEOMODE
+// SDL 1.2
 void Sys_SendKeyEvents( void )
 {
 	static qboolean sound_active = true;
 	int keycode;
 	SDL_Event event;
 
+	VID_EnableJoystick(true);
+
 	while( SDL_PollEvent( &event ) )
 		switch( event.type ) {
 			case SDL_QUIT:
-#if !(SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2)
-#ifdef WIN32
-				if (MessageBox( NULL, "Are you sure you want to quit?", "Confirm Exit", MB_YESNO | MB_SETFOREGROUND | MB_ICONQUESTION ) == IDNO)
-					return 0;
-#endif
-#endif
 				Sys_Quit(0);
 				break;
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
 				keycode = MapKey(event.key.keysym.sym);
-				if (!IN_JoystickBlockDoubledKeyEvents(keycode))
+				if (!VID_JoyBlockEmulatedKeys(keycode))
 					Key_Event(keycode, event.key.keysym.unicode, (event.key.state == SDL_PRESSED));
 				break;
 			case SDL_ACTIVEEVENT:
@@ -612,22 +786,24 @@ void Sys_SendKeyEvents( void )
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 			case SDL_MOUSEBUTTONUP:
+				if (!vid_touchscreen.integer)
 				if (event.button.button <= 18)
 					Key_Event( buttonremap[event.button.button - 1], 0, event.button.state == SDL_PRESSED );
 				break;
 			case SDL_JOYBUTTONDOWN:
-				if (!joy_enable.integer)
-					break; // ignore down events if joystick has been disabled
 			case SDL_JOYBUTTONUP:
-				if (event.jbutton.button < 48)
-					Key_Event( event.jbutton.button + (event.jbutton.button < 16 ? K_JOY1 : K_AUX1 - 16), 0, (event.jbutton.state == SDL_PRESSED) );
+			case SDL_JOYAXISMOTION:
+			case SDL_JOYBALLMOTION:
+			case SDL_JOYHATMOTION:
+				break;
+			case SDL_VIDEOEXPOSE:
 				break;
 			case SDL_VIDEORESIZE:
 				if(vid_resizable.integer < 2)
 				{
 					vid.width = event.resize.w;
 					vid.height = event.resize.h;
-					SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
+					screen = SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
 					if (vid_softsurface)
 					{
 						SDL_FreeSurface(vid_softsurface);
@@ -648,6 +824,20 @@ void Sys_SendKeyEvents( void )
 					}
 #endif
 				}
+				break;
+#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+#else
+			case SDL_TEXTEDITING:
+				// unused when SETVIDEOMODE API is used
+				break;
+			case SDL_TEXTINPUT:
+				// this occurs with SETVIDEOMODE but we are not using it
+				break;
+#endif
+			case SDL_MOUSEMOTION:
+				break;
+			default:
+				Con_DPrintf("Received unrecognized SDL_Event type 0x%x\n", event.type);
 				break;
 		}
 
@@ -670,13 +860,224 @@ void Sys_SendKeyEvents( void )
 	}
 }
 
+#else
+
+// SDL 1.3
+void Sys_SendKeyEvents( void )
+{
+	static qboolean sound_active = true;
+	static qboolean missingunicodehack = true;
+	int keycode;
+	int i;
+	int j;
+	int unicode;
+	SDL_Event event;
+
+	VID_EnableJoystick(true);
+
+	while( SDL_PollEvent( &event ) )
+		switch( event.type ) {
+			case SDL_QUIT:
+				Sys_Quit(0);
+				break;
+			case SDL_KEYDOWN:
+			case SDL_KEYUP:
+				keycode = MapKey(event.key.keysym.sym);
+				if (!VID_JoyBlockEmulatedKeys(keycode))
+					Key_Event(keycode, 0, (event.key.state == SDL_PRESSED));
+				break;
+			case SDL_MOUSEBUTTONDOWN:
+			case SDL_MOUSEBUTTONUP:
+				if (!vid_touchscreen.integer)
+				if (event.button.button <= 18)
+					Key_Event( buttonremap[event.button.button - 1], 0, event.button.state == SDL_PRESSED );
+				break;
+			case SDL_JOYBUTTONDOWN:
+			case SDL_JOYBUTTONUP:
+			case SDL_JOYAXISMOTION:
+			case SDL_JOYBALLMOTION:
+			case SDL_JOYHATMOTION:
+				break;
+			case SDL_VIDEOEXPOSE:
+				break;
+			case SDL_WINDOWEVENT:
+				//if (event.window.windowID == window) // how to compare?
+				{
+					switch(event.window.event)
+					{
+					case SDL_WINDOWEVENT_SHOWN:
+						vid_hidden = false;
+						break;
+					case  SDL_WINDOWEVENT_HIDDEN:
+						vid_hidden = true;
+						break;
+					case SDL_WINDOWEVENT_EXPOSED:
+						break;
+					case SDL_WINDOWEVENT_MOVED:
+						break;
+					case SDL_WINDOWEVENT_RESIZED:
+						if(vid_resizable.integer < 2)
+						{
+							vid.width = event.window.data1;
+							vid.height = event.window.data2;
+							if (vid_softsurface)
+							{
+								SDL_FreeSurface(vid_softsurface);
+								vid_softsurface = SDL_CreateRGBSurface(SDL_SWSURFACE, vid.width, vid.height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+								vid.softpixels = (unsigned int *)vid_softsurface->pixels;
+								SDL_SetAlpha(vid_softsurface, 0, 255);
+								if (vid.softdepthpixels)
+									free(vid.softdepthpixels);
+								vid.softdepthpixels = (unsigned int*)calloc(1, vid.width * vid.height * 4);
+							}
+#ifdef SDL_R_RESTART
+							// better not call R_Modules_Restart from here directly, as this may wreak havoc...
+							// so, let's better queue it for next frame
+							if(!sdl_needs_restart)
+							{
+								Cbuf_AddText("\nr_restart\n");
+								sdl_needs_restart = true;
+							}
+#endif
+						}
+						break;
+					case SDL_WINDOWEVENT_MINIMIZED:
+						break;
+					case SDL_WINDOWEVENT_MAXIMIZED:
+						break;
+					case SDL_WINDOWEVENT_RESTORED:
+						break;
+					case SDL_WINDOWEVENT_ENTER:
+						break;
+					case SDL_WINDOWEVENT_LEAVE:
+						break;
+					case SDL_WINDOWEVENT_FOCUS_GAINED:
+						vid_hasfocus = true;
+						break;
+					case SDL_WINDOWEVENT_FOCUS_LOST:
+						vid_hasfocus = false;
+						break;
+					case SDL_WINDOWEVENT_CLOSE:
+						Sys_Quit(0);
+						break;
+					}
+				}
+				break;
+			case SDL_TEXTEDITING:
+				// FIXME!  this is where composition gets supported
+				break;
+			case SDL_TEXTINPUT:
+				// we have some characters to parse
+				missingunicodehack = false;
+				{
+					unicode = 0;
+					for (i = 0;event.text.text[i];)
+					{
+						unicode = event.text.text[i++];
+						if (unicode & 0x80)
+						{
+							// UTF-8 character
+							// strip high bits (we could count these to validate character length but we don't)
+							for (j = 0x80;unicode & j;j >>= 1)
+								unicode ^= j;
+							for (;(event.text.text[i] & 0xC0) == 0x80;i++)
+								unicode = (unicode << 6) | (event.text.text[i] & 0x3F);
+							// low characters are invalid and could be bad, so replace them
+							if (unicode < 0x80)
+								unicode = '?'; // we could use 0xFFFD instead, the unicode substitute character
+						}
+						//Con_DPrintf("SDL_TEXTINPUT: K_TEXT %i \n", unicode);
+						Key_Event(K_TEXT, unicode, true);
+						Key_Event(K_TEXT, unicode, false);
+					}
+				}
+				break;
+			case SDL_MOUSEMOTION:
+				break;
+			case SDL_FINGERDOWN:
+				Con_DPrintf("SDL_FINGERDOWN for finger %i\n", (int)event.tfinger.fingerId);
+				for (i = 0;i < MAXFINGERS-1;i++)
+				{
+					if (!multitouch[i][0])
+					{
+						multitouch[i][0] = event.tfinger.fingerId;
+						multitouch[i][1] = event.tfinger.x;
+						multitouch[i][2] = event.tfinger.y;
+						// TODO: use event.tfinger.pressure?
+						break;
+					}
+				}
+				if (i == MAXFINGERS-1)
+					Con_DPrintf("Too many fingers at once!\n");
+				break;
+			case SDL_FINGERUP:
+				Con_DPrintf("SDL_FINGERUP for finger %i\n", (int)event.tfinger.fingerId);
+				for (i = 0;i < MAXFINGERS-1;i++)
+				{
+					if (multitouch[i][0] == event.tfinger.fingerId)
+					{
+						multitouch[i][0] = 0;
+						break;
+					}
+				}
+				if (i == MAXFINGERS-1)
+					Con_DPrintf("No SDL_FINGERDOWN event matches this SDL_FINGERMOTION event\n");
+				break;
+			case SDL_FINGERMOTION:
+				Con_DPrintf("SDL_FINGERMOTION for finger %i\n", (int)event.tfinger.fingerId);
+				for (i = 0;i < MAXFINGERS-1;i++)
+				{
+					if (multitouch[i][0] == event.tfinger.fingerId)
+					{
+						multitouch[i][1] = event.tfinger.x;
+						multitouch[i][2] = event.tfinger.y;
+						break;
+					}
+				}
+				if (i == MAXFINGERS-1)
+					Con_DPrintf("No SDL_FINGERDOWN event matches this SDL_FINGERMOTION event\n");
+				break;
+			case SDL_TOUCHBUTTONDOWN:
+				// not sure what to do with this...
+				break;
+			case SDL_TOUCHBUTTONUP:
+				// not sure what to do with this...
+				break;
+			default:
+				Con_DPrintf("Received unrecognized SDL_Event type 0x%x\n", event.type);
+				break;
+		}
+
+	// enable/disable sound on focus gain/loss
+	if ((!vid_hidden && vid_activewindow) || !snd_mutewhenidle.integer)
+	{
+		if (!sound_active)
+		{
+			S_UnblockSound ();
+			sound_active = true;
+		}
+	}
+	else
+	{
+		if (sound_active)
+		{
+			S_BlockSound ();
+			sound_active = false;
+		}
+	}
+}
+#endif
+
 /////////////////
 // Video system
 ////
 
+#ifdef USE_GLES2
 #ifdef __IPHONEOS__
-//#include <SDL_opengles.h>
 #include <OpenGLES/ES2/gl.h>
+#else
+#include <SDL_opengles.h>
+#endif
 
 GLboolean wrapglIsBuffer(GLuint buffer) {return glIsBuffer(buffer);}
 GLboolean wrapglIsEnabled(GLenum cap) {return glIsEnabled(cap);}
@@ -698,9 +1099,10 @@ void wrapglActiveTexture(GLenum e) {glActiveTexture(e);}
 void wrapglAlphaFunc(GLenum func, GLclampf ref) {Con_Printf("glAlphaFunc(func, ref)\n");}
 void wrapglArrayElement(GLint i) {Con_Printf("glArrayElement(i)\n");}
 void wrapglAttachShader(GLuint containerObj, GLuint obj) {glAttachShader(containerObj, obj);}
-void wrapglBegin(GLenum mode) {Con_Printf("glBegin(mode)\n");}
+//void wrapglBegin(GLenum mode) {Con_Printf("glBegin(mode)\n");}
 //void wrapglBeginQuery(GLenum target, GLuint qid) {glBeginQuery(target, qid);}
 void wrapglBindAttribLocation(GLuint programObj, GLuint index, const GLchar *name) {glBindAttribLocation(programObj, index, name);}
+void wrapglBindFragDataLocation(GLuint programObj, GLuint index, const GLchar *name) {glBindFragDataLocation(programObj, index, name);}
 void wrapglBindBuffer(GLenum target, GLuint buffer) {glBindBuffer(target, buffer);}
 void wrapglBindFramebuffer(GLenum target, GLuint framebuffer) {glBindFramebuffer(target, framebuffer);}
 void wrapglBindRenderbuffer(GLenum target, GLuint renderbuffer) {glBindRenderbuffer(target, renderbuffer);}
@@ -750,7 +1152,7 @@ void wrapglDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *i
 void wrapglEnable(GLenum cap) {glEnable(cap);}
 void wrapglEnableClientState(GLenum cap) {Con_Printf("glEnableClientState(cap)\n");}
 void wrapglEnableVertexAttribArray(GLuint index) {glEnableVertexAttribArray(index);}
-void wrapglEnd(void) {Con_Printf("glEnd()\n");}
+//void wrapglEnd(void) {Con_Printf("glEnd()\n");}
 //void wrapglEndQuery(GLenum target) {glEndQuery(target);}
 void wrapglFinish(void) {glFinish();}
 void wrapglFlush(void) {glFlush();}
@@ -801,7 +1203,7 @@ void wrapglMultiTexCoord4f(GLenum target, GLfloat s, GLfloat t, GLfloat r, GLflo
 void wrapglNormalPointer(GLenum type, GLsizei stride, const GLvoid *ptr) {Con_Printf("glNormalPointer(type, stride, ptr)\n");}
 void wrapglPixelStorei(GLenum pname, GLint param) {glPixelStorei(pname, param);}
 void wrapglPointSize(GLfloat size) {Con_Printf("glPointSize(size)\n");}
-void wrapglPolygonMode(GLenum face, GLenum mode) {Con_Printf("glPolygonMode(face, mode)\n");}
+//void wrapglPolygonMode(GLenum face, GLenum mode) {Con_Printf("glPolygonMode(face, mode)\n");}
 void wrapglPolygonOffset(GLfloat factor, GLfloat units) {glPolygonOffset(factor, units);}
 void wrapglPolygonStipple(const GLubyte *mask) {Con_Printf("glPolygonStipple(mask)\n");}
 void wrapglReadBuffer(GLenum mode) {Con_Printf("glReadBuffer(mode)\n");}
@@ -919,9 +1321,10 @@ void GLES_Init(void)
 	qglAlphaFunc = wrapglAlphaFunc;
 	qglArrayElement = wrapglArrayElement;
 	qglAttachShader = wrapglAttachShader;
-	qglBegin = wrapglBegin;
+//	qglBegin = wrapglBegin;
 //	qglBeginQueryARB = wrapglBeginQuery;
 	qglBindAttribLocation = wrapglBindAttribLocation;
+	qglBindFragDataLocation = wrapglBindFragDataLocation;
 	qglBindBufferARB = wrapglBindBuffer;
 	qglBindFramebufferEXT = wrapglBindFramebuffer;
 	qglBindRenderbufferEXT = wrapglBindRenderbuffer;
@@ -970,7 +1373,7 @@ void GLES_Init(void)
 	qglEnable = wrapglEnable;
 	qglEnableClientState = wrapglEnableClientState;
 	qglEnableVertexAttribArray = wrapglEnableVertexAttribArray;
-	qglEnd = wrapglEnd;
+//	qglEnd = wrapglEnd;
 //	qglEndQueryARB = wrapglEndQuery;
 	qglFinish = wrapglFinish;
 	qglFlush = wrapglFlush;
@@ -1021,7 +1424,7 @@ void GLES_Init(void)
 	qglNormalPointer = wrapglNormalPointer;
 	qglPixelStorei = wrapglPixelStorei;
 	qglPointSize = wrapglPointSize;
-	qglPolygonMode = wrapglPolygonMode;
+//	qglPolygonMode = wrapglPolygonMode;
 	qglPolygonOffset = wrapglPolygonOffset;
 //	qglPolygonStipple = wrapglPolygonStipple;
 	qglReadBuffer = wrapglReadBuffer;
@@ -1135,6 +1538,9 @@ void GLES_Init(void)
 	
 	// LordHavoc: report supported extensions
 	Con_DPrintf("\nQuakeC extensions for server and client: %s\nQuakeC extensions for menu: %s\n", vm_sv_extensions, vm_m_extensions );
+
+	// GLES devices in general do not like GL_BGRA, so use GL_RGBA
+	vid.forcetextype = TEXTYPE_RGBA;
 	
 	vid.support.gl20shaders = true;
 	vid.support.amd_texture_texture4 = false;
@@ -1159,6 +1565,7 @@ void GLES_Init(void)
 	vid.support.ext_texture_compression_s3tc = false;
 	vid.support.ext_texture_edge_clamp = true;
 	vid.support.ext_texture_filter_anisotropic = false; // probably don't want to use it...
+	vid.support.ext_texture_srgb = false;
 
 	qglGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_2d);
 	if (vid.support.ext_texture_filter_anisotropic)
@@ -1190,6 +1597,8 @@ void GLES_Init(void)
 	Con_DPrintf("Using GLES2.0 rendering path - %i texture matrix, %i texture images, %i texcoords%s\n", vid.texunits, vid.teximageunits, vid.texarrayunits, vid.support.ext_framebuffer_object ? ", shadowmapping supported" : "");
 	vid.renderpath = RENDERPATH_GLES2;
 	vid.useinterleavedarrays = false;
+	vid.sRGBcapable2D = false;
+	vid.sRGBcapable3D = false;
 
 	// VorteX: set other info (maybe place them in VID_InitMode?)
 	extern cvar_t gl_info_vendor;
@@ -1212,9 +1621,6 @@ void *GL_GetProcAddress(const char *name)
 	return p;
 }
 
-#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
-static int Sys_EventFilter( SDL_Event *event );
-#endif
 static qboolean vid_sdl_initjoysticksystem = false;
 
 void VID_Init (void)
@@ -1224,32 +1630,10 @@ void VID_Init (void)
 	Cvar_RegisterVariable(&apple_mouse_noaccel);
 #endif
 #endif
-	Cvar_RegisterVariable(&vid_soft);
-	Cvar_RegisterVariable(&vid_soft_threads);
-	Cvar_RegisterVariable(&vid_soft_interlace);
-	Cvar_RegisterVariable(&joy_detected);
-	Cvar_RegisterVariable(&joy_enable);
-	Cvar_RegisterVariable(&joy_index);
-	Cvar_RegisterVariable(&joy_axisforward);
-	Cvar_RegisterVariable(&joy_axisside);
-	Cvar_RegisterVariable(&joy_axisup);
-	Cvar_RegisterVariable(&joy_axispitch);
-	Cvar_RegisterVariable(&joy_axisyaw);
-	//Cvar_RegisterVariable(&joy_axisroll);
-	Cvar_RegisterVariable(&joy_deadzoneforward);
-	Cvar_RegisterVariable(&joy_deadzoneside);
-	Cvar_RegisterVariable(&joy_deadzoneup);
-	Cvar_RegisterVariable(&joy_deadzonepitch);
-	Cvar_RegisterVariable(&joy_deadzoneyaw);
-	//Cvar_RegisterVariable(&joy_deadzoneroll);
-	Cvar_RegisterVariable(&joy_sensitivityforward);
-	Cvar_RegisterVariable(&joy_sensitivityside);
-	Cvar_RegisterVariable(&joy_sensitivityup);
-	Cvar_RegisterVariable(&joy_sensitivitypitch);
-	Cvar_RegisterVariable(&joy_sensitivityyaw);
-	//Cvar_RegisterVariable(&joy_sensitivityroll);
-	Cvar_RegisterVariable(&joy_axiskeyevents);
-	
+#ifdef __IPHONEOS__
+	Cvar_SetValueQuick(&vid_touchscreen, 1);
+#endif
+
 #ifdef SDL_R_RESTART
 	R_RegisterModule("SDL", sdl_start, sdl_shutdown, sdl_newmap, NULL, NULL);
 #endif
@@ -1262,24 +1646,72 @@ void VID_Init (void)
 	vid_isfullscreen = false;
 }
 
+static int vid_sdljoystickindex = -1;
+void VID_EnableJoystick(qboolean enable)
+{
+	int index = joy_enable.integer > 0 ? joy_index.integer : -1;
+	int numsdljoysticks;
+	qboolean success = false;
+	int sharedcount = 0;
+	int sdlindex = -1;
+	sharedcount = VID_Shared_SetJoystick(index);
+	if (index >= 0 && index < sharedcount)
+		success = true;
+	sdlindex = index - sharedcount;
+
+	numsdljoysticks = SDL_NumJoysticks();
+	if (sdlindex < 0 || sdlindex >= numsdljoysticks)
+		sdlindex = -1;
+
+	// update cvar containing count of XInput joysticks + SDL joysticks
+	if (joy_detected.integer != sharedcount + numsdljoysticks)
+		Cvar_SetValueQuick(&joy_detected, sharedcount + numsdljoysticks);
+
+	if (vid_sdljoystickindex != sdlindex)
+	{
+		vid_sdljoystickindex = sdlindex;
+		// close SDL joystick if active
+		if (vid_sdljoystick)
+			SDL_JoystickClose(vid_sdljoystick);
+		vid_sdljoystick = NULL;
+		if (sdlindex >= 0)
+		{
+			vid_sdljoystick = SDL_JoystickOpen(sdlindex);
+			if (vid_sdljoystick)
+				Con_Printf("Joystick %i opened (SDL_Joystick %i is \"%s\" with %i axes, %i buttons, %i balls)\n", index, sdlindex, SDL_JoystickName(sdlindex), (int)SDL_JoystickNumAxes(vid_sdljoystick), (int)SDL_JoystickNumButtons(vid_sdljoystick), (int)SDL_JoystickNumBalls(vid_sdljoystick));
+			else
+			{
+				Con_Printf("Joystick %i failed (SDL_JoystickOpen(%i) returned: %s)\n", index, sdlindex, SDL_GetError());
+				sdlindex = -1;
+			}
+		}
+	}
+
+	if (sdlindex >= 0)
+		success = true;
+
+	Cvar_SetValueQuick(&joy_active, success ? 1 : 0);
+}
+
+#if SETVIDEOMODE
 // set the icon (we dont use SDL here since it would be too much a PITA)
 #ifdef WIN32
 #include "resource.h"
 #include <SDL_syswm.h>
-static void VID_SetCaption(void)
+static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, int screenbpp, int screenflags)
 {
-    SDL_SysWMinfo	info;
-	HICON			icon;
-
-	// set the caption
+	SDL_Surface *screen = NULL;
+	SDL_SysWMinfo info;
+	HICON icon;
 	SDL_WM_SetCaption( gamename, NULL );
-
-	// get the HWND handle
-    SDL_VERSION( &info.version );
-	if( !SDL_GetWMInfo( &info ) )
-		return;
-
-	icon = LoadIcon( GetModuleHandle( NULL ), MAKEINTRESOURCE( IDI_ICON1 ) );
+	screen = SDL_SetVideoMode(screenwidth, screenheight, screenbpp, screenflags);
+	if (screen)
+	{
+		// get the HWND handle
+		SDL_VERSION( &info.version );
+		if (SDL_GetWMInfo(&info))
+		{
+			icon = LoadIcon( GetModuleHandle( NULL ), MAKEINTRESOURCE( IDI_ICON1 ) );
 #ifndef _W64 //If Windows 64bit data types don't exist
 #ifndef SetClassLongPtr
 #define SetClassLongPtr SetClassLong
@@ -1291,20 +1723,26 @@ static void VID_SetCaption(void)
 #define LONG_PTR LONG
 #endif
 #endif
-	SetClassLongPtr( info.window, GCLP_HICON, (LONG_PTR)icon );
+			SetClassLongPtr( info.window, GCLP_HICON, (LONG_PTR)icon );
+		}
+	}
+	return screen;
 }
-static void VID_SetIcon_Pre(void)
+#elif defined(MACOSX)
+static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, int screenbpp, int screenflags)
 {
-}
-static void VID_SetIcon_Post(void)
-{
+	SDL_Surface *screen = NULL;
+	SDL_WM_SetCaption( gamename, NULL );
+	screen = SDL_SetVideoMode(screenwidth, screenheight, screenbpp, screenflags);
+	// we don't use SDL_WM_SetIcon here because the icon in the .app should be used
+	return screen;
 }
 #else
 // Adding the OS independent XPM version --blub
 #include "darkplaces.xpm"
 #include "nexuiz.xpm"
 static SDL_Surface *icon = NULL;
-static void VID_SetIcon_Pre(void)
+static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, int screenbpp, int screenflags)
 {
 	/*
 	 * Somewhat restricted XPM reader. Only supports XPMs saved by GIMP 2.4 at
@@ -1318,7 +1756,11 @@ static void VID_SetIcon_Pre(void)
 	char *xpm;
 	char **idata, *data;
 	const SDL_version *version;
+	SDL_Surface *screen = NULL;
 
+	if (icon)
+		SDL_FreeSurface(icon);
+	icon = NULL;
 	version = SDL_Linked_Version();
 	// only use non-XPM icon support in SDL v1.3 and higher
 	// SDL v1.2 does not support "smooth" transparency, and thus is better
@@ -1344,14 +1786,14 @@ static void VID_SetIcon_Pre(void)
 
 			icon = SDL_CreateRGBSurface(SDL_SRCALPHA, width, height, 32, LittleLong(red), LittleLong(green), LittleLong(blue), LittleLong(alpha));
 
-			if(icon == NULL) {
+			if (icon)
+				icon->pixels = data;
+			else
+			{
 				Con_Printf(	"Failed to create surface for the window Icon!\n"
 						"%s\n", SDL_GetError());
 				free(data);
-				return;
 			}
-
-			icon->pixels = data;
 		}
 	}
 
@@ -1370,107 +1812,114 @@ static void VID_SetIcon_Pre(void)
 
 		data = idata[0];
 
-		if(sscanf(data, "%i %i %i %i", &width, &height, &colors, &isize) != 4)
+		if(sscanf(data, "%i %i %i %i", &width, &height, &colors, &isize) == 4)
 		{
-			// NOTE: Only 1-char colornames are supported
-			Con_Printf("Sorry, but this does not even look similar to an XPM.\n");
-			return;
-		}
-
-		if(isize != 1)
-		{
-			// NOTE: Only 1-char colornames are supported
-			Con_Printf("This XPM's palette is either huge or idiotically unoptimized. It's key size is %i\n", isize);
-			return;
-		}
-
-		for(i = 0; i < colors; ++i)
-		{
-			unsigned int r, g, b;
-			char idx;
-
-			if(sscanf(idata[i+1], "%c c #%02x%02x%02x", &idx, &r, &g, &b) != 4)
+			if(isize == 1)
 			{
-				char foo[2];
-				if(sscanf(idata[i+1], "%c c Non%1[e]", &idx, foo) != 2) // I take the DailyWTF credit for this. --div0
+				for(i = 0; i < colors; ++i)
 				{
-					Con_Printf("This XPM's palette looks odd. Can't continue.\n");
-					return;
+					unsigned int r, g, b;
+					char idx;
+
+					if(sscanf(idata[i+1], "%c c #%02x%02x%02x", &idx, &r, &g, &b) != 4)
+					{
+						char foo[2];
+						if(sscanf(idata[i+1], "%c c Non%1[e]", &idx, foo) != 2) // I take the DailyWTF credit for this. --div0
+							break;
+						else
+						{
+							palette[i].r = 255; // color key
+							palette[i].g = 0;
+							palette[i].b = 255;
+							thenone = i; // weeeee
+							palenc[(unsigned char) idx] = i;
+						}
+					}
+					else
+					{
+						palette[i].r = r - (r == 255 && g == 0 && b == 255); // change 255/0/255 pink to 254/0/255 for color key
+						palette[i].g = g;
+						palette[i].b = b;
+						palenc[(unsigned char) idx] = i;
+					}
+				}
+
+				if (i == colors)
+				{
+					// allocate the image data
+					data = (char*) malloc(width*height);
+
+					for(j = 0; j < height; ++j)
+					{
+						for(i = 0; i < width; ++i)
+						{
+							// casting to the safest possible datatypes ^^
+							data[j * width + i] = palenc[((unsigned char*)idata[colors+j+1])[i]];
+						}
+					}
+
+					if(icon != NULL)
+					{
+						// SDL_FreeSurface should free the data too
+						// but for completeness' sake...
+						if(icon->flags & SDL_PREALLOC)
+						{
+							free(icon->pixels);
+							icon->pixels = NULL; // safety
+						}
+						SDL_FreeSurface(icon);
+					}
+
+					icon = SDL_CreateRGBSurface(SDL_SRCCOLORKEY, width, height, 8, 0,0,0,0);// rmask, gmask, bmask, amask); no mask needed
+					// 8 bit surfaces get an empty palette allocated according to the docs
+					// so it's a palette image for sure :) no endian check necessary for the mask
+
+					if(icon)
+					{
+						icon->pixels = data;
+						SDL_SetPalette(icon, SDL_PHYSPAL|SDL_LOGPAL, palette, 0, colors);
+						SDL_SetColorKey(icon, SDL_SRCCOLORKEY, thenone);
+					}
+					else
+					{
+						Con_Printf(	"Failed to create surface for the window Icon!\n"
+								"%s\n", SDL_GetError());
+						free(data);
+					}
 				}
 				else
 				{
-					palette[i].r = 255; // color key
-					palette[i].g = 0;
-					palette[i].b = 255;
-					thenone = i; // weeeee
+					Con_Printf("This XPM's palette looks odd. Can't continue.\n");
 				}
 			}
 			else
 			{
-				palette[i].r = r - (r == 255 && g == 0 && b == 255); // change 255/0/255 pink to 254/0/255 for color key
-				palette[i].g = g;
-				palette[i].b = b;
+				// NOTE: Only 1-char colornames are supported
+				Con_Printf("This XPM's palette is either huge or idiotically unoptimized. It's key size is %i\n", isize);
 			}
-
-			palenc[(unsigned char) idx] = i;
 		}
-
-		// allocate the image data
-		data = (char*) malloc(width*height);
-
-		for(j = 0; j < height; ++j)
+		else
 		{
-			for(i = 0; i < width; ++i)
-			{
-				// casting to the safest possible datatypes ^^
-				data[j * width + i] = palenc[((unsigned char*)idata[colors+j+1])[i]];
-			}
+			// NOTE: Only 1-char colornames are supported
+			Con_Printf("Sorry, but this does not even look similar to an XPM.\n");
 		}
-
-		if(icon != NULL)
-		{
-			// SDL_FreeSurface should free the data too
-			// but for completeness' sake...
-			if(icon->flags & SDL_PREALLOC)
-			{
-				free(icon->pixels);
-				icon->pixels = NULL; // safety
-			}
-			SDL_FreeSurface(icon);
-		}
-
-		icon = SDL_CreateRGBSurface(SDL_SRCCOLORKEY, width, height, 8, 0,0,0,0);// rmask, gmask, bmask, amask); no mask needed
-		// 8 bit surfaces get an empty palette allocated according to the docs
-		// so it's a palette image for sure :) no endian check necessary for the mask
-
-		if(icon == NULL) {
-			Con_Printf(	"Failed to create surface for the window Icon!\n"
-					"%s\n", SDL_GetError());
-			free(data);
-			return;
-		}
-
-		icon->pixels = data;
-		SDL_SetPalette(icon, SDL_PHYSPAL|SDL_LOGPAL, palette, 0, colors);
-		SDL_SetColorKey(icon, SDL_SRCCOLORKEY, thenone);
 	}
 
-	SDL_WM_SetIcon(icon, NULL);
-}
-static void VID_SetIcon_Post(void)
-{
+	if (icon)
+		SDL_WM_SetIcon(icon, NULL);
+
+	SDL_WM_SetCaption( gamename, NULL );
+	screen = SDL_SetVideoMode(screenwidth, screenheight, screenbpp, screenflags);
+
 #if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
 // LordHavoc: info.info.x11.lock_func and accompanying code do not seem to compile with SDL 1.3
 #if SDL_VIDEO_DRIVER_X11 && !SDL_VIDEO_DRIVER_QUARTZ
-	int j;
-	char *data;
-	const SDL_version *version;
 
 	version = SDL_Linked_Version();
 	// only use non-XPM icon support in SDL v1.3 and higher
 	// SDL v1.2 does not support "smooth" transparency, and thus is better
 	// off the xpm way
-	if(!(version->major >= 2 || (version->major == 1 && version->minor >= 3)))
+	if(screen && (!(version->major >= 2 || (version->major == 1 && version->minor >= 3))))
 	{
 		// in this case, we did not set the good icon yet
 		SDL_SysWMinfo info;
@@ -1515,13 +1964,10 @@ static void VID_SetIcon_Post(void)
 	}
 #endif
 #endif
+	return screen;
 }
 
-
-static void VID_SetCaption(void)
-{
-	SDL_WM_SetCaption( gamename, NULL );
-}
+#endif
 #endif
 
 static void VID_OutputVersion(void)
@@ -1537,27 +1983,36 @@ static void VID_OutputVersion(void)
 qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
 	int i;
-// FIXME SDL_SetVideoMode
+#if SETVIDEOMODE
 	static int notfirstvideomode = false;
 	int flags = SDL_OPENGL;
+#else
+	int windowflags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
+#endif
 	const char *drivername;
 
 	win_half_width = mode->width>>1;
 	win_half_height = mode->height>>1;
 
 	if(vid_resizable.integer)
+#if SETVIDEOMODE
 		flags |= SDL_RESIZABLE;
+#else
+		windowflags |= SDL_WINDOW_RESIZABLE;
+#endif
 
 	VID_OutputVersion();
 
+#if SETVIDEOMODE
 	/*
-	SDL Hack
+	SDL 1.2 Hack
 		We cant switch from one OpenGL video mode to another.
 		Thus we first switch to some stupid 2D mode and then back to OpenGL.
 	*/
 	if (notfirstvideomode)
 		SDL_SetVideoMode( 0, 0, 0, 0 );
 	notfirstvideomode = true;
+#endif
 
 	// SDL usually knows best
 	drivername = NULL;
@@ -1572,7 +2027,13 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 		return false;
 	}
 
-#ifndef __IPHONEOS__
+#ifdef __IPHONEOS__
+	// mobile platforms are always fullscreen, we'll get the resolution after opening the window
+	mode->fullscreen = true;
+	// hide the menu with SDL_WINDOW_BORDERLESS
+	windowflags |= SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS;
+#endif
+#ifndef USE_GLES2
 	if ((qglGetString = (const GLubyte* (GLAPIENTRY *)(GLenum name))GL_GetProcAddress("glGetString")) == NULL)
 	{
 		VID_Shutdown();
@@ -1585,7 +2046,11 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 
 	vid_isfullscreen = false;
 	if (mode->fullscreen) {
+#if SETVIDEOMODE
 		flags |= SDL_FULLSCREEN;
+#else
+		windowflags |= SDL_WINDOW_FULLSCREEN;
+#endif
 		vid_isfullscreen = true;
 	}
 	//flags |= SDL_HWSURFACE;
@@ -1614,46 +2079,54 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLEBUFFERS, 1);
 		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLESAMPLES, mode->samples);
 	}
+
 #if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
 	if (vid_vsync.integer)
 		SDL_GL_SetAttribute (SDL_GL_SWAP_CONTROL, 1);
 	else
 		SDL_GL_SetAttribute (SDL_GL_SWAP_CONTROL, 0);
 #else
-#ifdef __IPHONEOS__
+#ifdef USE_GLES2
 	SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	SDL_GL_SetAttribute (SDL_GL_RETAINED_BACKING, 1);
-	// FIXME: get proper resolution from OS somehow (iPad for instance...)
-	mode->width = 320;
-	mode->height = 480;
 #endif
 #endif
 
 	video_bpp = mode->bitsperpixel;
+#if SETVIDEOMODE
 	video_flags = flags;
-	VID_SetIcon_Pre();
-	screen = SDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
-	VID_SetIcon_Post();
-
+	screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
 	if (screen == NULL)
 	{
 		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
 		VID_Shutdown();
 		return false;
 	}
-
 	mode->width = screen->w;
 	mode->height = screen->h;
+#else
+	window_flags = windowflags;
+	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, mode->width, mode->height, windowflags);
+	if (window == NULL)
+	{
+		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
+		VID_Shutdown();
+		return false;
+	}
+	SDL_GetWindowSize(window, &mode->width, &mode->height);
+	context = SDL_GL_CreateContext(window);
+	if (context == NULL)
+	{
+		Con_Printf("Failed to initialize OpenGL context: %s\n", SDL_GetError());
+		VID_Shutdown();
+		return false;
+	}
+#endif
+
 	vid_softsurface = NULL;
 	vid.softpixels = NULL;
 
-	// set window title
-	VID_SetCaption();
-#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
-	// set up an event filter to ask confirmation on close button in WIN32
-	SDL_SetEventFilter( (SDL_EventFilter) Sys_EventFilter );
-#endif
 	// init keyboard
 	SDL_EnableUNICODE( SDL_ENABLE );
 	// enable key repeat since everyone expects it
@@ -1667,35 +2140,21 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	gl_platform = "SDL";
 	gl_platformextensions = "";
 
-#ifdef __IPHONEOS__
+#ifdef USE_GLES2
 	GLES_Init();
 #else
 	GL_Init();
 #endif
 
-	vid_numjoysticks = SDL_NumJoysticks();
-	vid_numjoysticks = bound(0, vid_numjoysticks, MAX_JOYSTICKS);
-	Cvar_SetValueQuick(&joy_detected, vid_numjoysticks);
-	Con_Printf("%d SDL joystick(s) found:\n", vid_numjoysticks);
-	memset(vid_joysticks, 0, sizeof(vid_joysticks));
-	for (i = 0;i < vid_numjoysticks;i++)
-	{
-		SDL_Joystick *joy;
-		joy = vid_joysticks[i] = SDL_JoystickOpen(i);
-		if (!joy)
-		{
-			Con_Printf("joystick #%i: open failed: %s\n", i, SDL_GetError());
-			continue;
-		}
-		Con_Printf("joystick #%i: opened \"%s\" with %i axes, %i buttons, %i balls\n", i, SDL_JoystickName(i), (int)SDL_JoystickNumAxes(joy), (int)SDL_JoystickNumButtons(joy), (int)SDL_JoystickNumBalls(joy));
-	}
-
 	vid_hidden = false;
 	vid_activewindow = false;
+	vid_hasfocus = true;
 	vid_usingmouse = false;
 	vid_usinghidecursor = false;
-
+		
+#if SETVIDEOMODE
 	SDL_WM_GrabInput(SDL_GRAB_OFF);
+#endif
 	return true;
 }
 
@@ -1708,36 +2167,58 @@ extern cvar_t gl_info_driver;
 
 qboolean VID_InitModeSoft(viddef_mode_t *mode)
 {
-// FIXME SDL_SetVideoMode
-	int i;
+#if SETVIDEOMODE
 	int flags = SDL_HWSURFACE;
+	if(!COM_CheckParm("-noasyncblit")) flags |= SDL_ASYNCBLIT;
+#else
+	int windowflags = SDL_WINDOW_SHOWN;
+#endif
 
 	win_half_width = mode->width>>1;
 	win_half_height = mode->height>>1;
 
 	if(vid_resizable.integer)
+#if SETVIDEOMODE
 		flags |= SDL_RESIZABLE;
+#else
+		windowflags |= SDL_WINDOW_RESIZABLE;
+#endif
 
 	VID_OutputVersion();
 
 	vid_isfullscreen = false;
 	if (mode->fullscreen) {
+#if SETVIDEOMODE
 		flags |= SDL_FULLSCREEN;
+#else
+		windowflags |= SDL_WINDOW_FULLSCREEN;
+#endif
 		vid_isfullscreen = true;
 	}
 
 	video_bpp = mode->bitsperpixel;
+#if SETVIDEOMODE
 	video_flags = flags;
-	VID_SetIcon_Pre();
-	screen = SDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
-	VID_SetIcon_Post();
-
+	screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
 	if (screen == NULL)
 	{
 		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
 		VID_Shutdown();
 		return false;
 	}
+	mode->width = screen->w;
+	mode->height = screen->h;
+#else
+	window_flags = windowflags;
+	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, mode->width, mode->height, windowflags);
+	if (window == NULL)
+	{
+		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
+		VID_Shutdown();
+		return false;
+	}
+	SDL_GetWindowSize(window, &mode->width, &mode->height);
+#endif
 
 	// create a framebuffer using our specific color format, we let the SDL blit function convert it in VID_Finish
 	vid_softsurface = SDL_CreateRGBSurface(SDL_SWSURFACE, mode->width, mode->height, 32, 0x00FF0000, 0x0000FF00, 0x00000000FF, 0xFF000000);
@@ -1758,97 +2239,22 @@ qboolean VID_InitModeSoft(viddef_mode_t *mode)
 		return false;
 	}
 
-	// set window title
-	VID_SetCaption();
-	// set up an event filter to ask confirmation on close button in WIN32
-#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
-	SDL_SetEventFilter( (SDL_EventFilter) Sys_EventFilter );
-#endif
 	// init keyboard
 	SDL_EnableUNICODE( SDL_ENABLE );
 	// enable key repeat since everyone expects it
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 
-	gl_platform = "SDLSoft";
-	gl_platformextensions = "";
-
-	gl_renderer = "DarkPlaces-Soft";
-	gl_vendor = "Forest Hale";
-	gl_version = "0.0";
-	gl_extensions = "";
-
-	// clear the extension flags
-	memset(&vid.support, 0, sizeof(vid.support));
-	Cvar_SetQuick(&gl_info_extensions, "");
-
-	vid.forcevbo = false;
-	vid.support.arb_depth_texture = true;
-	vid.support.arb_draw_buffers = true;
-	vid.support.arb_occlusion_query = true;
-	vid.support.arb_shadow = true;
-	//vid.support.arb_texture_compression = true;
-	vid.support.arb_texture_cube_map = true;
-	vid.support.arb_texture_non_power_of_two = false;
-	vid.support.arb_vertex_buffer_object = true;
-	vid.support.ext_blend_subtract = true;
-	vid.support.ext_draw_range_elements = true;
-	vid.support.ext_framebuffer_object = true;
-	vid.support.ext_texture_3d = true;
-	//vid.support.ext_texture_compression_s3tc = true;
-	vid.support.ext_texture_filter_anisotropic = true;
-	vid.support.ati_separate_stencil = true;
-
-	vid.maxtexturesize_2d = 16384;
-	vid.maxtexturesize_3d = 512;
-	vid.maxtexturesize_cubemap = 16384;
-	vid.texunits = 4;
-	vid.teximageunits = 32;
-	vid.texarrayunits = 8;
-	vid.max_anisotropy = 1;
-	vid.maxdrawbuffers = 4;
-
-	vid.texunits = bound(4, vid.texunits, MAX_TEXTUREUNITS);
-	vid.teximageunits = bound(16, vid.teximageunits, MAX_TEXTUREUNITS);
-	vid.texarrayunits = bound(8, vid.texarrayunits, MAX_TEXTUREUNITS);
-	Con_DPrintf("Using DarkPlaces Software Rasterizer rendering path\n");
-	vid.renderpath = RENDERPATH_SOFT;
-	vid.useinterleavedarrays = false;
-
-	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
-	Cvar_SetQuick(&gl_info_renderer, gl_renderer);
-	Cvar_SetQuick(&gl_info_version, gl_version);
-	Cvar_SetQuick(&gl_info_platform, gl_platform ? gl_platform : "");
-	Cvar_SetQuick(&gl_info_driver, gl_driver);
-
-	// LordHavoc: report supported extensions
-	Con_DPrintf("\nQuakeC extensions for server and client: %s\nQuakeC extensions for menu: %s\n", vm_sv_extensions, vm_m_extensions );
-
-	// clear to black (loading plaque will be seen over this)
-	GL_Clear(GL_COLOR_BUFFER_BIT, NULL, 1.0f, 128);
-
-	vid_numjoysticks = SDL_NumJoysticks();
-	vid_numjoysticks = bound(0, vid_numjoysticks, MAX_JOYSTICKS);
-	Cvar_SetValueQuick(&joy_detected, vid_numjoysticks);
-	Con_Printf("%d SDL joystick(s) found:\n", vid_numjoysticks);
-	memset(vid_joysticks, 0, sizeof(vid_joysticks));
-	for (i = 0;i < vid_numjoysticks;i++)
-	{
-		SDL_Joystick *joy;
-		joy = vid_joysticks[i] = SDL_JoystickOpen(i);
-		if (!joy)
-		{
-			Con_Printf("joystick #%i: open failed: %s\n", i, SDL_GetError());
-			continue;
-		}
-		Con_Printf("joystick #%i: opened \"%s\" with %i axes, %i buttons, %i balls\n", i, SDL_JoystickName(i), (int)SDL_JoystickNumAxes(joy), (int)SDL_JoystickNumButtons(joy), (int)SDL_JoystickNumBalls(joy));
-	}
+	VID_Soft_SharedSetup();
 
 	vid_hidden = false;
 	vid_activewindow = false;
+	vid_hasfocus = true;
 	vid_usingmouse = false;
 	vid_usinghidecursor = false;
 
+#if SETVIDEOMODE
 	SDL_WM_GrabInput(SDL_GRAB_OFF);
+#endif
 	return true;
 }
 
@@ -1856,7 +2262,7 @@ qboolean VID_InitMode(viddef_mode_t *mode)
 {
 	if (!SDL_WasInit(SDL_INIT_VIDEO) && SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 		Sys_Error ("Failed to init SDL video subsystem: %s", SDL_GetError());
-#ifdef SSE2_PRESENT
+#ifdef SSE_POSSIBLE
 	if (vid_soft.integer)
 		return VID_InitModeSoft(mode);
 	else
@@ -1866,13 +2272,18 @@ qboolean VID_InitMode(viddef_mode_t *mode)
 
 void VID_Shutdown (void)
 {
+	VID_EnableJoystick(false);
 	VID_SetMouse(false, false, false);
 	VID_RestoreSystemGamma();
 
+#if SETVIDEOMODE
 #ifndef WIN32
+#ifndef MACOSX
 	if (icon)
 		SDL_FreeSurface(icon);
 	icon = NULL;
+#endif
+#endif
 #endif
 
 	if (vid_softsurface)
@@ -1882,6 +2293,12 @@ void VID_Shutdown (void)
 	if (vid.softdepthpixels)
 		free(vid.softdepthpixels);
 	vid.softdepthpixels = NULL;
+
+#if SETVIDEOMODE
+#else
+	SDL_DestroyWindow(window);
+	window = NULL;
+#endif
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 
@@ -1903,17 +2320,16 @@ int VID_GetGamma (unsigned short *ramps, int rampsize)
 
 void VID_Finish (void)
 {
+#if SETVIDEOMODE
 	Uint8 appstate;
 
 	//react on appstate changes
 	appstate = SDL_GetAppState();
 
 	vid_hidden = !(appstate & SDL_APPACTIVE);
-
-	if( vid_hidden || !( appstate & SDL_APPMOUSEFOCUS ) || !( appstate & SDL_APPINPUTFOCUS ) )
-		vid_activewindow = false;
-	else
-		vid_activewindow = true;
+	vid_hasfocus = (appstate & SDL_APPINPUTFOCUS) != 0;
+#endif
+	vid_activewindow = !vid_hidden && vid_hasfocus;
 
 	VID_UpdateGamma(false, 256);
 
@@ -1924,13 +2340,13 @@ void VID_Finish (void)
 		case RENDERPATH_GL11:
 		case RENDERPATH_GL13:
 		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
 			CHECKGLERROR
 			if (r_speeds.integer == 2 || gl_finish.integer)
-			{
-				qglFinish();CHECKGLERROR
-			}
-#if !(SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2)
+				GL_Finish();
+#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+#else
 {
 	qboolean vid_usevsync;
 	vid_usevsync = (vid_vsync.integer && !cls.timedemo);
@@ -1943,16 +2359,33 @@ void VID_Finish (void)
 	}
 }
 #endif
+#if SETVIDEOMODE
 			SDL_GL_SwapBuffers();
+#else
+			SDL_GL_SwapWindow(window);
+#endif
 			break;
 		case RENDERPATH_SOFT:
 			DPSOFTRAST_Finish();
+#if SETVIDEOMODE
+//		if (!r_test.integer)
+		{
 			SDL_BlitSurface(vid_softsurface, NULL, screen, NULL);
 			SDL_Flip(screen);
+		}
+#else
+			{
+				SDL_Surface *screen = SDL_GetWindowSurface(window);
+				SDL_BlitSurface(vid_softsurface, NULL, screen, NULL);
+				SDL_UpdateWindowSurface(window);
+			}
+#endif
 			break;
 		case RENDERPATH_D3D9:
 		case RENDERPATH_D3D10:
 		case RENDERPATH_D3D11:
+			if (r_speeds.integer == 2 || gl_finish.integer)
+				GL_Finish();
 			break;
 		}
 	}
@@ -1965,7 +2398,7 @@ size_t VID_ListModes(vid_mode_t *modes, size_t maxcount)
 	int bpp = SDL_GetVideoInfo()->vfmt->BitsPerPixel;
 
 	k = 0;
-	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); *vidmodes; ++vidmodes)
+	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); vidmodes && *vidmodes; ++vidmodes)
 	{
 		if(k >= maxcount)
 			break;

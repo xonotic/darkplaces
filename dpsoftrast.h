@@ -14,13 +14,15 @@
 #define DPSOFTRAST_TEXTURE_FORMAT_DEPTH 1
 #define DPSOFTRAST_TEXTURE_FORMAT_RGBA8 2
 #define DPSOFTRAST_TEXTURE_FORMAT_ALPHA8 3
-#define DPSOFTRAST_TEXTURE_FORMAT_COMPAREMASK 3
+#define DPSOFTRAST_TEXTURE_FORMAT_RGBA16F 4
+#define DPSOFTRAST_TEXTURE_FORMAT_RGBA32F 5
+#define DPSOFTRAST_TEXTURE_FORMAT_COMPAREMASK 0x0F
 
 // modifier flags for texture (can not be changed after creation)
-#define DPSOFTRAST_TEXTURE_FLAG_MIPMAP 4
-#define DPSOFTRAST_TEXTURE_FLAG_CUBEMAP 8
-#define DPSOFTRAST_TEXTURE_FLAG_USEALPHA 16
-#define DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE 32
+#define DPSOFTRAST_TEXTURE_FLAG_MIPMAP 0x10
+#define DPSOFTRAST_TEXTURE_FLAG_CUBEMAP 0x20
+#define DPSOFTRAST_TEXTURE_FLAG_USEALPHA 0x40
+#define DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE 0x80
 
 typedef enum DPSOFTRAST_TEXTURE_FILTER_e
 {
@@ -54,6 +56,7 @@ void DPSOFTRAST_ColorMask(int r, int g, int b, int a);
 void DPSOFTRAST_DepthTest(int enable);
 void DPSOFTRAST_ScissorTest(int enable);
 void DPSOFTRAST_Scissor(float x, float y, float width, float height);
+void DPSOFTRAST_ClipPlane(float x, float y, float z, float w);
 
 void DPSOFTRAST_BlendFunc(int smodulate, int dmodulate);
 void DPSOFTRAST_BlendSubtract(int enable);
@@ -171,27 +174,30 @@ typedef enum shaderpermutation_e
 	SHADERPERMUTATION_FOGINSIDE = 1<<5, ///< tint the color by fog color or black if using additive blend mode
 	SHADERPERMUTATION_FOGOUTSIDE = 1<<6, ///< tint the color by fog color or black if using additive blend mode
 	SHADERPERMUTATION_FOGHEIGHTTEXTURE = 1<<7, ///< fog color and density determined by texture mapped on vertical axis
-	SHADERPERMUTATION_GAMMARAMPS = 1<<8, ///< gamma (postprocessing only)
-	SHADERPERMUTATION_CUBEFILTER = 1<<9, ///< (lightsource) use cubemap light filter
-	SHADERPERMUTATION_GLOW = 1<<10, ///< (lightmap) blend in an additive glow texture
-	SHADERPERMUTATION_BLOOM = 1<<11, ///< bloom (postprocessing only)
-	SHADERPERMUTATION_SPECULAR = 1<<12, ///< (lightsource or deluxemapping) render specular effects
-	SHADERPERMUTATION_POSTPROCESSING = 1<<13, ///< user defined postprocessing (postprocessing only)
-	SHADERPERMUTATION_REFLECTION = 1<<14, ///< normalmap-perturbed reflection of the scene infront of the surface, preformed as an overlay on the surface
-	SHADERPERMUTATION_OFFSETMAPPING = 1<<15, ///< adjust texcoords to roughly simulate a displacement mapped surface
-	SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING = 1<<16, ///< adjust texcoords to accurately simulate a displacement mapped surface (requires OFFSETMAPPING to also be set!)
-	SHADERPERMUTATION_SHADOWMAP2D = 1<<17, ///< (lightsource) use shadowmap texture as light filter
-	SHADERPERMUTATION_SHADOWMAPPCF = 1<<18, ///< (lightsource) use percentage closer filtering on shadowmap test results
-	SHADERPERMUTATION_SHADOWMAPPCF2 = 1<<19, ///< (lightsource) use higher quality percentage closer filtering on shadowmap test results
-	SHADERPERMUTATION_SHADOWSAMPLER = 1<<20, ///< (lightsource) use hardware shadowmap test
-	SHADERPERMUTATION_SHADOWMAPVSDCT = 1<<21, ///< (lightsource) use virtual shadow depth cube texture for shadowmap indexing
-	SHADERPERMUTATION_SHADOWMAPORTHO = 1<<22, //< (lightsource) use orthographic shadowmap projection
-	SHADERPERMUTATION_DEFERREDLIGHTMAP = 1<<23, ///< (lightmap) read Texture_ScreenDiffuse/Specular textures and add them on top of lightmapping
-	SHADERPERMUTATION_ALPHAKILL = 1<<24, ///< (deferredgeometry) discard pixel if diffuse texture alpha below 0.5
-	SHADERPERMUTATION_REFLECTCUBE = 1<<25, ///< fake reflections using global cubemap (not HDRI light probe)
-	SHADERPERMUTATION_NORMALMAPSCROLLBLEND = 1<<26, // (water) counter-direction normalmaps scrolling
-	SHADERPERMUTATION_LIMIT = 1<<27, ///< size of permutations array
-	SHADERPERMUTATION_COUNT = 27 ///< size of shaderpermutationinfo array
+	SHADERPERMUTATION_FOGALPHAHACK = 1<<8, ///< fog color and density determined by texture mapped on vertical axis
+	SHADERPERMUTATION_GAMMARAMPS = 1<<9, ///< gamma (postprocessing only)
+	SHADERPERMUTATION_CUBEFILTER = 1<<10, ///< (lightsource) use cubemap light filter
+	SHADERPERMUTATION_GLOW = 1<<11, ///< (lightmap) blend in an additive glow texture
+	SHADERPERMUTATION_BLOOM = 1<<12, ///< bloom (postprocessing only)
+	SHADERPERMUTATION_SPECULAR = 1<<13, ///< (lightsource or deluxemapping) render specular effects
+	SHADERPERMUTATION_POSTPROCESSING = 1<<14, ///< user defined postprocessing (postprocessing only)
+	SHADERPERMUTATION_REFLECTION = 1<<15, ///< normalmap-perturbed reflection of the scene infront of the surface, preformed as an overlay on the surface
+	SHADERPERMUTATION_OFFSETMAPPING = 1<<16, ///< adjust texcoords to roughly simulate a displacement mapped surface
+	SHADERPERMUTATION_OFFSETMAPPING_RELIEFMAPPING = 1<<17, ///< adjust texcoords to accurately simulate a displacement mapped surface (requires OFFSETMAPPING to also be set!)
+	SHADERPERMUTATION_SHADOWMAP2D = 1<<18, ///< (lightsource) use shadowmap texture as light filter
+	SHADERPERMUTATION_SHADOWMAPPCF = 1<<19, ///< (lightsource) use percentage closer filtering on shadowmap test results
+	SHADERPERMUTATION_SHADOWMAPPCF2 = 1<<20, ///< (lightsource) use higher quality percentage closer filtering on shadowmap test results
+	SHADERPERMUTATION_SHADOWSAMPLER = 1<<21, ///< (lightsource) use hardware shadowmap test
+	SHADERPERMUTATION_SHADOWMAPVSDCT = 1<<22, ///< (lightsource) use virtual shadow depth cube texture for shadowmap indexing
+	SHADERPERMUTATION_SHADOWMAPORTHO = 1<<23, ///< (lightsource) use orthographic shadowmap projection
+	SHADERPERMUTATION_DEFERREDLIGHTMAP = 1<<24, ///< (lightmap) read Texture_ScreenDiffuse/Specular textures and add them on top of lightmapping
+	SHADERPERMUTATION_ALPHAKILL = 1<<25, ///< (deferredgeometry) discard pixel if diffuse texture alpha below 0.5
+	SHADERPERMUTATION_REFLECTCUBE = 1<<26, ///< fake reflections using global cubemap (not HDRI light probe)
+	SHADERPERMUTATION_NORMALMAPSCROLLBLEND = 1<<27, ///< (water) counter-direction normalmaps scrolling
+	SHADERPERMUTATION_BOUNCEGRID = 1<<28, ///< (lightmap) use Texture_BounceGrid as an additional source of ambient light
+	SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL = 1<<29, ///< (lightmap) use 16-component pixels in bouncegrid texture for directional lighting rather than standard 4-component
+	SHADERPERMUTATION_LIMIT = 1<<30, ///< size of permutations array
+	SHADERPERMUTATION_COUNT = 30 ///< size of shaderpermutationinfo array
 }
 shaderpermutation_t;
 
@@ -250,7 +256,7 @@ typedef enum DPSOFTRAST_UNIFORM_e
 	DPSOFTRAST_UNIFORM_LightColor,
 	DPSOFTRAST_UNIFORM_LightDir,
 	DPSOFTRAST_UNIFORM_LightPosition,
-	DPSOFTRAST_UNIFORM_OffsetMapping_Scale,
+	DPSOFTRAST_UNIFORM_OffsetMapping_ScaleSteps,
 	DPSOFTRAST_UNIFORM_PixelSize,
 	DPSOFTRAST_UNIFORM_ReflectColor,
 	DPSOFTRAST_UNIFORM_ReflectFactor,
@@ -307,7 +313,7 @@ typedef enum DPSOFTRAST_UNIFORM_e
 }
 DPSOFTRAST_UNIFORM;
 
-void DPSOFTRAST_SetShader(int mode, int permutation);
+void DPSOFTRAST_SetShader(int mode, int permutation, int exactspecularmath);
 #define DPSOFTRAST_Uniform1f(index, v0) DPSOFTRAST_Uniform4f(index, v0, 0, 0, 0)
 #define DPSOFTRAST_Uniform2f(index, v0, v1) DPSOFTRAST_Uniform4f(index, v0, v1, 0, 0)
 #define DPSOFTRAST_Uniform3f(index, v0, v1, v2) DPSOFTRAST_Uniform4f(index, v0, v1, v2, 0)

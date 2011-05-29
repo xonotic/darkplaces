@@ -83,9 +83,12 @@ cvar_t scr_screenshot_name_in_mapdir = {CVAR_SAVE, "scr_screenshot_name_in_mapdi
 cvar_t shownetgraph = {CVAR_SAVE, "shownetgraph", "0", "shows a graph of packet sizes and other information, 0 = off, 1 = show client netgraph, 2 = show client and server netgraphs (when hosting a server)"};
 cvar_t cl_demo_mousegrab = {0, "cl_demo_mousegrab", "0", "Allows reading the mouse input while playing demos. Useful for camera mods developed in csqc. (0: never, 1: always)"};
 cvar_t timedemo_screenshotframelist = {0, "timedemo_screenshotframelist", "", "when performing a timedemo, take screenshots of each frame in this space-separated list - example: 1 201 401"};
+cvar_t vid_touchscreen_outlinealpha = {0, "vid_touchscreen_outlinealpha", "0.25", "opacity of touchscreen area outlines"};
+cvar_t vid_touchscreen_overlayalpha = {0, "vid_touchscreen_overlayalpha", "0.25", "opacity of touchscreen area icons"};
 
 extern cvar_t v_glslgamma;
 extern cvar_t sbar_info_pos;
+extern cvar_t r_fog_clear;
 #define WANT_SCREENSHOT_HWGAMMA (scr_screenshot_hwgamma.integer && vid_usinghwgamma)
 
 int jpeg_supported = false;
@@ -612,9 +615,9 @@ static int SCR_InfobarHeight(void)
 	if (cl.time > cl.oldtime)
 		scr_infobartime_off -= cl.time - cl.oldtime;
 	if(scr_infobartime_off > 0)
-		offset += 8;
+		offset += 1;
 	if(cls.qw_downloadname[0])
-		offset += 8;
+		offset += 1;
 
 	downinfo = Curl_GetDownloadInfo(&nDownloads, &addinfo);
 	if(downinfo)
@@ -734,8 +737,8 @@ void R_TimeReport(const char *desc)
 		return;
 
 	CHECKGLERROR
-	if (r_speeds.integer == 2 && qglFinish)
-		qglFinish();
+	if (r_speeds.integer == 2)
+		GL_Finish();
 	CHECKGLERROR
 	r_timereport_temp = r_timereport_current;
 	r_timereport_current = Sys_DoubleTime();
@@ -765,7 +768,7 @@ void R_TimeReport_BeginFrame(void)
 	r_timereport_active = false;
 	memset(&r_refdef.stats, 0, sizeof(r_refdef.stats));
 
-	if (r_speeds.integer >= 2 && cls.signon == SIGNONS && cls.state == ca_connected)
+	if (r_speeds.integer >= 2)
 	{
 		r_timereport_active = true;
 		r_timereport_start = r_timereport_current = Sys_DoubleTime();
@@ -780,6 +783,8 @@ static int R_CountLeafTriangles(const dp_model_t *model, const mleaf_t *leaf)
 	return triangles;
 }
 
+extern cvar_t r_viewscale;
+extern float viewscalefpsadjusted;
 void R_TimeReport_EndFrame(void)
 {
 	int i, j, lines, y;
@@ -788,30 +793,34 @@ void R_TimeReport_EndFrame(void)
 	mleaf_t *viewleaf;
 
 	string[0] = 0;
-	if (r_speeds.integer && cls.signon == SIGNONS && cls.state == ca_connected)
+	if (r_speeds.integer)
 	{
 		// put the location name in the r_speeds display as it greatly helps
 		// when creating loc files
 		loc = CL_Locs_FindNearest(cl.movement_origin);
 		viewleaf = (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.PointInLeaf) ? r_refdef.scene.worldmodel->brush.PointInLeaf(r_refdef.scene.worldmodel, r_refdef.view.origin) : NULL;
 		dpsnprintf(string, sizeof(string),
-"%s%s\n"
+"%6.0fus rendertime %3.0f%% viewscale %s%s %.3f cl.time\n"
 "%3i renders org:'%+8.2f %+8.2f %+8.2f' dir:'%+2.3f %+2.3f %+2.3f'\n"
-"%5i viewleaf%5i cluster%2i area%4i brushes%4i surfaces(%7i triangles)\n"
+"%5i viewleaf%5i cluster%3i area%4i brushes%4i surfaces(%7i triangles)\n"
 "%7i surfaces%7i triangles %5i entities (%7i surfaces%7i triangles)\n"
 "%5i leafs%5i portals%6i/%6i particles%6i/%6i decals %3i%% quality\n"
 "%7i lightmap updates (%7i pixels)%8iKB/%8iKB framedata\n"
 "%4i lights%4i clears%4i scissored%7i light%7i shadow%7i dynamic\n"
+"bouncegrid:%4i lights%6i particles%6i traces%6i hits%6i splats%6i bounces\n"
+"collision cache efficiency:%6i cached%6i traced%6ianimated\n"
 "%6i draws%8i vertices%8i triangles bloompixels%8i copied%8i drawn\n"
 "updated%5i indexbuffers%8i bytes%5i vertexbuffers%8i bytes\n"
 "%s"
-, loc ? "Location: " : "", loc ? loc->name : ""
+, r_refdef.lastdrawscreentime * 1000000.0, r_viewscale.value * sqrt(viewscalefpsadjusted) * 100.0f, loc ? "Location: " : "", loc ? loc->name : "", cl.time
 , r_refdef.stats.renders, r_refdef.view.origin[0], r_refdef.view.origin[1], r_refdef.view.origin[2], r_refdef.view.forward[0], r_refdef.view.forward[1], r_refdef.view.forward[2]
 , viewleaf ? (int)(viewleaf - r_refdef.scene.worldmodel->brush.data_leafs) : -1, viewleaf ? viewleaf->clusterindex : -1, viewleaf ? viewleaf->areaindex : -1, viewleaf ? viewleaf->numleafbrushes : 0, viewleaf ? viewleaf->numleafsurfaces : 0, viewleaf ? R_CountLeafTriangles(r_refdef.scene.worldmodel, viewleaf) : 0
 , r_refdef.stats.world_surfaces, r_refdef.stats.world_triangles, r_refdef.stats.entities, r_refdef.stats.entities_surfaces, r_refdef.stats.entities_triangles
 , r_refdef.stats.world_leafs, r_refdef.stats.world_portals, r_refdef.stats.particles, cl.num_particles, r_refdef.stats.drawndecals, r_refdef.stats.totaldecals, (int)(100 * r_refdef.view.quality)
 , r_refdef.stats.lightmapupdates, r_refdef.stats.lightmapupdatepixels, (r_refdef.stats.framedatacurrent+512) / 1024, (r_refdef.stats.framedatasize+512)/1024
 , r_refdef.stats.lights, r_refdef.stats.lights_clears, r_refdef.stats.lights_scissored, r_refdef.stats.lights_lighttriangles, r_refdef.stats.lights_shadowtriangles, r_refdef.stats.lights_dynamicshadowtriangles
+, r_refdef.stats.bouncegrid_lights, r_refdef.stats.bouncegrid_particles, r_refdef.stats.bouncegrid_traces, r_refdef.stats.bouncegrid_hits, r_refdef.stats.bouncegrid_splats, r_refdef.stats.bouncegrid_bounces
+, r_refdef.stats.collisioncache_cached, r_refdef.stats.collisioncache_traced, r_refdef.stats.collisioncache_animated
 , r_refdef.stats.draws, r_refdef.stats.draws_vertices, r_refdef.stats.draws_elements / 3, r_refdef.stats.bloom_copypixels, r_refdef.stats.bloom_drawpixels
 , r_refdef.stats.indexbufferuploadcount, r_refdef.stats.indexbufferuploadsize, r_refdef.stats.vertexbufferuploadcount, r_refdef.stats.vertexbufferuploadsize
 , r_speeds_timestring);
@@ -957,6 +966,8 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable(&shownetgraph);
 	Cvar_RegisterVariable(&cl_demo_mousegrab);
 	Cvar_RegisterVariable(&timedemo_screenshotframelist);
+	Cvar_RegisterVariable(&vid_touchscreen_outlinealpha);
+	Cvar_RegisterVariable(&vid_touchscreen_overlayalpha);
 
 	Cmd_AddCommand ("sizeup",SCR_SizeUp_f, "increase view size (increases viewsize cvar)");
 	Cmd_AddCommand ("sizedown",SCR_SizeDown_f, "decrease view size (decreases viewsize cvar)");
@@ -1588,6 +1599,31 @@ qboolean SCR_ScreenShot(char *filename, unsigned char *buffer1, unsigned char *b
 
 //=============================================================================
 
+int scr_numtouchscreenareas;
+scr_touchscreenarea_t scr_touchscreenareas[16];
+
+static void SCR_DrawTouchscreenOverlay(void)
+{
+	int i;
+	scr_touchscreenarea_t *a;
+	cachepic_t *pic;
+	for (i = 0, a = scr_touchscreenareas;i < scr_numtouchscreenareas;i++, a++)
+	{
+		if (vid_touchscreen_outlinealpha.value > 0 && a->rect[0] >= 0 && a->rect[1] >= 0 && a->rect[2] >= 4 && a->rect[3] >= 4)
+		{
+			DrawQ_Fill(a->rect[0] +              2, a->rect[1]                 , a->rect[2] - 4,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+			DrawQ_Fill(a->rect[0] +              1, a->rect[1] +              1, a->rect[2] - 2,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+			DrawQ_Fill(a->rect[0]                 , a->rect[1] +              2,          2    , a->rect[3] - 2, 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+			DrawQ_Fill(a->rect[0] + a->rect[2] - 2, a->rect[1] +              2,          2    , a->rect[3] - 2, 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+			DrawQ_Fill(a->rect[0] +              1, a->rect[1] + a->rect[3] - 2, a->rect[2] - 2,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+			DrawQ_Fill(a->rect[0] +              2, a->rect[1] + a->rect[3] - 1, a->rect[2] - 4,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
+		}
+		pic = a->pic ? Draw_CachePic(a->pic) : NULL;
+		if (pic && pic->tex != r_texture_notexture)
+			DrawQ_Pic(a->rect[0], a->rect[1], Draw_CachePic(a->pic), a->rect[2], a->rect[3], 1, 1, 1, vid_touchscreen_overlayalpha.value * (0.5f + 0.5f * a->active), 0);
+	}
+}
+
 extern void R_UpdateFogColor(void);
 void R_ClearScreen(qboolean fogcolor)
 {
@@ -1597,7 +1633,8 @@ void R_ClearScreen(qboolean fogcolor)
 	if (fogcolor)
 	{
 		R_UpdateFogColor();
-		VectorCopy(r_refdef.fogcolor, clearcolor);
+		if (r_fog_clear.integer)
+			VectorCopy(r_refdef.fogcolor, clearcolor);
 	}
 	// clear depth is 1.0
 	// LordHavoc: we use a stencil centered around 128 instead of 0,
@@ -1770,7 +1807,6 @@ void SCR_DrawScreen (void)
 		SCR_DrawPause ();
 		if (!r_letterbox.value)
 			Sbar_Draw();
-		Sbar_ShowFPS();
 		SHOWLMP_drawall();
 		SCR_CheckDrawCenterString();
 	}
@@ -1785,14 +1821,14 @@ void SCR_DrawScreen (void)
 
 	SCR_DrawInfobar();
 
+	SCR_DrawTouchscreenOverlay();
+
 	if (r_timereport_active)
 		R_TimeReport("2d");
 
-	if (cls.signon == SIGNONS)
-	{
-		R_TimeReport_EndFrame();
-		R_TimeReport_BeginFrame();
-	}
+	R_TimeReport_EndFrame();
+	R_TimeReport_BeginFrame();
+	Sbar_ShowFPS();
 
 	DrawQ_Finish();
 
@@ -2009,6 +2045,7 @@ static void SCR_DrawLoadingScreen_SharedSetup (qboolean clear)
 //	CHECKGLERROR
 	r_refdef.draw2dstage = true;
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, 0, 0, vid.width, vid.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_ColorMask(1,1,1,1);
 	// when starting up a new video mode, make sure the screen is cleared to black
@@ -2018,7 +2055,7 @@ static void SCR_DrawLoadingScreen_SharedSetup (qboolean clear)
 	R_Mesh_Start();
 	R_EntityMatrix(&identitymatrix);
 	// draw the loading plaque
-	loadingscreenpic = Draw_CachePic (loadingscreenpic_number ? va("gfx/loading%d", loadingscreenpic_number+1) : "gfx/loading");
+	loadingscreenpic = Draw_CachePic_Flags (loadingscreenpic_number ? va("gfx/loading%d", loadingscreenpic_number+1) : "gfx/loading", loadingscreenpic_number ? CACHEPICFLAG_NOTPERSISTENT : 0);
 
 	w = loadingscreenpic->width;
 	h = loadingscreenpic->height;
@@ -2088,7 +2125,7 @@ static void SCR_DrawLoadingScreen (qboolean clear)
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	}
 	R_Mesh_PrepareVertices_Generic_Arrays(4, loadingscreenpic_vertex3f, NULL, loadingscreenpic_texcoord2f);
-	R_SetupShader_Generic(loadingscreenpic->tex, NULL, GL_MODULATE, 1);
+	R_SetupShader_Generic(Draw_GetPicTexture(loadingscreenpic), NULL, GL_MODULATE, 1);
 	R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	SCR_DrawLoadingStack();
 }
@@ -2174,6 +2211,7 @@ extern cvar_t cl_minfps_qualitymax;
 extern cvar_t cl_minfps_qualitymin;
 extern cvar_t cl_minfps_qualitypower;
 extern cvar_t cl_minfps_qualityscale;
+extern cvar_t r_viewscale_fpsscaling;
 static double cl_updatescreen_rendertime = 0;
 static double cl_updatescreen_quality = 1;
 extern void Sbar_ShowFPS_Update(void);
@@ -2181,6 +2219,7 @@ void CL_UpdateScreen(void)
 {
 	vec3_t vieworigin;
 	double rendertime1;
+	double drawscreenstart;
 	float conwidth, conheight;
 	float f;
 	r_viewport_t viewport;
@@ -2270,6 +2309,7 @@ void CL_UpdateScreen(void)
 	}
 
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, 0, 0, vid.width, vid.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
+	R_Mesh_ResetRenderTargets();
 	R_SetViewport(&viewport);
 	GL_ScissorTest(false);
 	GL_ColorMask(1,1,1,1);
@@ -2308,6 +2348,9 @@ void CL_UpdateScreen(void)
 		}
 	}
 
+	if (r_viewscale_fpsscaling.integer)
+		GL_Finish();
+	drawscreenstart = Sys_DoubleTime();
 	if (R_Stereo_Active())
 	{
 		r_stereo_side = 0;
@@ -2340,6 +2383,9 @@ void CL_UpdateScreen(void)
 	}
 	else
 		SCR_DrawScreen();
+	if (r_viewscale_fpsscaling.integer)
+		GL_Finish();
+	r_refdef.lastdrawscreentime = Sys_DoubleTime() - drawscreenstart;
 
 	SCR_CaptureVideo();
 
@@ -2358,11 +2404,11 @@ void CL_UpdateScreen(void)
 	else if (key_consoleactive)
 		VID_SetMouse(vid.fullscreen, false, false);
 	else if (key_dest == key_menu_grabbed)
-		VID_SetMouse(true, vid_mouse.integer && !in_client_mouse, true);
+		VID_SetMouse(true, vid_mouse.integer && !in_client_mouse && !vid_touchscreen.integer, !vid_touchscreen.integer);
 	else if (key_dest == key_menu)
-		VID_SetMouse(vid.fullscreen, vid_mouse.integer && !in_client_mouse, true);
+		VID_SetMouse(vid.fullscreen, vid_mouse.integer && !in_client_mouse && !vid_touchscreen.integer, !vid_touchscreen.integer);
 	else
-		VID_SetMouse(vid.fullscreen, vid_mouse.integer && !cl.csqc_wantsmousemove && cl_prydoncursor.integer <= 0 && (!cls.demoplayback || cl_demo_mousegrab.integer), true);
+		VID_SetMouse(vid.fullscreen, vid_mouse.integer && !cl.csqc_wantsmousemove && cl_prydoncursor.integer <= 0 && (!cls.demoplayback || cl_demo_mousegrab.integer) && !vid_touchscreen.integer, !vid_touchscreen.integer);
 
 	VID_Finish();
 }

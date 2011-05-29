@@ -24,6 +24,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // disable data conversion warnings
 
 #ifdef _MSC_VER
+#pragma warning(disable : 4310) // LordHavoc: MSVC++ 2008 x86: cast truncates constant value
+#pragma warning(disable : 4245) // LordHavoc: MSVC++ 2008 x86: 'initializing' : conversion from 'int' to 'unsigned char', signed/unsigned mismatch
+#pragma warning(disable : 4204) // LordHavoc: MSVC++ 2008 x86: nonstandard extension used : non-constant aggregate initializer
+#pragma warning(disable : 4267) // LordHavoc: MSVC++ 2008 x64, conversion from 'size_t' to 'int', possible loss of data
 //#pragma warning(disable : 4244)     // LordHavoc: MSVC++ 4 x86, double/float
 //#pragma warning(disable : 4305)		// LordHavoc: MSVC++ 6 x86, double/float
 //#pragma warning(disable : 4706)		// LordHavoc: MSVC++ 2008 x86, assignment within conditional expression
@@ -594,6 +598,41 @@ extern void (GLAPIENTRY *qglGenerateMipmapEXT)(GLenum target);
 #endif
 extern void (GLAPIENTRY *qglDrawBuffersARB)(GLsizei n, const GLenum *bufs);
 
+// GL_ARB_texture_float
+#ifndef GL_RGBA32F_ARB
+#define GL_RGBA32F_ARB                                       0x8814
+#define GL_RGB32F_ARB                                        0x8815
+#define GL_ALPHA32F_ARB                                      0x8816
+#define GL_INTENSITY32F_ARB                                  0x8817
+#define GL_LUMINANCE32F_ARB                                  0x8818
+#define GL_LUMINANCE_ALPHA32F_ARB                            0x8819
+#define GL_RGBA16F_ARB                                       0x881A
+#define GL_RGB16F_ARB                                        0x881B
+#define GL_ALPHA16F_ARB                                      0x881C
+#define GL_INTENSITY16F_ARB                                  0x881D
+#define GL_LUMINANCE16F_ARB                                  0x881E
+#define GL_LUMINANCE_ALPHA16F_ARB                            0x881F
+#endif
+
+// GL_EXT_texture_sRGB
+#ifndef GL_SRGB_EXT
+#define GL_SRGB_EXT                                          0x8C40
+#define GL_SRGB8_EXT                                         0x8C41
+#define GL_SRGB_ALPHA_EXT                                    0x8C42
+#define GL_SRGB8_ALPHA8_EXT                                  0x8C43
+#define GL_SLUMINANCE_ALPHA_EXT                              0x8C44
+#define GL_SLUMINANCE8_ALPHA8_EXT                            0x8C45
+#define GL_SLUMINANCE_EXT                                    0x8C46
+#define GL_SLUMINANCE8_EXT                                   0x8C47
+#define GL_COMPRESSED_SRGB_EXT                               0x8C48
+#define GL_COMPRESSED_SRGB_ALPHA_EXT                         0x8C49
+#define GL_COMPRESSED_SLUMINANCE_EXT                         0x8C4A
+#define GL_COMPRESSED_SLUMINANCE_ALPHA_EXT                   0x8C4B
+#define GL_COMPRESSED_SRGB_S3TC_DXT1_EXT                     0x8C4C
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT               0x8C4D
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT               0x8C4E
+#define GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT               0x8C4F
+#endif
 
 extern void (GLAPIENTRY *qglScissor)(GLint x, GLint y, GLsizei width, GLsizei height);
 
@@ -843,6 +882,7 @@ extern void (GLAPIENTRY *qglVertexAttribPointer)(GLuint index, GLint size, GLenu
 extern void (GLAPIENTRY *qglEnableVertexAttribArray)(GLuint index);
 extern void (GLAPIENTRY *qglDisableVertexAttribArray)(GLuint index);
 extern void (GLAPIENTRY *qglBindAttribLocation)(GLuint programObj, GLuint index, const GLchar *name);
+extern void (GLAPIENTRY *qglBindFragDataLocation)(GLuint programObj, GLuint index, const GLchar *name);
 extern void (GLAPIENTRY *qglGetActiveAttrib)(GLuint programObj, GLuint index, GLsizei maxLength, GLsizei *length, GLint *size, GLenum *type, GLchar *name);
 extern GLint (GLAPIENTRY *qglGetAttribLocation)(GLuint programObj, const GLchar *name);
 extern void (GLAPIENTRY *qglGetVertexAttribdv)(GLuint index, GLenum pname, GLdouble *params);
@@ -948,6 +988,20 @@ extern void (GLAPIENTRY *qglGetQueryObjectuivARB)(GLuint qid, GLenum pname, GLui
 //GL_AMD_texture_texture4
 
 //GL_ARB_texture_gather
+
+//GL_ARB_multisample
+#define GL_MULTISAMPLE_ARB              0x809D
+#define GL_SAMPLE_ALPHA_TO_COVERAGE_ARB 0x809E
+#define GL_SAMPLE_ALPHA_TO_ONE_ARB      0x809F
+#define GL_SAMPLE_COVERAGE_ARB          0x80A0
+#define GL_SAMPLE_BUFFERS_ARB           0x80A8
+#define GL_SAMPLES_ARB                  0x80A9
+#define GL_SAMPLE_COVERAGE_VALUE_ARB    0x80AA
+#define GL_SAMPLE_COVERAGE_INVERT_ARB   0x80AB
+#define GL_MULTISAMPLE_BIT_ARB          0x20000000
+extern void (GLAPIENTRY *qglSampleCoverageARB)(GLclampf value, GLboolean invert);
+
+extern void (GLAPIENTRY *qglPointSize)(GLfloat size);
 
 #define DEBUGGL
 

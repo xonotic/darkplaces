@@ -29,7 +29,7 @@ unsigned char *loadimagepixelsbgra (const char *filename, qboolean complain, qbo
 qboolean LoadPCX_QWSkin(const unsigned char *f, int filesize, unsigned char *pixels, int outwidth, int outheight);
 
 // loads a texture, as a texture
-rtexture_t *loadtextureimage (rtexturepool_t *pool, const char *filename, qboolean complain, int flags, qboolean allowFixtrans, qboolean convertsRGB);
+rtexture_t *loadtextureimage (rtexturepool_t *pool, const char *filename, qboolean complain, int flags, qboolean allowFixtrans, qboolean sRGB);
 
 // writes an upside down BGR image into a TGA
 qboolean Image_WriteTGABGR_preflipped (const char *filename, int width, int height, const unsigned char *data);
@@ -48,6 +48,10 @@ void Image_HeightmapToNormalmap_BGRA(const unsigned char *inpixels, unsigned cha
 // console command to fix the colors of transparent pixels (to prevent weird borders)
 void Image_FixTransparentPixels_f(void);
 extern cvar_t r_fixtrans_auto;
+
+#define Image_LinearFloatFromsRGB(c) (((c) < 11) ? (c) * 0.000302341331f : (float)pow(((c)*(1.0f/256.0f) + 0.055f)*(1.0f/1.0555f), 2.4f))
+
+void Image_MakeLinearColorsFromsRGB(unsigned char *pout, const unsigned char *pin, int numpixels);
 
 #endif
 

@@ -22,12 +22,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef QUAKEDEF_H
 #define QUAKEDEF_H
 
-/// on UNIX platforms we need to define this so that video saving does not cause a SIGFSZ (file size) signal when a video clip exceeds 2GB
-#define _FILE_OFFSET_BITS 64
-
-// for cd_linux.c
-#define __KERNEL_STRICT_NAMES
-
 #if defined(__GNUC__) && (__GNUC__ > 2)
 #define DP_FUNC_PRINTF(n) __attribute__ ((format (printf, n, n+1)))
 #define DP_FUNC_PURE      __attribute__ ((pure))
@@ -92,7 +86,7 @@ extern char engineversion[128];
 #define MAX_NETWM_ICON 1026 // one 32x32
 
 #define	MAX_WATERPLANES			2
-#define	MAX_CUBEMAPS			64
+#define	MAX_CUBEMAPS			1024
 #define	MAX_EXPLOSIONS			8
 #define	MAX_DLIGHTS				16
 #define	MAX_CACHED_PICS			1024 // this is 144 bytes each (or 152 on 64bit)
@@ -159,7 +153,7 @@ extern char engineversion[128];
 #define MAX_NETWM_ICON 352822 // 16x16, 22x22, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256, 512x512
 
 #define	MAX_WATERPLANES			16 ///< max number of water planes visible (each one causes additional view renders)
-#define	MAX_CUBEMAPS			256 ///< max number of cubemap textures loaded for light filters
+#define	MAX_CUBEMAPS			1024 ///< max number of cubemap textures loaded for light filters
 #define	MAX_EXPLOSIONS			64 ///< max number of explosion shell effects active at once (not particle related)
 #define	MAX_DLIGHTS				256 ///< max number of dynamic lights (rocket flashes, etc) in scene at once
 #define	MAX_CACHED_PICS			1024 ///< max number of 2D pics loaded at once
@@ -235,6 +229,7 @@ extern char engineversion[128];
 //#define STAT_TIME			17 ///< FTE
 //#define STAT_VIEW2		20 ///< FTE
 #define STAT_VIEWZOOM		21 ///< DP
+#define STAT_MOVEVARS_AIRACCEL_QW_STRETCHFACTOR 220 ///< DP
 #define STAT_MOVEVARS_AIRCONTROL_PENALTY					221 ///< DP
 #define STAT_MOVEVARS_AIRSPEEDLIMIT_NONQW 222 ///< DP
 #define STAT_MOVEVARS_AIRSTRAFEACCEL_QW 223 ///< DP
@@ -435,6 +430,10 @@ extern cvar_t developer_loading;
 #elif defined(__OpenBSD__)
 # define DP_OS_NAME		"OpenBSD"
 # define DP_OS_STR		"openbsd"
+#elif defined(TARGET_OS_IPHONE)
+# define DP_OS_NAME		"iPhoneOS"
+# define DP_OS_STR		"iphoneos"
+# define USE_GLES2		1
 #elif defined(MACOSX)
 # define DP_OS_NAME		"Mac OS X"
 # define DP_OS_STR		"osx"
@@ -443,6 +442,7 @@ extern cvar_t developer_loading;
 # define DP_OS_STR		"morphos"
 #else
 # define DP_OS_NAME		"Unknown"
+# define DP_OS_STR		"unknown"
 #endif
 
 #if defined(__GNUC__)
@@ -479,6 +479,18 @@ extern cvar_t developer_loading;
 # undef SSE_PRESENT
 # undef SSE_POSSIBLE
 # undef SSE2_PRESENT
+#endif
+
+#ifdef SSE2_PRESENT
+#define Sys_HaveSSE() true
+#define Sys_HaveSSE2() true
+#elif defined(SSE_POSSIBLE)
+// runtime detection of SSE/SSE2 capabilities for x86
+qboolean Sys_HaveSSE(void);
+qboolean Sys_HaveSSE2(void);
+#else
+#define Sys_HaveSSE() false
+#define Sys_HaveSSE2() false
 #endif
 
 /// incremented every frame, never reset

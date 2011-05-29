@@ -188,7 +188,7 @@ OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_SND_COMMON) snd_sdl.
 
 
 # Compilation
-CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D)
+CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES
 CFLAGS_DEBUG=-ggdb
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs
 CFLAGS_RELEASE=
@@ -196,6 +196,7 @@ CFLAGS_RELEASE_PROFILE=-fbranch-probabilities
 CFLAGS_SDL=$(SDLCONFIG_CFLAGS)
 
 CFLAGS_SSE=-msse
+CFLAGS_SSE2=-msse2
 
 OPTIM_DEBUG=$(CPUOPTIMIZATIONS)
 #OPTIM_RELEASE=-O2 -fno-strict-aliasing -ffast-math -funroll-loops $(CPUOPTIMIZATIONS)
@@ -209,17 +210,17 @@ DO_CC=$(CC) $(CFLAGS) -c $< -o $@
 
 
 # Link
-LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=debug
-LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=profile
-LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=release
+LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always --dirty; } || echo -` -DBUILDTYPE=debug
+LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always --dirty; } || echo -` -DBUILDTYPE=profile
+LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always --dirty; } || echo -` -DBUILDTYPE=release
 
 
 ##### UNIX specific variables #####
 
-OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_null.o keysym2ucs.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
+OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
 
 LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL)
-LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86dga -lXxf86vm $(LIB_SOUND)
+LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86dga -lXxf86vm -pthread $(LIB_SOUND)
 LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
 LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
 LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
@@ -533,6 +534,10 @@ crypto.o: crypto.c
 mod_skeletal_animatevertices_sse.o: mod_skeletal_animatevertices_sse.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SSE)
+
+dpsoftrast.o: dpsoftrast.c
+	$(CHECKLEVEL2)
+	$(DO_CC) $(CFLAGS_SSE2)
 
 darkplaces.o: %.o : %.rc
 	$(CHECKLEVEL2)

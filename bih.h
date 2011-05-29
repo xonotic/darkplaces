@@ -6,6 +6,8 @@
 #ifndef BIH_H
 #define BIH_H
 
+#define BIH_MAXUNORDEREDCHILDREN 8
+
 typedef enum biherror_e
 {
 	BIHERROR_OK, // no error, be happy
@@ -17,15 +19,16 @@ typedef enum bih_nodetype_e
 {
 	BIH_SPLITX = 0,
 	BIH_SPLITY = 1,
-	BIH_SPLITZ = 2
+	BIH_SPLITZ = 2,
+	BIH_UNORDERED = 3,
 }
 bih_nodetype_t;
 
 typedef enum bih_leaftype_e
 {
-	BIH_BRUSH = 3,
-	BIH_COLLISIONTRIANGLE = 4,
-	BIH_RENDERTRIANGLE = 5
+	BIH_BRUSH = 4,
+	BIH_COLLISIONTRIANGLE = 5,
+	BIH_RENDERTRIANGLE = 6
 }
 bih_leaftype_t;
 
@@ -36,12 +39,14 @@ typedef struct bih_node_s
 	// TODO: move bounds data to parent node and remove it from leafs?
 	float mins[3];
 	float maxs[3];
-	// < 0 is a leaf index (-1-leafindex), >= 0 is another node index (always >= this node's index)
+	// node indexes of children (always > this node's index)
 	int front;
 	int back;
 	// interval of children
 	float frontmin; // children[0]
 	float backmax; // children[1]
+	// BIH_UNORDERED uses this for a list of leafindex (all >= 0), -1 = end of list
+	int children[BIH_MAXUNORDEREDCHILDREN];
 }
 bih_node_t;
 

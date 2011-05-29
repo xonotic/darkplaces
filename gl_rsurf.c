@@ -27,7 +27,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 cvar_t r_ambient = {0, "r_ambient", "0", "brightens map, value is 0-128"};
 cvar_t r_lockpvs = {0, "r_lockpvs", "0", "disables pvs switching, allows you to walk around and inspect what is visible from a given location in the map (anything not visible from your current location will not be drawn)"};
 cvar_t r_lockvisibility = {0, "r_lockvisibility", "0", "disables visibility updates, allows you to walk around and inspect what is visible from a given viewpoint in the map (anything offscreen at the moment this is enabled will not be drawn)"};
-cvar_t r_useportalculling = {0, "r_useportalculling", "1", "improve framerate with r_novis 1 by using portal culling - still not as good as compiled visibility data in the map, but it helps (a value of 2 forces use of this even with vis data, which improves framerates in maps without too much complexity, but hurts in extremely complex maps, which is why 2 is not the default mode)"};
+cvar_t r_useportalculling = {0, "r_useportalculling", "2", "improve framerate with r_novis 1 by using portal culling - still not as good as compiled visibility data in the map, but it helps (a value of 2 forces use of this even with vis data, which improves framerates in maps without too much complexity, but hurts in extremely complex maps, which is why 2 is not the default mode)"};
+cvar_t r_usesurfaceculling = {0, "r_usesurfaceculling", "1", "improve framerate by culling offscreen surfaces"};
 cvar_t r_q3bsp_renderskydepth = {0, "r_q3bsp_renderskydepth", "0", "draws sky depth masking in q3 maps (as in q1 maps), this means for example that sky polygons can hide other things"};
 
 /*
@@ -119,7 +120,7 @@ void R_BuildLightMap (const entity_render_t *ent, msurface_t *surface)
 		}
 	}
 
-	R_UpdateTexture(surface->lightmaptexture, templight, surface->lightmapinfo->lightmaporigin[0], surface->lightmapinfo->lightmaporigin[1], smax, tmax);
+	R_UpdateTexture(surface->lightmaptexture, templight, surface->lightmapinfo->lightmaporigin[0], surface->lightmapinfo->lightmaporigin[1], 0, smax, tmax, 1);
 
 	// update the surface's deluxemap if it has one
 	if (surface->deluxemaptexture != r_texture_blanknormalmap)
@@ -157,7 +158,7 @@ void R_BuildLightMap (const entity_render_t *ent, msurface_t *surface)
 			l = (int)(n[2] * 128 + 128);out[0] = bound(0, l, 255);
 			out[3] = 255;
 		}
-		R_UpdateTexture(surface->deluxemaptexture, templight, surface->lightmapinfo->lightmaporigin[0], surface->lightmapinfo->lightmaporigin[1], smax, tmax);
+		R_UpdateTexture(surface->deluxemaptexture, templight, surface->lightmapinfo->lightmaporigin[0], surface->lightmapinfo->lightmaporigin[1], 0, smax, tmax, 1);
 	}
 }
 
@@ -532,6 +533,24 @@ void R_View_WorldVisibility(qboolean forcenovis)
 			}
 		}
 	}
+
+	if (r_usesurfaceculling.integer)
+	{
+		int k = model->firstmodelsurface;
+		int l = k + model->nummodelsurfaces;
+		unsigned char *visible = r_refdef.viewcache.world_surfacevisible;
+		msurface_t *surfaces = model->data_surfaces;
+		msurface_t *surface;
+		for (;k < l;k++)
+		{
+			if (visible[k])
+			{
+				surface = surfaces + k;
+				if (R_CullBox(surface->mins, surface->maxs))
+					visible[k] = false;
+			}
+		}
+}
 }
 
 void R_Q1BSP_DrawSky(entity_render_t *ent)
@@ -937,6 +956,7 @@ static void R_Q1BSP_RecursiveGetLightInfo_BIH(r_q1bsp_getlightinfo_t *info, cons
 	int axis;
 	int surfaceindex;
 	int t;
+	int nodeleafindex;
 	int currentmaterialflags;
 	qboolean castshadow;
 	msurface_t *surface;
@@ -948,16 +968,87 @@ static void R_Q1BSP_RecursiveGetLightInfo_BIH(r_q1bsp_getlightinfo_t *info, cons
 	// note: because the BSP leafs are not in the BIH tree, the _BSP function
 	// must be called to mark leafs visible for entity culling...
 	// we start at the root node
-	nodestack[nodestackpos++] = 0;
+	nodestack[nodestackpos++] = bih->rootnode;
 	// we'll be done when the stack is empty
 	while (nodestackpos)
 	{
 		// pop one off the stack to process
 		nodenum = nodestack[--nodestackpos];
-		if (nodenum >= 0)
+		// node
+		node = bih->nodes + nodenum;
+		if (node->type == BIH_UNORDERED)
 		{
-			// node
-			node = bih->nodes + nodenum;
+			for (nodeleafindex = 0;nodeleafindex < BIH_MAXUNORDEREDCHILDREN && node->children[nodeleafindex] >= 0;nodeleafindex++)
+			{
+				leaf = bih->leafs + node->children[nodeleafindex];
+				if (leaf->type != BIH_RENDERTRIANGLE)
+					continue;
+#if 1
+				if (!BoxesOverlap(info->lightmins, info->lightmaxs, leaf->mins, leaf->maxs))
+					continue;
+#endif
+#if 1
+				if (!r_shadow_compilingrtlight && R_CullBoxCustomPlanes(leaf->mins, leaf->maxs, info->numfrustumplanes, info->frustumplanes))
+					continue;
+#endif
+				surfaceindex = leaf->surfaceindex;
+				surface = info->model->data_surfaces + surfaceindex;
+				currentmaterialflags = R_GetCurrentTexture(surface->texture)->currentmaterialflags;
+				castshadow = !(currentmaterialflags & MATERIALFLAG_NOSHADOW);
+				t = leaf->itemindex + surface->num_firstshadowmeshtriangle - surface->num_firsttriangle;
+				e = info->model->brush.shadowmesh->element3i + t * 3;
+				v[0] = info->model->brush.shadowmesh->vertex3f + e[0] * 3;
+				v[1] = info->model->brush.shadowmesh->vertex3f + e[1] * 3;
+				v[2] = info->model->brush.shadowmesh->vertex3f + e[2] * 3;
+				VectorCopy(v[0], v2[0]);
+				VectorCopy(v[1], v2[1]);
+				VectorCopy(v[2], v2[2]);
+				if (info->svbsp_insertoccluder)
+				{
+					if (castshadow)
+						SVBSP_AddPolygon(&r_svbsp, 3, v2[0], true, NULL, NULL, 0);
+					continue;
+				}
+				if (info->svbsp_active && !(SVBSP_AddPolygon(&r_svbsp, 3, v2[0], false, NULL, NULL, 0) & 2))
+					continue;
+				// we don't occlude triangles from lighting even
+				// if they are backfacing, because when using
+				// shadowmapping they are often not fully occluded
+				// on the horizon of an edge
+				SETPVSBIT(info->outlighttrispvs, t);
+				if (castshadow)
+				{
+					if (currentmaterialflags & MATERIALFLAG_NOCULLFACE)
+					{
+						// if the material is double sided we
+						// can't cull by direction
+						SETPVSBIT(info->outshadowtrispvs, t);
+					}
+					else if (r_shadow_frontsidecasting.integer)
+					{
+						// front side casting occludes backfaces,
+						// so they are completely useless as both
+						// casters and lit polygons
+						if (PointInfrontOfTriangle(info->relativelightorigin, v2[0], v2[1], v2[2]))
+							SETPVSBIT(info->outshadowtrispvs, t);
+					}
+					else
+					{
+						// back side casting does not occlude
+						// anything so we can't cull lit polygons
+						if (!PointInfrontOfTriangle(info->relativelightorigin, v2[0], v2[1], v2[2]))
+							SETPVSBIT(info->outshadowtrispvs, t);
+					}
+				}
+				if (!CHECKPVSBIT(info->outsurfacepvs, surfaceindex))
+				{
+					SETPVSBIT(info->outsurfacepvs, surfaceindex);
+					info->outsurfacelist[info->outnumsurfaces++] = surfaceindex;
+				}
+			}
+		}
+		else
+		{
 			axis = node->type - BIH_SPLITX;
 #if 0
 			if (!BoxesOverlap(info->lightmins, info->lightmaxs, node->mins, node->maxs))
@@ -972,80 +1063,15 @@ static void R_Q1BSP_RecursiveGetLightInfo_BIH(r_q1bsp_getlightinfo_t *info, cons
 				if (info->lightmaxs[axis] >= node->frontmin && nodestackpos < GETLIGHTINFO_MAXNODESTACK)
 					nodestack[nodestackpos++] = node->front;
 				nodestack[nodestackpos++] = node->back;
+				continue;
 			}
 			else if (info->lightmaxs[axis] >= node->frontmin)
+			{
 				nodestack[nodestackpos++] = node->front;
+				continue;
+			}
 			else
 				continue; // light falls between children, nothing here
-		}
-		else
-		{
-			// leaf
-			leaf = bih->leafs + (-1-nodenum);
-			if (leaf->type != BIH_RENDERTRIANGLE)
-				continue;
-#if 1
-			if (!BoxesOverlap(info->lightmins, info->lightmaxs, leaf->mins, leaf->maxs))
-				continue;
-#endif
-#if 1
-			if (!r_shadow_compilingrtlight && R_CullBoxCustomPlanes(leaf->mins, leaf->maxs, info->numfrustumplanes, info->frustumplanes))
-				continue;
-#endif
-			surfaceindex = leaf->surfaceindex;
-			surface = info->model->data_surfaces + surfaceindex;
-			currentmaterialflags = R_GetCurrentTexture(surface->texture)->currentmaterialflags;
-			castshadow = !(currentmaterialflags & MATERIALFLAG_NOSHADOW);
-			t = leaf->itemindex + surface->num_firstshadowmeshtriangle - surface->num_firsttriangle;
-			e = info->model->brush.shadowmesh->element3i + t * 3;
-			v[0] = info->model->brush.shadowmesh->vertex3f + e[0] * 3;
-			v[1] = info->model->brush.shadowmesh->vertex3f + e[1] * 3;
-			v[2] = info->model->brush.shadowmesh->vertex3f + e[2] * 3;
-			VectorCopy(v[0], v2[0]);
-			VectorCopy(v[1], v2[1]);
-			VectorCopy(v[2], v2[2]);
-			if (info->svbsp_insertoccluder)
-			{
-				if (castshadow)
-					SVBSP_AddPolygon(&r_svbsp, 3, v2[0], true, NULL, NULL, 0);
-				continue;
-			}
-			if (info->svbsp_active && !(SVBSP_AddPolygon(&r_svbsp, 3, v2[0], false, NULL, NULL, 0) & 2))
-				continue;
-			// we don't occlude triangles from lighting even
-			// if they are backfacing, because when using
-			// shadowmapping they are often not fully occluded
-			// on the horizon of an edge
-			SETPVSBIT(info->outlighttrispvs, t);
-			if (castshadow)
-			{
-				if (currentmaterialflags & MATERIALFLAG_NOCULLFACE)
-				{
-					// if the material is double sided we
-					// can't cull by direction
-					SETPVSBIT(info->outshadowtrispvs, t);
-				}
-				else if (r_shadow_frontsidecasting.integer)
-				{
-					// front side casting occludes backfaces,
-					// so they are completely useless as both
-					// casters and lit polygons
-					if (PointInfrontOfTriangle(info->relativelightorigin, v2[0], v2[1], v2[2]))
-						SETPVSBIT(info->outshadowtrispvs, t);
-				}
-				else
-				{
-					// back side casting does not occlude
-					// anything so we can't cull lit polygons
-					if (!PointInfrontOfTriangle(info->relativelightorigin, v2[0], v2[1], v2[2]))
-						SETPVSBIT(info->outshadowtrispvs, t);
-				}
-			}
-			if (!CHECKPVSBIT(info->outsurfacepvs, surfaceindex))
-			{
-				SETPVSBIT(info->outsurfacepvs, surfaceindex);
-				info->outsurfacelist[info->outnumsurfaces++] = surfaceindex;
-			}
 		}
 	}
 }
@@ -1461,7 +1487,8 @@ void R_Q1BSP_DrawLight(entity_render_t *ent, int numsurfaces, const int *surface
 			for (kend = k;kend < batchnumsurfaces && tex == batchsurfacelist[kend]->texture;kend++)
 				;
 			// now figure out what to do with this particular range of surfaces
-			if (!(rsurface.texture->currentmaterialflags & MATERIALFLAG_WALL))
+			// VorteX: added MATERIALFLAG_NORTLIGHT
+			if ((rsurface.texture->currentmaterialflags & (MATERIALFLAG_WALL + MATERIALFLAG_NORTLIGHT)) != MATERIALFLAG_WALL)
 				continue;
 			if (r_waterstate.renderingscene && (rsurface.texture->currentmaterialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION | MATERIALFLAG_CAMERA)))
 				continue;
@@ -1579,6 +1606,7 @@ void GL_Surf_Init(void)
 	Cvar_RegisterVariable(&r_lockpvs);
 	Cvar_RegisterVariable(&r_lockvisibility);
 	Cvar_RegisterVariable(&r_useportalculling);
+	Cvar_RegisterVariable(&r_usesurfaceculling);
 	Cvar_RegisterVariable(&r_q3bsp_renderskydepth);
 
 	Cmd_AddCommand ("r_replacemaptexture", R_ReplaceWorldTexture, "override a map texture for testing purposes");

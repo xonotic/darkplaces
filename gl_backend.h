@@ -28,6 +28,7 @@ void R_Viewport_InitCubeSideView(r_viewport_t *v, const matrix4x4_t *cameramatri
 void R_Viewport_InitRectSideView(r_viewport_t *v, const matrix4x4_t *cameramatrix, int side, int size, int border, float nearclip, float farclip, const float *nearplane);
 void R_SetViewport(const r_viewport_t *v);
 void R_GetViewport(r_viewport_t *v);
+void GL_Finish(void);
 
 void GL_BlendFunc(int blendfunc1, int blendfunc2);
 void GL_DepthMask(int state);
@@ -39,6 +40,7 @@ void R_SetStencil(qboolean enable, int writemask, int fail, int zfail, int zpass
 void GL_PolygonOffset(float planeoffset, float depthoffset);
 void GL_CullFace(int state);
 void GL_AlphaTest(int state);
+void GL_MultiSampling(qboolean state);
 void GL_ColorMask(int r, int g, int b, int a);
 void GL_Color(float cr, float cg, float cb, float ca);
 void GL_ActiveTexture(unsigned int num);
@@ -50,6 +52,7 @@ void GL_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpi
 int R_Mesh_CreateFramebufferObject(rtexture_t *depthtexture, rtexture_t *colortexture, rtexture_t *colortexture2, rtexture_t *colortexture3, rtexture_t *colortexture4);
 void R_Mesh_DestroyFramebufferObject(int fbo);
 void R_Mesh_ResetRenderTargets(void);
+void R_Mesh_SetMainRenderTargets(void);
 void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture, rtexture_t *colortexture2, rtexture_t *colortexture3, rtexture_t *colortexture4);
 
 unsigned int GL_Backend_CompileProgram(int vertexstrings_count, const char **vertexstrings_list, int geometrystrings_count, const char **geometrystrings_list, int fragmentstrings_count, const char **fragmentstrings_list);
@@ -107,6 +110,8 @@ void R_Mesh_TexMatrix(unsigned int unitnum, const matrix4x4_t *matrix);
 void R_Mesh_TexCombine(unsigned int unitnum, int combinergb, int combinealpha, int rgbscale, int alphascale);
 // set up a blank texture state (unbinds all textures, texcoord pointers, and resets combine settings)
 void R_Mesh_ResetTextureState(void);
+// before a texture is freed, make sure there are no references to it
+void R_Mesh_ClearBindingsForTexture(int texnum);
 
 // renders a mesh
 void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtriangles, const int *element3i, const r_meshbuffer_t *element3i_indexbuffer, size_t element3i_bufferoffset, const unsigned short *element3s, const r_meshbuffer_t *element3s_indexbuffer, size_t element3s_bufferoffset);

@@ -5,9 +5,9 @@
 #include "dpvsimpledecode.h"
 
 // VorteX: JAM video module used by Blood Omnicide
-//#define USEJAM
+#define USEJAM
 #ifdef USEJAM
-  #include "jamdecode.c"
+  #include "cl_video_jamdecode.c"
 #endif
 
 // cvars
@@ -61,7 +61,7 @@ static qboolean OpenStream( clvideo_t * video )
 static void VideoUpdateCallback(rtexture_t *rt, void *data)
 {
 	clvideo_t *video = (clvideo_t *) data;
-	R_UpdateTexture( video->cpif.tex, (unsigned char *)video->imagedata, 0, 0, video->cpif.width, video->cpif.height );
+	R_UpdateTexture( video->cpif.tex, (unsigned char *)video->imagedata, 0, 0, 0, video->cpif.width, video->cpif.height, 1 );
 }
 
 static void LinkVideoTexture( clvideo_t *video )
@@ -612,6 +612,9 @@ static void CL_PlayVideo_f(void)
 	const char *extension;
 
 	Host_StartVideo();
+
+	if (COM_CheckParm("-benchmark"))
+		return;
 
 	if (Cmd_Argc() < 2)
 	{

@@ -45,6 +45,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef SUPPORTDIRECTX
 #include <dinput.h>
 #endif
+#include "dpsoftrast.h"
 
 #ifdef SUPPORTD3D
 #include <d3d9.h>
@@ -139,6 +140,11 @@ HWND mainwindow;
 static HDC	 baseDC;
 static HGLRC baseRC;
 
+static HDC vid_softhdc;
+static HGDIOBJ vid_softhdc_backup;
+static BITMAPINFO vid_softbmi;
+static HBITMAP vid_softdibhandle;
+
 //HWND WINAPI InitializeWindow (HINSTANCE hInstance, int nCmdShow);
 
 static qboolean vid_isfullscreen;
@@ -198,76 +204,7 @@ static qboolean	dinput_acquired;
 static unsigned int		mstate_di;
 #endif
 
-// joystick defines and variables
-// where should defines be moved?
-#define JOY_ABSOLUTE_AXIS	0x00000000		// control like a joystick
-#define JOY_RELATIVE_AXIS	0x00000010		// control like a mouse, spinner, trackball
-#define	JOY_MAX_AXES		6				// X, Y, Z, R, U, V
-#define JOY_AXIS_X			0
-#define JOY_AXIS_Y			1
-#define JOY_AXIS_Z			2
-#define JOY_AXIS_R			3
-#define JOY_AXIS_U			4
-#define JOY_AXIS_V			5
-
-// joystick axes state
-typedef struct
-{
-	float oldmove;
-	float move;
-	float mdelta;
-	double keytime;
-}joy_axiscache_t;
-static joy_axiscache_t joy_axescache[JOY_MAX_AXES];
-
-enum _ControlList
-{
-	AxisNada = 0, AxisForward, AxisLook, AxisSide, AxisTurn
-};
-
-static DWORD	dwAxisFlags[JOY_MAX_AXES] =
-{
-	JOY_RETURNX, JOY_RETURNY, JOY_RETURNZ, JOY_RETURNR, JOY_RETURNU, JOY_RETURNV
-};
-
-static DWORD	dwAxisMap[JOY_MAX_AXES];
-static DWORD	dwControlMap[JOY_MAX_AXES];
-static PDWORD	pdwRawValue[JOY_MAX_AXES];
-
-// none of these cvars are saved over a session
-// this means that advanced controller configuration needs to be executed
-// each time.  this avoids any problems with getting back to a default usage
-// or when changing from one controller to another.  this way at least something
-// works.
-static cvar_t in_joystick = {CVAR_SAVE, "joystick","0", "enables joysticks"};
-static cvar_t joy_name = {0, "joyname", "joystick", "name of joystick to use (informational only, used only by joyadvanced 1 mode)"};
-static cvar_t joy_advanced = {0, "joyadvanced", "0", "use more than 2 axis joysticks (configuring this is very technical)"};
-static cvar_t joy_advaxisx = {0, "joyadvaxisx", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_advaxisy = {0, "joyadvaxisy", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_advaxisz = {0, "joyadvaxisz", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_advaxisr = {0, "joyadvaxisr", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_advaxisu = {0, "joyadvaxisu", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_advaxisv = {0, "joyadvaxisv", "0", "axis mapping for joyadvanced 1 mode"};
-static cvar_t joy_forwardthreshold = {0, "joyforwardthreshold", "0.15", "minimum joystick movement necessary to move forward"};
-static cvar_t joy_sidethreshold = {0, "joysidethreshold", "0.15", "minimum joystick movement necessary to move sideways (strafing)"};
-static cvar_t joy_pitchthreshold = {0, "joypitchthreshold", "0.15", "minimum joystick movement necessary to look up/down"};
-static cvar_t joy_yawthreshold = {0, "joyyawthreshold", "0.15", "minimum joystick movement necessary to turn left/right"};
-static cvar_t joy_forwardsensitivity = {0, "joyforwardsensitivity", "-1.0", "how fast the joystick moves forward"};
-static cvar_t joy_sidesensitivity = {0, "joysidesensitivity", "-1.0", "how fast the joystick moves sideways (strafing)"};
-static cvar_t joy_pitchsensitivity = {0, "joypitchsensitivity", "1.0", "how fast the joystick looks up/down"};
-static cvar_t joy_yawsensitivity = {0, "joyyawsensitivity", "-1.0", "how fast the joystick turns left/right"};
-static cvar_t joy_wwhack1 = {0, "joywwhack1", "0.0", "special hack for wingman warrior"};
-static cvar_t joy_wwhack2 = {0, "joywwhack2", "0.0", "special hack for wingman warrior"};
-static cvar_t joy_axiskeyevents = {CVAR_SAVE, "joy_axiskeyevents", "0", "generate uparrow/leftarrow etc. keyevents for joystick axes, use if your joystick driver is not generating them"};
-
 static cvar_t vid_forcerefreshrate = {0, "vid_forcerefreshrate", "0", "try to set the given vid_refreshrate even if Windows doesn't list it as valid video mode"};
-
-static qboolean	joy_avail, joy_advancedinit, joy_haspov;
-static DWORD		joy_oldbuttonstate, joy_oldpovstate;
-
-static int			joy_id;
-static DWORD		joy_flags;
-static DWORD		joy_numbuttons;
 
 #ifdef SUPPORTDIRECTX
 static LPDIRECTINPUT		g_pdi;
@@ -275,12 +212,7 @@ static LPDIRECTINPUTDEVICE	g_pMouse;
 static HINSTANCE hInstDI;
 #endif
 
-static JOYINFOEX	ji;
-
 // forward-referenced functions
-static void IN_StartupJoystick (void);
-static void Joy_AdvancedUpdate_f (void);
-static void IN_JoyMove (void);
 static void IN_StartupMouse (void);
 
 
@@ -293,76 +225,93 @@ qboolean vid_begunscene = false;
 void VID_Finish (void)
 {
 #ifdef SUPPORTD3D
-	if (vid_d3d9dev)
-	{
-		HRESULT hr;
-		if (vid_begunscene)
-		{
-			IDirect3DDevice9_EndScene(vid_d3d9dev);
-			vid_begunscene = false;
-		}
-		if (vid_reallyhidden)
-			return;
-		if (!vid_d3ddevicelost)
-		{
-			vid_hidden = vid_reallyhidden;
-			hr = IDirect3DDevice9_Present(vid_d3d9dev, NULL, NULL, NULL, NULL);
-			if (hr == D3DERR_DEVICELOST)
-			{
-				vid_d3ddevicelost = true;
-				vid_hidden = true;
-				Sleep(100);
-			}
-		}
-		else
-		{
-			hr = IDirect3DDevice9_TestCooperativeLevel(vid_d3d9dev);
-			switch(hr)
-			{
-			case D3DERR_DEVICELOST:
-				vid_d3ddevicelost = true;
-				vid_hidden = true;
-				Sleep(100);
-				break;
-			case D3DERR_DEVICENOTRESET:
-				vid_d3ddevicelost = false;
-				vid_hidden = vid_reallyhidden;
-				R_Modules_DeviceLost();
-				IDirect3DDevice9_Reset(vid_d3d9dev, &vid_d3dpresentparameters);
-				R_Modules_DeviceRestored();
-				break;
-			case D3D_OK:
-				vid_hidden = vid_reallyhidden;
-				IDirect3DDevice9_Present(vid_d3d9dev, NULL, NULL, NULL, NULL);
-				break;
-			}
-		}
-		if (!vid_begunscene && !vid_hidden)
-		{
-			IDirect3DDevice9_BeginScene(vid_d3d9dev);
-			vid_begunscene = true;
-		}
-		return;
-	}
+	HRESULT hr;
 #endif
-
 	vid_hidden = vid_reallyhidden;
 
 	vid_usevsync = vid_vsync.integer && !cls.timedemo && qwglSwapIntervalEXT;
-	if (vid_usingvsync != vid_usevsync)
-	{
-		vid_usingvsync = vid_usevsync;
-		qwglSwapIntervalEXT (vid_usevsync);
-	}
 
 	if (!vid_hidden)
 	{
-		CHECKGLERROR
-		if (r_speeds.integer == 2 || gl_finish.integer)
+		switch(vid.renderpath)
 		{
-			qglFinish();CHECKGLERROR
+		case RENDERPATH_GL11:
+		case RENDERPATH_GL13:
+		case RENDERPATH_GL20:
+		case RENDERPATH_GLES1:
+		case RENDERPATH_GLES2:
+			if (vid_usingvsync != vid_usevsync)
+			{
+				vid_usingvsync = vid_usevsync;
+				qwglSwapIntervalEXT (vid_usevsync);
+			}
+			if (r_speeds.integer == 2 || gl_finish.integer)
+				GL_Finish();
+			SwapBuffers(baseDC);
+			break;
+		case RENDERPATH_D3D9:
+#ifdef SUPPORTD3D
+			if (vid_begunscene)
+			{
+				IDirect3DDevice9_EndScene(vid_d3d9dev);
+				vid_begunscene = false;
+			}
+			if (!vid_reallyhidden)
+			{
+				if (!vid_d3ddevicelost)
+				{
+					vid_hidden = vid_reallyhidden;
+					hr = IDirect3DDevice9_Present(vid_d3d9dev, NULL, NULL, NULL, NULL);
+					if (hr == D3DERR_DEVICELOST)
+					{
+						vid_d3ddevicelost = true;
+						vid_hidden = true;
+						Sleep(100);
+					}
+				}
+				else
+				{
+					hr = IDirect3DDevice9_TestCooperativeLevel(vid_d3d9dev);
+					switch(hr)
+					{
+					case D3DERR_DEVICELOST:
+						vid_d3ddevicelost = true;
+						vid_hidden = true;
+						Sleep(100);
+						break;
+					case D3DERR_DEVICENOTRESET:
+						vid_d3ddevicelost = false;
+						vid_hidden = vid_reallyhidden;
+						R_Modules_DeviceLost();
+						IDirect3DDevice9_Reset(vid_d3d9dev, &vid_d3dpresentparameters);
+						R_Modules_DeviceRestored();
+						break;
+					case D3D_OK:
+						vid_hidden = vid_reallyhidden;
+						IDirect3DDevice9_Present(vid_d3d9dev, NULL, NULL, NULL, NULL);
+						break;
+					}
+				}
+				if (!vid_begunscene && !vid_hidden)
+				{
+					IDirect3DDevice9_BeginScene(vid_d3d9dev);
+					vid_begunscene = true;
+				}
+			}
+#endif
+			break;
+		case RENDERPATH_D3D10:
+			break;
+		case RENDERPATH_D3D11:
+			break;
+		case RENDERPATH_SOFT:
+			DPSOFTRAST_Finish();
+//			baseDC = GetDC(mainwindow);
+			BitBlt(baseDC, 0, 0, vid.width, vid.height, vid_softhdc, 0, 0, SRCCOPY);
+//			ReleaseDC(mainwindow, baseDC);
+//			baseDC = NULL;
+			break;
 		}
-		SwapBuffers(baseDC);
 	}
 
 	// make sure a context switch can happen every frame - Logitech drivers
@@ -585,7 +534,6 @@ static keynum_t buttonremap[16] =
 };
 
 /* main window procedure */
-static qboolean IN_JoystickBlockDoubledKeyEvents(int keycode);
 LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam)
 {
 	LONG    lRet = 1;
@@ -630,7 +578,7 @@ LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam)
 			else if( charlength == 2 ) {
 				asciichar[0] = asciichar[1];
 			}
-			if (!IN_JoystickBlockDoubledKeyEvents(vkey))
+			if (!VID_JoyBlockEmulatedKeys(vkey))
 				Key_Event (vkey, asciichar[0], down);
 			break;
 
@@ -1366,7 +1314,6 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	vid_initialized = true;
 
 	IN_StartupMouse ();
-	IN_StartupJoystick ();
 
 	if (qwglSwapIntervalEXT)
 	{
@@ -1546,6 +1493,9 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	memset(&vid.support, 0, sizeof(vid.support));
 	Cvar_SetQuick(&gl_info_extensions, "");
 
+	// D3D9 requires BGRA
+	vid.forcetextype = TEXTYPE_BGRA;
+
 	vid.forcevbo = false;
 	vid.support.arb_depth_texture = true;
 	vid.support.arb_draw_buffers = vid_d3d9caps.NumSimultaneousRTs > 1;
@@ -1562,6 +1512,7 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	vid.support.ext_texture_compression_s3tc = true;
 	vid.support.ext_texture_filter_anisotropic = true;
 	vid.support.ati_separate_stencil = (vid_d3d9caps.StencilCaps & D3DSTENCILCAPS_TWOSIDED) != 0;
+	vid.support.ext_texture_srgb = false; // FIXME use D3DSAMP_SRGBTEXTURE if CheckDeviceFormat agrees
 
 	vid.maxtexturesize_2d = min(vid_d3d9caps.MaxTextureWidth, vid_d3d9caps.MaxTextureHeight);
 	vid.maxtexturesize_3d = vid_d3d9caps.MaxVolumeExtent;
@@ -1577,6 +1528,8 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	vid.texarrayunits = bound(8, vid.texarrayunits, MAX_TEXTUREUNITS);
 	Con_DPrintf("Using D3D9.0 rendering path - %i texture matrix, %i texture images, %i texcoords, shadowmapping supported%s\n", vid.texunits, vid.teximageunits, vid.texarrayunits, vid.maxdrawbuffers > 1 ? ", MRT detected (allows prepass deferred lighting)" : "");
 	vid.renderpath = RENDERPATH_D3D9;
+	vid.sRGBcapable2D = false;
+	vid.sRGBcapable3D = true;
 	vid.useinterleavedarrays = true;
 
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
@@ -1606,14 +1559,297 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	vid_initialized = true;
 
 	IN_StartupMouse ();
-	IN_StartupJoystick ();
 
 	return true;
 }
 #endif
 
+qboolean VID_InitModeSOFT(viddef_mode_t *mode)
+{
+	int i;
+	HDC hdc;
+	RECT rect;
+	MSG msg;
+	int pixelformat, newpixelformat;
+	DWORD WindowStyle, ExWindowStyle;
+	int CenterX, CenterY;
+	int depth;
+	DEVMODE thismode;
+	qboolean foundmode, foundgoodmode;
+	int bpp = mode->bitsperpixel;
+	int width = mode->width;
+	int height = mode->height;
+	int refreshrate = (int)floor(mode->refreshrate+0.5);
+	int fullscreen = mode->fullscreen;
+
+	if (vid_initialized)
+		Sys_Error("VID_InitMode called when video is already initialised");
+
+	memset(&gdevmode, 0, sizeof(gdevmode));
+
+	vid_isfullscreen = false;
+	if (fullscreen)
+	{
+		if(vid_forcerefreshrate.integer)
+		{
+			foundmode = true;
+			gdevmode.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
+			gdevmode.dmBitsPerPel = bpp;
+			gdevmode.dmPelsWidth = width;
+			gdevmode.dmPelsHeight = height;
+			gdevmode.dmSize = sizeof (gdevmode);
+			if(refreshrate)
+			{
+				gdevmode.dmFields |= DM_DISPLAYFREQUENCY;
+				gdevmode.dmDisplayFrequency = refreshrate;
+			}
+		}
+		else
+		{
+			if(refreshrate == 0)
+				refreshrate = initialdevmode.dmDisplayFrequency; // default vid_refreshrate to the rate of the desktop
+
+			foundmode = false;
+			foundgoodmode = false;
+
+			thismode.dmSize = sizeof(thismode);
+			thismode.dmDriverExtra = 0;
+			for(i = 0; EnumDisplaySettings(NULL, i, &thismode); ++i)
+			{
+				if(~thismode.dmFields & (DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY))
+				{
+					Con_DPrintf("enumerating modes yielded a bogus item... please debug this\n");
+					continue;
+				}
+				if(developer_extra.integer)
+					Con_DPrintf("Found mode %dx%dx%dbpp %dHz... ", (int)thismode.dmPelsWidth, (int)thismode.dmPelsHeight, (int)thismode.dmBitsPerPel, (int)thismode.dmDisplayFrequency);
+				if(thismode.dmBitsPerPel != (DWORD)bpp)
+				{
+					if(developer_extra.integer)
+						Con_DPrintf("wrong bpp\n");
+					continue;
+				}
+				if(thismode.dmPelsWidth != (DWORD)width)
+				{
+					if(developer_extra.integer)
+						Con_DPrintf("wrong width\n");
+					continue;
+				}
+				if(thismode.dmPelsHeight != (DWORD)height)
+				{
+					if(developer_extra.integer)
+						Con_DPrintf("wrong height\n");
+					continue;
+				}
+
+				if(foundgoodmode)
+				{
+					// if we have a good mode, make sure this mode is better than the previous one, and allowed by the refreshrate
+					if(thismode.dmDisplayFrequency > (DWORD)refreshrate)
+					{
+						if(developer_extra.integer)
+							Con_DPrintf("too high refresh rate\n");
+						continue;
+					}
+					else if(thismode.dmDisplayFrequency <= gdevmode.dmDisplayFrequency)
+					{
+						if(developer_extra.integer)
+							Con_DPrintf("doesn't beat previous best match (too low)\n");
+						continue;
+					}
+				}
+				else if(foundmode)
+				{
+					// we do have one, but it isn't good... make sure it has a lower frequency than the previous one
+					if(thismode.dmDisplayFrequency >= gdevmode.dmDisplayFrequency)
+					{
+						if(developer_extra.integer)
+							Con_DPrintf("doesn't beat previous best match (too high)\n");
+						continue;
+					}
+				}
+				// otherwise, take anything
+
+				memcpy(&gdevmode, &thismode, sizeof(gdevmode));
+				if(thismode.dmDisplayFrequency <= (DWORD)refreshrate)
+					foundgoodmode = true;
+				else
+				{
+					if(developer_extra.integer)
+						Con_DPrintf("(out of range)\n");
+				}
+				foundmode = true;
+				if(developer_extra.integer)
+					Con_DPrintf("accepted\n");
+			}
+		}
+
+		if (!foundmode)
+		{
+			VID_Shutdown();
+			Con_Printf("Unable to find the requested mode %dx%dx%dbpp\n", width, height, bpp);
+			return false;
+		}
+		else if(ChangeDisplaySettings (&gdevmode, CDS_FULLSCREEN) != DISP_CHANGE_SUCCESSFUL)
+		{
+			VID_Shutdown();
+			Con_Printf("Unable to change to requested mode %dx%dx%dbpp\n", width, height, bpp);
+			return false;
+		}
+
+		vid_isfullscreen = true;
+		WindowStyle = WS_POPUP;
+		ExWindowStyle = WS_EX_TOPMOST;
+	}
+	else
+	{
+		hdc = GetDC (NULL);
+		i = GetDeviceCaps(hdc, RASTERCAPS);
+		depth = GetDeviceCaps(hdc, PLANES) * GetDeviceCaps(hdc, BITSPIXEL);
+		ReleaseDC (NULL, hdc);
+		if (i & RC_PALETTE)
+		{
+			VID_Shutdown();
+			Con_Print("Can't run in non-RGB mode\n");
+			return false;
+		}
+		if (bpp > depth)
+		{
+			VID_Shutdown();
+			Con_Print("A higher desktop depth is required to run this video mode\n");
+			return false;
+		}
+
+		WindowStyle = WS_OVERLAPPED | WS_BORDER | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+		ExWindowStyle = 0;
+	}
+
+	rect.top = 0;
+	rect.left = 0;
+	rect.right = width;
+	rect.bottom = height;
+	AdjustWindowRectEx(&rect, WindowStyle, false, 0);
+
+	if (fullscreen)
+	{
+		CenterX = 0;
+		CenterY = 0;
+	}
+	else
+	{
+		CenterX = (GetSystemMetrics(SM_CXSCREEN) - (rect.right - rect.left)) / 2;
+		CenterY = (GetSystemMetrics(SM_CYSCREEN) - (rect.bottom - rect.top)) / 2;
+	}
+	CenterX = max(0, CenterX);
+	CenterY = max(0, CenterY);
+
+	// x and y may be changed by WM_MOVE messages
+	window_x = CenterX;
+	window_y = CenterY;
+	rect.left += CenterX;
+	rect.right += CenterX;
+	rect.top += CenterY;
+	rect.bottom += CenterY;
+
+	pixelformat = 0;
+	newpixelformat = 0;
+	gl_extensions = "";
+	gl_platformextensions = "";
+
+	mainwindow = CreateWindowEx (ExWindowStyle, "DarkPlacesWindowClass", gamename, WindowStyle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, NULL, NULL, global_hInstance, NULL);
+	if (!mainwindow)
+	{
+		Con_Printf("CreateWindowEx(%d, %s, %s, %d, %d, %d, %d, %d, %p, %p, %p, %p) failed\n", (int)ExWindowStyle, "DarkPlacesWindowClass", gamename, (int)WindowStyle, (int)(rect.left), (int)(rect.top), (int)(rect.right - rect.left), (int)(rect.bottom - rect.top), (void *)NULL, (void *)NULL, (void *)global_hInstance, (void *)NULL);
+		VID_Shutdown();
+		return false;
+	}
+
+	baseDC = GetDC(mainwindow);
+	vid.softpixels = NULL;
+	memset(&vid_softbmi, 0, sizeof(vid_softbmi));
+	vid_softbmi.bmiHeader.biSize = sizeof(vid_softbmi.bmiHeader);
+	vid_softbmi.bmiHeader.biWidth = width;
+	vid_softbmi.bmiHeader.biHeight = -height; // negative to make a top-down bitmap
+	vid_softbmi.bmiHeader.biPlanes = 1;
+	vid_softbmi.bmiHeader.biBitCount = 32;
+	vid_softbmi.bmiHeader.biCompression = BI_RGB;
+	vid_softbmi.bmiHeader.biSizeImage = width*height*4;
+	vid_softbmi.bmiHeader.biClrUsed = 256;
+	vid_softbmi.bmiHeader.biClrImportant = 256;
+	vid_softdibhandle = CreateDIBSection(baseDC, &vid_softbmi, DIB_RGB_COLORS, (void **)&vid.softpixels, NULL, 0);
+	if (!vid_softdibhandle)
+	{
+		Con_Printf("CreateDIBSection failed\n");
+		VID_Shutdown();
+		return false;
+	}
+
+	vid_softhdc = CreateCompatibleDC(baseDC);
+	vid_softhdc_backup = SelectObject(vid_softhdc, vid_softdibhandle);
+	if (!vid_softhdc_backup)
+	{
+		Con_Printf("SelectObject failed\n");
+		VID_Shutdown();
+		return false;
+	}
+//	ReleaseDC(mainwindow, baseDC);
+//	baseDC = NULL;
+
+	vid.softdepthpixels = (unsigned int *)calloc(1, mode->width * mode->height * 4);
+	if (DPSOFTRAST_Init(mode->width, mode->height, vid_soft_threads.integer, vid_soft_interlace.integer, (unsigned int *)vid.softpixels, (unsigned int *)vid.softdepthpixels) < 0)
+	{
+		Con_Printf("Failed to initialize software rasterizer\n");
+		VID_Shutdown();
+		return false;
+	}
+
+	VID_Soft_SharedSetup();
+
+	ShowWindow (mainwindow, SW_SHOWDEFAULT);
+	UpdateWindow (mainwindow);
+
+	// now we try to make sure we get the focus on the mode switch, because
+	// sometimes in some systems we don't.  We grab the foreground, then
+	// finish setting up, pump all our messages, and sleep for a little while
+	// to let messages finish bouncing around the system, then we put
+	// ourselves at the top of the z order, then grab the foreground again,
+	// Who knows if it helps, but it probably doesn't hurt
+	SetForegroundWindow (mainwindow);
+
+	while (PeekMessage (&msg, NULL, 0, 0, PM_REMOVE))
+	{
+		TranslateMessage (&msg);
+		DispatchMessage (&msg);
+	}
+
+	Sleep (100);
+
+	SetWindowPos (mainwindow, HWND_TOP, 0, 0, 0, 0, SWP_DRAWFRAME | SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOCOPYBITS);
+
+	SetForegroundWindow (mainwindow);
+
+	// fix the leftover Alt from any Alt-Tab or the like that switched us away
+	ClearAllStates ();
+
+	//vid_menudrawfn = VID_MenuDraw;
+	//vid_menukeyfn = VID_MenuKey;
+	vid_usingmouse = false;
+	vid_usinghidecursor = false;
+	vid_usingvsync = false;
+	vid_reallyhidden = vid_hidden = false;
+	vid_initialized = true;
+
+	IN_StartupMouse ();
+
+	return true;
+}
+
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
+#ifdef SSE_POSSIBLE
+	if (vid_soft.integer)
+		return VID_InitModeSOFT(mode);
+#endif
 #ifdef SUPPORTD3D
 //	if (vid_dx11.integer)
 //		return VID_InitModeDX(mode, 11);
@@ -1633,6 +1869,7 @@ void VID_Shutdown (void)
 	if(vid_initialized == false)
 		return;
 
+	VID_EnableJoystick(false);
 	VID_SetMouse(false, false, false);
 	VID_RestoreSystemGamma();
 
@@ -1643,6 +1880,20 @@ void VID_Shutdown (void)
 	gl_extensions = "";
 	gl_platform = "";
 	gl_platformextensions = "";
+	if (vid_softhdc)
+	{
+		SelectObject(vid_softhdc, vid_softhdc_backup);
+		ReleaseDC(mainwindow, vid_softhdc);
+	}
+	vid_softhdc = NULL;
+	vid_softhdc_backup = NULL;
+	if (vid_softdibhandle)
+		DeleteObject(vid_softdibhandle);
+	vid_softdibhandle = NULL;
+	vid.softpixels = NULL;
+	if (vid.softdepthpixels)
+		free(vid.softdepthpixels);
+	vid.softdepthpixels = NULL;
 #ifdef SUPPORTD3D
 	if (vid_d3d9dev)
 	{
@@ -1668,6 +1919,7 @@ void VID_Shutdown (void)
 	GL_CloseLibrary();
 	if (baseDC && mainwindow)
 		ReleaseDC(mainwindow, baseDC);
+	baseDC = NULL;
 	AppActivate(false, false);
 	if (mainwindow)
 		DestroyWindow(mainwindow);
@@ -1757,6 +2009,27 @@ void VID_SetMouse(qboolean fullscreengrab, qboolean relative, qboolean hidecurso
 	}
 }
 
+void VID_BuildJoyState(vid_joystate_t *joystate)
+{
+	VID_Shared_BuildJoyState_Begin(joystate);
+	VID_Shared_BuildJoyState_Finish(joystate);
+}
+
+void VID_EnableJoystick(qboolean enable)
+{
+	int index = joy_enable.integer > 0 ? joy_index.integer : -1;
+	qboolean success = false;
+	int sharedcount = 0;
+	sharedcount = VID_Shared_SetJoystick(index);
+	if (index >= 0 && index < sharedcount)
+		success = true;
+
+	// update cvar containing count of XInput joysticks
+	if (joy_detected.integer != sharedcount)
+		Cvar_SetValueQuick(&joy_detected, sharedcount);
+
+	Cvar_SetValueQuick(&joy_active, success ? 1 : 0);
+}
 
 #ifdef SUPPORTDIRECTX
 /*
@@ -1868,7 +2141,7 @@ static void IN_StartupMouse (void)
 	mouseinitialized = true;
 
 #ifdef SUPPORTDIRECTX
-// COMMANDLINEOPTION: Windows Input: -dinput enables DirectInput for mouse/joystick input
+// COMMANDLINEOPTION: Windows Input: -dinput enables DirectInput for mouse input
 	if (COM_CheckParm ("-dinput"))
 		dinput = IN_InitDInput ();
 
@@ -1978,579 +2251,19 @@ IN_Move
 */
 void IN_Move (void)
 {
+	vid_joystate_t joystate;
 	if (vid_activewindow && !vid_reallyhidden)
-	{
 		IN_MouseMove ();
-		IN_JoyMove ();
-	}
+	VID_EnableJoystick(true);
+	VID_BuildJoyState(&joystate);
+	VID_ApplyJoyState(&joystate);
 }
 
-
-/*
-===============
-IN_StartupJoystick
-===============
-*/
-static void IN_StartupJoystick (void)
-{
-	int			numdevs;
-	JOYCAPS		jc;
-	MMRESULT	mmr;
-	mmr = 0;
-
- 	// assume no joystick
-	joy_avail = false;
-
-	// abort startup if user requests no joystick
-// COMMANDLINEOPTION: Windows Input: -nojoy disables joystick support, may be a small speed increase
-	if (COM_CheckParm ("-nojoy"))
-		return;
-
-	// verify joystick driver is present
-	if ((numdevs = joyGetNumDevs ()) == 0)
-	{
-		Con_Print("\njoystick not found -- driver not present\n\n");
-		return;
-	}
-
-	// cycle through the joystick ids for the first valid one
-	for (joy_id=0 ; joy_id<numdevs ; joy_id++)
-	{
-		memset (&ji, 0, sizeof(ji));
-		ji.dwSize = sizeof(ji);
-		ji.dwFlags = JOY_RETURNCENTERED;
-
-		if ((mmr = joyGetPosEx (joy_id, &ji)) == JOYERR_NOERROR)
-			break;
-	}
-
-	// abort startup if we didn't find a valid joystick
-	if (mmr != JOYERR_NOERROR)
-	{
-		Con_Printf("\njoystick not found -- no valid joysticks (%x)\n\n", mmr);
-		return;
-	}
-
-	// get the capabilities of the selected joystick
-	// abort startup if command fails
-	memset (&jc, 0, sizeof(jc));
-	if ((mmr = joyGetDevCaps (joy_id, &jc, sizeof(jc))) != JOYERR_NOERROR)
-	{
-		Con_Printf("\njoystick not found -- invalid joystick capabilities (%x)\n\n", mmr);
-		return;
-	}
-
-	// save the joystick's number of buttons and POV status
-	joy_numbuttons = jc.wNumButtons;
-	joy_haspov = (jc.wCaps & JOYCAPS_HASPOV) != 0;
-
-	// old button and POV states default to no buttons pressed
-	joy_oldbuttonstate = joy_oldpovstate = 0;
-
-	// mark the joystick as available and advanced initialization not completed
-	// this is needed as cvars are not available during initialization
-
-	joy_avail = true;
-	joy_advancedinit = false;
-
-	Con_Print("\njoystick detected\n\n");
-}
-
-
-/*
-===========
-RawValuePointer
-===========
-*/
-static PDWORD RawValuePointer (int axis)
-{
-	switch (axis)
-	{
-	case JOY_AXIS_X:
-		return &ji.dwXpos;
-	case JOY_AXIS_Y:
-		return &ji.dwYpos;
-	case JOY_AXIS_Z:
-		return &ji.dwZpos;
-	case JOY_AXIS_R:
-		return &ji.dwRpos;
-	case JOY_AXIS_U:
-		return &ji.dwUpos;
-	case JOY_AXIS_V:
-		return &ji.dwVpos;
-	}
-	return NULL; // LordHavoc: hush compiler warning
-}
-
-
-/*
-===========
-Joy_AdvancedUpdate_f
-===========
-*/
-static void Joy_AdvancedUpdate_f (void)
-{
-
-	// called once by IN_ReadJoystick and by user whenever an update is needed
-	// cvars are now available
-	int	i;
-	DWORD dwTemp;
-
-	// initialize all the maps
-	for (i = 0; i < JOY_MAX_AXES; i++)
-	{
-		dwAxisMap[i] = AxisNada;
-		dwControlMap[i] = JOY_ABSOLUTE_AXIS;
-		pdwRawValue[i] = RawValuePointer(i);
-	}
-
-	if( joy_advanced.integer == 0)
-	{
-		// default joystick initialization
-		// 2 axes only with joystick control
-		dwAxisMap[JOY_AXIS_X] = AxisTurn;
-		// dwControlMap[JOY_AXIS_X] = JOY_ABSOLUTE_AXIS;
-		dwAxisMap[JOY_AXIS_Y] = AxisForward;
-		// dwControlMap[JOY_AXIS_Y] = JOY_ABSOLUTE_AXIS;
-	}
-	else
-	{
-		if (strcmp (joy_name.string, "joystick") != 0)
-		{
-			// notify user of advanced controller
-			Con_Printf("\n%s configured\n\n", joy_name.string);
-		}
-
-		// advanced initialization here
-		// data supplied by user via joy_axisn cvars
-		dwTemp = (DWORD) joy_advaxisx.value;
-		dwAxisMap[JOY_AXIS_X] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_X] = dwTemp & JOY_RELATIVE_AXIS;
-		dwTemp = (DWORD) joy_advaxisy.value;
-		dwAxisMap[JOY_AXIS_Y] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_Y] = dwTemp & JOY_RELATIVE_AXIS;
-		dwTemp = (DWORD) joy_advaxisz.value;
-		dwAxisMap[JOY_AXIS_Z] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_Z] = dwTemp & JOY_RELATIVE_AXIS;
-		dwTemp = (DWORD) joy_advaxisr.value;
-		dwAxisMap[JOY_AXIS_R] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_R] = dwTemp & JOY_RELATIVE_AXIS;
-		dwTemp = (DWORD) joy_advaxisu.value;
-		dwAxisMap[JOY_AXIS_U] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_U] = dwTemp & JOY_RELATIVE_AXIS;
-		dwTemp = (DWORD) joy_advaxisv.value;
-		dwAxisMap[JOY_AXIS_V] = dwTemp & 0x0000000f;
-		dwControlMap[JOY_AXIS_V] = dwTemp & JOY_RELATIVE_AXIS;
-	}
-
-	// compute the axes to collect from DirectInput
-	joy_flags = JOY_RETURNCENTERED | JOY_RETURNBUTTONS | JOY_RETURNPOV;
-	for (i = 0; i < JOY_MAX_AXES; i++)
-	{
-		if (dwAxisMap[i] != AxisNada)
-		{
-			joy_flags |= dwAxisFlags[i];
-		}
-	}
-}
-
-/*
-===============
-IN_ReadJoystick
-===============
-*/
-static qboolean IN_ReadJoystick (void)
-{
-
-	memset (&ji, 0, sizeof(ji));
-	ji.dwSize = sizeof(ji);
-	ji.dwFlags = joy_flags;
-
-	if (joyGetPosEx (joy_id, &ji) == JOYERR_NOERROR)
-	{
-		// this is a hack -- there is a bug in the Logitech WingMan Warrior DirectInput Driver
-		// rather than having 32768 be the zero point, they have the zero point at 32668
-		// go figure -- anyway, now we get the full resolution out of the device
-		if (joy_wwhack1.integer != 0.0)
-		{
-			ji.dwUpos += 100;
-		}
-		return true;
-	}
-	else
-	{
-		// read error occurred
-		// turning off the joystick seems too harsh for 1 read error,
-		// but what should be done?
-		return false;
-	}
-}
-
-/*
-===========
- IN_JoystickGetAxisNum
-===========
-*/
-
-int IN_JoystickGetAxisNum(int ControlListType)
-{
-	int i;
-
-	for (i = 0; i < JOY_MAX_AXES; i++)
-		if (dwAxisMap[i] == (DWORD) ControlListType)
-			return i;
-	return -1;
-}
-
-/*
-===========
- IN_JoystickGetAxis
-===========
-*/
-static double IN_JoystickGetAxis(int axis, double sensitivity, double deadzone)
-{
-	float	fAxisValue, fTemp;
-
-	if (!joy_avail || axis < 0 || axis >= JOY_MAX_AXES)
-		return 0; // no such axis on this joystick
-
-	// get the floating point zero-centered, potentially-inverted data for the current axis
-	fAxisValue = (float) *pdwRawValue[axis];
-
-	// move centerpoint to zero
-	fAxisValue -= 32768.0;
-
-	if (joy_wwhack2.integer != 0.0)
-	{
-		if (dwAxisMap[axis] == AxisTurn)
-		{
-			// this is a special formula for the Logitech WingMan Warrior
-			// y=ax^b; where a = 300 and b = 1.3
-			// also x values are in increments of 800 (so this is factored out)
-			// then bounds check result to level out excessively high spin rates
-			fTemp = 300.0 * pow(abs(fAxisValue) / 800.0, 1.3);
-			if (fTemp > 14000.0)
-				fTemp = 14000.0;
-			// restore direction information
-			fAxisValue = (fAxisValue > 0.0) ? fTemp : -fTemp;
-		}
-	}
-
-	// convert range from -32768..32767 to -1..1
-	fAxisValue /= 32768.0;
-
-	// deadzone around center
-	if (fabs(fAxisValue) < deadzone)
-		return 0; 
-
-	// apply sensitivity
-	return fAxisValue * sensitivity;
-}
-
-/*
-===========
- IN_JoystickKeyeventForAxis
-===========
-*/
-
-static void IN_JoystickKeyeventForAxis(int axis, int key_pos, int key_neg)
-{
-	double joytime;
-
-	if (axis < 0 || axis >= JOY_MAX_AXES)
-		return; // no such axis on this joystick
-
-	joytime = Sys_DoubleTime();
-	// no key event, continuous keydown event
-	if (joy_axescache[axis].move == joy_axescache[axis].oldmove)
-	{
-		if (joy_axescache[axis].move != 0 && joytime > joy_axescache[axis].keytime)
-		{
-			//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-			Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-			joy_axescache[axis].keytime = joytime + 0.5 / 20;
-		}
-		return;
-	}
-	// generate key up event
-	if (joy_axescache[axis].oldmove)
-	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg, 0, 0);
-	}
-	// generate key down event
-	if (joy_axescache[axis].move)
-	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-		joy_axescache[axis].keytime = joytime + 0.5;
-	}
-}
-
-/*
-===========
- IN_JoystickBlockDoubledKeyEvents
-===========
-*/
-
-static qboolean IN_ReadJoystick (void);
-static qboolean IN_JoystickBlockDoubledKeyEvents(int keycode)
-{
-	int axis;
-
-	if (!joy_axiskeyevents.integer)
-		return false;
-
-	// block keyevent if it's going to be provided by joystick keyevent system
-	if (joy_avail)
-	{
-		// collect the joystick data, if possible
-		if (IN_ReadJoystick() != true)
-			return false;
-		axis = IN_JoystickGetAxisNum(AxisForward);
-		if (keycode == K_UPARROW || keycode == K_DOWNARROW)
-			if (IN_JoystickGetAxis(axis, 1, 0.01) || joy_axescache[axis].move || joy_axescache[axis].oldmove)
-				return true;
-		axis = IN_JoystickGetAxisNum(AxisSide);
-		if (keycode == K_RIGHTARROW || keycode == K_LEFTARROW)
-			if (IN_JoystickGetAxis(axis, 1, 0.01) || joy_axescache[axis].move || joy_axescache[axis].oldmove)
-				return true;
-	}
-
-	return false;
-}
-
-/*
-===========
- IN_JoyMove
-===========
-*/
-static void IN_JoyMove (void)
-{
-	float	speed, aspeed;
-	float	fAxisValue;
-	int		i, mouselook = (in_mlook.state & 1) || freelook.integer, AxisForwardIndex = -1, AxisSideIndex = -1;
-
-	// complete initialization if first time in
-	// this is needed as cvars are not available at initialization time
-	if( joy_advancedinit != true )
-	{
-		Joy_AdvancedUpdate_f();
-		joy_advancedinit = true;
-	}
-
-	if (joy_avail)
-	{
-		int		i, key_index;
-		DWORD	buttonstate, povstate;
-
-		// loop through the joystick buttons
-		// key a joystick event or auxillary event for higher number buttons for each state change
-		buttonstate = ji.dwButtons;
-		for (i=0 ; i < (int) joy_numbuttons ; i++)
-		{
-			if ( (buttonstate & (1<<i)) && !(joy_oldbuttonstate & (1<<i)) )
-			{
-				key_index = (i < 16) ? K_JOY1 : K_AUX1;
-				Key_Event (key_index + i, 0, true);
-			}
-			if ( !(buttonstate & (1<<i)) && (joy_oldbuttonstate & (1<<i)) )
-			{
-				key_index = (i < 16) ? K_JOY1 : K_AUX1;
-				Key_Event (key_index + i, 0, false);
-			}
-		}
-		joy_oldbuttonstate = buttonstate;
-
-		if (joy_haspov)
-		{
-			// convert POV information into 4 bits of state information
-			// this avoids any potential problems related to moving from one
-			// direction to another without going through the center position
-			povstate = 0;
-			if(ji.dwPOV != JOY_POVCENTERED)
-			{
-				if (ji.dwPOV == JOY_POVFORWARD)
-					povstate |= 0x01;
-				if (ji.dwPOV == JOY_POVRIGHT)
-					povstate |= 0x02;
-				if (ji.dwPOV == JOY_POVBACKWARD)
-					povstate |= 0x04;
-				if (ji.dwPOV == JOY_POVLEFT)
-					povstate |= 0x08;
-			}
-			// determine which bits have changed and key an auxillary event for each change
-			for (i=0 ; i < 4 ; i++)
-			{
-				if ( (povstate & (1<<i)) && !(joy_oldpovstate & (1<<i)) )
-				{
-					Key_Event (K_AUX29 + i, 0, true);
-				}
-
-				if ( !(povstate & (1<<i)) && (joy_oldpovstate & (1<<i)) )
-				{
-					Key_Event (K_AUX29 + i, 0, false);
-				}
-			}
-			joy_oldpovstate = povstate;
-		}
-	}
-
-	// verify joystick is available and that the user wants to use it
-	if (!joy_avail || !in_joystick.integer)
-	{
-		return;
-	}
-
-	// collect the joystick data, if possible
-	if (IN_ReadJoystick () != true)
-	{
-		return;
-	}
-
-	if (in_speed.state & 1)
-		speed = cl_movespeedkey.value;
-	else
-		speed = 1;
-	// LordHavoc: viewzoom affects sensitivity for sniping
-	aspeed = speed * cl.realframetime * cl.viewzoom;
-
-	// loop through the axes
-	for (i = 0; i < JOY_MAX_AXES; i++)
-	{
-		// convert axis to real move
-		switch (dwAxisMap[i])
-		{
-			case AxisForward:
-				if (AxisForwardIndex < 0)
-					AxisForwardIndex = i;
-				if ((joy_advanced.integer == 0) && mouselook)
-				{
-					// user wants forward control to become look control
-					fAxisValue = IN_JoystickGetAxis(i, joy_pitchsensitivity.value, joy_pitchthreshold.value);
-					if (fAxisValue != 0)
-					{
-						// if mouse invert is on, invert the joystick pitch value
-						// only absolute control support here (joy_advanced is false)
-						if (m_pitch.value < 0.0)
-							cl.viewangles[PITCH] -= fAxisValue * aspeed * cl_pitchspeed.value;
-						else
-							cl.viewangles[PITCH] += fAxisValue * aspeed * cl_pitchspeed.value;
-						V_StopPitchDrift();
-					}
-					else
-					{
-						// no pitch movement
-						// disable pitch return-to-center unless requested by user
-						// *** this code can be removed when the lookspring bug is fixed
-						// *** the bug always has the lookspring feature on
-						if (lookspring.value == 0.0)
-							V_StopPitchDrift();
-					}
-				}
-				else
-				{
-					// user wants forward control to be forward control
-					fAxisValue = IN_JoystickGetAxis(i, joy_forwardsensitivity.value, joy_forwardthreshold.value);
-					cl.cmd.forwardmove += fAxisValue * speed * cl_forwardspeed.value;
-				}
-				break;
-
-			case AxisSide:
-				if (AxisSideIndex < 0)
-					AxisSideIndex = i;
-				fAxisValue = IN_JoystickGetAxis(i, joy_sidesensitivity.value, joy_sidethreshold.value);
-				cl.cmd.sidemove += fAxisValue * speed * cl_sidespeed.value;
-				break;
-
-			case AxisTurn:
-				if ((in_strafe.state & 1) || (lookstrafe.integer && mouselook))
-				{
-					// user wants turn control to become side control
-					fAxisValue = IN_JoystickGetAxis(i, joy_sidesensitivity.value, joy_sidethreshold.value);
-					cl.cmd.sidemove -= fAxisValue * speed * cl_sidespeed.value;
-				}
-				else
-				{
-					// user wants turn control to be turn control
-					fAxisValue = IN_JoystickGetAxis(i, joy_yawsensitivity.value, joy_yawthreshold.value);
-					if (dwControlMap[i] == JOY_ABSOLUTE_AXIS)
-						cl.viewangles[YAW] += fAxisValue * aspeed * cl_yawspeed.value;
-					else
-						cl.viewangles[YAW] += fAxisValue * speed * 180.0;
-				}
-				break;
-
-			case AxisLook:
-				fAxisValue = IN_JoystickGetAxis(i, joy_pitchsensitivity.value, joy_pitchthreshold.value);
-				if (mouselook)
-				{
-					if (fAxisValue != 0)
-					{
-						// pitch movement detected and pitch movement desired by user
-						if (dwControlMap[i] == JOY_ABSOLUTE_AXIS)
-							cl.viewangles[PITCH] += fAxisValue * aspeed * cl_pitchspeed.value;
-						else
-							cl.viewangles[PITCH] += fAxisValue * speed * 180.0;
-						V_StopPitchDrift();
-					}
-					else
-					{
-						// no pitch movement
-						// disable pitch return-to-center unless requested by user
-						// *** this code can be removed when the lookspring bug is fixed
-						// *** the bug always has the lookspring feature on
-						if(lookspring.integer == 0)
-							V_StopPitchDrift();
-					}
-				}
-				break;
-
-			default:
-				fAxisValue = IN_JoystickGetAxis(i, 1, 0.01);
-				break;
-		}
-	
-		// cache for keyevents
-		joy_axescache[i].oldmove = joy_axescache[i].move;
-		joy_axescache[i].move = IN_JoystickGetAxis(i, 1, 0.01);
-	}
-
-	// run keyevents
-	if (joy_axiskeyevents.integer)
-	{
-		IN_JoystickKeyeventForAxis(AxisForwardIndex, K_DOWNARROW, K_UPARROW);
-		IN_JoystickKeyeventForAxis(AxisSideIndex, K_RIGHTARROW, K_LEFTARROW);
-	}
-}
 
 static void IN_Init(void)
 {
 	uiWheelMessage = RegisterWindowMessage ( "MSWHEEL_ROLLMSG" );
-
-	// joystick variables
-	Cvar_RegisterVariable (&in_joystick);
-	Cvar_RegisterVariable (&joy_name);
-	Cvar_RegisterVariable (&joy_advanced);
-	Cvar_RegisterVariable (&joy_advaxisx);
-	Cvar_RegisterVariable (&joy_advaxisy);
-	Cvar_RegisterVariable (&joy_advaxisz);
-	Cvar_RegisterVariable (&joy_advaxisr);
-	Cvar_RegisterVariable (&joy_advaxisu);
-	Cvar_RegisterVariable (&joy_advaxisv);
-	Cvar_RegisterVariable (&joy_forwardthreshold);
-	Cvar_RegisterVariable (&joy_sidethreshold);
-	Cvar_RegisterVariable (&joy_pitchthreshold);
-	Cvar_RegisterVariable (&joy_yawthreshold);
-	Cvar_RegisterVariable (&joy_forwardsensitivity);
-	Cvar_RegisterVariable (&joy_sidesensitivity);
-	Cvar_RegisterVariable (&joy_pitchsensitivity);
-	Cvar_RegisterVariable (&joy_yawsensitivity);
-	Cvar_RegisterVariable (&joy_wwhack1);
-	Cvar_RegisterVariable (&joy_wwhack2);
-	Cvar_RegisterVariable (&joy_axiskeyevents);
 	Cvar_RegisterVariable (&vid_forcerefreshrate);
-	Cmd_AddCommand ("joyadvancedupdate", Joy_AdvancedUpdate_f, "applies current joyadv* cvar settings to the joystick driver");
 }
 
 static void IN_Shutdown(void)

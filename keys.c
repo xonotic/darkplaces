@@ -24,7 +24,7 @@
 #include "cl_video.h"
 #include "utf8lib.h"
 
-cvar_t con_closeontoggleconsole = {CVAR_SAVE, "con_closeontoggleconsole","1", "allows toggleconsole binds to close the console as well"};
+cvar_t con_closeontoggleconsole = {CVAR_SAVE, "con_closeontoggleconsole","1", "allows toggleconsole binds to close the console as well; when set to 2, this even works when not at the start of the line in console input; when set to 3, this works even if the toggleconsole key is the color tag"};
 
 /*
 key up events are sent even if in console mode
@@ -472,6 +472,36 @@ static const keyname_t   keynames[] = {
 	{"AUX30", K_AUX30},
 	{"AUX31", K_AUX31},
 	{"AUX32", K_AUX32},
+
+	{"X360_DPAD_UP", K_X360_DPAD_UP},
+	{"X360_DPAD_DOWN", K_X360_DPAD_DOWN},
+	{"X360_DPAD_LEFT", K_X360_DPAD_LEFT},
+	{"X360_DPAD_RIGHT", K_X360_DPAD_RIGHT},
+	{"X360_START", K_X360_START},
+	{"X360_BACK", K_X360_BACK},
+	{"X360_LEFT_THUMB", K_X360_LEFT_THUMB},
+	{"X360_RIGHT_THUMB", K_X360_RIGHT_THUMB},
+	{"X360_LEFT_SHOULDER", K_X360_LEFT_SHOULDER},
+	{"X360_RIGHT_SHOULDER", K_X360_RIGHT_SHOULDER},
+	{"X360_A", K_X360_A},
+	{"X360_B", K_X360_B},
+	{"X360_X", K_X360_X},
+	{"X360_Y", K_X360_Y},
+	{"X360_LEFT_TRIGGER", K_X360_LEFT_TRIGGER},
+	{"X360_RIGHT_TRIGGER", K_X360_RIGHT_TRIGGER},
+	{"X360_LEFT_THUMB_UP", K_X360_LEFT_THUMB_UP},
+	{"X360_LEFT_THUMB_DOWN", K_X360_LEFT_THUMB_DOWN},
+	{"X360_LEFT_THUMB_LEFT", K_X360_LEFT_THUMB_LEFT},
+	{"X360_LEFT_THUMB_RIGHT", K_X360_LEFT_THUMB_RIGHT},
+	{"X360_RIGHT_THUMB_UP", K_X360_RIGHT_THUMB_UP},
+	{"X360_RIGHT_THUMB_DOWN", K_X360_RIGHT_THUMB_DOWN},
+	{"X360_RIGHT_THUMB_LEFT", K_X360_RIGHT_THUMB_LEFT},
+	{"X360_RIGHT_THUMB_RIGHT", K_X360_RIGHT_THUMB_RIGHT},
+
+	{"JOY_UP", K_JOY_UP},
+	{"JOY_DOWN", K_JOY_DOWN},
+	{"JOY_LEFT", K_JOY_LEFT},
+	{"JOY_RIGHT", K_JOY_RIGHT},
 
 	{"SEMICOLON", ';'},			// because a raw semicolon separates commands
 	{"TILDE", '~'},
@@ -1472,7 +1502,7 @@ Key_PrintBindList(int j)
 		p = keybindings[j][i];
 		if (p)
 		{
-			Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\");
+			Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\", false);
 			if (j == 0)
 				Con_Printf("^2%s ^7= \"%s\"\n", Key_KeynumToString (i), bindbuf);
 			else
@@ -1565,7 +1595,7 @@ Key_WriteBindings (qfile_t *f)
 			p = keybindings[j][i];
 			if (p)
 			{
-				Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\"); // don't need to escape $ because cvars are not expanded inside bind
+				Cmd_QuoteString(bindbuf, sizeof(bindbuf), p, "\"\\", false); // don't need to escape $ because cvars are not expanded inside bind
 				if (j == 0)
 					FS_Printf(f, "bind %s \"%s\"\n", Key_KeynumToString (i), bindbuf);
 				else
@@ -1864,7 +1894,7 @@ Key_Event (int key, int ascii, qboolean down)
 		// con_closeontoggleconsole enables toggleconsole keys to close the
 		// console, as long as they are not the color prefix character
 		// (special exemption for german keyboard layouts)
-		if (con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && (key_consoleactive & KEY_CONSOLEACTIVE_USER) && ascii != STRING_COLOR_TAG)
+		if (con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && (key_consoleactive & KEY_CONSOLEACTIVE_USER) && (con_closeontoggleconsole.integer >= ((ascii != STRING_COLOR_TAG) ? 2 : 3) || key_linepos == 1))
 		{
 			Con_ToggleConsole_f ();
 			return;

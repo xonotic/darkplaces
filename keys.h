@@ -34,6 +34,7 @@
 //
 typedef enum keynum_e
 {
+	K_TEXT			= 1, // used only for unicode character input
 	K_TAB			= 9,
 	K_ENTER			= 13,
 	K_ESCAPE		= 27,
@@ -186,6 +187,38 @@ typedef enum keynum_e
 	K_AUX30,
 	K_AUX31,
 	K_AUX32,
+
+	// Microsoft Xbox 360 Controller For Windows
+	K_X360_DPAD_UP,
+	K_X360_DPAD_DOWN,
+	K_X360_DPAD_LEFT,
+	K_X360_DPAD_RIGHT,
+	K_X360_START,
+	K_X360_BACK,
+	K_X360_LEFT_THUMB,
+	K_X360_RIGHT_THUMB,
+	K_X360_LEFT_SHOULDER,
+	K_X360_RIGHT_SHOULDER,
+	K_X360_A,
+	K_X360_B,
+	K_X360_X,
+	K_X360_Y,
+	K_X360_LEFT_TRIGGER,
+	K_X360_RIGHT_TRIGGER,
+	K_X360_LEFT_THUMB_UP,
+	K_X360_LEFT_THUMB_DOWN,
+	K_X360_LEFT_THUMB_LEFT,
+	K_X360_LEFT_THUMB_RIGHT,
+	K_X360_RIGHT_THUMB_UP,
+	K_X360_RIGHT_THUMB_DOWN,
+	K_X360_RIGHT_THUMB_LEFT,
+	K_X360_RIGHT_THUMB_RIGHT,
+
+	// generic joystick emulation for menu
+	K_JOY_UP,
+	K_JOY_DOWN,
+	K_JOY_LEFT,
+	K_JOY_RIGHT,
 
 	K_MIDINOTE0 = 896, // to this, the note number is added
 	K_MIDINOTE1,
