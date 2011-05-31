@@ -2747,6 +2747,7 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 		if (SV_RunThink (ent))
 			SV_WalkMove (ent);
 		break;
+	case MOVETYPE_SPECTATOR:
 	case MOVETYPE_TOSS:
 	case MOVETYPE_BOUNCE:
 	case MOVETYPE_BOUNCEMISSILE:

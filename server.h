@@ -317,6 +317,7 @@ typedef struct client_s
 #define MOVETYPE_FOLLOW			12		///< track movement of aiment
 #define MOVETYPE_FAKEPUSH		13		///< tenebrae's push that doesn't push
 #define MOVETYPE_PHYSICS		32		///< indicates this object is physics controlled
+#define MOVETYPE_SPECTATOR	64
 
 // edict->solid values
 #define	SOLID_NOT				0		///< no interaction with other objects

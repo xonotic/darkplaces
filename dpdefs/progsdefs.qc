@@ -255,6 +255,7 @@ float	MOVETYPE_NOCLIP			= 8;
 float	MOVETYPE_FLYMISSILE		= 9;	// fly with extra size against monsters
 float	MOVETYPE_BOUNCE			= 10;
 float	MOVETYPE_BOUNCEMISSILE	= 11;	// bounce with extra size
+float	MOVETYPE_SPECTATOR			=	14; // fly but only collide with map
 
 // edict.solid values
 float	SOLID_NOT				= 0;	// no interaction with other objects
