@@ -987,7 +987,8 @@ void SV_CheckAllEnts (void)
 		if (check->fields.server->movetype == MOVETYPE_PUSH
 		 || check->fields.server->movetype == MOVETYPE_NONE
 		 || check->fields.server->movetype == MOVETYPE_FOLLOW
-		 || check->fields.server->movetype == MOVETYPE_NOCLIP)
+		 || check->fields.server->movetype == MOVETYPE_NOCLIP
+		 || check->fields.server->movetype == MOVETYPE_SPECTATOR)
 			continue;
 
 		if (SV_TestEntityPosition (check, vec3_origin))
@@ -2916,6 +2917,7 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 		if (host_client->clmovement_inputtimeout <= 0)
 			SV_WalkMove (ent);
 		break;
+	case MOVETYPE_SPECTATOR:
 	case MOVETYPE_TOSS:
 	case MOVETYPE_BOUNCE:
 	case MOVETYPE_BOUNCEMISSILE:
