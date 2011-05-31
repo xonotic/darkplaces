@@ -1513,9 +1513,11 @@ static qboolean SV_PushEntity (trace_t *trace, prvm_edict_t *ent, vec3_t push, q
 	if (movetype == MOVETYPE_FLYMISSILE)
 		type = MOVE_MISSILE;
 	else if (solid == SOLID_TRIGGER || solid == SOLID_NOT)
-		type = MOVE_NOMONSTERS; // only clip against bmodels
+		type = MOVE_WORLDONLY; // only clip against bmodels
 	else
 		type = MOVE_NORMAL;
+		
+	Con_Printf("wtfhax: %i \n", type); 
 
 	*trace = SV_TraceBox(start, mins, maxs, end, type, ent, SV_GenericHitSuperContentsMask(ent));
 	if (trace->bmodelstartsolid && failonbmodelstartsolid)
@@ -2211,7 +2213,7 @@ void SV_WalkMove (prvm_edict_t *ent)
 		if (ent->fields.server->movetype == MOVETYPE_FLYMISSILE)
 			type = MOVE_MISSILE;
 		else if (ent->fields.server->solid == SOLID_TRIGGER || ent->fields.server->solid == SOLID_NOT)
-			type = MOVE_NOMONSTERS; // only clip against bmodels
+			type = MOVE_WORLDONLY; // only clip against bmodels
 		else
 			type = MOVE_NORMAL;
 		trace = SV_TraceBox(upmove, ent->fields.server->mins, ent->fields.server->maxs, downmove, type, ent, SV_GenericHitSuperContentsMask(ent));
