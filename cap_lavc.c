@@ -128,6 +128,7 @@ typedef unsigned char      quint8_t;
 #define AVFMT_RAWPICTURE   0x0020
 #define AVFMT_GLOBALHEADER 0x0040
 
+enum AVPacketSideDataType { AV_PKT_DATA_PALETTE = 0 };
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
 enum AVDiscard { AVDISCARD_DEFAULT = 0 };
@@ -135,6 +136,7 @@ enum AVStreamParseType { AVSTREAM_PARSE_NONE = 0 };
 enum PixelFormat { PIX_FMT_YUV420P = 0 };
 enum AVSampleFormat { AV_SAMPLE_FMT_S16 = 1 };
 enum AVMediaType { AVMEDIA_TYPE_VIDEO = 0, AVMEDIA_TYPE_AUDIO = 1 };
+enum AVPictureType { AV_PICTURE_TYPE_I = 1 };
 
 typedef struct AVPanScan AVPanScan;
 typedef struct AVClass AVClass;
@@ -188,6 +190,14 @@ typedef struct AVPacket {
 	int size;
 	int stream_index;
 	int flags;
+#if LIBAVFORMAT_VERSION_MAJOR >= 53
+	struct {
+		quint8_t *data;
+		int size;
+		enum AVPacketSideDataType type;
+	} *side_data;
+	int side_data_elems;
+#endif
 	int duration;
 	void (*destruct)(struct AVPacket *);
 	void *priv;
@@ -214,7 +224,7 @@ typedef struct AVCodec {
 	const enum AVSampleFormat *sample_fmts;
 	const qint64_t *channel_layouts;
 	uint8_t max_lowres;
-	AVClass *priv_class;
+	const AVClass *priv_class;
 } AVCodec;
 
 typedef struct AVProbeData {
@@ -228,7 +238,7 @@ typedef struct AVFrame {
 	int linesize[4];
 	quint8_t *base[4];
 	int key_frame;
-	int pict_type;
+	enum AVPictureType pict_type;
 	qint64_t pts;
 	int coded_picture_number;
 	int display_picture_number;
@@ -548,7 +558,7 @@ static dllfunction_t libavcodec_funcs[] =
 	{"avcodec_register_all",		(void **) &qavcodec_register_all},
 	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
 	{"av_init_packet",			(void **) &qav_init_packet},
-	{"av_get_context_defaults3",		(void **) &qavcodec_get_context_defaults3},
+	{"avcodec_get_context_defaults3",	(void **) &qavcodec_get_context_defaults3},
 	{NULL, NULL}
 };
 
@@ -1040,6 +1050,8 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 
 	FS_Close(cls.capturevideo.videofile);
 	cls.capturevideo.videofile = NULL;
+
+	cls.capturevideo.formatspecific = NULL;
 }
 
 static int lavc_write(void *f, quint8_t *buf, int bufsize)
