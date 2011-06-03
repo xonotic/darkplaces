@@ -14,6 +14,23 @@
 #include <libavutil/opt.h>
 #include <libavutil/avstring.h>
 
+#define ANNOYING_CAST_FOR_MRU(x) ((int64_t) (x)) /* not needed here, as we defined AV_NOPTS_VALUE right */
+/*
+20:31:39     divVerent | mru: got told to tell this to you... we have a *minor* bug in the header files... AV_NOPTS_VALUE becomes an uint64_t, not an int64_t
+20:31:43     divVerent | no idea if gcc or our code is to blame
+20:32:06     divVerent | but AV_NOPTS_VALUE expands to 0x8000000000000000L, which is too large to be int64_t, so it becomes uint64_t
+20:32:14     divVerent | and then -Wsign-compare (part of -Wextra) complains
+20:32:40          @mru | so don't use -Wextra
+20:32:44          @mru | problem solved
+[...]
+20:34:23     divVerent | but can we workaround by adding an (int64_t) to the AV_NOPTS_VALUE macro?
+20:34:33          @mru | no
+20:34:47          @mru | you have yet to convince me there's a bug
+20:35:05     divVerent | it's a warning that code using libav cannot avoid without littering itself with useless casts
+20:35:14     divVerent | as AV_NOPTS_VALUE is SUPPOSED to be signed
+20:35:17          @mru | or by not enabling that pointless warning
+*/
+
 #define qavcodec_register_all avcodec_register_all
 #define qav_register_all av_register_all
 #define qav_write_trailer av_write_trailer
@@ -96,7 +113,8 @@ typedef signed char        qint8_t;
 typedef unsigned char      quint8_t;
 #endif
 
-#define AV_NOPTS_VALUE (qint64_t)0x8000000000000000LLU
+#define AV_NOPTS_VALUE (qint64_t)(0x8000000000000000LLU)
+#define ANNOYING_CAST_FOR_MRU(x) x /* not needed here, as we defined AV_NOPTS_VALUE right */
 #define AV_TIME_BASE 1000000
 
 #define FF_MIN_BUFFER_SIZE 16384
@@ -879,7 +897,7 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 			packet.size = size;
 			if (avc->coded_frame->key_frame)
 				packet.flags |= AV_PKT_FLAG_KEY;
-			if (avc->coded_frame->pts != AV_NOPTS_VALUE)
+			if (avc->coded_frame->pts != ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
 				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[0]->time_base);
 			else
 				packet.pts = qav_rescale_q(format->vpts, avc->time_base, format->avf->streams[0]->time_base);
@@ -919,7 +937,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 	else
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
 
-	if(format->asavepts == AV_NOPTS_VALUE)
+	if(format->asavepts == ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
 		format->asavepts = format->apts;
 
 	if(size < 0)
@@ -931,11 +949,11 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 		packet.stream_index = 1;
 		packet.data = format->buffer;
 		packet.size = size;
-		if(avc->coded_frame && avc->coded_frame->pts != AV_NOPTS_VALUE)
+		if(avc->coded_frame && avc->coded_frame->pts != ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
 			packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[1]->time_base);
 		else
 			packet.pts = format->asavepts;
-		format->asavepts = AV_NOPTS_VALUE;
+		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 		if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 			Con_Printf("error writing\n");
 	}
@@ -952,7 +970,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 	{
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, NULL);
 
-		if(format->asavepts == AV_NOPTS_VALUE)
+		if(format->asavepts == ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
 			format->asavepts = format->apts;
 
 		if(size < 0)
@@ -965,11 +983,11 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 			packet.data = format->buffer;
 			packet.size = size;
 			packet.flags |= AV_PKT_FLAG_KEY;
-			if(avc->coded_frame && avc->coded_frame->pts != AV_NOPTS_VALUE)
+			if(avc->coded_frame && avc->coded_frame->pts != ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
 				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[1]->time_base);
 			else
 				packet.pts = format->asavepts;
-			format->asavepts = AV_NOPTS_VALUE;
+			format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 				Con_Printf("error writing\n");
 		}
@@ -1244,6 +1262,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		format->buffer = Z_Malloc(format->bufsize);
 		format->yuv = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height + ((cls.capturevideo.width + 1) / 2) * ((cls.capturevideo.height + 1) / 2) * 2);
 
-		format->asavepts = AV_NOPTS_VALUE;
+		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 	}
 }
