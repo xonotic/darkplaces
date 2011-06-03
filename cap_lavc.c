@@ -1123,7 +1123,9 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				format->bufsize = max(format->bufsize, format->aframesize * sizeof(*format->aframe) * cls.capturevideo.soundchannels * 2 + 200);
 		}
 
-		format->avf->pb = qav_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
+		if(!(format->avf->flags & AVFMT_NOFILE))
+			format->avf->pb = qav_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
+
 		if(qav_write_header(format->avf) < 0)
 		{
 			Con_Printf("Failed to write header\n");
