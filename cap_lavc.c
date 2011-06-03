@@ -119,6 +119,9 @@ typedef unsigned char      quint8_t;
 
 #define AV_PKT_FLAG_KEY   0x0001
 
+#define CODEC_FLAG_QSCALE 0x0002  ///< Use fixed qscale.
+#define AVFMT_NOFILE        0x0001
+
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
 enum AVDiscard { AVDISCARD_DEFAULT = 0 };
@@ -341,6 +344,30 @@ typedef struct AVCodecContext {
 	int prediction_method;
 	AVRational sample_aspect_ratio;
 	AVFrame *coded_frame;
+	int debug;
+	int debug_mv;
+	uint64_t error[4];
+	int mb_qmin;
+	int mb_qmax;
+	int me_cmp;
+	int me_sub_cmp;
+	int mb_cmp;
+	int ildct_cmp;
+	int dia_size;
+	int last_predictor_count;
+	int pre_me;
+	int me_pre_cmp;
+	int pre_dia_size;
+	int me_subpel_quality;
+	enum PixelFormat (*get_format)(struct AVCodecContext *s, const enum PixelFormat * fmt);
+	int dtg_active_format;
+	int me_range;
+	int intra_quant_bias;
+	int inter_quant_bias;
+	int color_table_id;
+	int internal_buffer_count;
+	void *internal_buffer;
+	int global_quality;
 	// remaining fields stripped
 } AVCodecContext;
 
@@ -494,7 +521,8 @@ int (*qav_set_string3)(void *obj, const char *name, const char *val, int alloc, 
 const char * (*qav_get_string)(void *obj, const char *name, const AVOption **o_out, char *buf, int buf_len);
 char * (*qav_get_token)(const char **buf, const char *term);
 int (*qav_set_parameters)(AVFormatContext *s, AVFormatParameters *ap);
-
+int (*qav_find_nearest_q_idx)(AVRational q, const AVRational* q_list);
+int (*qavcodec_get_context_defaults3)(AVCodecContext *s, AVCodec *codec);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -508,6 +536,7 @@ static dllfunction_t libavcodec_funcs[] =
 	{"avcodec_register_all",		(void **) &qavcodec_register_all},
 	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
 	{"av_init_packet",			(void **) &qav_init_packet},
+	{"av_get_context_defaults3",		(void **) &qavcodec_get_context_defaults3},
 	{NULL, NULL}
 };
 
@@ -534,6 +563,7 @@ static dllfunction_t libavutil_funcs[] =
 	{"av_set_string3",			(void **) &qav_set_string3},
 	{"av_get_string",			(void **) &qav_get_string},
 	{"av_get_token",			(void **) &qav_get_token},
+	{"av_find_nearest_q_idx",		(void **) &qav_find_nearest_q_idx},
 	{NULL, NULL}
 };
 
@@ -592,6 +622,8 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 }
 
 #endif
+
+#define QSCALE_NONE -99999
 
 #if DEFAULT_VP8
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
@@ -988,7 +1020,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 	cls.capturevideo.formatspecific = Mem_Alloc(tempmempool, sizeof(capturevideostate_lavc_formatspecific_t));
 	{
 		LOAD_FORMATSPECIFIC_LAVC();
-		AVStream *video_str;
 		AVCodec *encoder;
 		AVFormatParameters avp;
 		int num, denom;
@@ -1022,50 +1053,65 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		format->avf->preload = 0.5 * AV_TIME_BASE;
 		format->avf->max_delay = 0.7 * AV_TIME_BASE;
 
-		video_str = qav_new_stream(format->avf, 0);
-		video_str->codec->codec_type = AVMEDIA_TYPE_VIDEO;
-
-		encoder = qavcodec_find_encoder_by_name(cl_capturevideo_lavc_vcodec.string);
-		if(!encoder)
+		// we always have video
 		{
-			Con_Printf("Failed to find encoder\n");
-			SCR_CaptureVideo_EndVideo();
-			return;
+			AVStream *video_str;
+			video_str = qav_new_stream(format->avf, 0);
+			video_str->codec->codec_type = AVMEDIA_TYPE_VIDEO;
+
+			encoder = qavcodec_find_encoder_by_name(cl_capturevideo_lavc_vcodec.string);
+			if(!encoder)
+			{
+				Con_Printf("Failed to find encoder\n");
+				SCR_CaptureVideo_EndVideo();
+				return;
+			}
+			qavcodec_get_context_defaults3(video_str->codec, encoder);
+			video_str->codec->codec_id = encoder->id;
+
+			FindFraction(cls.capturevideo.framerate / cls.capturevideo.framestep, &num, &denom, cls.capturevideo.framerate / cls.capturevideo.framestep * 1001 + 2);
+			{
+				AVRational r;
+				r.num = num;
+				r.den = denom;
+				if(encoder && encoder->supported_framerates)
+					r = encoder->supported_framerates[qav_find_nearest_q_idx(r, encoder->supported_framerates)];
+				video_str->codec->time_base.num = r.den;
+				video_str->codec->time_base.den = r.num;
+				video_str->time_base = video_str->codec->time_base;
+			}
+
+			video_str->codec->width = cls.capturevideo.width;
+			video_str->codec->height = cls.capturevideo.height;
+			video_str->codec->pix_fmt = PIX_FMT_YUV420P;
+			FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
+			video_str->sample_aspect_ratio.num = num;
+			video_str->sample_aspect_ratio.den = denom;
+			video_str->codec->sample_aspect_ratio.num = num;
+			video_str->codec->sample_aspect_ratio.den = denom;
+
+			if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
+				video_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
+
+			video_str->codec->global_quality = 0;
+			if(set_avoptions(video_str->codec, encoder->priv_class, video_str->codec->priv_data, cl_capturevideo_lavc_voptions.string, "=", " \t", 0) < 0)
+				Con_Printf("Failed to set video options\n");
+			if (video_str->codec->global_quality != 0)
+				video_str->codec->flags |= CODEC_FLAG_QSCALE;
+
+			if(qavcodec_open(video_str->codec, encoder) < 0)
+			{
+				Con_Printf("Failed to open encoder\n");
+				SCR_CaptureVideo_EndVideo();
+				return;
+			}
+
+			if (video_str->codec->global_quality != 0)
+				video_str->codec->flags |= CODEC_FLAG_QSCALE;
+
+			format->vpts = 0;
+			format->bufsize = max(format->bufsize, (size_t) (cls.capturevideo.width * cls.capturevideo.height * 6 + 200));
 		}
-		video_str->codec->codec_id = encoder->id;
-		if(set_avoptions(video_str->codec, encoder->priv_class, video_str->codec->priv_data, cl_capturevideo_lavc_voptions.string, "=", " \t", 0) < 0)
-		{
-			Con_Printf("Failed to set video options\n");
-		}
-
-		FindFraction(cls.capturevideo.framerate / cls.capturevideo.framestep, &num, &denom, cls.capturevideo.framerate / cls.capturevideo.framestep * 1001 + 2);
-		video_str->codec->time_base.num = denom;
-		video_str->codec->time_base.den = num;
-		video_str->time_base = video_str->codec->time_base;
-		// FIXME supported_framerates
-
-		video_str->codec->width = cls.capturevideo.width;
-		video_str->codec->height = cls.capturevideo.height;
-		video_str->codec->pix_fmt = PIX_FMT_YUV420P;
-
-		FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
-		video_str->sample_aspect_ratio.num = num;
-		video_str->sample_aspect_ratio.den = denom;
-		video_str->codec->sample_aspect_ratio.num = num;
-		video_str->codec->sample_aspect_ratio.den = denom;
-
-		if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
-			video_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
-
-		if(qavcodec_open(video_str->codec, encoder) < 0)
-		{
-			Con_Printf("Failed to open encoder\n");
-			SCR_CaptureVideo_EndVideo();
-			return;
-		}
-
-		format->vpts = 0;
-		format->bufsize = max(format->bufsize, (size_t) (cls.capturevideo.width * cls.capturevideo.height * 6 + 200));
 
 		if(cls.capturevideo.soundrate)
 		{
@@ -1080,11 +1126,8 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				SCR_CaptureVideo_EndVideo();
 				return;
 			}
+			qavcodec_get_context_defaults3(audio_str->codec, encoder);
 			audio_str->codec->codec_id = encoder->id;
-			if(set_avoptions(audio_str->codec, encoder->priv_class, audio_str->codec->priv_data, cl_capturevideo_lavc_aoptions.string, "=", " \t", 0) < 0)
-			{
-				Con_Printf("Failed to set audio options\n");
-			}
 
 			audio_str->codec->time_base.num = 1;
 			audio_str->codec->time_base.den = cls.capturevideo.soundrate;
@@ -1092,6 +1135,12 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			audio_str->codec->sample_rate = cls.capturevideo.soundrate;
 			audio_str->codec->channels = cls.capturevideo.soundchannels;
 			audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16;
+
+			audio_str->codec->global_quality = QSCALE_NONE;
+			if(set_avoptions(audio_str->codec, encoder->priv_class, audio_str->codec->priv_data, cl_capturevideo_lavc_aoptions.string, "=", " \t", 0) < 0)
+				Con_Printf("Failed to set audio options\n");
+			if (audio_str->codec->global_quality != QSCALE_NONE)
+				audio_str->codec->flags |= CODEC_FLAG_QSCALE;
 
 			if(format->avf->oformat->flags & AVFMT_GLOBALHEADER)
 				audio_str->codec->flags |= CODEC_FLAG_GLOBAL_HEADER;
@@ -1123,7 +1172,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				format->bufsize = max(format->bufsize, format->aframesize * sizeof(*format->aframe) * cls.capturevideo.soundchannels * 2 + 200);
 		}
 
-		if(!(format->avf->flags & AVFMT_NOFILE))
+		if(!(format->avf->oformat->flags & AVFMT_NOFILE))
 			format->avf->pb = qav_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
 
 		if(qav_write_header(format->avf) < 0)
