@@ -34,6 +34,7 @@
 #define qav_set_string3 av_set_string3
 #define qav_get_string av_get_string
 #define qav_get_token av_get_token
+#define qav_set_parameters av_set_parameters
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -108,10 +109,13 @@ typedef unsigned char      quint8_t;
 #define FF_API_OLD_METADATA            (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_LAVF_UNUSED             (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_MAX_STREAMS             (LIBAVFORMAT_VERSION_MAJOR < 53)
+#define FF_API_PARAMETERS_CODEC_ID     (LIBAVFORMAT_VERSION_MAJOR < 53)
 
 #ifdef FF_API_MAX_STREAMS
 #define MAX_STREAMS 20
 #endif
+
+#define attribute_deprecated
 
 #define AV_PKT_FLAG_KEY   0x0001
 
@@ -132,7 +136,6 @@ typedef struct AVMetadata AVMetadata;
 typedef struct AVIndexEntry AVIndexEntry;
 typedef struct RcOverride RcOverride;
 typedef struct AVOption AVOption;
-typedef struct AVFormatParameters AVFormatParameters;
 typedef struct AVMetadataConv AVMetadataConv;
 typedef struct AVCodecContext AVCodecContext;
 
@@ -144,6 +147,25 @@ typedef struct AVRational {
 typedef struct AVFrac {
 	qint64_t val, num, den;
 } AVFrac;
+
+typedef struct AVFormatParameters {
+	AVRational time_base;
+	int sample_rate;
+	int channels;
+	int width;
+	int height;
+	enum PixelFormat pix_fmt;
+	int channel;
+	const char *standard;
+	unsigned int mpeg2ts_raw:1;
+	unsigned int mpeg2ts_compute_pcr:1;
+	unsigned int initial_pause:1;
+	unsigned int prealloced_context:1;
+#if FF_API_PARAMETERS_CODEC_ID
+	attribute_deprecated enum CodecID video_codec_id;
+	attribute_deprecated enum CodecID audio_codec_id;
+#endif
+} AVFormatParameters;
 
 typedef struct AVPacket {
 	qint64_t pts;
@@ -471,6 +493,7 @@ int64_t (*qav_rescale_q)(int64_t a, AVRational bq, AVRational cq);
 int (*qav_set_string3)(void *obj, const char *name, const char *val, int alloc, const AVOption **o_out);
 const char * (*qav_get_string)(void *obj, const char *name, const AVOption **o_out, char *buf, int buf_len);
 char * (*qav_get_token)(const char **buf, const char *term);
+int (*qav_set_parameters)(AVFormatContext *s, AVFormatParameters *ap);
 
 
 static dllhandle_t libavcodec_dll = NULL;
@@ -499,6 +522,7 @@ static dllfunction_t libavformat_funcs[] =
 	{"av_register_all",			(void **) &qav_register_all},
 	{"av_write_header",			(void **) &qav_write_header},
 	{"av_write_trailer",			(void **) &qav_write_trailer},
+	{"av_set_parameters",			(void **) &qav_set_parameters},
 	{NULL, NULL}
 };
 
@@ -966,23 +990,34 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		LOAD_FORMATSPECIFIC_LAVC();
 		AVStream *video_str;
 		AVCodec *encoder;
+		AVFormatParameters avp;
 		int num, denom;
 
 		format->bufsize = FF_MIN_BUFFER_SIZE;
 
 		format->avf = qavformat_alloc_context();
-		format->avf->oformat = qav_guess_format(NULL, va("%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension), NULL);
+		format->avf->oformat = qav_guess_format(NULL, fn, NULL); // TODO: use a separate cvar for the ffmpeg format name
+		if(!format->avf->oformat)
+			format->avf->oformat = qav_guess_format(NULL, fn, cls.capturevideo.formatextension);
 		if(!format->avf->oformat)
 		{
-			Con_Printf("Failed to find format\n");
+			Con_Printf("format not found\n");
 			SCR_CaptureVideo_EndVideo();
 			return;
 		}
+
 		strlcpy(format->avf->filename, fn, sizeof(format->avf->filename));
-		if(set_avoptions(format->avf, format->avf->oformat->priv_class, format->avf->priv_data, cl_capturevideo_lavc_formatoptions.string, "=", " \t", 0) < 0)
+
+		memset(&avp, 0, sizeof(avp));
+		if(qav_set_parameters(format->avf, &avp) < 0)
 		{
-			Con_Printf("Failed to set some format options\n");
+			Con_Printf("format cannot be initialized\n");
+			SCR_CaptureVideo_EndVideo();
+			return;
 		}
+
+		if(set_avoptions(format->avf, format->avf->oformat->priv_class, format->avf->priv_data, cl_capturevideo_lavc_formatoptions.string, "=", " \t", 0) < 0)
+			Con_Printf("Failed to set some format options\n");
 
 		format->avf->preload = 0.5 * AV_TIME_BASE;
 		format->avf->max_delay = 0.7 * AV_TIME_BASE;
