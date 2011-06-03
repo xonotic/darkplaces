@@ -718,7 +718,6 @@ static int set_avoptions(void *ctx, const void *privclass, void *privctx, const 
 	return errorcode ? errorcode : good;
 }
 
-
 void SCR_CaptureVideo_Lavc_Init(void)
 {
 	if(SCR_CaptureVideo_Lavc_OpenLibrary())
@@ -742,8 +741,8 @@ void SCR_CaptureVideo_Lavc_Shutdown(void)
 typedef struct capturevideostate_lavc_formatspecific_s
 {
 	AVFormatContext *avf;
-	int apts;
-	int vpts;
+	int64_t apts;
+	int64_t vpts;
 	unsigned char *yuv;
 	unsigned char *buffer;
 	size_t bufsize;
@@ -752,6 +751,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	int aframepos;
 	qboolean pcmhack;
 	quint8_t bytebuffer[32768];
+	int64_t asavepts;
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
@@ -879,6 +879,10 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 		size = qavcodec_encode_audio(avc, format->buffer, format->aframesize * format->pcmhack, format->aframe);
 	else
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
+
+	if(format->asavepts == AV_NOPTS_VALUE)
+		format->asavepts = format->apts;
+
 	if(size < 0)
 		Con_Printf("error encoding\n");
 	if(size > 0)
@@ -888,7 +892,11 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 		packet.stream_index = 1;
 		packet.data = format->buffer;
 		packet.size = size;
-		packet.pts = format->apts;
+		if(avc->coded_frame && avc->coded_frame->pts != AV_NOPTS_VALUE)
+			packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[1]->time_base);
+		else
+			packet.pts = format->asavepts;
+		format->asavepts = AV_NOPTS_VALUE;
 		if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 			Con_Printf("error writing\n");
 	}
@@ -904,16 +912,25 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 	do
 	{
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, NULL);
+
+		if(format->asavepts == AV_NOPTS_VALUE)
+			format->asavepts = format->apts;
+
 		if(size < 0)
 			Con_Printf("error encoding\n");
 		if(size > 0)
 		{
 			AVPacket packet;
 			qav_init_packet(&packet);
-			packet.stream_index = 1;
+			packet.stream_index = format->avf->streams[1]->index;
 			packet.data = format->buffer;
 			packet.size = size;
-			packet.pts = format->apts;
+			packet.flags |= AV_PKT_FLAG_KEY;
+			if(avc->coded_frame && avc->coded_frame->pts != AV_NOPTS_VALUE)
+				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[1]->time_base);
+			else
+				packet.pts = format->asavepts;
+			format->asavepts = AV_NOPTS_VALUE;
 			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 				Con_Printf("error writing\n");
 		}
@@ -932,7 +949,6 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 		int *map = mapping[bound(1, cls.capturevideo.soundchannels, 8) - 1];
 		size_t bufpos = 0;
 
-		// FIXME encode the rest of the buffer at the end of the video, filled with zeroes!
 		if(paintbuffer)
 		{
 			while(bufpos < length)
@@ -1079,6 +1095,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				video_str->codec->time_base.num = r.den;
 				video_str->codec->time_base.den = r.num;
 				video_str->time_base = video_str->codec->time_base;
+				cls.capturevideo.framerate = r.num / (double) r.den;
 			}
 
 			video_str->codec->width = cls.capturevideo.width;
@@ -1184,5 +1201,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 		format->buffer = Z_Malloc(format->bufsize);
 		format->yuv = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height + ((cls.capturevideo.width + 1) / 2) * ((cls.capturevideo.height + 1) / 2) * 2);
+
+		format->asavepts = AV_NOPTS_VALUE;
 	}
 }
