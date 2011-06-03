@@ -12,6 +12,7 @@
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
+#include <libavutil/avstring.h>
 
 #define qavcodec_register_all avcodec_register_all
 #define qav_register_all av_register_all
@@ -35,6 +36,9 @@
 #define qav_get_string av_get_string
 #define qav_get_token av_get_token
 #define qav_set_parameters av_set_parameters
+#define qav_rescale_q av_rescale_q
+#define qavcodec_get_context_defaults3 avcodec_get_context_defaults3
+#define qav_find_nearest_q_idx av_find_nearest_q_idx
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -96,7 +100,6 @@ typedef unsigned char      quint8_t;
 #define AV_TIME_BASE 1000000
 
 #define FF_MIN_BUFFER_SIZE 16384
-#define AVFMT_GLOBALHEADER 0x0040
 #define CODEC_FLAG_GLOBAL_HEADER 0x00400000
 
 #define LIBAVCODEC_VERSION_MAJOR 52
@@ -119,8 +122,10 @@ typedef unsigned char      quint8_t;
 
 #define AV_PKT_FLAG_KEY   0x0001
 
-#define CODEC_FLAG_QSCALE 0x0002  ///< Use fixed qscale.
-#define AVFMT_NOFILE        0x0001
+#define CODEC_FLAG_QSCALE  0x0002
+#define AVFMT_NOFILE       0x0001
+#define AVFMT_RAWPICTURE   0x0020
+#define AVFMT_GLOBALHEADER 0x0040
 
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
@@ -150,6 +155,11 @@ typedef struct AVRational {
 typedef struct AVFrac {
 	qint64_t val, num, den;
 } AVFrac;
+
+typedef struct AVPicture {
+	uint8_t *data[4];
+	int linesize[4];
+} AVPicture;
 
 typedef struct AVFormatParameters {
 	AVRational time_base;
@@ -201,7 +211,7 @@ typedef struct AVCodec {
 	const char *long_name;
 	const int *supported_samplerates;
 	const enum AVSampleFormat *sample_fmts;
-	const int64_t *channel_layouts;
+	const qint64_t *channel_layouts;
 	uint8_t max_lowres;
 	AVClass *priv_class;
 } AVCodec;
@@ -439,7 +449,7 @@ typedef struct AVFormatContext {
 	AVStream **streams;
 #endif
 	char filename[1024];
-	int64_t timestamp;
+	qint64_t timestamp;
 #if FF_API_OLD_METADATA
 	char title[512];
 	char author[512];
@@ -452,9 +462,9 @@ typedef struct AVFormatContext {
 #endif
 	int ctx_flags;
 	struct AVPacketList *packet_buffer;
-	int64_t start_time;
-	int64_t duration;
-	int64_t file_size;
+	qint64_t start_time;
+	qint64_t duration;
+	qint64_t file_size;
 	int bit_rate;
 	AVStream *cur_st;
 #if FF_API_LAVF_UNUSED
@@ -462,7 +472,7 @@ typedef struct AVFormatContext {
 	int cur_len_deprecated;
 	AVPacket cur_pkt_deprecated;
 #endif
-	int64_t data_offset;
+	qint64_t data_offset;
 	int index_built;
 	int mux_rate;
 	unsigned int packet_size;
@@ -516,7 +526,7 @@ int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
 int (*qav_get_bits_per_sample) (enum CodecID codec_id);
 ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
-int64_t (*qav_rescale_q)(int64_t a, AVRational bq, AVRational cq);
+qint64_t (*qav_rescale_q)(qint64_t a, AVRational bq, AVRational cq);
 int (*qav_set_string3)(void *obj, const char *name, const char *val, int alloc, const AVOption **o_out);
 const char * (*qav_get_string)(void *obj, const char *name, const AVOption **o_out, char *buf, int buf_len);
 char * (*qav_get_token)(const char **buf, const char *term);
@@ -741,8 +751,8 @@ void SCR_CaptureVideo_Lavc_Shutdown(void)
 typedef struct capturevideostate_lavc_formatspecific_s
 {
 	AVFormatContext *avf;
-	int64_t apts;
-	int64_t vpts;
+	qint64_t apts;
+	qint64_t vpts;
 	unsigned char *yuv;
 	unsigned char *buffer;
 	size_t bufsize;
@@ -751,7 +761,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	int aframepos;
 	qboolean pcmhack;
 	quint8_t bytebuffer[32768];
-	int64_t asavepts;
+	qint64_t asavepts;
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
@@ -821,15 +831,29 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 	do
 	{
 		qavcodec_get_frame_defaults(&frame);
-		if(num > 0)
+		if(format->avf->oformat->flags & AVFMT_RAWPICTURE)
 		{
-			SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
-			frame.pts = format->vpts;
-			size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
+			if(num > 0)
+			{
+				SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
+				memcpy(format->buffer, &frame, sizeof(AVPicture));
+				size = sizeof(AVPicture);
+			}
+			else
+				size = 0;
 		}
 		else
 		{
-			size = qavcodec_encode_video(avc, format->buffer, format->bufsize, NULL);
+			if(num > 0)
+			{
+				SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
+				frame.pts = format->vpts;
+				size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
+			}
+			else
+			{
+				size = qavcodec_encode_video(avc, format->buffer, format->bufsize, NULL);
+			}
 		}
 
 		if(size < 0)
@@ -845,6 +869,9 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 				packet.flags |= AV_PKT_FLAG_KEY;
 			if (avc->coded_frame->pts != AV_NOPTS_VALUE)
 				packet.pts = qav_rescale_q(avc->coded_frame->pts, avc->time_base, format->avf->streams[0]->time_base);
+			else
+				packet.pts = qav_rescale_q(format->vpts, avc->time_base, format->avf->streams[0]->time_base);
+			packet.duration = qav_rescale_q(num, avc->time_base, format->avf->streams[0]->time_base);
 			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 				Con_Printf("error writing\n");
 		}
@@ -1128,6 +1155,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 			format->vpts = 0;
 			format->bufsize = max(format->bufsize, (size_t) (cls.capturevideo.width * cls.capturevideo.height * 6 + 200));
+			format->bufsize = max(format->bufsize, sizeof(AVPicture));
 		}
 
 		if(cls.capturevideo.soundrate)
