@@ -102,17 +102,18 @@ typedef unsigned char      quint8_t;
 #define FF_MIN_BUFFER_SIZE 16384
 #define CODEC_FLAG_GLOBAL_HEADER 0x00400000
 
-#define LIBAVCODEC_VERSION_MAJOR 52
-#define LIBAVCODEC_VERSION_MAJOR_STRING "52"
-#define LIBAVFORMAT_VERSION_MAJOR 52
-#define LIBAVFORMAT_VERSION_MAJOR_STRING "52"
-#define LIBAVUTIL_VERSION_MAJOR 50
-#define LIBAVUTIL_VERSION_MAJOR_STRING "50"
+#define LIBAVCODEC_VERSION_MAJOR 53
+#define LIBAVCODEC_VERSION_MAJOR_STRING "53"
+#define LIBAVFORMAT_VERSION_MAJOR 53
+#define LIBAVFORMAT_VERSION_MAJOR_STRING "53"
+#define LIBAVUTIL_VERSION_MAJOR 51
+#define LIBAVUTIL_VERSION_MAJOR_STRING "51"
 
 #define FF_API_OLD_METADATA            (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_LAVF_UNUSED             (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_MAX_STREAMS             (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_PARAMETERS_CODEC_ID     (LIBAVFORMAT_VERSION_MAJOR < 53)
+#define FF_API_OLD_METADATA2           (LIBAVFORMAT_VERSION_MAJOR < 54)
 
 #ifdef FF_API_MAX_STREAMS
 #define MAX_STREAMS 20
@@ -502,10 +503,11 @@ typedef struct AVOutputFormat {
 	 */
 	const struct AVCodecTag * const *codec_tag;
 	enum CodecID subtitle_codec;
-#if FF_API_OLD_METADATA
+#if FF_API_OLD_METADATA2
 	const AVMetadataConv *metadata_conv;
 #endif
 	const AVClass *priv_class;
+	// remaining fields stripped
 } AVOutputFormat;
 
 void (*qavcodec_register_all) (void);
