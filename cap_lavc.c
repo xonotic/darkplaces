@@ -228,9 +228,9 @@ typedef struct AVCodec {
 	enum AVMediaType type;
 	enum CodecID id;
 	int priv_data_size;
-	int (*init)(AVCodecContext *);          
+	int (*init)(AVCodecContext *);
 	int (*encode)(AVCodecContext *, uint8_t *buf, int buf_size, void *data);
-	int (*close)(AVCodecContext *);         
+	int (*close)(AVCodecContext *);
 	int (*decode)(AVCodecContext *, void *outdata, int *outdata_size, AVPacket *avpkt);
 	int capabilities;
 	struct AVCodec *next;
