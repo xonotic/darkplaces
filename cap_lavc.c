@@ -27,11 +27,13 @@
 #define qav_guess_format av_guess_format
 #define qav_new_stream av_new_stream
 #define qavcodec_find_encoder_by_name avcodec_find_encoder_by_name
-#define qav_set_options_string av_set_options_string
 #define qavcodec_open avcodec_open
 #define qav_get_bits_per_sample av_get_bits_per_sample
 #define qav_alloc_put_byte av_alloc_put_byte
 #define qav_write_header av_write_header
+#define qav_set_string3 av_set_string3
+#define qav_get_string av_get_string
+#define qav_get_token av_get_token
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -57,6 +59,15 @@ qboolean SCR_CaptureVideo_Lavc_Available(void)
 }
 
 #else
+
+#include <errno.h>
+#if EDOM > 0
+#define AVERROR(e) (-(e))
+#define AVUNERROR(e) (-(e))
+#else
+#define AVERROR(e) (e)
+#define AVUNERROR(e) (e)
+#endif
 
 #ifdef WIN32
 // MSVC does not know *int*_t
@@ -120,291 +131,322 @@ typedef struct AVChapter AVChapter;
 typedef struct AVMetadata AVMetadata;
 typedef struct AVIndexEntry AVIndexEntry;
 typedef struct RcOverride RcOverride;
+typedef struct AVOption AVOption;
+typedef struct AVFormatParameters AVFormatParameters;
+typedef struct AVMetadataConv AVMetadataConv;
+typedef struct AVCodecContext AVCodecContext;
 
 typedef struct AVRational {
-    int num;
-    int den;
+	int num;
+	int den;
 } AVRational;
 
 typedef struct AVFrac {
-    qint64_t val, num, den;
+	qint64_t val, num, den;
 } AVFrac;
 
+typedef struct AVPacket {
+	qint64_t pts;
+	qint64_t dts;
+	quint8_t *data;
+	int size;
+	int stream_index;
+	int flags;
+	int duration;
+	void (*destruct)(struct AVPacket *);
+	void *priv;
+	qint64_t pos;
+	qint64_t convergence_duration;
+} AVPacket;
+
 typedef struct AVCodec {
-    const char *name;
-    enum AVMediaType type;
-    enum CodecID id;
-    // remaining fields stripped
+	const char *name;
+	enum AVMediaType type;
+	enum CodecID id;
+	int priv_data_size;
+	int (*init)(AVCodecContext *);          
+	int (*encode)(AVCodecContext *, uint8_t *buf, int buf_size, void *data);
+	int (*close)(AVCodecContext *);         
+	int (*decode)(AVCodecContext *, void *outdata, int *outdata_size, AVPacket *avpkt);
+	int capabilities;
+	struct AVCodec *next;
+	void (*flush)(AVCodecContext *);
+	const AVRational *supported_framerates;
+	const enum PixelFormat *pix_fmts;
+	const char *long_name;
+	const int *supported_samplerates;
+	const enum AVSampleFormat *sample_fmts;
+	const int64_t *channel_layouts;
+	uint8_t max_lowres;
+	AVClass *priv_class;
 } AVCodec;
 
 typedef struct AVProbeData {
-    const char *filename;
-    unsigned char *buf;
-    int buf_size;
+	const char *filename;
+	unsigned char *buf;
+	int buf_size;
 } AVProbeData;
 
 typedef struct AVFrame {
-    quint8_t *data[4];
-    int linesize[4];
-    quint8_t *base[4];
-    int key_frame;
-    int pict_type;
-    qint64_t pts;
-    int coded_picture_number;
-    int display_picture_number;
-    int quality;
-    int age;
-    int reference;
-    qint8_t *qscale_table;
-    int qstride;
-    quint8_t *mbskip_table;
-    qint16_t (*motion_val[2])[2];
-    quint32_t *mb_type;
-    quint8_t motion_subsample_log2;
-    void *opaque;
-    quint64_t error[4];
-    int type;
-    int repeat_pict;
-    int qscale_type;
-    int interlaced_frame;
-    int top_field_first;
-    AVPanScan *pan_scan;
-    int palette_has_changed;
-    int buffer_hints;
-    short *dct_coeff;
-    qint8_t *ref_index[2];
-    qint64_t reordered_opaque;
-    void *hwaccel_picture_private;
-    qint64_t pkt_pts;
-    qint64_t pkt_dts;
-    struct AVCodecContext *owner;
-    void *thread_opaque;
+	quint8_t *data[4];
+	int linesize[4];
+	quint8_t *base[4];
+	int key_frame;
+	int pict_type;
+	qint64_t pts;
+	int coded_picture_number;
+	int display_picture_number;
+	int quality;
+	int age;
+	int reference;
+	qint8_t *qscale_table;
+	int qstride;
+	quint8_t *mbskip_table;
+	qint16_t (*motion_val[2])[2];
+	quint32_t *mb_type;
+	quint8_t motion_subsample_log2;
+	void *opaque;
+	quint64_t error[4];
+	int type;
+	int repeat_pict;
+	int qscale_type;
+	int interlaced_frame;
+	int top_field_first;
+	AVPanScan *pan_scan;
+	int palette_has_changed;
+	int buffer_hints;
+	short *dct_coeff;
+	qint8_t *ref_index[2];
+	qint64_t reordered_opaque;
+	void *hwaccel_picture_private;
+	qint64_t pkt_pts;
+	qint64_t pkt_dts;
+	struct AVCodecContext *owner;
+	void *thread_opaque;
 } AVFrame;
 
-typedef struct AVPacket {
-    qint64_t pts;
-    qint64_t dts;
-    quint8_t *data;
-    int size;
-    int stream_index;
-    int flags;
-    int duration;
-    void (*destruct)(struct AVPacket *);
-    void *priv;
-    qint64_t pos;
-    qint64_t convergence_duration;
-} AVPacket;
-
 typedef struct AVCodecContext {
-    const AVClass *av_class;
-    int bit_rate;
-    int bit_rate_tolerance;
-    int flags;
-    int sub_id;
-    int me_method;
-    quint8_t *extradata;
-    int extradata_size;
-    AVRational time_base;
-    int width, height;
-    int gop_size;
-    enum PixelFormat pix_fmt;
-    int rate_emu;
-    void (*draw_horiz_band)(struct AVCodecContext *s, const AVFrame *src, int offset[4], int y, int type, int height);
-    int sample_rate;
-    int channels;
-    enum AVSampleFormat sample_fmt;
-    int frame_size;
-    int frame_number;
+	const AVClass *av_class;
+	int bit_rate;
+	int bit_rate_tolerance;
+	int flags;
+	int sub_id;
+	int me_method;
+	quint8_t *extradata;
+	int extradata_size;
+	AVRational time_base;
+	int width, height;
+	int gop_size;
+	enum PixelFormat pix_fmt;
+	int rate_emu;
+	void (*draw_horiz_band)(struct AVCodecContext *s, const AVFrame *src, int offset[4], int y, int type, int height);
+	int sample_rate;
+	int channels;
+	enum AVSampleFormat sample_fmt;
+	int frame_size;
+	int frame_number;
 #if LIBAVCODEC_VERSION_MAJOR < 53
-    int real_pict_num;
+	int real_pict_num;
 #endif
-    int delay;
-    float qcompress;
-    float qblur;
-    int qmin;
-    int qmax;
-    int max_qdiff;
-    int max_b_frames;
-    float b_quant_factor;
-    int rc_strategy;
-    int b_frame_strategy;
-    int hurry_up;
-    struct AVCodec *codec;
-    void *priv_data;
-    int rtp_payload_size;
-    void (*rtp_callback)(struct AVCodecContext *avctx, void *data, int size, int mb_nb);
-    int mv_bits;
-    int header_bits;
-    int i_tex_bits;
-    int p_tex_bits;
-    int i_count;
-    int p_count;
-    int skip_count;
-    int misc_bits;
-    int frame_bits;
-    void *opaque;
-    char codec_name[32];
-    enum AVMediaType codec_type;
-    enum CodecID codec_id;
-    unsigned int codec_tag;
-    int workaround_bugs;
-    int luma_elim_threshold;
-    int chroma_elim_threshold;
-    int strict_std_compliance;
-    float b_quant_offset;
-    int error_recognition;
-    int (*get_buffer)(struct AVCodecContext *c, AVFrame *pic);
-    void (*release_buffer)(struct AVCodecContext *c, AVFrame *pic);
-    int has_b_frames;
-    int block_align;
-    int parse_only;
-    int mpeg_quant;
-    char *stats_out;
-    char *stats_in;
-    float rc_qsquish;
-    float rc_qmod_amp;
-    int rc_qmod_freq;
-    RcOverride *rc_override;
-    int rc_override_count;
-    const char *rc_eq;
-    int rc_max_rate;
-    int rc_min_rate;
-    int rc_buffer_size;
-    float rc_buffer_aggressivity;
-    float i_quant_factor;
-    float i_quant_offset;
-    float rc_initial_cplx;
-    int dct_algo;
-    float lumi_masking;
-    float temporal_cplx_masking;
-    float spatial_cplx_masking;
-    float p_masking;
-    float dark_masking;
-    int idct_algo;
-    int slice_count;
-    int *slice_offset;
-    int error_concealment;
-    unsigned dsp_mask;
-     int bits_per_coded_sample;
-     int prediction_method;
-    AVRational sample_aspect_ratio;
-    AVFrame *coded_frame;
-    // remaining fields stripped
+	int delay;
+	float qcompress;
+	float qblur;
+	int qmin;
+	int qmax;
+	int max_qdiff;
+	int max_b_frames;
+	float b_quant_factor;
+	int rc_strategy;
+	int b_frame_strategy;
+	int hurry_up;
+	struct AVCodec *codec;
+	void *priv_data;
+	int rtp_payload_size;
+	void (*rtp_callback)(struct AVCodecContext *avctx, void *data, int size, int mb_nb);
+	int mv_bits;
+	int header_bits;
+	int i_tex_bits;
+	int p_tex_bits;
+	int i_count;
+	int p_count;
+	int skip_count;
+	int misc_bits;
+	int frame_bits;
+	void *opaque;
+	char codec_name[32];
+	enum AVMediaType codec_type;
+	enum CodecID codec_id;
+	unsigned int codec_tag;
+	int workaround_bugs;
+	int luma_elim_threshold;
+	int chroma_elim_threshold;
+	int strict_std_compliance;
+	float b_quant_offset;
+	int error_recognition;
+	int (*get_buffer)(struct AVCodecContext *c, AVFrame *pic);
+	void (*release_buffer)(struct AVCodecContext *c, AVFrame *pic);
+	int has_b_frames;
+	int block_align;
+	int parse_only;
+	int mpeg_quant;
+	char *stats_out;
+	char *stats_in;
+	float rc_qsquish;
+	float rc_qmod_amp;
+	int rc_qmod_freq;
+	RcOverride *rc_override;
+	int rc_override_count;
+	const char *rc_eq;
+	int rc_max_rate;
+	int rc_min_rate;
+	int rc_buffer_size;
+	float rc_buffer_aggressivity;
+	float i_quant_factor;
+	float i_quant_offset;
+	float rc_initial_cplx;
+	int dct_algo;
+	float lumi_masking;
+	float temporal_cplx_masking;
+	float spatial_cplx_masking;
+	float p_masking;
+	float dark_masking;
+	int idct_algo;
+	int slice_count;
+	int *slice_offset;
+	int error_concealment;
+	unsigned dsp_mask;
+	int bits_per_coded_sample;
+	int prediction_method;
+	AVRational sample_aspect_ratio;
+	AVFrame *coded_frame;
+	// remaining fields stripped
 } AVCodecContext;
 
 typedef struct AVStream {
-    int index;
-    int id;
-    AVCodecContext *codec;
-    AVRational r_frame_rate;
-    void *priv_data;
-    qint64_t first_dts;
-    struct AVFrac pts;
-    AVRational time_base;
-    int pts_wrap_bits;
-    int stream_copy;
-    enum AVDiscard discard;
-    float quality;
-    qint64_t start_time;
-    qint64_t duration;
+	int index;
+	int id;
+	AVCodecContext *codec;
+	AVRational r_frame_rate;
+	void *priv_data;
+	qint64_t first_dts;
+	struct AVFrac pts;
+	AVRational time_base;
+	int pts_wrap_bits;
+	int stream_copy;
+	enum AVDiscard discard;
+	float quality;
+	qint64_t start_time;
+	qint64_t duration;
 #if FF_API_OLD_METADATA
-    char language[4];
+	char language[4];
 #endif
-    enum AVStreamParseType need_parsing;
-    struct AVCodecParserContext *parser;
-    qint64_t cur_dts;
-    int last_IP_duration;
-    qint64_t last_IP_pts;
-    AVIndexEntry *index_entries;
-    int nb_index_entries;
-    unsigned int index_entries_allocated_size;
-    qint64_t nb_frames;
+	enum AVStreamParseType need_parsing;
+	struct AVCodecParserContext *parser;
+	qint64_t cur_dts;
+	int last_IP_duration;
+	qint64_t last_IP_pts;
+	AVIndexEntry *index_entries;
+	int nb_index_entries;
+	unsigned int index_entries_allocated_size;
+	qint64_t nb_frames;
 #if FF_API_LAVF_UNUSED
-    qint64_t unused[4+1];
+	qint64_t unused[4+1];
 #endif
 #if FF_API_OLD_METADATA
-    char *filename;
+	char *filename;
 #endif
-    int disposition;
-    AVProbeData probe_data;
-    qint64_t pts_buffer[16 +1];
-    AVRational sample_aspect_ratio;
-    AVMetadata *metadata;
-    const quint8_t *cur_ptr;
-    int cur_len;
-    AVPacket cur_pkt;
-    qint64_t reference_dts;
-    int probe_packets;
-    struct AVPacketList *last_in_packet_buffer;
-    AVRational avg_frame_rate;
-    int codec_info_nb_frames;
-    struct {
-        qint64_t last_dts;
-        qint64_t duration_gcd;
-        int duration_count;
-        double duration_error[(60*12+5)];
-        qint64_t codec_info_duration;
-    } *info;
+	int disposition;
+	AVProbeData probe_data;
+	qint64_t pts_buffer[16 +1];
+	AVRational sample_aspect_ratio;
+	AVMetadata *metadata;
+	const quint8_t *cur_ptr;
+	int cur_len;
+	AVPacket cur_pkt;
+	qint64_t reference_dts;
+	int probe_packets;
+	struct AVPacketList *last_in_packet_buffer;
+	AVRational avg_frame_rate;
+	int codec_info_nb_frames;
+	struct {
+		qint64_t last_dts;
+		qint64_t duration_gcd;
+		int duration_count;
+		double duration_error[(60*12+5)];
+		qint64_t codec_info_duration;
+	} *info;
 } AVStream;
 
 typedef struct AVFormatContext {
-    const AVClass *av_class;
-    struct AVInputFormat *iformat;
-    struct AVOutputFormat *oformat;
-    void *priv_data;
-    ByteIOContext *pb;
-    unsigned int nb_streams;
+	const AVClass *av_class;
+	struct AVInputFormat *iformat;
+	struct AVOutputFormat *oformat;
+	void *priv_data;
+	ByteIOContext *pb;
+	unsigned int nb_streams;
 #if FF_API_MAX_STREAMS
-    AVStream *streams[MAX_STREAMS];
+	AVStream *streams[MAX_STREAMS];
 #else
-    AVStream **streams;
+	AVStream **streams;
 #endif
-    char filename[1024];
-    int64_t timestamp;
+	char filename[1024];
+	int64_t timestamp;
 #if FF_API_OLD_METADATA
-    char title[512];
-    char author[512];
-    char copyright[512];
-    char comment[512];
-    char album[512];
-    int year;
-    int track;
-    char genre[32];
+	char title[512];
+	char author[512];
+	char copyright[512];
+	char comment[512];
+	char album[512];
+	int year;
+	int track;
+	char genre[32];
 #endif
-    int ctx_flags;
-    struct AVPacketList *packet_buffer;
-    int64_t start_time;
-    int64_t duration;
-    int64_t file_size;
-    int bit_rate;
-    AVStream *cur_st;
+	int ctx_flags;
+	struct AVPacketList *packet_buffer;
+	int64_t start_time;
+	int64_t duration;
+	int64_t file_size;
+	int bit_rate;
+	AVStream *cur_st;
 #if FF_API_LAVF_UNUSED
-    const uint8_t *cur_ptr_deprecated;
-    int cur_len_deprecated;
-    AVPacket cur_pkt_deprecated;
+	const uint8_t *cur_ptr_deprecated;
+	int cur_len_deprecated;
+	AVPacket cur_pkt_deprecated;
 #endif
-    int64_t data_offset;
-    int index_built;
-    int mux_rate;
-    unsigned int packet_size;
-    int preload;
-    int max_delay;
-    // remaining fields stripped
+	int64_t data_offset;
+	int index_built;
+	int mux_rate;
+	unsigned int packet_size;
+	int preload;
+	int max_delay;
+	// remaining fields stripped
 } AVFormatContext;
 
 typedef struct AVOutputFormat {
-    const char *name;
-    const char *long_name;
-    const char *mime_type;
-    const char *extensions;
-    int priv_data_size;
-    enum CodecID audio_codec;
-    enum CodecID video_codec;
-    int (*write_header)(struct AVFormatContext *);
-    int (*write_packet)(struct AVFormatContext *, AVPacket *pkt);
-    int (*write_trailer)(struct AVFormatContext *);
-    int flags;
-    // remaining fields stripped
+	const char *name;
+	const char *long_name;
+	const char *mime_type;
+	const char *extensions;
+	int priv_data_size;
+	enum CodecID audio_codec;
+	enum CodecID video_codec;
+	int (*write_header)(struct AVFormatContext *);
+	int (*write_packet)(struct AVFormatContext *, AVPacket *pkt);
+	int (*write_trailer)(struct AVFormatContext *);
+	int flags;
+	int (*set_parameters)(struct AVFormatContext *, AVFormatParameters *);
+	int (*interleave_packet)(struct AVFormatContext *, AVPacket *out,
+			AVPacket *in, int flush);
+	/**
+	 * List of supported codec_id-codec_tag pairs, ordered by "better
+	 * choice first". The arrays are all terminated by CODEC_ID_NONE.
+	 */
+	const struct AVCodecTag * const *codec_tag;
+	enum CodecID subtitle_codec;
+#if FF_API_OLD_METADATA
+	const AVMetadataConv *metadata_conv;
+#endif
+	const AVClass *priv_class;
 } AVOutputFormat;
 
 void (*qavcodec_register_all) (void);
@@ -421,12 +463,15 @@ AVFormatContext * (*qavformat_alloc_context) (void);
 AVOutputFormat * (*qav_guess_format) (const char *short_name, const char *filename, const char *mime_type);
 AVStream * (*qav_new_stream) (AVFormatContext *s, int id);
 AVCodec * (*qavcodec_find_encoder_by_name) (const char *name);
-int (*qav_set_options_string) (void *ctx, const char *opts, const char *key_val_sep, const char *pairs_sep);
 int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
 int (*qav_get_bits_per_sample) (enum CodecID codec_id);
 ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
 int64_t (*qav_rescale_q)(int64_t a, AVRational bq, AVRational cq);
+int (*qav_set_string3)(void *obj, const char *name, const char *val, int alloc, const AVOption **o_out);
+const char * (*qav_get_string)(void *obj, const char *name, const AVOption **o_out, char *buf, int buf_len);
+char * (*qav_get_token)(const char **buf, const char *term);
+
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -460,9 +505,11 @@ static dllfunction_t libavformat_funcs[] =
 static dllhandle_t libavutil_dll = NULL;
 static dllfunction_t libavutil_funcs[] =
 {
-	{"av_set_options_string",		(void **) &qav_set_options_string},
 	{"av_free",				(void **) &qav_free},
 	{"av_rescale_q",			(void **) &qav_rescale_q},
+	{"av_set_string3",			(void **) &qav_set_string3},
+	{"av_get_string",			(void **) &qav_get_string},
+	{"av_get_token",			(void **) &qav_get_token},
 	{NULL, NULL}
 };
 
@@ -499,11 +546,11 @@ qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 	};
 
 	if (!libavcodec_dll)
-		 Sys_LoadLibrary (libavcodec_dllnames, &libavcodec_dll, libavcodec_funcs);
+		Sys_LoadLibrary (libavcodec_dllnames, &libavcodec_dll, libavcodec_funcs);
 	if (!libavformat_dll)
-		 Sys_LoadLibrary (libavformat_dllnames, &libavformat_dll, libavformat_funcs);
+		Sys_LoadLibrary (libavformat_dllnames, &libavformat_dll, libavformat_funcs);
 	if (!libavutil_dll)
-		 Sys_LoadLibrary (libavutil_dllnames, &libavutil_dll, libavutil_funcs);
+		Sys_LoadLibrary (libavutil_dllnames, &libavutil_dll, libavutil_funcs);
 
 	return libavcodec_dll && libavformat_dll && libavutil_dll;
 }
@@ -535,8 +582,8 @@ static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libx264", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions",
 	/* sane */     "crf=23 threads=4 "
-	/* faster */   "coder=1 flags=+loop cmp=+chroma partitions=+parti8x8+parti4x4+partp8x8+partb8x8 me_method=hex subq=4 me_range=16 g=250 keyint_min=25 sc_threshold=40 i_qfactor=0.71 b_strategy=1 qcomp=0.6 qmin=10 qmax=51 qdiff=4 bf=3 refs=2 directpred=1 trellis=1 flags2=+bpyramid-mixed_refs+wpred+dct8x8+fastpskip wpredp=1 rc_lookahead=20 "
-	/* baseline */ "coder=0 bf=0 flags2=-wpred-dct8x8 wpredp=0",
+		/* faster */   "coder=1 flags=+loop cmp=+chroma partitions=+parti8x8+parti4x4+partp8x8+partb8x8 me_method=hex subq=4 me_range=16 g=250 keyint_min=25 sc_threshold=40 i_qfactor=0.71 b_strategy=1 qcomp=0.6 qmin=10 qmax=51 qdiff=4 bf=3 refs=2 directpred=1 trellis=1 flags2=+bpyramid-mixed_refs+wpred+dct8x8+fastpskip wpredp=1 rc_lookahead=20 "
+		/* baseline */ "coder=0 bf=0 flags2=-wpred-dct8x8 wpredp=0",
 	"space separated key=value pairs for video encoder flags"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "aac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
@@ -548,6 +595,73 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "flac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #endif
+
+static int set_avoptions(void *ctx, const void *privclass, void *privctx, const char *str, const char *key_val_sep, const char *pairs_sep, int dry_run)
+{
+	int good = 0;
+	int errorcode = 0;
+
+	if (!privclass)
+		privctx = NULL;
+
+	while (*str)
+	{
+		char *key = qav_get_token(&str, key_val_sep);
+		char *val;
+		int ret;
+
+		if (*key && strspn(str, key_val_sep)) {
+			str++;
+			val = qav_get_token(&str, pairs_sep);
+		} else {
+			if (!dry_run)
+				Con_Printf("Missing key or no key/value separator found after key '%s'\n", key);
+			qav_free(key);
+			if (!errorcode)
+				errorcode = AVERROR(EINVAL);
+			if(*str)
+				++str;
+			continue;
+		}
+
+		if (!dry_run)
+			Con_DPrintf("Setting value '%s' for key '%s'\n", val, key);
+
+		ret = AVERROR(ENOENT);
+		if (dry_run) {
+			char buf[256];
+			const AVOption *opt;
+			const char *p = NULL;
+			if (privctx)
+				p = qav_get_string(privctx, key, &opt, buf, sizeof(buf));
+			if (p == NULL)
+				p = qav_get_string(ctx, key, &opt, buf, sizeof(buf));
+			if (p)
+				ret = 0;
+		} else {
+			if (privctx)
+				ret = qav_set_string3(privctx, key, val, 1, NULL);
+			if (ret == AVERROR(ENOENT))
+				ret = qav_set_string3(ctx, key, val, 1, NULL);
+			if (ret == AVERROR(ENOENT))
+				Con_Printf("Key '%s' not found.\n", key);
+		}
+
+		qav_free(key);
+		qav_free(val);
+
+		if (ret < 0) {
+			if (!errorcode)
+				errorcode = ret;
+		} else
+			++good;
+
+		if(*str)
+			++str;
+	}
+	return errorcode ? errorcode : good;
+}
+
 
 void SCR_CaptureVideo_Lavc_Init(void)
 {
@@ -865,9 +979,9 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			return;
 		}
 		strlcpy(format->avf->filename, fn, sizeof(format->avf->filename));
-		if(qav_set_options_string(format->avf, cl_capturevideo_lavc_formatoptions.string, "=", " \t") < 0)
+		if(set_avoptions(format->avf, format->avf->oformat->priv_class, format->avf->priv_data, cl_capturevideo_lavc_formatoptions.string, "=", " \t", 0) < 0)
 		{
-			Con_Printf("Failed to set format options\n");
+			Con_Printf("Failed to set some format options\n");
 		}
 
 		format->avf->preload = 0.5 * AV_TIME_BASE;
@@ -884,7 +998,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 			return;
 		}
 		video_str->codec->codec_id = encoder->id;
-		if(qav_set_options_string(video_str->codec, cl_capturevideo_lavc_voptions.string, "=", " \t") < 0)
+		if(set_avoptions(video_str->codec, encoder->priv_class, video_str->codec->priv_data, cl_capturevideo_lavc_voptions.string, "=", " \t", 0) < 0)
 		{
 			Con_Printf("Failed to set video options\n");
 		}
@@ -932,7 +1046,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				return;
 			}
 			audio_str->codec->codec_id = encoder->id;
-			if(qav_set_options_string(audio_str->codec, cl_capturevideo_lavc_aoptions.string, "=", " \t") < 0)
+			if(set_avoptions(audio_str->codec, encoder->priv_class, audio_str->codec->priv_data, cl_capturevideo_lavc_aoptions.string, "=", " \t", 0) < 0)
 			{
 				Con_Printf("Failed to set audio options\n");
 			}
