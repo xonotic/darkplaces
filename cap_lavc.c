@@ -13,6 +13,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 #include <libavutil/avstring.h>
+#include <libswscale/swscale.h>
 
 #define ANNOYING_CAST_FOR_MRU(x) ((int64_t) (x)) /* not needed here, as we defined AV_NOPTS_VALUE right */
 /*
@@ -126,6 +127,8 @@ typedef unsigned char      quint8_t;
 #define LIBAVFORMAT_VERSION_MAJOR_STRING "53"
 #define LIBAVUTIL_VERSION_MAJOR 51
 #define LIBAVUTIL_VERSION_MAJOR_STRING "51"
+#define LIBSWSCALE_VERSION_MAJOR 1
+#define LIBSWSCALE_VERSION_MAJOR_STRING "1"
 
 #define FF_API_OLD_METADATA            (LIBAVFORMAT_VERSION_MAJOR < 53)
 #define FF_API_LAVF_UNUSED             (LIBAVFORMAT_VERSION_MAJOR < 53)
@@ -167,6 +170,7 @@ typedef struct RcOverride RcOverride;
 typedef struct AVOption AVOption;
 typedef struct AVMetadataConv AVMetadataConv;
 typedef struct AVCodecContext AVCodecContext;
+typedef struct SwsFilter SwsFilter;
 
 typedef struct AVRational {
 	int num;
@@ -563,6 +567,9 @@ char * (*qav_get_token)(const char **buf, const char *term);
 int (*qav_set_parameters)(AVFormatContext *s, AVFormatParameters *ap);
 int (*qav_find_nearest_q_idx)(AVRational q, const AVRational* q_list);
 int (*qavcodec_get_context_defaults3)(AVCodecContext *s, AVCodec *codec);
+struct SwsContext * (*qsws_getCachedContext)(struct SwsContext *context, int srcW, int srcH, enum PixelFormat srcFormat, int dstW, int dstH, enum PixelFormat dstFormat, int flags, SwsFilter *srcFilter, SwsFilter *dstFilter, const double *param);
+int (*qsws_scale)(struct SwsContext *context, const uint8_t* const srcSlice[], const int srcStride[], int srcSliceY, int srcSliceH, uint8_t* const dst[], const int dstStride[]);
+void (*qsws_freeContext)(struct SwsContext *swsContext);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -607,6 +614,15 @@ static dllfunction_t libavutil_funcs[] =
 	{NULL, NULL}
 };
 
+static dllhandle_t libswscale_dll = NULL;
+static dllfunction_t libswscale_funcs[] =
+{
+	{"sws_getCachedContext",		(void **) &qsws_getCachedContext},
+	{"sws_scale",				(void **) &qsws_scale},
+	{"sws_freeContext",			(void **) &qsws_freeContext},
+	{NULL, NULL}
+};
+
 qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 {
 	const char* libavcodec_dllnames [] =
@@ -639,18 +655,31 @@ qboolean SCR_CaptureVideo_Lavc_OpenLibrary(void)
 		NULL
 	};
 
+	const char* libswscale_dllnames [] =
+	{
+#if defined(WIN32)
+		"swscale-" LIBSWSCALE_VERSION_MAJOR_STRING ".dll",
+#else
+		"libswscale.so." LIBSWSCALE_VERSION_MAJOR_STRING,
+#endif
+		NULL
+	};
+
 	if (!libavcodec_dll)
 		Sys_LoadLibrary (libavcodec_dllnames, &libavcodec_dll, libavcodec_funcs);
 	if (!libavformat_dll)
 		Sys_LoadLibrary (libavformat_dllnames, &libavformat_dll, libavformat_funcs);
 	if (!libavutil_dll)
 		Sys_LoadLibrary (libavutil_dllnames, &libavutil_dll, libavutil_funcs);
+	if (!libswscale_dll)
+		Sys_LoadLibrary (libswscale_dllnames, &libswscale_dll, libswscale_funcs);
 
-	return libavcodec_dll && libavformat_dll && libavutil_dll;
+	return libavcodec_dll && libavformat_dll && libavutil_dll && libswscale_dll;
 }
 
 void SCR_CaptureVideo_Lavc_CloseLibrary(void)
 {
+	Sys_UnloadLibrary(&libswscale_dll);
 	Sys_UnloadLibrary(&libavutil_dll);
 	Sys_UnloadLibrary(&libavformat_dll);
 	Sys_UnloadLibrary(&libavcodec_dll);
@@ -658,7 +687,7 @@ void SCR_CaptureVideo_Lavc_CloseLibrary(void)
 
 qboolean SCR_CaptureVideo_Lavc_Available(void)
 {
-	return libavcodec_dll && libavformat_dll && libavutil_dll;
+	return libavcodec_dll && libavformat_dll && libavutil_dll && libswscale_dll;
 }
 
 #endif
