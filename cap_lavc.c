@@ -827,6 +827,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	qboolean pcmhack;
 	quint8_t bytebuffer[32768];
 	qint64_t asavepts;
+	struct SwsContext *sws;
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
@@ -896,11 +897,15 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 	do
 	{
 		qavcodec_get_frame_defaults(&frame);
+		if(num > 0)
+		{
+			SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
+			frame.pts = format->vpts;
+		}
 		if(format->avf->oformat->flags & AVFMT_RAWPICTURE)
 		{
 			if(num > 0)
 			{
-				SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
 				memcpy(format->buffer, &frame, sizeof(AVPicture));
 				size = sizeof(AVPicture);
 			}
@@ -910,15 +915,9 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 		else
 		{
 			if(num > 0)
-			{
-				SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
-				frame.pts = format->vpts;
 				size = qavcodec_encode_video(avc, format->buffer, format->bufsize, &frame);
-			}
 			else
-			{
 				size = qavcodec_encode_video(avc, format->buffer, format->bufsize, NULL);
-			}
 		}
 
 		if(size < 0)
@@ -1099,12 +1098,13 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 	}
 	if(format->aframe)
 		Mem_Free(format->aframe);
+	if(format->sws)
+		qsws_freeContext(format->sws);
 	Mem_Free(format);
+	cls.capturevideo.formatspecific = NULL;
 
 	FS_Close(cls.capturevideo.videofile);
 	cls.capturevideo.videofile = NULL;
-
-	cls.capturevideo.formatspecific = NULL;
 }
 
 static int lavc_write(void *f, quint8_t *buf, int bufsize)
@@ -1252,6 +1252,8 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				else
 					video_str->codec->pix_fmt = PIX_FMT_YUV420P;
 			}
+			if(video_str->codec->pix_fmt != PIX_FMT_BGRA)
+				format->sws = qsws_getCachedContext(NULL, cls.capturevideo.width, cls.capturevideo.height, PIX_FMT_BGRA, cls.capturevideo.width, cls.capturevideo.height, video_str->codec->pix_fmt, 0, NULL, NULL, NULL);
 			FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
 			video_str->sample_aspect_ratio.num = num;
 			video_str->sample_aspect_ratio.den = denom;
