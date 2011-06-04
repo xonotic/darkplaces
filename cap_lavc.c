@@ -65,6 +65,8 @@
 #define qavpicture_alloc avpicture_alloc
 #define qsws_getCachedContext sws_getCachedContext
 #define qav_get_pix_fmt av_get_pix_fmt
+#define qav_get_sample_fmt av_get_sample_fmt
+#define qav_get_bits_per_sample_fmt av_get_bits_per_sample_fmt
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -163,7 +165,7 @@ enum CodecID { CODEC_ID_NONE = 0 };
 enum AVDiscard { AVDISCARD_DEFAULT = 0 };
 enum AVStreamParseType { AVSTREAM_PARSE_NONE = 0 };
 enum PixelFormat { PIX_FMT_NONE = -1, PIX_FMT_YUV420P = 0, PIX_FMT_RGB24 = 2, PIX_FMT_BGR24 = 3, PIX_FMT_ARGB = 27, PIX_FMT_RGBA = 28, PIX_FMT_ABGR = 29, PIX_FMT_BGRA = 30 };
-enum AVSampleFormat { AV_SAMPLE_FMT_S16 = 1 };
+enum AVSampleFormat { AV_SAMPLE_FMT_NONE = -1, AV_SAMPLE_FMT_U8 = 0, AV_SAMPLE_FMT_S16 = 1, AV_SAMPLE_FMT_S32 = 2, AV_SAMPLE_FMT_FLT = 3, AV_SAMPLE_FMT_DBL = 4 };
 enum AVMediaType { AVMEDIA_TYPE_VIDEO = 0, AVMEDIA_TYPE_AUDIO = 1 };
 enum AVPictureType { AV_PICTURE_TYPE_I = 1 };
 
@@ -581,6 +583,8 @@ void (*qsws_freeContext)(struct SwsContext *swsContext);
 enum PixelFormat (*qav_get_pix_fmt)(const char *name);
 int (*qavpicture_alloc)(AVPicture *picture, enum PixelFormat pix_fmt, int width, int height);
 void (*qavpicture_free)(AVPicture *picture);
+enum AVSampleFormat (*qav_get_sample_fmt)(const char *name);
+int (*qav_get_bits_per_sample_fmt)(enum AVSampleFormat sample_fmt);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -625,6 +629,8 @@ static dllfunction_t libavutil_funcs[] =
 	{"av_get_token",			(void **) &qav_get_token},
 	{"av_find_nearest_q_idx",		(void **) &qav_find_nearest_q_idx},
 	{"av_get_pix_fmt",			(void **) &qav_get_pix_fmt},
+	{"av_get_sample_fmt",			(void **) &qav_get_sample_fmt},
+	{"av_get_bits_per_sample_fmt",		(void **) &qav_get_bits_per_sample_fmt},
 	{NULL, NULL}
 };
 
@@ -716,6 +722,7 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_asampleformat = {CVAR_SAVE, "cl_capturevideo_lavc_asampleformat", "s16", "preferred audio sample format"};
 #elif DEFAULT_X264
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mp4", "video format to use"};
 static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
@@ -728,6 +735,7 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "aac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_asampleformat = {CVAR_SAVE, "cl_capturevideo_lavc_asampleformat", "s16", "preferred audio sample format"};
 #else
 static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_format", "mkv", "video format to use"};
 static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
@@ -736,6 +744,7 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "flac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_asampleformat = {CVAR_SAVE, "cl_capturevideo_lavc_asampleformat", "s16", "preferred audio sample format"};
 #endif
 
 static int set_avoptions(void *ctx, const void *privclass, void *privctx, const char *str, const char *key_val_sep, const char *pairs_sep, int dry_run)
@@ -817,6 +826,7 @@ void SCR_CaptureVideo_Lavc_Init(void)
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_vpixelformat);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_acodec);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_aoptions);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_asampleformat);
 	}
 }
 
@@ -834,9 +844,10 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	unsigned char *flipbuffer;
 	AVPicture picbuffer;
 	size_t bufsize;
-	short *aframe;
+	void *aframe;
 	int aframesize;
 	int aframepos;
+	size_t aframetypesize;
 	qboolean pcmhack;
 	quint8_t bytebuffer[32768];
 	qint64_t asavepts;
@@ -1031,12 +1042,56 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 			while(bufpos < length)
 			{
 				// fill up buffer
-				while(bufpos < length && format->aframepos < format->aframesize)
+				switch(avc->sample_fmt)
 				{
-					for(i = 0; i < cls.capturevideo.soundchannels; ++i)
-						format->aframe[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i];
-					++bufpos;
-					++format->aframepos;
+					case AV_SAMPLE_FMT_U8:
+						while(bufpos < length && format->aframepos < format->aframesize)
+						{
+							for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+								((uint8_t *)format->aframe)[format->aframepos*cls.capturevideo.soundchannels+map[i]] = (paintbuffer[bufpos].sample[i] >> 8) ^ 0x80;
+							++bufpos;
+							++format->aframepos;
+						}
+						break;
+					case AV_SAMPLE_FMT_S16:
+						while(bufpos < length && format->aframepos < format->aframesize)
+						{
+							for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+								((int16_t *)format->aframe)[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i];
+							++bufpos;
+							++format->aframepos;
+						}
+						break;
+					case AV_SAMPLE_FMT_S32:
+						while(bufpos < length && format->aframepos < format->aframesize)
+						{
+							for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+								((int32_t *)format->aframe)[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i] << 16;
+							++bufpos;
+							++format->aframepos;
+						}
+						break;
+					case AV_SAMPLE_FMT_FLT:
+						while(bufpos < length && format->aframepos < format->aframesize)
+						{
+							for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+								((float *)format->aframe)[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i] / 32768.0f;
+							++bufpos;
+							++format->aframepos;
+						}
+						break;
+					case AV_SAMPLE_FMT_DBL:
+						while(bufpos < length && format->aframepos < format->aframesize)
+						{
+							for(i = 0; i < cls.capturevideo.soundchannels; ++i)
+								((double *)format->aframe)[format->aframepos*cls.capturevideo.soundchannels+map[i]] = paintbuffer[bufpos].sample[i] / 32768.0;
+							++bufpos;
+							++format->aframepos;
+						}
+						break;
+					default:
+						Con_Printf("UNKNOWN SAMPLE FORMAT\n");
+						break;
 				}
 
 				if(format->aframepos >= avc->frame_size)
@@ -1193,8 +1248,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				{
 					for(i = 0; encoder->pix_fmts[i] >= 0; ++i)
 					{
-						if(encoder->pix_fmts[i] == req_pix_fmt)
-							break;
 						if(any == PIX_FMT_NONE)
 							any = encoder->pix_fmts[i];
 						// if we ask for a 8bit per component RGB format, prefer any RGB 8bit per component format
@@ -1297,7 +1350,36 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 			audio_str->codec->sample_rate = cls.capturevideo.soundrate;
 			audio_str->codec->channels = cls.capturevideo.soundchannels;
-			audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16; // FIXME check if supported
+			{
+				enum AVSampleFormat req_sample_fmt = qav_get_sample_fmt(cl_capturevideo_lavc_asampleformat.string);
+				int i;
+				enum AVSampleFormat any  = AV_SAMPLE_FMT_NONE;
+				enum AVSampleFormat geq  = AV_SAMPLE_FMT_NONE;
+				enum AVSampleFormat same = AV_SAMPLE_FMT_NONE;
+				if(encoder->sample_fmts)
+				{
+					for(i = 0; encoder->sample_fmts[i] >= 0; ++i)
+					{
+						if(any == AV_SAMPLE_FMT_NONE)
+							any = encoder->sample_fmts[i];
+						if(geq == AV_SAMPLE_FMT_NONE)
+							if(req_sample_fmt != AV_SAMPLE_FMT_NONE && qav_get_bits_per_sample_fmt(encoder->sample_fmts[i]) >= qav_get_bits_per_sample_fmt(req_sample_fmt))
+								geq = encoder->sample_fmts[i];
+						if(req_sample_fmt == encoder->sample_fmts[i])
+							same = encoder->sample_fmts[i];
+					}
+				}
+				if(same != AV_SAMPLE_FMT_NONE)
+					audio_str->codec->sample_fmt = same;
+				else if(geq != AV_SAMPLE_FMT_NONE)
+					audio_str->codec->sample_fmt = geq;
+				else if(any != AV_SAMPLE_FMT_NONE)
+					audio_str->codec->sample_fmt = any;
+				else if(req_sample_fmt != AV_SAMPLE_FMT_NONE)
+					audio_str->codec->sample_fmt = req_sample_fmt;
+				else
+					audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16;
+			}
 
 			audio_str->codec->global_quality = QSCALE_NONE;
 			if(set_avoptions(audio_str->codec, encoder->priv_class, audio_str->codec->priv_data, cl_capturevideo_lavc_aoptions.string, "=", " \t", 0) < 0)
@@ -1317,22 +1399,21 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 			// is it a nasty PCM codec?
 			if(audio_str->codec->frame_size <= 1)
-			{
 				format->pcmhack = qav_get_bits_per_sample(audio_str->codec->codec_id) / 8;
-			}
 
 			format->aframesize = audio_str->codec->frame_size;
 			if(format->pcmhack)
 				format->aframesize = 16384; // use 16k samples for PCM
 
 			format->apts = 0;
-			format->aframe = Z_Malloc(format->aframesize * sizeof(*format->aframe) * cls.capturevideo.soundchannels);
+			format->aframetypesize = qav_get_bits_per_sample_fmt(audio_str->codec->sample_fmt) / 8;
+			format->aframe = Z_Malloc(format->aframesize * format->aframetypesize * cls.capturevideo.soundchannels);
 			format->aframepos = 0;
 
 			if(format->pcmhack)
 				format->bufsize = max(format->bufsize, format->aframesize * format->pcmhack * cls.capturevideo.soundchannels * 2 + 200);
 			else
-				format->bufsize = max(format->bufsize, format->aframesize * sizeof(*format->aframe) * cls.capturevideo.soundchannels * 2 + 200);
+				format->bufsize = max(format->bufsize, format->aframesize * format->aframetypesize * cls.capturevideo.soundchannels * 2 + 200);
 		}
 
 		if(!(format->avf->oformat->flags & AVFMT_NOFILE))
