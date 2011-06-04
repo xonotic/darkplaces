@@ -49,7 +49,7 @@
 #define qavcodec_find_encoder_by_name avcodec_find_encoder_by_name
 #define qavcodec_open avcodec_open
 #define qav_get_bits_per_sample av_get_bits_per_sample
-#define qav_alloc_put_byte av_alloc_put_byte
+#define qavio_alloc_context avio_alloc_context
 #define qav_write_header av_write_header
 #define qav_set_string3 av_set_string3
 #define qav_get_string av_get_string
@@ -65,8 +65,6 @@
 #define qavpicture_alloc avpicture_alloc
 #define qsws_getCachedContext sws_getCachedContext
 #define qav_get_pix_fmt av_get_pix_fmt
-
-// cap_lavc.c:1332:4: warning: ‘av_alloc_put_byte’ is deprecated (declared at /usr/include/libavformat/avio.h:227) [-Wdeprecated-declarations]
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -568,7 +566,7 @@ AVStream * (*qav_new_stream) (AVFormatContext *s, int id);
 AVCodec * (*qavcodec_find_encoder_by_name) (const char *name);
 int (*qavcodec_open) (AVCodecContext *avctx, AVCodec *codec);
 int (*qav_get_bits_per_sample) (enum CodecID codec_id);
-ByteIOContext * (*qav_alloc_put_byte) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
+ByteIOContext * (*qavio_alloc_context) (unsigned char *buffer, int buffer_size, int write_flag, void *opaque, int (*read_packet)(void *opaque, quint8_t *buf, int buf_size), int (*write_packet)(void *opaque, quint8_t *buf, int buf_size), qint64_t (*seek) (void *opaque, qint64_t offset, int whence));
 int (*qav_write_header) (AVFormatContext *s);
 qint64_t (*qav_rescale_q)(qint64_t a, AVRational bq, AVRational cq);
 int (*qav_set_string3)(void *obj, const char *name, const char *val, int alloc, const AVOption **o_out);
@@ -605,7 +603,7 @@ static dllfunction_t libavcodec_funcs[] =
 static dllhandle_t libavformat_dll = NULL;
 static dllfunction_t libavformat_funcs[] =
 {
-	{"av_alloc_put_byte",			(void **) &qav_alloc_put_byte},
+	{"avio_alloc_context",			(void **) &qavio_alloc_context},
 	{"avformat_alloc_context",		(void **) &qavformat_alloc_context},
 	{"av_guess_format",			(void **) &qav_guess_format},
 	{"av_interleaved_write_frame",		(void **) &qav_interleaved_write_frame},
@@ -1338,7 +1336,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		}
 
 		if(!(format->avf->oformat->flags & AVFMT_NOFILE))
-			format->avf->pb = qav_alloc_put_byte(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
+			format->avf->pb = qavio_alloc_context(format->bytebuffer, sizeof(format->bytebuffer), 1, cls.capturevideo.videofile, NULL, lavc_write, lavc_seek);
 
 		if(qav_write_header(format->avf) < 0)
 		{
