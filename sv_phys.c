@@ -1513,12 +1513,12 @@ static qboolean SV_PushEntity (trace_t *trace, prvm_edict_t *ent, vec3_t push, q
 
 	if (movetype == MOVETYPE_FLYMISSILE)
 		type = MOVE_MISSILE;
+	else if (movetype == MOVETYPE_SPECTATOR)
+		type = MOVE_WORLDONLY;
 	else if (solid == SOLID_TRIGGER || solid == SOLID_NOT)
-		type = MOVE_WORLDONLY; // only clip against bmodels
+		type = MOVE_NOMONSTERS; // only clip against bmodels
 	else
 		type = MOVE_NORMAL;
-		
-	Con_Printf("wtfhax: %i \n", type); 
 
 	*trace = SV_TraceBox(start, mins, maxs, end, type, ent, SV_GenericHitSuperContentsMask(ent));
 	if (trace->bmodelstartsolid && failonbmodelstartsolid)
@@ -2211,12 +2211,16 @@ void SV_WalkMove (prvm_edict_t *ent)
 		// our trace will hit that thing too)
 		VectorSet(upmove, ent->fields.server->origin[0], ent->fields.server->origin[1], ent->fields.server->origin[2] + 1);
 		VectorSet(downmove, ent->fields.server->origin[0], ent->fields.server->origin[1], ent->fields.server->origin[2] - 1);
+
 		if (ent->fields.server->movetype == MOVETYPE_FLYMISSILE)
 			type = MOVE_MISSILE;
+		else if (ent->fields.server->movetype == MOVETYPE_SPECTATOR)
+			type = MOVE_WORLDONLY;
 		else if (ent->fields.server->solid == SOLID_TRIGGER || ent->fields.server->solid == SOLID_NOT)
-			type = MOVE_WORLDONLY; // only clip against bmodels
+			type = MOVE_NOMONSTERS; // only clip against bmodels
 		else
 			type = MOVE_NORMAL;
+			
 		trace = SV_TraceBox(upmove, ent->fields.server->mins, ent->fields.server->maxs, downmove, type, ent, SV_GenericHitSuperContentsMask(ent));
 		if(trace.fraction < 1 && trace.plane.normal[2] > 0.7)
 			clip |= 1; // but we HAVE found a floor
@@ -2748,12 +2752,12 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 		if (SV_RunThink (ent))
 			SV_WalkMove (ent);
 		break;
-	case MOVETYPE_SPECTATOR:
 	case MOVETYPE_TOSS:
 	case MOVETYPE_BOUNCE:
 	case MOVETYPE_BOUNCEMISSILE:
 	case MOVETYPE_FLYMISSILE:
 	case MOVETYPE_FLY:
+	case MOVETYPE_SPECTATOR:
 		// regular thinking
 		if (SV_RunThink (ent))
 			SV_Physics_Toss (ent);
@@ -2917,7 +2921,6 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 		if (host_client->clmovement_inputtimeout <= 0)
 			SV_WalkMove (ent);
 		break;
-	case MOVETYPE_SPECTATOR:
 	case MOVETYPE_TOSS:
 	case MOVETYPE_BOUNCE:
 	case MOVETYPE_BOUNCEMISSILE:
@@ -2927,6 +2930,7 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 		SV_Physics_Toss (ent);
 		break;
 	case MOVETYPE_FLY:
+	case MOVETYPE_SPECTATOR:
 		SV_RunThink (ent);
 		SV_WalkMove (ent);
 		break;
