@@ -13,6 +13,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 #include <libavutil/avstring.h>
+#include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 
 #define ANNOYING_CAST_FOR_MRU(x) ((int64_t) (x)) /* not needed here, as we defined AV_NOPTS_VALUE right */
@@ -57,6 +58,15 @@
 #define qav_rescale_q av_rescale_q
 #define qavcodec_get_context_defaults3 avcodec_get_context_defaults3
 #define qav_find_nearest_q_idx av_find_nearest_q_idx
+#define qsws_scale sws_scale
+#define qsws_freeContext sws_freeContext
+#define qavpicture_free avpicture_free
+#define qav_get_pix_fmt av_get_pix_fmt
+#define qavpicture_alloc avpicture_alloc
+#define qsws_getCachedContext sws_getCachedContext
+#define qav_get_pix_fmt av_get_pix_fmt
+
+// cap_lavc.c:1332:4: warning: ‘av_alloc_put_byte’ is deprecated (declared at /usr/include/libavformat/avio.h:227) [-Wdeprecated-declarations]
 
 typedef  int64_t qint64_t;
 typedef uint64_t quint64_t;
@@ -571,6 +581,8 @@ struct SwsContext * (*qsws_getCachedContext)(struct SwsContext *context, int src
 int (*qsws_scale)(struct SwsContext *context, const uint8_t* const srcSlice[], const int srcStride[], int srcSliceY, int srcSliceH, uint8_t* const dst[], const int dstStride[]);
 void (*qsws_freeContext)(struct SwsContext *swsContext);
 enum PixelFormat (*qav_get_pix_fmt)(const char *name);
+int (*qavpicture_alloc)(AVPicture *picture, enum PixelFormat pix_fmt, int width, int height);
+void (*qavpicture_free)(AVPicture *picture);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -585,6 +597,8 @@ static dllfunction_t libavcodec_funcs[] =
 	{"av_get_bits_per_sample",		(void **) &qav_get_bits_per_sample},
 	{"av_init_packet",			(void **) &qav_init_packet},
 	{"avcodec_get_context_defaults3",	(void **) &qavcodec_get_context_defaults3},
+	{"avpicture_alloc",			(void **) &qavpicture_alloc},
+	{"avpicture_free",			(void **) &qavpicture_free},
 	{NULL, NULL}
 };
 
@@ -818,9 +832,9 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	AVFormatContext *avf;
 	qint64_t apts;
 	qint64_t vpts;
-	unsigned char *planebuffer;
 	unsigned char *buffer;
 	unsigned char *flipbuffer;
+	AVPicture picbuffer;
 	size_t bufsize;
 	short *aframe;
 	int aframesize;
@@ -862,15 +876,8 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 			int four_w = cls.capturevideo.width * 4;
 			const quint8_t *outbuffer[1];
 			outbuffer[0] = cls.capturevideo.outbuffer;
-			// FIXME these sizes are safe, but calculate the REAL sizes
-			frame.data[0] = format->planebuffer;
-			frame.linesize[0] = four_w;
-			frame.data[1] = format->planebuffer + four_w * cls.capturevideo.height;
-			frame.linesize[1] = four_w;
-			frame.data[2] = format->planebuffer + four_w * cls.capturevideo.height * 2;
-			frame.linesize[2] = four_w;
-			frame.data[3] = format->planebuffer + four_w * cls.capturevideo.height * 3;
-			frame.linesize[3] = four_w;
+			memcpy(frame.data, format->picbuffer.data, sizeof(frame.data));
+			memcpy(frame.linesize, format->picbuffer.linesize, sizeof(frame.linesize));
 			qsws_scale(format->sws, outbuffer, &four_w, 0, cls.capturevideo.height, frame.data, frame.linesize);
 		}
 		else
@@ -1080,7 +1087,10 @@ static void SCR_CaptureVideo_Lavc_EndVideo(void)
 	if(format->aframe)
 		Mem_Free(format->aframe);
 	if(format->sws)
+	{
 		qsws_freeContext(format->sws);
+		qavpicture_free(&format->picbuffer);
+	}
 	Mem_Free(format);
 	cls.capturevideo.formatspecific = NULL;
 
@@ -1234,7 +1244,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 					video_str->codec->pix_fmt = PIX_FMT_YUV420P;
 			}
 			if(video_str->codec->pix_fmt != PIX_FMT_BGRA)
+			{
+				qavpicture_alloc(&format->picbuffer, video_str->codec->pix_fmt, cls.capturevideo.width, cls.capturevideo.height);
 				format->sws = qsws_getCachedContext(NULL, cls.capturevideo.width, cls.capturevideo.height, PIX_FMT_BGRA, cls.capturevideo.width, cls.capturevideo.height, video_str->codec->pix_fmt, 0, NULL, NULL, NULL);
+			}
 			FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
 			video_str->sample_aspect_ratio.num = num;
 			video_str->sample_aspect_ratio.den = denom;
@@ -1335,8 +1348,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		}
 
 		format->buffer = Z_Malloc(format->bufsize);
-		if(format->sws)
-			format->planebuffer = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height * 4 * 4); // FIXME calculate real good buffer size
 		format->flipbuffer = Z_Malloc(cls.capturevideo.width * 4); // FIXME calculate real good buffer size
 
 		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
