@@ -154,7 +154,7 @@ enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
 enum AVDiscard { AVDISCARD_DEFAULT = 0 };
 enum AVStreamParseType { AVSTREAM_PARSE_NONE = 0 };
-enum PixelFormat { PIX_FMT_YUV420P = 0 };
+enum PixelFormat { PIX_FMT_NONE = -1, PIX_FMT_YUV420P = 0, PIX_FMT_RGB24 = 2, PIX_FMT_BGR24 = 3, PIX_FMT_ARGB = 27, PIX_FMT_RGBA = 28, PIX_FMT_ABGR = 29, PIX_FMT_BGRA = 30 };
 enum AVSampleFormat { AV_SAMPLE_FMT_S16 = 1 };
 enum AVMediaType { AVMEDIA_TYPE_VIDEO = 0, AVMEDIA_TYPE_AUDIO = 1 };
 enum AVPictureType { AV_PICTURE_TYPE_I = 1 };
@@ -570,6 +570,7 @@ int (*qavcodec_get_context_defaults3)(AVCodecContext *s, AVCodec *codec);
 struct SwsContext * (*qsws_getCachedContext)(struct SwsContext *context, int srcW, int srcH, enum PixelFormat srcFormat, int dstW, int dstH, enum PixelFormat dstFormat, int flags, SwsFilter *srcFilter, SwsFilter *dstFilter, const double *param);
 int (*qsws_scale)(struct SwsContext *context, const uint8_t* const srcSlice[], const int srcStride[], int srcSliceY, int srcSliceH, uint8_t* const dst[], const int dstStride[]);
 void (*qsws_freeContext)(struct SwsContext *swsContext);
+enum PixelFormat (*qav_get_pix_fmt)(const char *name);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -611,6 +612,7 @@ static dllfunction_t libavutil_funcs[] =
 	{"av_get_string",			(void **) &qav_get_string},
 	{"av_get_token",			(void **) &qav_get_token},
 	{"av_find_nearest_q_idx",		(void **) &qav_find_nearest_q_idx},
+	{"av_get_pix_fmt",			(void **) &qav_get_pix_fmt},
 	{NULL, NULL}
 };
 
@@ -699,6 +701,7 @@ static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_fo
 static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "libvpx", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "vorbis", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #elif DEFAULT_X264
@@ -710,6 +713,7 @@ static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_
 		/* faster */   "coder=1 flags=+loop cmp=+chroma partitions=+parti8x8+parti4x4+partp8x8+partb8x8 me_method=hex subq=4 me_range=16 g=250 keyint_min=25 sc_threshold=40 i_qfactor=0.71 b_strategy=1 qcomp=0.6 qmin=10 qmax=51 qdiff=4 bf=3 refs=2 directpred=1 trellis=1 flags2=+bpyramid-mixed_refs+wpred+dct8x8+fastpskip wpredp=1 rc_lookahead=20 "
 		/* baseline */ "coder=0 bf=0 flags2=-wpred-dct8x8 wpredp=0",
 	"space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "aac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #else
@@ -717,6 +721,7 @@ static cvar_t cl_capturevideo_lavc_format = {CVAR_SAVE, "cl_capturevideo_lavc_fo
 static cvar_t cl_capturevideo_lavc_formatoptions = {CVAR_SAVE, "cl_capturevideo_lavc_formatoptions", "", "space separated key=value pairs for video format flags"};
 static cvar_t cl_capturevideo_lavc_vcodec = {CVAR_SAVE, "cl_capturevideo_lavc_vcodec", "ffvhuff", "video codec to use"};
 static cvar_t cl_capturevideo_lavc_voptions = {CVAR_SAVE, "cl_capturevideo_lavc_voptions", "", "space separated key=value pairs for video encoder flags"};
+static cvar_t cl_capturevideo_lavc_vpixelformat = {CVAR_SAVE, "cl_capturevideo_lavc_vpixelformat", "bgr24", "preferred video pixel format"};
 static cvar_t cl_capturevideo_lavc_acodec = {CVAR_SAVE, "cl_capturevideo_lavc_acodec", "flac", "audio codec to use"};
 static cvar_t cl_capturevideo_lavc_aoptions = {CVAR_SAVE, "cl_capturevideo_lavc_aoptions", "", "space separated key=value pairs for video encoder flags"};
 #endif
@@ -797,6 +802,7 @@ void SCR_CaptureVideo_Lavc_Init(void)
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_formatoptions);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_vcodec);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_voptions);
+		Cvar_RegisterVariable(&cl_capturevideo_lavc_vpixelformat);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_acodec);
 		Cvar_RegisterVariable(&cl_capturevideo_lavc_aoptions);
 	}
@@ -1188,7 +1194,64 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 			video_str->codec->width = cls.capturevideo.width;
 			video_str->codec->height = cls.capturevideo.height;
-			video_str->codec->pix_fmt = PIX_FMT_YUV420P;
+			{
+				enum PixelFormat req_pix_fmt = qav_get_pix_fmt(cl_capturevideo_lavc_vpixelformat.string);
+				int i;
+				enum PixelFormat any  = PIX_FMT_NONE;
+				enum PixelFormat rgb  = PIX_FMT_NONE;
+				enum PixelFormat same = PIX_FMT_NONE;
+				if(encoder->pix_fmts)
+				{
+					for(i = 0; encoder->pix_fmts[i] >= 0; ++i)
+					{
+						if(encoder->pix_fmts[i] == req_pix_fmt)
+							break;
+						if(any == PIX_FMT_NONE)
+							any = encoder->pix_fmts[i];
+						// if we ask for a 8bit per component RGB format, prefer any RGB 8bit per component format
+						if(rgb == PIX_FMT_NONE)
+						{
+							switch(req_pix_fmt)
+							{
+								case PIX_FMT_RGB24:
+								case PIX_FMT_BGR24:
+								case PIX_FMT_ARGB:
+								case PIX_FMT_RGBA:
+								case PIX_FMT_ABGR:
+								case PIX_FMT_BGRA:
+									switch(encoder->pix_fmts[i])
+									{
+										case PIX_FMT_RGB24:
+										case PIX_FMT_BGR24:
+										case PIX_FMT_ARGB:
+										case PIX_FMT_RGBA:
+										case PIX_FMT_ABGR:
+										case PIX_FMT_BGRA:
+											rgb = encoder->pix_fmts[i];
+											break;
+										default:
+											break;
+									}
+									break;
+								default:
+									break;
+							}
+						}
+						if(req_pix_fmt == encoder->pix_fmts[i])
+							same = encoder->pix_fmts[i];
+					}
+				}
+				if(same != PIX_FMT_NONE)
+					video_str->codec->pix_fmt = same;
+				else if(rgb != PIX_FMT_NONE)
+					video_str->codec->pix_fmt = rgb;
+				else if(any != PIX_FMT_NONE)
+					video_str->codec->pix_fmt = any;
+				else if(req_pix_fmt != PIX_FMT_NONE)
+					video_str->codec->pix_fmt = req_pix_fmt;
+				else
+					video_str->codec->pix_fmt = PIX_FMT_YUV420P;
+			}
 			FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
 			video_str->sample_aspect_ratio.num = num;
 			video_str->sample_aspect_ratio.den = denom;
@@ -1240,7 +1303,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 
 			audio_str->codec->sample_rate = cls.capturevideo.soundrate;
 			audio_str->codec->channels = cls.capturevideo.soundchannels;
-			audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16;
+			audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16; // FIXME check if supported
 
 			audio_str->codec->global_quality = QSCALE_NONE;
 			if(set_avoptions(audio_str->codec, encoder->priv_class, audio_str->codec->priv_data, cl_capturevideo_lavc_aoptions.string, "=", " \t", 0) < 0)
