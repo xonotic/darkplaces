@@ -818,7 +818,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	AVFormatContext *avf;
 	qint64_t apts;
 	qint64_t vpts;
-	unsigned char *yuv;
+	unsigned char *planebuffer;
 	unsigned char *buffer;
 	size_t bufsize;
 	short *aframe;
@@ -831,59 +831,6 @@ typedef struct capturevideostate_lavc_formatspecific_s
 }
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
-
-static void SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(AVFrame *frame)
-{
-	LOAD_FORMATSPECIFIC_LAVC();
-	int x, y;
-	int blockr, blockg, blockb;
-	unsigned char *b = cls.capturevideo.outbuffer;
-	int w = cls.capturevideo.width;
-	int uw = (w+1)/2;
-	int h = cls.capturevideo.height;
-	int uh = (h+1)/2;
-	int inpitch = w*4;
-
-	unsigned char *yuvy = format->yuv;
-	unsigned char *yuvu = yuvy + w*h;
-	unsigned char *yuvv = yuvu + uw*uh;
-
-	frame->data[0] = yuvy;
-	frame->linesize[0] = w;
-	frame->data[1] = yuvu;
-	frame->linesize[1] = uw;
-	frame->data[2] = yuvv;
-	frame->linesize[2] = uw;
-
-	for(y = 0; y < h; ++y)
-	{
-		for(b = cls.capturevideo.outbuffer + (h-1-y)*w*4, x = 0; x < w; ++x)
-		{
-			blockr = b[2];
-			blockg = b[1];
-			blockb = b[0];
-			yuvy[x + w * y] =
-				cls.capturevideo.yuvnormalizetable[0][cls.capturevideo.rgbtoyuvscaletable[0][0][blockr] + cls.capturevideo.rgbtoyuvscaletable[0][1][blockg] + cls.capturevideo.rgbtoyuvscaletable[0][2][blockb]];
-			b += 4;
-		}
-
-		if((y & 1) == 0)
-		{
-			for(b = cls.capturevideo.outbuffer + (h-2-y)*w*4, x = 0; x < (w+1)/2; ++x)
-			{
-				blockr = (b[2] + b[6] + b[inpitch+2] + b[inpitch+6]) >> 2;
-				blockg = (b[1] + b[5] + b[inpitch+1] + b[inpitch+5]) >> 2;
-				blockb = (b[0] + b[4] + b[inpitch+0] + b[inpitch+4]) >> 2;
-				yuvu[x + uw * (y/2)] =
-					cls.capturevideo.yuvnormalizetable[1][cls.capturevideo.rgbtoyuvscaletable[1][0][blockr] + cls.capturevideo.rgbtoyuvscaletable[1][1][blockg] + cls.capturevideo.rgbtoyuvscaletable[1][2][blockb] + 128];
-				yuvv[x + uw * (y/2)] =
-					cls.capturevideo.yuvnormalizetable[2][cls.capturevideo.rgbtoyuvscaletable[2][0][blockr] + cls.capturevideo.rgbtoyuvscaletable[2][1][blockg] + cls.capturevideo.rgbtoyuvscaletable[2][2][blockb] + 128];
-				b += 8;
-			}
-		}
-	}
-}
-
 
 static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 {
@@ -899,7 +846,27 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 		qavcodec_get_frame_defaults(&frame);
 		if(num > 0)
 		{
-			SCR_CaptureVideo_Lavc_ConvertFrame_BGRA_to_YUV(&frame);
+			if(format->sws)
+			{
+				int four_w = cls.capturevideo.width * 4;
+				const quint8_t *outbuffer[1];
+				outbuffer[0] = cls.capturevideo.outbuffer;
+				// FIXME these sizes are safe, but calculate the REAL sizes
+				frame.data[0] = format->planebuffer;
+				frame.linesize[0] = four_w;
+				frame.data[1] = format->planebuffer + four_w * cls.capturevideo.height;
+				frame.linesize[1] = four_w;
+				frame.data[2] = format->planebuffer + four_w * cls.capturevideo.height * 2;
+				frame.linesize[2] = four_w;
+				frame.data[3] = format->planebuffer + four_w * cls.capturevideo.height * 3;
+				frame.linesize[3] = four_w;
+				qsws_scale(format->sws, outbuffer, &four_w, 0, cls.capturevideo.height, frame.data, frame.linesize);
+			}
+			else
+			{
+				frame.data[0] = cls.capturevideo.outbuffer;
+				frame.linesize[0] = cls.capturevideo.width * 4;
+			}
 			frame.pts = format->vpts;
 		}
 		if(format->avf->oformat->flags & AVFMT_RAWPICTURE)
@@ -1354,7 +1321,8 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		}
 
 		format->buffer = Z_Malloc(format->bufsize);
-		format->yuv = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height + ((cls.capturevideo.width + 1) / 2) * ((cls.capturevideo.height + 1) / 2) * 2);
+		if(format->sws)
+			format->planebuffer = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height * 4 * 4); // FIXME calculate real good buffer size
 
 		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 	}
