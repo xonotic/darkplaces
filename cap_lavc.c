@@ -820,6 +820,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	qint64_t vpts;
 	unsigned char *planebuffer;
 	unsigned char *buffer;
+	unsigned char *flipbuffer;
 	size_t bufsize;
 	short *aframe;
 	int aframesize;
@@ -832,6 +833,17 @@ typedef struct capturevideostate_lavc_formatspecific_s
 capturevideostate_lavc_formatspecific_t;
 #define LOAD_FORMATSPECIFIC_LAVC() capturevideostate_lavc_formatspecific_t *format = (capturevideostate_lavc_formatspecific_t *) cls.capturevideo.formatspecific
 
+static void flip(void *buf, size_t linewidth, size_t lines, void *flipbuf)
+{
+	int i, j;
+	for(i = 0, j = lines - 1; i < j; ++i, --j)
+	{
+		memcpy(flipbuf, ((char *) buf) + linewidth * i, linewidth);
+		memcpy(((char *) buf) + linewidth * i, ((char *) buf) + linewidth * j, linewidth);
+		memcpy(((char *) buf) + linewidth * j, flipbuf, linewidth);
+	}
+}
+
 static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 {
 	LOAD_FORMATSPECIFIC_LAVC();
@@ -841,34 +853,36 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 	AVFrame frame;
 	int size;
 
-	do
+	if(num > 0)
 	{
 		qavcodec_get_frame_defaults(&frame);
-		if(num > 0)
+		flip(cls.capturevideo.outbuffer, cls.capturevideo.width * 4, cls.capturevideo.height, format->flipbuffer);
+		if(format->sws)
 		{
-			if(format->sws)
-			{
-				int four_w = cls.capturevideo.width * 4;
-				const quint8_t *outbuffer[1];
-				outbuffer[0] = cls.capturevideo.outbuffer;
-				// FIXME these sizes are safe, but calculate the REAL sizes
-				frame.data[0] = format->planebuffer;
-				frame.linesize[0] = four_w;
-				frame.data[1] = format->planebuffer + four_w * cls.capturevideo.height;
-				frame.linesize[1] = four_w;
-				frame.data[2] = format->planebuffer + four_w * cls.capturevideo.height * 2;
-				frame.linesize[2] = four_w;
-				frame.data[3] = format->planebuffer + four_w * cls.capturevideo.height * 3;
-				frame.linesize[3] = four_w;
-				qsws_scale(format->sws, outbuffer, &four_w, 0, cls.capturevideo.height, frame.data, frame.linesize);
-			}
-			else
-			{
-				frame.data[0] = cls.capturevideo.outbuffer;
-				frame.linesize[0] = cls.capturevideo.width * 4;
-			}
-			frame.pts = format->vpts;
+			int four_w = cls.capturevideo.width * 4;
+			const quint8_t *outbuffer[1];
+			outbuffer[0] = cls.capturevideo.outbuffer;
+			// FIXME these sizes are safe, but calculate the REAL sizes
+			frame.data[0] = format->planebuffer;
+			frame.linesize[0] = four_w;
+			frame.data[1] = format->planebuffer + four_w * cls.capturevideo.height;
+			frame.linesize[1] = four_w;
+			frame.data[2] = format->planebuffer + four_w * cls.capturevideo.height * 2;
+			frame.linesize[2] = four_w;
+			frame.data[3] = format->planebuffer + four_w * cls.capturevideo.height * 3;
+			frame.linesize[3] = four_w;
+			qsws_scale(format->sws, outbuffer, &four_w, 0, cls.capturevideo.height, frame.data, frame.linesize);
 		}
+		else
+		{
+			frame.data[0] = cls.capturevideo.outbuffer;
+			frame.linesize[0] = cls.capturevideo.width * 4;
+		}
+		frame.pts = format->vpts;
+	}
+
+	do
+	{
 		if(format->avf->oformat->flags & AVFMT_RAWPICTURE)
 		{
 			if(num > 0)
@@ -1323,6 +1337,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		format->buffer = Z_Malloc(format->bufsize);
 		if(format->sws)
 			format->planebuffer = Z_Malloc(cls.capturevideo.width * cls.capturevideo.height * 4 * 4); // FIXME calculate real good buffer size
+		format->flipbuffer = Z_Malloc(cls.capturevideo.width * 4); // FIXME calculate real good buffer size
 
 		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 	}
