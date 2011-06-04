@@ -855,7 +855,7 @@ typedef struct capturevideostate_lavc_formatspecific_s
 	int aframesize;
 	int aframepos;
 	size_t aframetypesize;
-	qboolean pcmhack;
+	size_t pcmhack;
 	quint8_t bytebuffer[32768];
 	qint64_t asavepts;
 	struct SwsContext *sws;
@@ -971,7 +971,10 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 	AVCodecContext *avc = format->avf->streams[1]->codec;
 
 	if(format->pcmhack)
-		size = qavcodec_encode_audio(avc, format->buffer, format->aframesize * format->pcmhack, format->aframe);
+	{
+		//Con_DPrintf("encoding %d bytes\n", (int)(format->aframesize * cls.capturevideo.soundchannels * format->pcmhack));
+		size = qavcodec_encode_audio(avc, format->buffer, format->aframesize * cls.capturevideo.soundchannels * format->pcmhack, format->aframe);
+	}
 	else
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
 
@@ -996,7 +999,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 			Con_Printf("error writing\n");
 	}
 
-	format->apts += avc->frame_size;
+	format->apts += format->aframesize;
 	format->aframepos = 0;
 }
 static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
@@ -1101,7 +1104,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 						break;
 				}
 
-				if(format->aframepos >= avc->frame_size)
+				if(format->aframepos >= format->aframesize)
 				{
 					SCR_CaptureVideo_Lavc_SoundFrame_Encode();
 				}
@@ -1115,7 +1118,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame(const portable_sampleframe_t *paint
 		}
 		else
 		{
-			memset(format->aframe + format->aframepos*cls.capturevideo.soundchannels, 0, sizeof(format->aframe[0]) * (format->aframesize - format->aframepos));
+			memset((char *)format->aframe + format->aframetypesize*format->aframepos*cls.capturevideo.soundchannels, 0, format->aframetypesize * (format->aframesize - format->aframepos));
 			SCR_CaptureVideo_Lavc_SoundFrame_Encode();
 			SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd();
 		}
