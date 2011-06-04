@@ -65,7 +65,9 @@
 #define qavpicture_alloc avpicture_alloc
 #define qsws_getCachedContext sws_getCachedContext
 #define qav_get_pix_fmt av_get_pix_fmt
+#define qav_get_pix_fmt_name av_get_pix_fmt_name
 #define qav_get_sample_fmt av_get_sample_fmt
+#define qav_get_sample_fmt_name av_get_sample_fmt_name
 #define qav_get_bits_per_sample_fmt av_get_bits_per_sample_fmt
 
 typedef  int64_t qint64_t;
@@ -158,6 +160,7 @@ typedef unsigned char      quint8_t;
 #define AVFMT_NOFILE       0x0001
 #define AVFMT_RAWPICTURE   0x0020
 #define AVFMT_GLOBALHEADER 0x0040
+#define SWS_POINT          0x10
 
 enum AVPacketSideDataType { AV_PKT_DATA_PALETTE = 0 };
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
@@ -585,6 +588,8 @@ int (*qavpicture_alloc)(AVPicture *picture, enum PixelFormat pix_fmt, int width,
 void (*qavpicture_free)(AVPicture *picture);
 enum AVSampleFormat (*qav_get_sample_fmt)(const char *name);
 int (*qav_get_bits_per_sample_fmt)(enum AVSampleFormat sample_fmt);
+const char * (*qav_get_pix_fmt_name)(enum PixelFormat pix_fmt);
+const char * (*qav_get_sample_fmt_name)(enum AVSampleFormat sample_fmt);
 
 static dllhandle_t libavcodec_dll = NULL;
 static dllfunction_t libavcodec_funcs[] =
@@ -631,6 +636,8 @@ static dllfunction_t libavutil_funcs[] =
 	{"av_get_pix_fmt",			(void **) &qav_get_pix_fmt},
 	{"av_get_sample_fmt",			(void **) &qav_get_sample_fmt},
 	{"av_get_bits_per_sample_fmt",		(void **) &qav_get_bits_per_sample_fmt},
+	{"av_get_pix_fmt_name",			(void **) &qav_get_pix_fmt_name},
+	{"av_get_sample_fmt_name",		(void **) &qav_get_sample_fmt_name},
 	{NULL, NULL}
 };
 
@@ -1293,11 +1300,15 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 					video_str->codec->pix_fmt = req_pix_fmt;
 				else
 					video_str->codec->pix_fmt = PIX_FMT_YUV420P;
+				if(video_str->codec->pix_fmt != PIX_FMT_NONE && qav_get_pix_fmt_name(video_str->codec->pix_fmt))
+					Con_DPrintf("Picked pixel format: %s\n", qav_get_pix_fmt_name(video_str->codec->pix_fmt));
+				else
+					Con_Printf("Failed to pick a valid pixel format\n");
 			}
 			if(video_str->codec->pix_fmt != PIX_FMT_BGRA)
 			{
 				qavpicture_alloc(&format->picbuffer, video_str->codec->pix_fmt, cls.capturevideo.width, cls.capturevideo.height);
-				format->sws = qsws_getCachedContext(NULL, cls.capturevideo.width, cls.capturevideo.height, PIX_FMT_BGRA, cls.capturevideo.width, cls.capturevideo.height, video_str->codec->pix_fmt, 0, NULL, NULL, NULL);
+				format->sws = qsws_getCachedContext(NULL, cls.capturevideo.width, cls.capturevideo.height, PIX_FMT_BGRA, cls.capturevideo.width, cls.capturevideo.height, video_str->codec->pix_fmt, SWS_POINT, NULL, NULL, NULL);
 			}
 			FindFraction(1 / vid_pixelheight.value, &num, &denom, 1000);
 			video_str->sample_aspect_ratio.num = num;
@@ -1379,6 +1390,10 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 					audio_str->codec->sample_fmt = req_sample_fmt;
 				else
 					audio_str->codec->sample_fmt = AV_SAMPLE_FMT_S16;
+				if(audio_str->codec->sample_fmt != AV_SAMPLE_FMT_NONE && qav_get_sample_fmt_name(audio_str->codec->sample_fmt))
+					Con_DPrintf("Picked sample format: %s\n", qav_get_sample_fmt_name(audio_str->codec->sample_fmt));
+				else
+					Con_Printf("Failed to pick a valid sample format\n");
 			}
 
 			audio_str->codec->global_quality = QSCALE_NONE;
@@ -1427,7 +1442,7 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 		}
 
 		format->buffer = Z_Malloc(format->bufsize);
-		format->flipbuffer = Z_Malloc(cls.capturevideo.width * 4); // FIXME calculate real good buffer size
+		format->flipbuffer = Z_Malloc(cls.capturevideo.width * 4);
 
 		format->asavepts = ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE);
 	}
