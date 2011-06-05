@@ -319,7 +319,9 @@ typedef struct AVCodecContext {
 	int width, height;
 	int gop_size;
 	enum PixelFormat pix_fmt;
+#if LIBAVCODEC_VERSION_MAJOR < 53
 	int rate_emu;
+#endif
 	void (*draw_horiz_band)(struct AVCodecContext *s, const AVFrame *src, int offset[4], int y, int type, int height);
 	int sample_rate;
 	int channels;
@@ -339,7 +341,9 @@ typedef struct AVCodecContext {
 	float b_quant_factor;
 	int rc_strategy;
 	int b_frame_strategy;
+#if LIBAVCODEC_VERSION_MAJOR < 53
 	int hurry_up;
+#endif
 	struct AVCodec *codec;
 	void *priv_data;
 	int rtp_payload_size;
@@ -403,8 +407,10 @@ typedef struct AVCodecContext {
 	int debug;
 	int debug_mv;
 	uint64_t error[4];
+#if LIBAVCODEC_VERSION_MAJOR < 53
 	int mb_qmin;
 	int mb_qmax;
+#endif
 	int me_cmp;
 	int me_sub_cmp;
 	int mb_cmp;
@@ -1334,9 +1340,6 @@ void SCR_CaptureVideo_Lavc_BeginVideo(void)
 				SCR_CaptureVideo_EndVideo();
 				return;
 			}
-
-			if (video_str->codec->global_quality != 0)
-				video_str->codec->flags |= CODEC_FLAG_QSCALE;
 
 			format->vpts = 0;
 			format->bufsize = max(format->bufsize, (size_t) (cls.capturevideo.width * cls.capturevideo.height * 6 + 200));
