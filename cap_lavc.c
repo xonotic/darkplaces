@@ -936,7 +936,7 @@ static void SCR_CaptureVideo_Lavc_VideoFrames(int num)
 		{
 			AVPacket packet;
 			qav_init_packet(&packet);
-			packet.stream_index = 0;
+			packet.stream_index = format->avf->streams[0]->index;
 			packet.data = format->buffer;
 			packet.size = size;
 			if (avc->coded_frame->key_frame)
@@ -1038,6 +1038,9 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 			if(qav_interleaved_write_frame(format->avf, &packet) < 0)
 				Con_Printf("error writing\n");
 		}
+
+		// don't ask...
+		format->apts += format->aframesize;
 	}
 	while(size > 0);
 }
