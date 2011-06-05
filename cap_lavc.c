@@ -985,7 +985,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_Encode(void)
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, format->aframe);
 
 	if(format->asavepts == ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
-		format->asavepts = format->apts;
+		format->asavepts = floor(format->apts / (double) cls.capturevideo.soundrate * (double) format->avf->streams[1]->time_base.den / (double) format->avf->streams[1]->time_base.num + 0.5);
 
 	if(size < 0)
 		Con_Printf("error encoding\n");
@@ -1018,7 +1018,7 @@ static void SCR_CaptureVideo_Lavc_SoundFrame_EncodeEnd(void)
 		size = qavcodec_encode_audio(avc, format->buffer, format->bufsize, NULL);
 
 		if(format->asavepts == ANNOYING_CAST_FOR_MRU(AV_NOPTS_VALUE))
-			format->asavepts = format->apts;
+			format->asavepts = floor(format->apts / (double) cls.capturevideo.soundrate * (double) format->avf->streams[1]->time_base.den / (double) format->avf->streams[1]->time_base.num + 0.5);
 
 		if(size < 0)
 			Con_Printf("error encoding\n");
