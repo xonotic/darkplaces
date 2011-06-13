@@ -162,6 +162,9 @@ typedef unsigned char      quint8_t;
 #define AVFMT_GLOBALHEADER 0x0040
 #define SWS_POINT          0x10
 
+#define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+#define AVERROR_OPTION_NOT_FOUND   (-MKTAG(0xF8,'O','P','T'))
+
 enum AVPacketSideDataType { AV_PKT_DATA_PALETTE = 0 };
 enum AVColorPrimaries { AVCOL_PRI_UNSPECIFIED = 2 };
 enum CodecID { CODEC_ID_NONE = 0 };
@@ -791,7 +794,7 @@ static int set_avoptions(void *ctx, const void *privclass, void *privctx, const 
 		if (!dry_run)
 			Con_DPrintf("Setting value '%s' for key '%s'\n", val, key);
 
-		ret = AVERROR(ENOENT);
+		ret = AVERROR_OPTION_NOT_FOUND;
 		if (dry_run) {
 			char buf[256];
 			const AVOption *opt;
@@ -805,9 +808,9 @@ static int set_avoptions(void *ctx, const void *privclass, void *privctx, const 
 		} else {
 			if (privctx)
 				ret = qav_set_string3(privctx, key, val, 1, NULL);
-			if (ret == AVERROR(ENOENT))
+			if (ret == AVERROR(ENOENT) || ret == AVERROR_OPTION_NOT_FOUND)
 				ret = qav_set_string3(ctx, key, val, 1, NULL);
-			if (ret == AVERROR(ENOENT))
+			if (ret == AVERROR(ENOENT) || ret == AVERROR_OPTION_NOT_FOUND)
 				Con_Printf("Key '%s' not found.\n", key);
 		}
 
