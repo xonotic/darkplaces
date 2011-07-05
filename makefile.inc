@@ -187,7 +187,15 @@ OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_SND_COMMON) snd_sdl.
 
 
 # Compilation
-CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES
+CFLAGS_COMMON=\
+	$(CFLAGS_MAKEDEP) \
+	$(CFLAGS_PRELOAD) \
+	$(CFLAGS_FS) \
+	$(CFLAGS_WARNINGS) \
+	$(CFLAGS_LIBJPEG) \
+	$(CFLAGS_D3D) \
+	-D_FILE_OFFSET_BITS=64 \
+	-D__KERNEL_STRICT_NAMES
 CFLAGS_DEBUG=-ggdb
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs
 CFLAGS_RELEASE=
@@ -218,14 +226,54 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
 
-LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_GMP) $(LIB_CRYPTO_RIJNDAEL)
-LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86vm -pthread $(LIB_SOUND)
-LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
-LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
-LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
+LDFLAGS_UNIXCOMMON=\
+	-lm \
+	$(LIB_ODE) \
+	$(LIB_JPEG) \
+	$(LIB_CRYPTO) \
+	$(LIB_GMP) \
+	$(LIB_CRYPTO_RIJNDAEL)
+LDFLAGS_UNIXCL=\
+	-L$(UNIX_X11LIBPATH) \
+	-lX11 \
+	-lXpm \
+	-lXext \
+	-lXxf86vm \
+	-pthread \
+	$(LIB_SOUND)
+LDFLAGS_UNIXCL_PRELOAD=\
+	-lz \
+	-ljpeg \
+	-lpng \
+	-logg \
+	-ltheora \
+	-lvorbis \
+	-lvorbisenc \
+	-lvorbisfile \
+	-lcurl \
+	-lmodplug
+LDFLAGS_UNIXSV_PRELOAD=\
+	-lz \
+	-ljpeg \
+	-lpng \
+	-lcurl
+LDFLAGS_UNIXSDL_PRELOAD=\
+	-lz \
+	-ljpeg \
+	-lpng \
+	-logg \
+	-ltheora \
+	-lvorbis \
+	-lvorbisenc \
+	-lvorbisfile \
+	-lcurl \
+	-lmodplug
 CFLAGS_UNIX_PRELOAD=-DPREFER_PRELOAD
 
-LDFLAGS_UNIXSDL=$(SDLCONFIG_LIBS) $(LIB_SND_MODPLUG)
+LDFLAGS_UNIXSDL=\
+	$(SDLCONFIG_LIBS) \
+	$(LIB_SND_MODPLUG)
+
 EXE_UNIXCL=darkplaces-glx
 EXE_UNIXSV=darkplaces-dedicated
 EXE_UNIXSDL=darkplaces-sdl
