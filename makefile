@@ -307,6 +307,11 @@ CFLAGS_LIBJPEG=-DLINK_TO_LIBJPEG
 LIB_JPEG=-ljpeg
 endif
 
+ifdef LINK_TO_LIBVORBIS
+CFLAGS_LIBVORBIS=-DLINK_TO_LIBVORBIS `pkg-config --cflags vorbisfile`
+LIB_LIBVORBIS=`pkg-config --libs vorbisfile`
+endif
+
 ifdef LINK_TO_ZLIB
 CFLAGS_ZLIB=-DLINK_TO_ZLIB
 LIB_ZLIB=-lz
