@@ -307,6 +307,11 @@ CFLAGS_CURL=-DLINK_TO_CURL `pkg-config --cflags libcurl`
 LIB_CURL=`pkg-config --libs libcurl`
 endif
 
+ifdef LINK_TO_FREETYPE2
+CFLAGS_FREETYPE2=-DLINK_TO_FREETYPE2 `pkg-config --cflags freetype2`
+LIB_FREETYPE2=`pkg-config --libs freetype2`
+endif
+
 ifdef LINK_TO_LIBJPEG
 CFLAGS_LIBJPEG=-DLINK_TO_LIBJPEG
 LIB_JPEG=-ljpeg

@@ -4,7 +4,14 @@
 #include "quakedef.h"
 
 #include "ft2.h"
-#include "ft2_defs.h"
+
+#ifdef LINK_TO_FREETYPE2
+# include <ft2build.h>
+# include FT_FREETYPE_H
+#else
+# include "ft2_defs.h"
+#endif
+
 #include "ft2_fontdefs.h"
 #include "image.h"
 
@@ -41,6 +48,26 @@ cvar_t r_font_diskcache = {CVAR_SAVE, "r_font_diskcache", "0", "save font textur
 cvar_t r_font_compress = {CVAR_SAVE, "r_font_compress", "0", "use texture compression on font textures to save video memory"};
 cvar_t r_font_nonpoweroftwo = {CVAR_SAVE, "r_font_nonpoweroftwo", "1", "use nonpoweroftwo textures for font (saves memory, potentially slower)"};
 cvar_t developer_font = {CVAR_SAVE, "developer_font", "0", "prints debug messages about fonts"};
+
+#ifdef LINK_TO_FREETYPE2
+
+#define qFT_Init_FreeType FT_Init_FreeType
+#define qFT_Done_FreeType FT_Done_FreeType
+#define qFT_New_Memory_Face FT_New_Memory_Face
+#define qFT_Done_Face FT_Done_Face
+#define qFT_Select_Size FT_Select_Size
+#define qFT_Request_Size FT_Request_Size
+#define qFT_Request_Size FT_Request_Size
+#define qFT_Set_Char_Size FT_Set_Char_Size
+#define qFT_Set_Pixel_Sizes FT_Set_Pixel_Sizes
+#define qFT_Load_Glyph FT_Load_Glyph
+#define qFT_Load_Char FT_Load_Char
+#define qFT_Get_Char_Index FT_Get_Char_Index
+#define qFT_Render_Glyph FT_Render_Glyph
+#define qFT_Get_Kerning FT_Get_Kerning
+#define qFT_Attach_Stream FT_Attach_Stream
+
+#else
 
 /*
 ================================================================================
@@ -135,6 +162,8 @@ static dllfunction_t ft2funcs[] =
 
 /// Handle for FreeType2 DLL
 static dllhandle_t ft2_dll = NULL;
+
+#endif /* PREFER_PRELOAD */
 
 /// Memory pool for fonts
 static mempool_t *font_mempool= NULL;
@@ -240,12 +269,14 @@ void Font_CloseLibrary (void)
 	fontfilecache_FreeAll();
 	if (font_mempool)
 		Mem_FreePool(&font_mempool);
-	if (font_ft2lib && qFT_Done_FreeType)
+	if (font_ft2lib)
 	{
 		qFT_Done_FreeType(font_ft2lib);
 		font_ft2lib = NULL;
 	}
+#ifndef LINK_TO_FREETYPE2
 	Sys_UnloadLibrary (&ft2_dll);
+#endif
 	pp.buf = NULL;
 }
 
@@ -258,6 +289,7 @@ Try to load the FreeType2 DLL
 */
 qboolean Font_OpenLibrary (void)
 {
+#ifndef LINK_TO_FREETYPE2
 	const char* dllnames [] =
 	{
 #if defined(WIN32)
@@ -283,6 +315,7 @@ qboolean Font_OpenLibrary (void)
 	// Load the DLL
 	if (!Sys_LoadLibrary (dllnames, &ft2_dll, ft2funcs))
 		return false;
+#endif
 	return true;
 }
 
@@ -358,8 +391,11 @@ Implementation of a more or less lazy font loading and rendering code.
 
 ft2_font_t *Font_Alloc(void)
 {
+#ifndef LINK_TO_FREETYPE2
 	if (!ft2_dll)
 		return NULL;
+#endif
+
 	return (ft2_font_t *)Mem_Alloc(font_mempool, sizeof(ft2_font_t));
 }
 
@@ -1065,7 +1101,9 @@ void Font_UnloadFont(ft2_font_t *font)
 			font->font_maps[i] = NULL;
 		}
 	}
+#ifndef LINK_TO_FREETYPE2
 	if (ft2_dll)
+#endif
 	{
 		if (font->face)
 		{
