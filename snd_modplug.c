@@ -26,7 +26,7 @@
 #include "snd_main.h"
 #include "snd_modplug.h"
 
-#ifdef SND_MODPLUG_STATIC
+#if defined(SND_MODPLUG_STATIC) || defined(LINK_TO_MODPLUG)
 
 #include <libmodplug/modplug.h>
 qboolean ModPlug_OpenLibrary (void)
@@ -247,7 +247,7 @@ static void ModPlug_GetSamplesFloat(channel_t *ch, sfx_t *sfx, int firstsamplefr
 			return;
 		}
 
-#ifndef SND_MODPLUG_STATIC
+#if !(defined(SND_MODPLUG_STATIC) || defined(LINK_TO_MODPLUG))
 		if(qModPlug_SetMasterVolume)
 #endif
 			qModPlug_SetMasterVolume(per_ch->mf, 512); // max volume, DP scales down!
@@ -407,7 +407,7 @@ qboolean ModPlug_LoadModPlugFile (const char *filename, sfx_t *sfx)
 		return false;
 	}
 
-#ifndef SND_MODPLUG_STATIC
+#if !(defined(SND_MODPLUG_STATIC) || defined(LINK_TO_MODPLUG))
 	if(qModPlug_SetMasterVolume)
 #endif
 		qModPlug_SetMasterVolume(mf, 512); // max volume, DP scales down!

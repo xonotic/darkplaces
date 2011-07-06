@@ -312,6 +312,11 @@ CFLAGS_LIBVORBIS=-DLINK_TO_LIBVORBIS `pkg-config --cflags vorbisfile`
 LIB_LIBVORBIS=`pkg-config --libs vorbisfile`
 endif
 
+ifdef LINK_TO_MODPLUG
+CFLAGS_SND_MODPLUG=-DLINK_TO_MODPLUG `pkg-config --cflags libmodplug`
+LIB_SND_MODPLUG=`pkg-config --libs libmodplug`
+endif
+
 ifdef LINK_TO_ZLIB
 CFLAGS_ZLIB=-DLINK_TO_ZLIB
 LIB_ZLIB=-lz
