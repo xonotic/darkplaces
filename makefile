@@ -317,6 +317,11 @@ CFLAGS_SND_MODPLUG=-DLINK_TO_MODPLUG `pkg-config --cflags libmodplug`
 LIB_SND_MODPLUG=`pkg-config --libs libmodplug`
 endif
 
+ifdef LINK_TO_ODE
+CFLAGS_ODE=-DLINK_TO_ODE `pkg-config --cflags ode`
+LIB_ODE=`pkg-config --libs ode`
+endif
+
 ifdef LINK_TO_ZLIB
 CFLAGS_ZLIB=-DLINK_TO_ZLIB
 LIB_ZLIB=-lz

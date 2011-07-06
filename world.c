@@ -330,6 +330,19 @@ void World_LinkEdict(world_t *world, prvm_edict_t *ent, const vec3_t mins, const
 // physics engine support
 //============================================================================
 
+// backwards compat
+#ifdef ODE_STATIC
+# define LINK_TO_ODE 1
+#endif
+
+#ifndef LINK_TO_ODE
+# define ODE_DYNAMIC 1
+#endif
+
+#if defined(LINK_TO_ODE) || defined(ODE_DYNAMIC)
+#define USEODE 1
+#endif
+
 #ifdef USEODE
 cvar_t physics_ode_quadtree_depth = {0, "physics_ode_quadtree_depth","5", "desired subdivision level of quadtree culling space"};
 cvar_t physics_ode_allowconvex = {0, "physics_ode_allowconvex", "0", "allow usage of Convex Hull primitive type on trimeshes that have custom 'collisionconvex' mesh. If disabled, trimesh primitive type are used."};
@@ -365,7 +378,7 @@ cvar_t physics_ode = {0, "physics_ode", "0", "run ODE physics (VERY experimental
 // LordHavoc: this large chunk of definitions comes from the ODE library
 // include files.
 
-#ifdef ODE_STATIC
+#ifdef LINK_TO_ODE
 #include "ode/ode.h"
 #else
 #ifdef WINAPI
