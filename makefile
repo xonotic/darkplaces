@@ -307,6 +307,16 @@ CFLAGS_CURL=-DLINK_TO_CURL `pkg-config --cflags libcurl`
 LIB_CURL=`pkg-config --libs libcurl`
 endif
 
+ifdef LINK_TO_D0_BLIND_ID
+CFLAGS_CRYPTO=-DLINK_TO_D0_BLIND_ID `pkg-config --cflags d0_blind_id`
+LIB_CRYPTO=`pkg-config --libs d0_blind_id`
+endif
+
+ifdef LINK_TO_D0_RIJNDAEL
+CFLAGS_CRYPTO_RIJNDAEL=-DLINK_TO_D0_RIJNDAEL `pkg-config --cflags d0_rijndael`
+LIB_CRYPTO_RIJNDAEL=`pkg-config --libs d0_rijndael`
+endif
+
 ifdef LINK_TO_FREETYPE2
 CFLAGS_FREETYPE2=-DLINK_TO_FREETYPE2 `pkg-config --cflags freetype2`
 LIB_FREETYPE2=`pkg-config --libs freetype2`

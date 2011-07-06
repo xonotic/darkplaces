@@ -48,11 +48,11 @@ STRIP?=strip
 OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o snd_modplug.o
 
 # statically loading d0_blind_id
-LIB_CRYPTO=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && echo \ $(DP_CRYPTO_STATIC_LIBDIR)/libd0_blind_id.a`
-LIB_GMP=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && { [ -n "$(DP_GMP_STATIC_LIBDIR)" ] && echo \ $(DP_GMP_STATIC_LIBDIR)/libgmp.a || echo \ -lgmp; }`
-CFLAGS_CRYPTO=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && echo \ -I$(DP_CRYPTO_STATIC_LIBDIR)/../include\ -DCRYPTO_STATIC`
-LIB_CRYPTO_RIJNDAEL=`[ -n "$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)" ] && echo \ $(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)/libd0_rijndael.a`
-CFLAGS_CRYPTO_RIJNDAEL=`[ -n "$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)" ] && echo \ -I$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)/../include\ -DCRYPTO_RIJNDAEL_STATIC`
+LIB_CRYPTO?=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && echo \ $(DP_CRYPTO_STATIC_LIBDIR)/libd0_blind_id.a`
+LIB_GMP?=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && { [ -n "$(DP_GMP_STATIC_LIBDIR)" ] && echo \ $(DP_GMP_STATIC_LIBDIR)/libgmp.a || echo \ -lgmp; }`
+CFLAGS_CRYPTO?=`[ -n "$(DP_CRYPTO_STATIC_LIBDIR)" ] && echo \ -I$(DP_CRYPTO_STATIC_LIBDIR)/../include\ -DCRYPTO_STATIC`
+LIB_CRYPTO_RIJNDAEL?=`[ -n "$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)" ] && echo \ $(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)/libd0_rijndael.a`
+CFLAGS_CRYPTO_RIJNDAEL?=`[ -n "$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)" ] && echo \ -I$(DP_CRYPTO_RIJNDAEL_STATIC_LIBDIR)/../include\ -DCRYPTO_RIJNDAEL_STATIC`
 
 # Additional stuff for libmodplug
 LIB_SND_MODPLUG?=`[ -n "$(DP_MODPLUG_STATIC_LIBDIR)" ] && echo \ $(DP_MODPLUG_STATIC_LIBDIR)/libmodplug.a\ -lstdc++`
