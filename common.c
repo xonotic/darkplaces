@@ -26,6 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 #include "quakedef.h"
+#include "utf8lib.h"
 
 cvar_t registered = {0, "registered","0", "indicates if this is running registered quake (whether gfx/pop.lmp was found)"};
 cvar_t cmdline = {0, "cmdline","0", "contains commandline the engine was launched with"};
@@ -493,9 +494,12 @@ float MSG_ReadBigFloat (void)
 char *MSG_ReadString (void)
 {
 	static char string[MAX_INPUTLINE];
-	int l,c;
-	for (l = 0;l < (int) sizeof(string) - 1 && (c = MSG_ReadByte()) != -1 && c != 0;l++)
-		string[l] = c;
+	const int maxstring = sizeof(string);
+	int l = 0,c;
+	// read string into buffer, but only store as many characters as will fit
+	while ((c = MSG_ReadByte()) > 0)
+		if (l < maxstring - 1)
+			string[l++] = c;
 	string[l] = 0;
 	return string;
 }
@@ -1687,6 +1691,23 @@ void COM_ToLowerString (const char *in, char *out, size_t size_out)
 	if (size_out == 0)
 		return;
 
+	if(utf8_enable.integer)
+	{
+		*out = 0;
+		while(*in && size_out > 1)
+		{
+			int n;
+			Uchar ch = u8_getchar_utf8_enabled(in, &in);
+			ch = u8_tolower(ch);
+			n = u8_fromchar(ch, out, size_out);
+			if(n <= 0)
+				break;
+			out += n;
+			size_out -= n;
+		}
+		return;
+	}
+
 	while (*in && size_out > 1)
 	{
 		if (*in >= 'A' && *in <= 'Z')
@@ -1702,6 +1723,23 @@ void COM_ToUpperString (const char *in, char *out, size_t size_out)
 {
 	if (size_out == 0)
 		return;
+
+	if(utf8_enable.integer)
+	{
+		*out = 0;
+		while(*in && size_out > 1)
+		{
+			int n;
+			Uchar ch = u8_getchar_utf8_enabled(in, &in);
+			ch = u8_toupper(ch);
+			n = u8_fromchar(ch, out, size_out);
+			if(n <= 0)
+				break;
+			out += n;
+			size_out -= n;
+		}
+		return;
+	}
 
 	while (*in && size_out > 1)
 	{

@@ -29,6 +29,7 @@ entity_state_t defaultstate =
 	0,//unsigned short exteriormodelforclient; // ! not shown if first person viewing from this entity, shown in all other cases
 	0,//unsigned short nodrawtoclient; // !
 	0,//unsigned short drawonlytoclient; // !
+	0,//unsigned short traileffectnum;
 	{0,0,0,0},//unsigned short light[4]; // color*256 (0.00 to 255.996), and radius*1
 	ACTIVE_NOT,//unsigned char active; // true if a valid state
 	0,//unsigned char lightstyle;
@@ -553,7 +554,7 @@ qboolean EntityFrameCSQC_WriteFrame (sizebuf_t *msg, int maxsize, int numnumbers
 					msg->allowoverflow = true;
 					PRVM_G_INT(OFS_PARM0) = sv.writeentitiestoclient_cliententitynumber;
 					PRVM_G_FLOAT(OFS_PARM1) = sendflags;
-					prog->globals.server->self = number;
+					PRVM_serverglobaledict(self) = number;
 					PRVM_ExecuteProgram(PRVM_serveredictfunction(ed, SendEntity), "Null SendEntity\n");
 					msg->allowoverflow = false;
 					if(PRVM_G_FLOAT(OFS_RETURN) && msg->cursize + 2 <= maxsize)
@@ -2063,13 +2064,13 @@ void EntityState5_WriteUpdate(int number, const entity_state_t *s, int changedbi
 	//dp_model_t *model;
 	ENTITYSIZEPROFILING_START(msg, s->number);
 
-	if (PRVM_serveredictfunction((&prog->edicts[s->number]), SendEntity))
-		return;
-
 	if (s->active != ACTIVE_NETWORK)
 		MSG_WriteShort(msg, number | 0x8000);
 	else
 	{
+		if (PRVM_serveredictfunction((&prog->edicts[s->number]), SendEntity))
+			return;
+
 		bits = changedbits;
 		if ((bits & E5_ORIGIN) && (!(s->flags & RENDER_LOWPRECISION) || s->exteriormodelforclient || s->tagentity || s->viewmodelforclient || (s->number >= 1 && s->number <= svs.maxclients) || s->origin[0] <= -4096.0625 || s->origin[0] >= 4095.9375 || s->origin[1] <= -4096.0625 || s->origin[1] >= 4095.9375 || s->origin[2] <= -4096.0625 || s->origin[2] >= 4095.9375))
 		// maybe also add: ((model = SV_GetModelByIndex(s->modelindex)) != NULL && model->name[0] == '*')
@@ -2271,6 +2272,8 @@ void EntityState5_WriteUpdate(int number, const entity_state_t *s, int changedbi
 				MSG_WriteShort(msg, (int)((sv.time - s->framegroupblend[0].start) * 1000.0));
 			}
 		}
+		if (bits & E5_TRAILEFFECTNUM)
+			MSG_WriteShort(msg, s->traileffectnum);
 	}
 
 	ENTITYSIZEPROFILING_END(msg, s->number);
@@ -2492,6 +2495,8 @@ static void EntityState5_ReadUpdate(entity_state_t *s, int number)
 			break;
 		}
 	}
+	if (bits & E5_TRAILEFFECTNUM)
+		s->traileffectnum = (unsigned short) MSG_ReadShort();
 
 
 	if (developer_networkentities.integer >= 2)
@@ -2592,6 +2597,8 @@ static int EntityState5_DeltaBits(const entity_state_t *o, const entity_state_t 
 			bits |= E5_GLOWMOD;
 		if (n->flags & RENDER_COMPLEXANIMATION)
 			bits |= E5_COMPLEXANIMATION;
+		if (o->traileffectnum != n->traileffectnum)
+			bits |= E5_TRAILEFFECTNUM;
 	}
 	else
 		if (o->active == ACTIVE_NETWORK)
@@ -2856,6 +2863,7 @@ qboolean EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_datab
 					packetlog = d->packetlog + packetlognumber;
 					packetlog->packetnumber = framenum;
 					packetlog->numstates = 0;
+					memset(packetlog->statsdeltabits, 0, sizeof(packetlog->statsdeltabits));
 				}
 				packetlog->statsdeltabits[i>>3] |= (1<<(i&7));
 				if (host_client->stats[i] >= 0 && host_client->stats[i] < 256)
@@ -2886,6 +2894,7 @@ qboolean EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_datab
 		packetlog = d->packetlog + packetlognumber;
 		packetlog->packetnumber = framenum;
 		packetlog->numstates = 0;
+		memset(packetlog->statsdeltabits, 0, sizeof(packetlog->statsdeltabits));
 	}
 
 	// write state updates

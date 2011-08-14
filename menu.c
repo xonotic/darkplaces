@@ -4515,7 +4515,7 @@ void ModList_RebuildList(void)
 
 	stringlistinit(&list);
 	listdirectory(&list, fs_basedir, "");
-	stringlistsort(&list);
+	stringlistsort(&list, true);
 	modlist_count = 0;
 	modlist_numenabled = fs_numgamedirs;
 	for (i = 0;i < list.numstrings;i++)
@@ -5300,7 +5300,6 @@ void MP_Init (void)
 	PRVM_Begin;
 	PRVM_InitProg(PRVM_MENUPROG);
 
-	prog->headercrc = M_PROGHEADER_CRC;
 	prog->edictprivate_size = 0; // no private struct used
 	prog->name = M_NAME;
 	prog->num_edicts = 1;

@@ -785,7 +785,7 @@ static void Mod_BuildAliasSkinFromSkinFrame(texture_t *texture, skinframe_t *ski
 	if (texture->currentskinframe->hasalpha)
 		texture->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
 	texture->currentmaterialflags = texture->basematerialflags;
-	texture->offsetmapping = OFFSETMAPPING_OFF;
+	texture->offsetmapping = OFFSETMAPPING_DEFAULT;
 	texture->offsetscale = 1;
 	texture->specularscalemod = 1;
 	texture->specularpowermod = 1;
@@ -1054,7 +1054,9 @@ void Mod_IDP0_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->animscenes = (animscene_t *)Mem_Alloc(loadmodel->mempool, sizeof(animscene_t) * loadmodel->numframes);
 	loadmodel->surfmesh.data_morphmdlvertex = (trivertx_t *)Mem_Alloc(loadmodel->mempool, sizeof(trivertx_t) * loadmodel->surfmesh.num_morphframes * loadmodel->surfmesh.num_vertices);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)Mem_Alloc(loadmodel->mempool, loadmodel->surfmesh.num_triangles * sizeof(int[3]));
+	}
 	Mod_MDL_LoadFrames (startframes, numverts, vertremap);
 	if (loadmodel->surfmesh.data_neighbor3i)
 		Mod_BuildTriangleNeighbors(loadmodel->surfmesh.data_neighbor3i, loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles);
@@ -1282,7 +1284,9 @@ void Mod_IDP2_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.data_morphmd2framesize6f = (float *)data;data += loadmodel->numframes * sizeof(float[6]);
 	loadmodel->surfmesh.data_element3i = (int *)data;data += loadmodel->surfmesh.num_triangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += loadmodel->surfmesh.num_triangles * sizeof(int[3]);
+	}
 
 	loadmodel->synctype = ST_RAND;
 
@@ -1563,11 +1567,15 @@ void Mod_IDP3_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->num_poses = loadmodel->surfmesh.num_morphframes;
 	loadmodel->surfmesh.data_element3i = (int *)data;data += meshtriangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += meshtriangles * sizeof(int[3]);
+	}
 	loadmodel->surfmesh.data_texcoordtexture2f = (float *)data;data += meshvertices * sizeof(float[2]);
 	loadmodel->surfmesh.data_morphmd3vertex = (md3vertex_t *)data;data += meshvertices * loadmodel->numframes * sizeof(md3vertex_t);
 	if (meshvertices <= 65536)
+	{
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += meshtriangles * sizeof(unsigned short[3]);
+	}
 
 	meshvertices = 0;
 	meshtriangles = 0;
@@ -1820,7 +1828,9 @@ void Mod_ZYMOTICMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_triangles = meshtriangles;
 	loadmodel->surfmesh.data_element3i = (int *)data;data += meshtriangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += meshtriangles * sizeof(int[3]);
+	}
 	loadmodel->surfmesh.data_vertex3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_svector3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_tvector3f = (float *)data;data += meshvertices * sizeof(float[3]);
@@ -1830,7 +1840,9 @@ void Mod_ZYMOTICMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_blends = 0;
 	loadmodel->surfmesh.blends = (unsigned short *)data;data += meshvertices * sizeof(unsigned short);
 	if (loadmodel->surfmesh.num_vertices <= 65536)
+	{
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += loadmodel->surfmesh.num_triangles * sizeof(unsigned short[3]);
+	}
 	loadmodel->data_poses6s = (short *)data;data += loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]);
 	loadmodel->surfmesh.data_blendweights = NULL;
 
@@ -2127,7 +2139,9 @@ void Mod_DARKPLACESMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_triangles = meshtriangles;
 	loadmodel->surfmesh.data_element3i = (int *)data;data += meshtriangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += meshtriangles * sizeof(int[3]);
+	}
 	loadmodel->surfmesh.data_vertex3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_svector3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_tvector3f = (float *)data;data += meshvertices * sizeof(float[3]);
@@ -2140,7 +2154,9 @@ void Mod_DARKPLACESMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_blends = 0;
 	loadmodel->surfmesh.blends = (unsigned short *)data;data += meshvertices * sizeof(unsigned short);
 	if (meshvertices <= 65536)
+	{
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += meshtriangles * sizeof(unsigned short[3]);
+	}
 	loadmodel->data_poses6s = (short *)data;data += loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]);
 	loadmodel->surfmesh.data_blendweights = (blendweights_t *)Mem_Alloc(loadmodel->mempool, meshvertices * sizeof(blendweights_t));
 
@@ -2765,7 +2781,9 @@ void Mod_PSKMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->data_textures = (texture_t *)data;data += loadmodel->num_surfaces * loadmodel->numskins * sizeof(texture_t);
 	loadmodel->surfmesh.data_element3i = (int *)data;data += loadmodel->surfmesh.num_triangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += loadmodel->surfmesh.num_triangles * sizeof(int[3]);
+	}
 	loadmodel->surfmesh.data_vertex3f = (float *)data;data += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_svector3f = (float *)data;data += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_tvector3f = (float *)data;data += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
@@ -2778,7 +2796,9 @@ void Mod_PSKMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_blends = 0;
 	loadmodel->surfmesh.blends = (unsigned short *)data;data += meshvertices * sizeof(unsigned short);
 	if (loadmodel->surfmesh.num_vertices <= 65536)
+	{
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += loadmodel->surfmesh.num_triangles * sizeof(unsigned short[3]);
+	}
 	loadmodel->data_poses6s = (short *)data;data += loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]);
 	loadmodel->surfmesh.data_blendweights = (blendweights_t *)Mem_Alloc(loadmodel->mempool, loadmodel->surfmesh.num_vertices * sizeof(blendweights_t));
 
@@ -2950,31 +2970,48 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 {
 	unsigned char *data;
 	const char *text;
-	unsigned char *pbase, *pend;
-	iqmheader_t *header;
+	const unsigned char *pbase, *pend;
+	iqmheader_t header;
 	skinfile_t *skinfiles;
 	int i, j, k, meshvertices, meshtriangles;
-	float *vposition = NULL, *vtexcoord = NULL, *vnormal = NULL, *vtangent = NULL;
-	unsigned char *vblendindexes = NULL, *vblendweights = NULL;
-	iqmjoint_t *joint;
-	iqmanim_t *anim;
-	iqmpose_t *pose;
-	iqmmesh_t *mesh;
-	iqmbounds_t *bounds;
-	iqmvertexarray_t *va;
-	unsigned short *framedata;
 	float biggestorigin;
-	const int *inelements;
+	const unsigned int *inelements;
 	int *outelements;
+	const int *inneighbors;
+	int *outneighbors;
 	float *outvertex, *outnormal, *outtexcoord, *outsvector, *outtvector;
+	// this pointers into the file data are read only through Little* functions so they can be unaligned memory
+	const float *vnormal = NULL;
+	const float *vposition = NULL;
+	const float *vtangent = NULL;
+	const float *vtexcoord = NULL;
+	const unsigned char *vblendindexes = NULL;
+	const unsigned char *vblendweights = NULL;
+	const unsigned short *framedata = NULL;
+	// temporary memory allocations (because the data in the file may be misaligned)
+	iqmanim_t *anims = NULL;
+	iqmbounds_t *bounds = NULL;
+	iqmjoint1_t *joint1 = NULL;
+	iqmjoint_t *joint = NULL;
+	iqmmesh_t *meshes = NULL;
+	iqmpose1_t *pose1 = NULL;
+	iqmpose_t *pose = NULL;
+	iqmvertexarray_t *vas = NULL;
 
 	pbase = (unsigned char *)buffer;
 	pend = (unsigned char *)bufferend;
-	header = (iqmheader_t *)buffer;
-	if (memcmp(header->id, "INTERQUAKEMODEL", 16))
+
+	if (pbase + sizeof(iqmheader_t) > pend)
+		Host_Error ("Mod_INTERQUAKEMODEL_Load: %s is not an Inter-Quake Model %d", loadmodel->name, (int)(pend - pbase));
+
+	// copy struct (otherwise it may be misaligned)
+	// LordHavoc: okay it's definitely not misaligned here, but for consistency...
+	memcpy(&header, pbase, sizeof(iqmheader_t));
+
+	if (memcmp(header.id, "INTERQUAKEMODEL", 16))
 		Host_Error ("Mod_INTERQUAKEMODEL_Load: %s is not an Inter-Quake Model", loadmodel->name);
-	if (LittleLong(header->version) != 1)
-		Host_Error ("Mod_INTERQUAKEMODEL_Load: only version 1 models are currently supported (name = %s)", loadmodel->name);
+	if (LittleLong(header.version) != 1 && LittleLong(header.version) != 2)
+		Host_Error ("Mod_INTERQUAKEMODEL_Load: only version 1 and 2 models are currently supported (name = %s)", loadmodel->name);
 
 	loadmodel->modeldatatypestring = "IQM";
 
@@ -2982,114 +3019,136 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->synctype = ST_RAND;
 
 	// byteswap header
-	header->version = LittleLong(header->version);
-	header->filesize = LittleLong(header->filesize);
-	header->flags = LittleLong(header->flags);
-	header->num_text = LittleLong(header->num_text);
-	header->ofs_text = LittleLong(header->ofs_text);
-	header->num_meshes = LittleLong(header->num_meshes);
-	header->ofs_meshes = LittleLong(header->ofs_meshes);
-	header->num_vertexarrays = LittleLong(header->num_vertexarrays);
-	header->num_vertexes = LittleLong(header->num_vertexes);
-	header->ofs_vertexarrays = LittleLong(header->ofs_vertexarrays);
-	header->num_triangles = LittleLong(header->num_triangles);
-	header->ofs_triangles = LittleLong(header->ofs_triangles);
-	header->ofs_neighbors = LittleLong(header->ofs_neighbors);
-	header->num_joints = LittleLong(header->num_joints);
-	header->ofs_joints = LittleLong(header->ofs_joints);
-	header->num_poses = LittleLong(header->num_poses);
-	header->ofs_poses = LittleLong(header->ofs_poses);
-	header->num_anims = LittleLong(header->num_anims);
-	header->ofs_anims = LittleLong(header->ofs_anims);
-	header->num_frames = LittleLong(header->num_frames);
-	header->num_framechannels = LittleLong(header->num_framechannels);
-	header->ofs_frames = LittleLong(header->ofs_frames);
-	header->ofs_bounds = LittleLong(header->ofs_bounds);
-	header->num_comment = LittleLong(header->num_comment);
-	header->ofs_comment = LittleLong(header->ofs_comment);
-	header->num_extensions = LittleLong(header->num_extensions);
-	header->ofs_extensions = LittleLong(header->ofs_extensions);
+	header.version = LittleLong(header.version);
+	header.filesize = LittleLong(header.filesize);
+	header.flags = LittleLong(header.flags);
+	header.num_text = LittleLong(header.num_text);
+	header.ofs_text = LittleLong(header.ofs_text);
+	header.num_meshes = LittleLong(header.num_meshes);
+	header.ofs_meshes = LittleLong(header.ofs_meshes);
+	header.num_vertexarrays = LittleLong(header.num_vertexarrays);
+	header.num_vertexes = LittleLong(header.num_vertexes);
+	header.ofs_vertexarrays = LittleLong(header.ofs_vertexarrays);
+	header.num_triangles = LittleLong(header.num_triangles);
+	header.ofs_triangles = LittleLong(header.ofs_triangles);
+	header.ofs_neighbors = LittleLong(header.ofs_neighbors);
+	header.num_joints = LittleLong(header.num_joints);
+	header.ofs_joints = LittleLong(header.ofs_joints);
+	header.num_poses = LittleLong(header.num_poses);
+	header.ofs_poses = LittleLong(header.ofs_poses);
+	header.num_anims = LittleLong(header.num_anims);
+	header.ofs_anims = LittleLong(header.ofs_anims);
+	header.num_frames = LittleLong(header.num_frames);
+	header.num_framechannels = LittleLong(header.num_framechannels);
+	header.ofs_frames = LittleLong(header.ofs_frames);
+	header.ofs_bounds = LittleLong(header.ofs_bounds);
+	header.num_comment = LittleLong(header.num_comment);
+	header.ofs_comment = LittleLong(header.ofs_comment);
+	header.num_extensions = LittleLong(header.num_extensions);
+	header.ofs_extensions = LittleLong(header.ofs_extensions);
 
-	if (header->num_triangles < 1 || header->num_vertexes < 3 || header->num_vertexarrays < 1 || header->num_meshes < 1)
+	if (header.num_triangles < 1 || header.num_vertexes < 3 || header.num_vertexarrays < 1 || header.num_meshes < 1)
 	{
 		Con_Printf("%s has no geometry\n", loadmodel->name);
 		return;
 	}
-	if (header->num_frames < 1 || header->num_anims < 1)
-	{
-		Con_Printf("%s has no animations\n", loadmodel->name);
-		return;
-	}
 
-	if (pbase + header->ofs_text + header->num_text > pend ||
-		pbase + header->ofs_meshes + header->num_meshes*sizeof(iqmmesh_t) > pend ||
-		pbase + header->ofs_vertexarrays + header->num_vertexarrays*sizeof(iqmvertexarray_t) > pend ||
-		pbase + header->ofs_triangles + header->num_triangles*sizeof(int[3]) > pend ||
-		(header->ofs_neighbors && pbase + header->ofs_neighbors + header->num_triangles*sizeof(int[3]) > pend) ||
-		pbase + header->ofs_joints + header->num_joints*sizeof(iqmjoint_t) > pend ||
-		pbase + header->ofs_poses + header->num_poses*sizeof(iqmpose_t) > pend ||
-		pbase + header->ofs_anims + header->num_anims*sizeof(iqmanim_t) > pend ||
-		pbase + header->ofs_frames + header->num_frames*header->num_framechannels*sizeof(unsigned short) > pend ||
-		(header->ofs_bounds && pbase + header->ofs_bounds + header->num_frames*sizeof(iqmbounds_t) > pend) ||
-		pbase + header->ofs_comment + header->num_comment > pend)
+	if (header.version == 1)
+	{
+		if (pbase + header.ofs_joints + header.num_joints*sizeof(iqmjoint1_t) > pend ||
+			pbase + header.ofs_poses + header.num_poses*sizeof(iqmpose1_t) > pend)
+		{
+			Con_Printf("%s has invalid size or offset information\n", loadmodel->name);
+			return;
+		}
+	}
+	else
+	{
+		if (pbase + header.ofs_joints + header.num_joints*sizeof(iqmjoint_t) > pend ||
+			pbase + header.ofs_poses + header.num_poses*sizeof(iqmpose_t) > pend)
+		{
+			Con_Printf("%s has invalid size or offset information\n", loadmodel->name);
+			return;
+		}
+	}
+	if (pbase + header.ofs_text + header.num_text > pend ||
+		pbase + header.ofs_meshes + header.num_meshes*sizeof(iqmmesh_t) > pend ||
+		pbase + header.ofs_vertexarrays + header.num_vertexarrays*sizeof(iqmvertexarray_t) > pend ||
+		pbase + header.ofs_triangles + header.num_triangles*sizeof(int[3]) > pend ||
+		(header.ofs_neighbors && pbase + header.ofs_neighbors + header.num_triangles*sizeof(int[3]) > pend) ||
+		pbase + header.ofs_anims + header.num_anims*sizeof(iqmanim_t) > pend ||
+		pbase + header.ofs_frames + header.num_frames*header.num_framechannels*sizeof(unsigned short) > pend ||
+		(header.ofs_bounds && pbase + header.ofs_bounds + header.num_frames*sizeof(iqmbounds_t) > pend) ||
+		pbase + header.ofs_comment + header.num_comment > pend)
 	{
 		Con_Printf("%s has invalid size or offset information\n", loadmodel->name);
 		return;
 	}
 
-	va = (iqmvertexarray_t *)(pbase + header->ofs_vertexarrays);
-	for (i = 0;i < (int)header->num_vertexarrays;i++)
+	// copy structs to make them aligned in memory (otherwise we crash on Sparc and PowerPC and others)
+	if (header.num_vertexarrays)
+		vas = (iqmvertexarray_t *)(pbase + header.ofs_vertexarrays);
+	if (header.num_anims)
+		anims = (iqmanim_t *)(pbase + header.ofs_anims);
+	if (header.ofs_bounds)
+		bounds = (iqmbounds_t *)(pbase + header.ofs_bounds);
+	if (header.num_meshes)
+		meshes = (iqmmesh_t *)(pbase + header.ofs_meshes);
+
+	for (i = 0;i < (int)header.num_vertexarrays;i++)
 	{
+		iqmvertexarray_t va;
 		size_t vsize;
-		va[i].type = LittleLong(va[i].type);
-		va[i].flags = LittleLong(va[i].flags);
-		va[i].format = LittleLong(va[i].format);
-		va[i].size = LittleLong(va[i].size);
-		va[i].offset = LittleLong(va[i].offset);
-		vsize = header->num_vertexes*va[i].size;
-		switch (va[i].format)
+		va.type = LittleLong(vas[i].type);
+		va.flags = LittleLong(vas[i].flags);
+		va.format = LittleLong(vas[i].format);
+		va.size = LittleLong(vas[i].size);
+		va.offset = LittleLong(vas[i].offset);
+		vsize = header.num_vertexes*va.size;
+		switch (va.format)
 		{ 
 		case IQM_FLOAT: vsize *= sizeof(float); break;
 		case IQM_UBYTE: vsize *= sizeof(unsigned char); break;
 		default: continue;
 		}
-		if (pbase + va[i].offset + vsize > pend)
-		  continue;
-		switch (va[i].type)
+		if (pbase + va.offset + vsize > pend)
+			continue;
+		// no need to copy the vertex data for alignment because LittleLong/LittleShort will be invoked on reading them, and the destination is aligned
+		switch (va.type)
 		{
 		case IQM_POSITION:
-			if (va[i].format == IQM_FLOAT && va[i].size == 3)
-				vposition = (float *)(pbase + va[i].offset);
+			if (va.format == IQM_FLOAT && va.size == 3)
+				vposition = (const float *)(pbase + va.offset);
 			break;
 		case IQM_TEXCOORD:
-			if (va[i].format == IQM_FLOAT && va[i].size == 2)
-				vtexcoord = (float *)(pbase + va[i].offset);
+			if (va.format == IQM_FLOAT && va.size == 2)
+				vtexcoord = (const float *)(pbase + va.offset);
 			break;
 		case IQM_NORMAL:
-			if (va[i].format == IQM_FLOAT && va[i].size == 3)
-				vnormal = (float *)(pbase + va[i].offset);
+			if (va.format == IQM_FLOAT && va.size == 3)
+				vnormal = (const float *)(pbase + va.offset);
 			break;
 		case IQM_TANGENT:
-			if (va[i].format == IQM_FLOAT && va[i].size == 4)
-				vtangent = (float *)(pbase + va[i].offset);
+			if (va.format == IQM_FLOAT && va.size == 4)
+				vtangent = (const float *)(pbase + va.offset);
 			break;
 		case IQM_BLENDINDEXES:
-			if (va[i].format == IQM_UBYTE && va[i].size == 4)
-				vblendindexes = (unsigned char *)(pbase + va[i].offset);
+			if (va.format == IQM_UBYTE && va.size == 4)
+				vblendindexes = (const unsigned char *)(pbase + va.offset);
 			break;
 		case IQM_BLENDWEIGHTS:
-			if (va[i].format == IQM_UBYTE && va[i].size == 4)
-				vblendweights = (unsigned char *)(pbase + va[i].offset);
+			if (va.format == IQM_UBYTE && va.size == 4)
+				vblendweights = (const unsigned char *)(pbase + va.offset);
 			break;
 		}
 	}
-	if (!vposition || !vtexcoord || !vblendindexes || !vblendweights)
+	if (header.num_vertexes > 0 && (!vposition || !vtexcoord || ((header.num_frames > 0 || header.num_anims > 0) && (!vblendindexes || !vblendweights))))
 	{
 		Con_Printf("%s is missing vertex array data\n", loadmodel->name);
 		return;
 	}
 
-	text = header->num_text && header->ofs_text ? (const char *)(pbase + header->ofs_text) : "";
+	text = header.num_text && header.ofs_text ? (const char *)(pbase + header.ofs_text) : "";
 
 	loadmodel->AnimateVertices = Mod_Skeletal_AnimateVertices;
 	loadmodel->DrawSky = NULL;
@@ -3112,18 +3171,18 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	if (loadmodel->numskins < 1)
 		loadmodel->numskins = 1;
 
-	loadmodel->numframes = header->num_anims;
-	loadmodel->num_bones = header->num_joints;
-	loadmodel->num_poses = header->num_frames;
-	loadmodel->nummodelsurfaces = loadmodel->num_surfaces = header->num_meshes;
+	loadmodel->numframes = max(header.num_anims, 1);
+	loadmodel->num_bones = header.num_joints;
+	loadmodel->num_poses = max(header.num_frames, 1);
+	loadmodel->nummodelsurfaces = loadmodel->num_surfaces = header.num_meshes;
 	loadmodel->num_textures = loadmodel->num_surfaces * loadmodel->numskins;
 	loadmodel->num_texturesperskin = loadmodel->num_surfaces;
 
-	meshvertices = header->num_vertexes;
-	meshtriangles = header->num_triangles;
+	meshvertices = header.num_vertexes;
+	meshtriangles = header.num_triangles;
 
 	// do most allocations as one merged chunk
-	data = (unsigned char *)Mem_Alloc(loadmodel->mempool, loadmodel->num_surfaces * sizeof(msurface_t) + loadmodel->num_surfaces * sizeof(int) + loadmodel->num_surfaces * loadmodel->numskins * sizeof(texture_t) + meshtriangles * sizeof(int[3]) + (meshvertices <= 65536 ? meshtriangles * sizeof(unsigned short[3]) : 0) + (r_enableshadowvolumes.integer ? meshtriangles * sizeof(int[3]) : 0) + meshvertices * (sizeof(float[14]) + sizeof(unsigned short)) + loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]) + loadmodel->num_bones * sizeof(float[12]) + loadmodel->numskins * sizeof(animscene_t) + loadmodel->num_bones * sizeof(aliasbone_t) + loadmodel->numframes * sizeof(animscene_t));
+	data = (unsigned char *)Mem_Alloc(loadmodel->mempool, loadmodel->num_surfaces * sizeof(msurface_t) + loadmodel->num_surfaces * sizeof(int) + loadmodel->num_surfaces * loadmodel->numskins * sizeof(texture_t) + meshtriangles * sizeof(int[3]) + (meshvertices <= 65536 ? meshtriangles * sizeof(unsigned short[3]) : 0) + (r_enableshadowvolumes.integer ? meshtriangles * sizeof(int[3]) : 0) + meshvertices * sizeof(float[14]) + (vblendindexes && vblendweights ? meshvertices * sizeof(unsigned short) : 0) + loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]) + loadmodel->num_bones * sizeof(float[12]) + loadmodel->numskins * sizeof(animscene_t) + loadmodel->num_bones * sizeof(aliasbone_t) + loadmodel->numframes * sizeof(animscene_t));
 	loadmodel->data_surfaces = (msurface_t *)data;data += loadmodel->num_surfaces * sizeof(msurface_t);
 	loadmodel->sortedmodelsurfaces = (int *)data;data += loadmodel->num_surfaces * sizeof(int);
 	loadmodel->data_textures = (texture_t *)data;data += loadmodel->num_surfaces * loadmodel->numskins * sizeof(texture_t);
@@ -3131,7 +3190,9 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.num_triangles = meshtriangles;
 	loadmodel->surfmesh.data_element3i = (int *)data;data += meshtriangles * sizeof(int[3]);
 	if (r_enableshadowvolumes.integer)
+	{
 		loadmodel->surfmesh.data_neighbor3i = (int *)data;data += meshtriangles * sizeof(int[3]);
+	}
 	loadmodel->surfmesh.data_vertex3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_svector3f = (float *)data;data += meshvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_tvector3f = (float *)data;data += meshvertices * sizeof(float[3]);
@@ -3141,12 +3202,18 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->skinscenes = (animscene_t *)data;data += loadmodel->numskins * sizeof(animscene_t);
 	loadmodel->data_bones = (aliasbone_t *)data;data += loadmodel->num_bones * sizeof(aliasbone_t);
 	loadmodel->animscenes = (animscene_t *)data;data += loadmodel->numframes * sizeof(animscene_t);
-	loadmodel->surfmesh.num_blends = 0;
-	loadmodel->surfmesh.blends = (unsigned short *)data;data += meshvertices * sizeof(unsigned short);
+	if (vblendindexes && vblendweights)
+	{
+		loadmodel->surfmesh.num_blends = 0;
+		loadmodel->surfmesh.blends = (unsigned short *)data;data += meshvertices * sizeof(unsigned short);
+	}
 	if (meshvertices <= 65536)
+	{
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += meshtriangles * sizeof(unsigned short[3]);
+	}
 	loadmodel->data_poses6s = (short *)data;data += loadmodel->num_poses * loadmodel->num_bones * sizeof(short[6]);
-	loadmodel->surfmesh.data_blendweights = (blendweights_t *)Mem_Alloc(loadmodel->mempool, meshvertices * sizeof(blendweights_t));
+	if (vblendindexes && vblendweights)
+		loadmodel->surfmesh.data_blendweights = (blendweights_t *)Mem_Alloc(loadmodel->mempool, meshvertices * sizeof(blendweights_t));
 
 	for (i = 0;i < loadmodel->numskins;i++)
 	{
@@ -3157,138 +3224,276 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	}
 
 	// load the bone info
-	joint = (iqmjoint_t *) (pbase + header->ofs_joints);
-	for (i = 0;i < loadmodel->num_bones;i++)
+	if (header.version == 1)
 	{
-		matrix4x4_t relbase, relinvbase, pinvbase, invbase;
-		joint[i].name = LittleLong(joint[i].name);
-		joint[i].parent = LittleLong(joint[i].parent);
-		for (j = 0;j < 3;j++)
+		iqmjoint1_t *injoint1 = (iqmjoint1_t *)(pbase + header.ofs_joints);
+		if (loadmodel->num_bones)
+			joint1 = (iqmjoint1_t *)Mem_Alloc(loadmodel->mempool, loadmodel->num_bones * sizeof(iqmjoint1_t));
+		for (i = 0;i < loadmodel->num_bones;i++)
 		{
-			joint[i].origin[j] = LittleFloat(joint[i].origin[j]);
-			joint[i].rotation[j] = LittleFloat(joint[i].rotation[j]);
-			joint[i].scale[j] = LittleFloat(joint[i].scale[j]);
+			matrix4x4_t relbase, relinvbase, pinvbase, invbase;
+			joint1[i].name = LittleLong(injoint1[i].name);
+			joint1[i].parent = LittleLong(injoint1[i].parent);
+			for (j = 0;j < 3;j++)
+			{
+				joint1[i].origin[j] = LittleFloat(injoint1[i].origin[j]);
+				joint1[i].rotation[j] = LittleFloat(injoint1[i].rotation[j]);
+				joint1[i].scale[j] = LittleFloat(injoint1[i].scale[j]);
+			}
+			strlcpy(loadmodel->data_bones[i].name, &text[joint1[i].name], sizeof(loadmodel->data_bones[i].name));
+			loadmodel->data_bones[i].parent = joint1[i].parent;
+			if (loadmodel->data_bones[i].parent >= i)
+				Host_Error("%s bone[%i].parent >= %i", loadmodel->name, i, i);
+			Matrix4x4_FromDoom3Joint(&relbase, joint1[i].origin[0], joint1[i].origin[1], joint1[i].origin[2], joint1[i].rotation[0], joint1[i].rotation[1], joint1[i].rotation[2]);
+			Matrix4x4_Invert_Simple(&relinvbase, &relbase);
+			if (loadmodel->data_bones[i].parent >= 0)
+			{
+				Matrix4x4_FromArray12FloatD3D(&pinvbase, loadmodel->data_baseboneposeinverse + 12*loadmodel->data_bones[i].parent);
+				Matrix4x4_Concat(&invbase, &relinvbase, &pinvbase);
+				Matrix4x4_ToArray12FloatD3D(&invbase, loadmodel->data_baseboneposeinverse + 12*i);
+			}
+			else Matrix4x4_ToArray12FloatD3D(&relinvbase, loadmodel->data_baseboneposeinverse + 12*i);
 		}
-		strlcpy(loadmodel->data_bones[i].name, &text[joint[i].name], sizeof(loadmodel->data_bones[i].name));
-		loadmodel->data_bones[i].parent = joint[i].parent;
-		if (loadmodel->data_bones[i].parent >= i)
-			Host_Error("%s bone[%i].parent >= %i", loadmodel->name, i, i);
-		Matrix4x4_FromDoom3Joint(&relbase, joint[i].origin[0], joint[i].origin[1], joint[i].origin[2], joint[i].rotation[0], joint[i].rotation[1], joint[i].rotation[2]);
-		Matrix4x4_Invert_Simple(&relinvbase, &relbase);
-		if (loadmodel->data_bones[i].parent >= 0)
+	}
+	else
+	{
+		iqmjoint_t *injoint = (iqmjoint_t *)(pbase + header.ofs_joints);
+		if (header.num_joints)
+			joint = (iqmjoint_t *)Mem_Alloc(loadmodel->mempool, loadmodel->num_bones * sizeof(iqmjoint_t));
+		for (i = 0;i < loadmodel->num_bones;i++)
 		{
-			Matrix4x4_FromArray12FloatD3D(&pinvbase, loadmodel->data_baseboneposeinverse + 12*loadmodel->data_bones[i].parent);
-			Matrix4x4_Concat(&invbase, &relinvbase, &pinvbase);
-			Matrix4x4_ToArray12FloatD3D(&invbase, loadmodel->data_baseboneposeinverse + 12*i);
-		}	
-		else Matrix4x4_ToArray12FloatD3D(&relinvbase, loadmodel->data_baseboneposeinverse + 12*i);
+			matrix4x4_t relbase, relinvbase, pinvbase, invbase;
+			joint[i].name = LittleLong(injoint[i].name);
+			joint[i].parent = LittleLong(injoint[i].parent);
+			for (j = 0;j < 3;j++)
+			{
+				joint[i].origin[j] = LittleFloat(injoint[i].origin[j]);
+				joint[i].rotation[j] = LittleFloat(injoint[i].rotation[j]);
+				joint[i].scale[j] = LittleFloat(injoint[i].scale[j]);
+			}
+			joint[i].rotation[3] = LittleFloat(injoint[i].rotation[3]);
+			strlcpy(loadmodel->data_bones[i].name, &text[joint[i].name], sizeof(loadmodel->data_bones[i].name));
+			loadmodel->data_bones[i].parent = joint[i].parent;
+			if (loadmodel->data_bones[i].parent >= i)
+				Host_Error("%s bone[%i].parent >= %i", loadmodel->name, i, i);
+			if (joint[i].rotation[3] > 0)
+				Vector4Negate(joint[i].rotation, joint[i].rotation);
+			Vector4Normalize2(joint[i].rotation, joint[i].rotation);
+			Matrix4x4_FromDoom3Joint(&relbase, joint[i].origin[0], joint[i].origin[1], joint[i].origin[2], joint[i].rotation[0], joint[i].rotation[1], joint[i].rotation[2]);
+			Matrix4x4_Invert_Simple(&relinvbase, &relbase);
+			if (loadmodel->data_bones[i].parent >= 0)
+			{
+				Matrix4x4_FromArray12FloatD3D(&pinvbase, loadmodel->data_baseboneposeinverse + 12*loadmodel->data_bones[i].parent);
+				Matrix4x4_Concat(&invbase, &relinvbase, &pinvbase);
+				Matrix4x4_ToArray12FloatD3D(&invbase, loadmodel->data_baseboneposeinverse + 12*i);
+			}	
+			else Matrix4x4_ToArray12FloatD3D(&relinvbase, loadmodel->data_baseboneposeinverse + 12*i);
+		}
 	}
 
 	// set up the animscenes based on the anims
-	anim = (iqmanim_t *) (pbase + header->ofs_anims);
-	for (i = 0;i < (int)header->num_anims;i++)
+	for (i = 0;i < (int)header.num_anims;i++)
 	{
-		anim[i].name = LittleLong(anim[i].name);
-		anim[i].first_frame = LittleLong(anim[i].first_frame);
-		anim[i].num_frames = LittleLong(anim[i].num_frames);
-		anim[i].framerate = LittleFloat(anim[i].framerate);
-		anim[i].flags = LittleLong(anim[i].flags);
-		strlcpy(loadmodel->animscenes[i].name, &text[anim[i].name], sizeof(loadmodel->animscenes[i].name));
-		loadmodel->animscenes[i].firstframe = anim[i].first_frame;
-		loadmodel->animscenes[i].framecount = anim[i].num_frames;
-		loadmodel->animscenes[i].loop = ((anim[i].flags & IQM_LOOP) != 0);
-		loadmodel->animscenes[i].framerate = anim[i].framerate;
+		iqmanim_t anim;
+		anim.name = LittleLong(anims[i].name);
+		anim.first_frame = LittleLong(anims[i].first_frame);
+		anim.num_frames = LittleLong(anims[i].num_frames);
+		anim.framerate = LittleFloat(anims[i].framerate);
+		anim.flags = LittleLong(anims[i].flags);
+		strlcpy(loadmodel->animscenes[i].name, &text[anim.name], sizeof(loadmodel->animscenes[i].name));
+		loadmodel->animscenes[i].firstframe = anim.first_frame;
+		loadmodel->animscenes[i].framecount = anim.num_frames;
+		loadmodel->animscenes[i].loop = ((anim.flags & IQM_LOOP) != 0);
+		loadmodel->animscenes[i].framerate = anim.framerate;
 	}
-	
-	pose = (iqmpose_t *) (pbase + header->ofs_poses);
-	biggestorigin = 0;
-	for (i = 0;i < (int)header->num_poses;i++)
+	if (header.num_anims <= 0)
 	{
-		float f;
-		pose[i].parent = LittleLong(pose[i].parent);
-		pose[i].channelmask = LittleLong(pose[i].channelmask);
-		pose[i].channeloffset[0] = LittleFloat(pose[i].channeloffset[0]);
-		pose[i].channeloffset[1] = LittleFloat(pose[i].channeloffset[1]);
-		pose[i].channeloffset[2] = LittleFloat(pose[i].channeloffset[2]);	
-		pose[i].channeloffset[3] = LittleFloat(pose[i].channeloffset[3]);
-		pose[i].channeloffset[4] = LittleFloat(pose[i].channeloffset[4]);
-		pose[i].channeloffset[5] = LittleFloat(pose[i].channeloffset[5]);
-		pose[i].channeloffset[6] = LittleFloat(pose[i].channeloffset[6]);
-		pose[i].channeloffset[7] = LittleFloat(pose[i].channeloffset[7]);
-		pose[i].channeloffset[8] = LittleFloat(pose[i].channeloffset[8]);
-		pose[i].channelscale[0] = LittleFloat(pose[i].channelscale[0]);
-		pose[i].channelscale[1] = LittleFloat(pose[i].channelscale[1]);
-		pose[i].channelscale[2] = LittleFloat(pose[i].channelscale[2]);
-		pose[i].channelscale[3] = LittleFloat(pose[i].channelscale[3]);
-		pose[i].channelscale[4] = LittleFloat(pose[i].channelscale[4]);
-		pose[i].channelscale[5] = LittleFloat(pose[i].channelscale[5]);
-		pose[i].channelscale[6] = LittleFloat(pose[i].channelscale[6]);
-		pose[i].channelscale[7] = LittleFloat(pose[i].channelscale[7]);
-		pose[i].channelscale[8] = LittleFloat(pose[i].channelscale[8]);
-		f = fabs(pose[i].channeloffset[0]); biggestorigin = max(biggestorigin, f);
-		f = fabs(pose[i].channeloffset[1]); biggestorigin = max(biggestorigin, f);
-		f = fabs(pose[i].channeloffset[2]); biggestorigin = max(biggestorigin, f);
-		f = fabs(pose[i].channeloffset[0] + 0xFFFF*pose[i].channelscale[0]); biggestorigin = max(biggestorigin, f);
-		f = fabs(pose[i].channeloffset[1] + 0xFFFF*pose[i].channelscale[1]); biggestorigin = max(biggestorigin, f);
-		f = fabs(pose[i].channeloffset[2] + 0xFFFF*pose[i].channelscale[2]); biggestorigin = max(biggestorigin, f);
+		strlcpy(loadmodel->animscenes[0].name, "static", sizeof(loadmodel->animscenes[0].name));
+		loadmodel->animscenes[0].firstframe = 0;
+		loadmodel->animscenes[0].framecount = 1;
+		loadmodel->animscenes[0].loop = true;
+		loadmodel->animscenes[0].framerate = 10;
+	}
+
+	biggestorigin = 0;
+	if (header.version == 1)
+	{
+		iqmpose1_t *inpose1 = (iqmpose1_t *)(pbase + header.ofs_poses);
+		if (header.num_poses)
+			pose1 = (iqmpose1_t *)Mem_Alloc(loadmodel->mempool, header.num_poses * sizeof(iqmpose1_t));
+		for (i = 0;i < (int)header.num_poses;i++)
+		{
+			float f;
+			pose1[i].parent = LittleLong(inpose1[i].parent);
+			pose1[i].channelmask = LittleLong(inpose1[i].channelmask);
+			for (j = 0;j < 9;j++)
+			{
+				pose1[i].channeloffset[j] = LittleFloat(inpose1[i].channeloffset[j]);
+				pose1[i].channelscale[j] = LittleFloat(inpose1[i].channelscale[j]);
+			}
+			f = fabs(pose1[i].channeloffset[0]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose1[i].channeloffset[1]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose1[i].channeloffset[2]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose1[i].channeloffset[0] + 0xFFFF*pose1[i].channelscale[0]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose1[i].channeloffset[1] + 0xFFFF*pose1[i].channelscale[1]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose1[i].channeloffset[2] + 0xFFFF*pose1[i].channelscale[2]); biggestorigin = max(biggestorigin, f);
+		}
+		if (header.num_frames <= 0)
+		{
+			for (i = 0;i < loadmodel->num_bones;i++)
+			{
+				float f;
+				f = fabs(joint1[i].origin[0]); biggestorigin = max(biggestorigin, f);
+				f = fabs(joint1[i].origin[1]); biggestorigin = max(biggestorigin, f);
+				f = fabs(joint1[i].origin[2]); biggestorigin = max(biggestorigin, f);
+			}
+		}
+	}
+	else
+	{
+		iqmpose_t *inpose = (iqmpose_t *)(pbase + header.ofs_poses);
+		if (header.num_poses)
+			pose = (iqmpose_t *)Mem_Alloc(loadmodel->mempool, header.num_poses * sizeof(iqmpose_t));
+		for (i = 0;i < (int)header.num_poses;i++)
+		{
+			float f;
+			pose[i].parent = LittleLong(inpose[i].parent);
+			pose[i].channelmask = LittleLong(inpose[i].channelmask);
+			for (j = 0;j < 10;j++)
+			{
+				pose[i].channeloffset[j] = LittleFloat(inpose[i].channeloffset[j]);
+				pose[i].channelscale[j] = LittleFloat(inpose[i].channelscale[j]);
+			}
+			f = fabs(pose[i].channeloffset[0]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose[i].channeloffset[1]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose[i].channeloffset[2]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose[i].channeloffset[0] + 0xFFFF*pose[i].channelscale[0]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose[i].channeloffset[1] + 0xFFFF*pose[i].channelscale[1]); biggestorigin = max(biggestorigin, f);
+			f = fabs(pose[i].channeloffset[2] + 0xFFFF*pose[i].channelscale[2]); biggestorigin = max(biggestorigin, f);
+		}
+		if (header.num_frames <= 0)
+		{
+			for (i = 0;i < loadmodel->num_bones;i++)
+			{
+				float f;
+				f = fabs(joint[i].origin[0]); biggestorigin = max(biggestorigin, f);
+				f = fabs(joint[i].origin[1]); biggestorigin = max(biggestorigin, f);
+				f = fabs(joint[i].origin[2]); biggestorigin = max(biggestorigin, f);
+			}
+		}
 	}
 	loadmodel->num_posescale = biggestorigin / 32767.0f;
 	loadmodel->num_poseinvscale = 1.0f / loadmodel->num_posescale;
 
 	// load the pose data
-	framedata = (unsigned short *) (pbase + header->ofs_frames);
-	for (i = 0, k = 0;i < (int)header->num_frames;i++)	
+	// this unaligned memory access is safe (LittleShort reads as bytes)
+	framedata = (const unsigned short *)(pbase + header.ofs_frames);
+	if (header.version == 1)
 	{
-		for (j = 0;j < (int)header->num_poses;j++, k++)
+		for (i = 0, k = 0;i < (int)header.num_frames;i++)
 		{
-			loadmodel->data_poses6s[k*6 + 0] = loadmodel->num_poseinvscale * (pose[j].channeloffset[0] + (pose[j].channelmask&1 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[0] : 0));
-			loadmodel->data_poses6s[k*6 + 1] = loadmodel->num_poseinvscale * (pose[j].channeloffset[1] + (pose[j].channelmask&2 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[1] : 0));
-			loadmodel->data_poses6s[k*6 + 2] = loadmodel->num_poseinvscale * (pose[j].channeloffset[2] + (pose[j].channelmask&4 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[2] : 0));
-			loadmodel->data_poses6s[k*6 + 3] = 32767.0f * (pose[j].channeloffset[3] + (pose[j].channelmask&8 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[3] : 0));
-			loadmodel->data_poses6s[k*6 + 4] = 32767.0f * (pose[j].channeloffset[4] + (pose[j].channelmask&16 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[4] : 0));
-			loadmodel->data_poses6s[k*6 + 5] = 32767.0f * (pose[j].channeloffset[5] + (pose[j].channelmask&32 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[5] : 0));
-			// skip scale data for now
-			if(pose[j].channelmask&64) framedata++;
-			if(pose[j].channelmask&128) framedata++;
-			if(pose[j].channelmask&256) framedata++;
+			for (j = 0;j < (int)header.num_poses;j++, k++)
+			{
+				loadmodel->data_poses6s[k*6 + 0] = loadmodel->num_poseinvscale * (pose1[j].channeloffset[0] + (pose1[j].channelmask&1 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[0] : 0));
+				loadmodel->data_poses6s[k*6 + 1] = loadmodel->num_poseinvscale * (pose1[j].channeloffset[1] + (pose1[j].channelmask&2 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[1] : 0));
+				loadmodel->data_poses6s[k*6 + 2] = loadmodel->num_poseinvscale * (pose1[j].channeloffset[2] + (pose1[j].channelmask&4 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[2] : 0));
+				loadmodel->data_poses6s[k*6 + 3] = 32767.0f * (pose1[j].channeloffset[3] + (pose1[j].channelmask&8 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[3] : 0));
+				loadmodel->data_poses6s[k*6 + 4] = 32767.0f * (pose1[j].channeloffset[4] + (pose1[j].channelmask&16 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[4] : 0));
+				loadmodel->data_poses6s[k*6 + 5] = 32767.0f * (pose1[j].channeloffset[5] + (pose1[j].channelmask&32 ? (unsigned short)LittleShort(*framedata++) * pose1[j].channelscale[5] : 0));
+				// skip scale data for now
+				if(pose1[j].channelmask&64) framedata++;
+				if(pose1[j].channelmask&128) framedata++;
+				if(pose1[j].channelmask&256) framedata++;
+			}
+		}
+		if (header.num_frames <= 0)
+		{
+			for (i = 0;i < loadmodel->num_bones;i++)
+			{
+				loadmodel->data_poses6s[i*6 + 0] = loadmodel->num_poseinvscale * joint1[i].origin[0];
+				loadmodel->data_poses6s[i*6 + 1] = loadmodel->num_poseinvscale * joint1[i].origin[1];
+				loadmodel->data_poses6s[i*6 + 2] = loadmodel->num_poseinvscale * joint1[i].origin[2];
+				loadmodel->data_poses6s[i*6 + 3] = 32767.0f * joint1[i].rotation[0];
+				loadmodel->data_poses6s[i*6 + 4] = 32767.0f * joint1[i].rotation[1];
+				loadmodel->data_poses6s[i*6 + 5] = 32767.0f * joint1[i].rotation[2];
+			}
+		}
+	}
+	else
+	{
+		for (i = 0, k = 0;i < (int)header.num_frames;i++)	
+		{
+			for (j = 0;j < (int)header.num_poses;j++, k++)
+			{
+				float rot[4];
+				loadmodel->data_poses6s[k*6 + 0] = loadmodel->num_poseinvscale * (pose[j].channeloffset[0] + (pose[j].channelmask&1 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[0] : 0));
+				loadmodel->data_poses6s[k*6 + 1] = loadmodel->num_poseinvscale * (pose[j].channeloffset[1] + (pose[j].channelmask&2 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[1] : 0));
+				loadmodel->data_poses6s[k*6 + 2] = loadmodel->num_poseinvscale * (pose[j].channeloffset[2] + (pose[j].channelmask&4 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[2] : 0));
+				rot[0] = pose[j].channeloffset[3] + (pose[j].channelmask&8 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[3] : 0);
+				rot[1] = pose[j].channeloffset[4] + (pose[j].channelmask&16 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[4] : 0);
+				rot[2] = pose[j].channeloffset[5] + (pose[j].channelmask&32 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[5] : 0);
+				rot[3] = pose[j].channeloffset[6] + (pose[j].channelmask&64 ? (unsigned short)LittleShort(*framedata++) * pose[j].channelscale[6] : 0);
+				if (rot[3] > 0)
+					Vector4Negate(rot, rot);
+				Vector4Normalize2(rot, rot);
+				loadmodel->data_poses6s[k*6 + 3] = 32767.0f * rot[0];
+				loadmodel->data_poses6s[k*6 + 4] = 32767.0f * rot[1];
+				loadmodel->data_poses6s[k*6 + 5] = 32767.0f * rot[2];
+				// skip scale data for now
+				if(pose[j].channelmask&128) framedata++;
+				if(pose[j].channelmask&256) framedata++;
+				if(pose[j].channelmask&512) framedata++;
+			}
+		}
+		if (header.num_frames <= 0)
+		{
+			for (i = 0;i < loadmodel->num_bones;i++)
+			{
+				loadmodel->data_poses6s[i*6 + 0] = loadmodel->num_poseinvscale * joint[i].origin[0];
+				loadmodel->data_poses6s[i*6 + 1] = loadmodel->num_poseinvscale * joint[i].origin[1];
+				loadmodel->data_poses6s[i*6 + 2] = loadmodel->num_poseinvscale * joint[i].origin[2];
+				loadmodel->data_poses6s[i*6 + 3] = 32767.0f * joint[i].rotation[0];
+				loadmodel->data_poses6s[i*6 + 4] = 32767.0f * joint[i].rotation[1];
+				loadmodel->data_poses6s[i*6 + 5] = 32767.0f * joint[i].rotation[2];
+			}
 		}
 	}
 
 	// load bounding box data
-	if (header->ofs_bounds)
+	if (header.ofs_bounds)
 	{
 		float xyradius = 0, radius = 0;
-		bounds = (iqmbounds_t *) (pbase + header->ofs_bounds);
 		VectorClear(loadmodel->normalmins);
 		VectorClear(loadmodel->normalmaxs);
-		for (i = 0; i < (int)header->num_frames;i++)
+		for (i = 0; i < (int)header.num_frames;i++)
 		{
-			bounds[i].mins[0] = LittleFloat(bounds[i].mins[0]);
-			bounds[i].mins[1] = LittleFloat(bounds[i].mins[1]);
-			bounds[i].mins[2] = LittleFloat(bounds[i].mins[2]);
-			bounds[i].maxs[0] = LittleFloat(bounds[i].maxs[0]);			
-			bounds[i].maxs[1] = LittleFloat(bounds[i].maxs[1]);	
-			bounds[i].maxs[2] = LittleFloat(bounds[i].maxs[2]);	
-			bounds[i].xyradius = LittleFloat(bounds[i].xyradius);
-			bounds[i].radius = LittleFloat(bounds[i].radius);
+			iqmbounds_t bound;
+			bound.mins[0] = LittleFloat(bounds[i].mins[0]);
+			bound.mins[1] = LittleFloat(bounds[i].mins[1]);
+			bound.mins[2] = LittleFloat(bounds[i].mins[2]);
+			bound.maxs[0] = LittleFloat(bounds[i].maxs[0]);			
+			bound.maxs[1] = LittleFloat(bounds[i].maxs[1]);	
+			bound.maxs[2] = LittleFloat(bounds[i].maxs[2]);	
+			bound.xyradius = LittleFloat(bounds[i].xyradius);
+			bound.radius = LittleFloat(bounds[i].radius);
 			if (!i)
 			{
-				VectorCopy(bounds[i].mins, loadmodel->normalmins);
-				VectorCopy(bounds[i].maxs, loadmodel->normalmaxs);
+				VectorCopy(bound.mins, loadmodel->normalmins);
+				VectorCopy(bound.maxs, loadmodel->normalmaxs);
 			}
 			else
 			{
-				if (loadmodel->normalmins[0] > bounds[i].mins[0]) loadmodel->normalmins[0] = bounds[i].mins[0];
-				if (loadmodel->normalmins[1] > bounds[i].mins[1]) loadmodel->normalmins[1] = bounds[i].mins[1];
-				if (loadmodel->normalmins[2] > bounds[i].mins[2]) loadmodel->normalmins[2] = bounds[i].mins[2];
-				if (loadmodel->normalmaxs[0] < bounds[i].maxs[0]) loadmodel->normalmaxs[0] = bounds[i].maxs[0];
-				if (loadmodel->normalmaxs[1] < bounds[i].maxs[1]) loadmodel->normalmaxs[1] = bounds[i].maxs[1];
-				if (loadmodel->normalmaxs[2] < bounds[i].maxs[2]) loadmodel->normalmaxs[2] = bounds[i].maxs[2];
+				if (loadmodel->normalmins[0] > bound.mins[0]) loadmodel->normalmins[0] = bound.mins[0];
+				if (loadmodel->normalmins[1] > bound.mins[1]) loadmodel->normalmins[1] = bound.mins[1];
+				if (loadmodel->normalmins[2] > bound.mins[2]) loadmodel->normalmins[2] = bound.mins[2];
+				if (loadmodel->normalmaxs[0] < bound.maxs[0]) loadmodel->normalmaxs[0] = bound.maxs[0];
+				if (loadmodel->normalmaxs[1] < bound.maxs[1]) loadmodel->normalmaxs[1] = bound.maxs[1];
+				if (loadmodel->normalmaxs[2] < bound.maxs[2]) loadmodel->normalmaxs[2] = bound.maxs[2];
 			}
-			if (bounds[i].xyradius > xyradius)
-				xyradius = bounds[i].xyradius;
-			if (bounds[i].radius > radius)
-				radius = bounds[i].radius;
+			if (bound.xyradius > xyradius)
+				xyradius = bound.xyradius;
+			if (bound.radius > radius)
+				radius = bound.radius;
 		}
 		loadmodel->yawmins[0] = loadmodel->yawmins[1] = -xyradius;
 		loadmodel->yawmaxs[0] = loadmodel->yawmaxs[1] = xyradius;
@@ -3301,35 +3506,38 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	}
 
 	// load triangle data
-	inelements = (const int *) (pbase + header->ofs_triangles);
+	// this unaligned memory access is safe (LittleLong reads as bytes)
+	inelements = (const unsigned int *)(pbase + header.ofs_triangles);
 	outelements = loadmodel->surfmesh.data_element3i;
-	for (i = 0;i < (int)header->num_triangles;i++)
+	for (i = 0;i < (int)header.num_triangles;i++)
 	{
-		outelements[0] = LittleLong(inelements[0]);		
+		outelements[0] = LittleLong(inelements[0]);
 		outelements[1] = LittleLong(inelements[1]);
 		outelements[2] = LittleLong(inelements[2]);
 		outelements += 3;
 		inelements += 3;
 	}
-	Mod_ValidateElements(loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles, 0, header->num_vertexes, __FILE__, __LINE__);
+	Mod_ValidateElements(loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles, 0, header.num_vertexes, __FILE__, __LINE__);
 
-	if (header->ofs_neighbors && loadmodel->surfmesh.data_neighbor3i)
+	if (header.ofs_neighbors && loadmodel->surfmesh.data_neighbor3i)
 	{
-		inelements = (const int *) (pbase + header->ofs_neighbors);
-		outelements = loadmodel->surfmesh.data_neighbor3i;
-		for (i = 0;i < (int)header->num_triangles;i++)
+		// this unaligned memory access is safe (LittleLong reads as bytes)
+		inneighbors = (const int *)(pbase + header.ofs_neighbors);
+		outneighbors = loadmodel->surfmesh.data_neighbor3i;
+		for (i = 0;i < (int)header.num_triangles;i++)
 		{
-			outelements[0] = LittleLong(inelements[0]);
-			outelements[1] = LittleLong(inelements[1]);
-			outelements[2] = LittleLong(inelements[2]);
-			outelements += 3;
-			inelements += 3;
+			outneighbors[0] = LittleLong(inneighbors[0]);
+			outneighbors[1] = LittleLong(inneighbors[1]);
+			outneighbors[2] = LittleLong(inneighbors[2]);
+			outneighbors += 3;
+			inneighbors += 3;
 		}
 	}
 
 	// load vertex data
+	// this unaligned memory access is safe (LittleFloat reads as bytes)
 	outvertex = loadmodel->surfmesh.data_vertex3f;
-	for (i = 0;i < (int)header->num_vertexes;i++)
+	for (i = 0;i < (int)header.num_vertexes;i++)
 	{
 		outvertex[0] = LittleFloat(vposition[0]);
 		outvertex[1] = LittleFloat(vposition[1]);
@@ -3339,7 +3547,8 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	}
 
 	outtexcoord = loadmodel->surfmesh.data_texcoordtexture2f;
-	for (i = 0;i < (int)header->num_vertexes;i++)
+	// this unaligned memory access is safe (LittleFloat reads as bytes)
+	for (i = 0;i < (int)header.num_vertexes;i++)
 	{
 		outtexcoord[0] = LittleFloat(vtexcoord[0]);
 		outtexcoord[1] = LittleFloat(vtexcoord[1]);
@@ -3347,10 +3556,11 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		outtexcoord += 2;
 	}
 
+	// this unaligned memory access is safe (LittleFloat reads as bytes)
 	if(vnormal)
 	{
 		outnormal = loadmodel->surfmesh.data_normal3f;
-		for (i = 0;i < (int)header->num_vertexes;i++)
+		for (i = 0;i < (int)header.num_vertexes;i++)
 		{
 			outnormal[0] = LittleFloat(vnormal[0]);
 			outnormal[1] = LittleFloat(vnormal[1]);
@@ -3360,12 +3570,13 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		}
 	}
 
+	// this unaligned memory access is safe (LittleFloat reads as bytes)
 	if(vnormal && vtangent)
 	{
 		outnormal = loadmodel->surfmesh.data_normal3f;
 		outsvector = loadmodel->surfmesh.data_svector3f;
 		outtvector = loadmodel->surfmesh.data_tvector3f;
-		for (i = 0;i < (int)header->num_vertexes;i++)
+		for (i = 0;i < (int)header.num_vertexes;i++)
 		{
 			outsvector[0] = LittleFloat(vtangent[0]);
 			outsvector[1] = LittleFloat(vtangent[1]);
@@ -3381,36 +3592,40 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		}
 	}
 
-	for (i = 0; i < (int)header->num_vertexes;i++)
+	// this unaligned memory access is safe (all bytes)
+	if (vblendindexes && vblendweights)
 	{
-		blendweights_t weights;
-		memcpy(weights.index, vblendindexes + i*4, 4);
-		memcpy(weights.influence, vblendweights + i*4, 4);
-		loadmodel->surfmesh.blends[i] = Mod_Skeletal_AddBlend(loadmodel, &weights);
+		for (i = 0; i < (int)header.num_vertexes;i++)
+		{
+			blendweights_t weights;
+			memcpy(weights.index, vblendindexes + i*4, 4);
+			memcpy(weights.influence, vblendweights + i*4, 4);
+			loadmodel->surfmesh.blends[i] = Mod_Skeletal_AddBlend(loadmodel, &weights);
+		}
 	}
 
 	// load meshes
-	mesh = (iqmmesh_t *) (pbase + header->ofs_meshes);
-	for (i = 0;i < (int)header->num_meshes;i++)
+	for (i = 0;i < (int)header.num_meshes;i++)
 	{
+		iqmmesh_t mesh;
 		msurface_t *surface;
 
-		mesh[i].name = LittleLong(mesh[i].name);
-		mesh[i].material = LittleLong(mesh[i].material);
-		mesh[i].first_vertex = LittleLong(mesh[i].first_vertex);
-		mesh[i].num_vertexes = LittleLong(mesh[i].num_vertexes);
-		mesh[i].first_triangle = LittleLong(mesh[i].first_triangle);
-		mesh[i].num_triangles = LittleLong(mesh[i].num_triangles);
+		mesh.name = LittleLong(meshes[i].name);
+		mesh.material = LittleLong(meshes[i].material);
+		mesh.first_vertex = LittleLong(meshes[i].first_vertex);
+		mesh.num_vertexes = LittleLong(meshes[i].num_vertexes);
+		mesh.first_triangle = LittleLong(meshes[i].first_triangle);
+		mesh.num_triangles = LittleLong(meshes[i].num_triangles);
 
 		loadmodel->sortedmodelsurfaces[i] = i;
 		surface = loadmodel->data_surfaces + i;
 		surface->texture = loadmodel->data_textures + i;
-		surface->num_firsttriangle = mesh[i].first_triangle;
-		surface->num_triangles = mesh[i].num_triangles;
-		surface->num_firstvertex = mesh[i].first_vertex;
-		surface->num_vertices = mesh[i].num_vertexes;
+		surface->num_firsttriangle = mesh.first_triangle;
+		surface->num_triangles = mesh.num_triangles;
+		surface->num_firstvertex = mesh.first_vertex;
+		surface->num_vertices = mesh.num_vertexes;
 
-		Mod_BuildAliasSkinsFromSkinFiles(loadmodel->data_textures + i, skinfiles, &text[mesh[i].name], &text[mesh[i].material]);
+		Mod_BuildAliasSkinsFromSkinFiles(loadmodel->data_textures + i, skinfiles, &text[mesh.name], &text[mesh.material]);
 	}
 
 	Mod_FreeSkinFiles(skinfiles);
@@ -3424,9 +3639,9 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		Mod_BuildNormals(0, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->surfmesh.data_vertex3f, loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.data_normal3f, r_smoothnormals_areaweighting.integer != 0);
 	if (!vnormal || !vtangent)
 		Mod_BuildTextureVectorsFromNormals(0, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->surfmesh.data_vertex3f, loadmodel->surfmesh.data_texcoordtexture2f, loadmodel->surfmesh.data_normal3f, loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.data_svector3f, loadmodel->surfmesh.data_tvector3f, r_smoothnormals_areaweighting.integer != 0);
-	if (!header->ofs_neighbors && loadmodel->surfmesh.data_neighbor3i)
+	if (!header.ofs_neighbors && loadmodel->surfmesh.data_neighbor3i)
 		Mod_BuildTriangleNeighbors(loadmodel->surfmesh.data_neighbor3i, loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles);
-	if (!header->ofs_bounds)
+	if (!header.ofs_bounds)
 		Mod_Alias_CalculateBoundingBox();
 
 	loadmodel->surfmesh.isanimated = loadmodel->numframes > 1 || loadmodel->animscenes[0].framecount > 1;
@@ -3440,6 +3655,9 @@ void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		loadmodel->TracePoint = Mod_CollisionBIH_TracePoint_Mesh;
 		loadmodel->PointSuperContents = Mod_CollisionBIH_PointSuperContents_Mesh;
 	}
-}
 
-			
+	if (joint        ) Mem_Free(joint        );joint         = NULL;
+	if (joint1       ) Mem_Free(joint1       );joint1        = NULL;
+	if (pose         ) Mem_Free(pose         );pose          = NULL;
+	if (pose1        ) Mem_Free(pose1        );pose1         = NULL;
+}

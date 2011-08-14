@@ -50,14 +50,18 @@ static qboolean r_savedds;
 //
 r_refdef_t r_refdef;
 
-cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "motionblur value scale - 0.5 recommended"};
-cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "motionblur based on damage"};
-cvar_t r_motionblur_vmin = {CVAR_SAVE, "r_motionblur_vmin", "300", "minimum influence from velocity"};
-cvar_t r_motionblur_vmax = {CVAR_SAVE, "r_motionblur_vmax", "600", "maximum influence from velocity"};
-cvar_t r_motionblur_bmin = {CVAR_SAVE, "r_motionblur_bmin", "0.5", "velocity at which there is no blur yet (may be negative to always have some blur)"};
-cvar_t r_motionblur_vcoeff = {CVAR_SAVE, "r_motionblur_vcoeff", "0.05", "sliding average reaction time for velocity"};
-cvar_t r_motionblur_maxblur = {CVAR_SAVE, "r_motionblur_maxblur", "0.88", "cap for motionblur alpha value"};
+cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended"};
+cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended"};
+cvar_t r_motionblur_averaging = {CVAR_SAVE, "r_motionblur_averaging", "0.1", "sliding average reaction time for velocity (higher = slower adaption to change)"};
 cvar_t r_motionblur_randomize = {CVAR_SAVE, "r_motionblur_randomize", "0.1", "randomizing coefficient to workaround ghosting"};
+cvar_t r_motionblur_minblur = {CVAR_SAVE, "r_motionblur_minblur", "0.5", "factor of blur to apply at all times (always have this amount of blur no matter what the other factors are)"};
+cvar_t r_motionblur_maxblur = {CVAR_SAVE, "r_motionblur_maxblur", "0.9", "maxmimum amount of blur"};
+cvar_t r_motionblur_velocityfactor = {CVAR_SAVE, "r_motionblur_velocityfactor", "1", "factoring in of player velocity to the blur equation - the faster the player moves around the map, the more blur they get"};
+cvar_t r_motionblur_velocityfactor_minspeed = {CVAR_SAVE, "r_motionblur_velocityfactor_minspeed", "400", "lower value of velocity when it starts to factor into blur equation"};
+cvar_t r_motionblur_velocityfactor_maxspeed = {CVAR_SAVE, "r_motionblur_velocityfactor_maxspeed", "800", "upper value of velocity when it reaches the peak factor into blur equation"};
+cvar_t r_motionblur_mousefactor = {CVAR_SAVE, "r_motionblur_mousefactor", "2", "factoring in of mouse acceleration to the blur equation - the faster the player turns their mouse, the more blur they get"};
+cvar_t r_motionblur_mousefactor_minspeed = {CVAR_SAVE, "r_motionblur_mousefactor_minspeed", "0", "lower value of mouse acceleration when it starts to factor into blur equation"};
+cvar_t r_motionblur_mousefactor_maxspeed = {CVAR_SAVE, "r_motionblur_mousefactor_maxspeed", "50", "upper value of mouse acceleration when it reaches the peak factor into blur equation"};
 
 // TODO do we want a r_equalize_entities cvar that works on all ents, or would that be a cheat?
 cvar_t r_equalize_entities_fullbright = {CVAR_SAVE, "r_equalize_entities_fullbright", "0", "render fullbright entities by equalizing their lightness, not by not rendering light"};
@@ -72,7 +76,7 @@ cvar_t r_farclip_world = {0, "r_farclip_world", "2", "adds map size to farclip m
 cvar_t r_nearclip = {0, "r_nearclip", "1", "distance from camera of nearclip plane" };
 cvar_t r_deformvertexes = {0, "r_deformvertexes", "1", "allows use of deformvertexes in shader files (can be turned off to check performance impact)"};
 cvar_t r_transparent = {0, "r_transparent", "1", "allows use of transparent surfaces (can be turned off to check performance impact)"};
-cvar_t r_transparent_alphatocoverage = {0, "r_transparent_alphatocoverage", "0", "enables alpha-to-coverage antialiasing technique on alphatest surfaces, this is not yet finished as multisampling is not used"};
+cvar_t r_transparent_alphatocoverage = {0, "r_transparent_alphatocoverage", "1", "enables GL_ALPHA_TO_COVERAGE antialiasing technique on alphablend and alphatest surfaces when using vid_samples 2 or higher"};
 cvar_t r_showoverdraw = {0, "r_showoverdraw", "0", "shows overlapping geometry"};
 cvar_t r_showbboxes = {0, "r_showbboxes", "0", "shows bounding boxes of server entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
 cvar_t r_showsurfaces = {0, "r_showsurfaces", "0", "1 shows surfaces as different colors, or a value of 2 shows triangle draw order (for analyzing whether meshes are optimized for vertex cache)"};
@@ -197,7 +201,8 @@ cvar_t r_hdr_irisadaptation_multiplier = {CVAR_SAVE, "r_hdr_irisadaptation_multi
 cvar_t r_hdr_irisadaptation_minvalue = {CVAR_SAVE, "r_hdr_irisadaptation_minvalue", "0.5", "minimum value that can result from multiplier / brightness"};
 cvar_t r_hdr_irisadaptation_maxvalue = {CVAR_SAVE, "r_hdr_irisadaptation_maxvalue", "4", "maximum value that can result from multiplier / brightness"};
 cvar_t r_hdr_irisadaptation_value = {0, "r_hdr_irisadaptation_value", "1", "current value as scenebrightness multiplier, changes continuously when irisadaptation is active"};
-cvar_t r_hdr_irisadaptation_fade = {CVAR_SAVE, "r_hdr_irisadaptation_fade", "1", "fade rate at which value adjusts"};
+cvar_t r_hdr_irisadaptation_fade_up = {CVAR_SAVE, "r_hdr_irisadaptation_fade_up", "0.1", "fade rate at which value adjusts to darkness"};
+cvar_t r_hdr_irisadaptation_fade_down = {CVAR_SAVE, "r_hdr_irisadaptation_fade_down", "0.5", "fade rate at which value adjusts to brightness"};
 
 cvar_t r_smoothnormals_areaweighting = {0, "r_smoothnormals_areaweighting", "1", "uses significantly faster (and supposedly higher quality) area-weighted vertex normals and tangent vectors rather than summing normalized triangle normals and tangents"};
 
@@ -215,6 +220,7 @@ cvar_t r_glsl_vertextextureblend_usebothalphas = {CVAR_SAVE, "r_glsl_vertextextu
 cvar_t r_framedatasize = {CVAR_SAVE, "r_framedatasize", "0.5", "size of renderer data cache used during one frame (for skeletal animation caching, light processing, etc)"};
 
 extern cvar_t v_glslgamma;
+extern cvar_t v_glslgamma_2d;
 
 extern qboolean v_flipped_state;
 
@@ -678,13 +684,15 @@ shadermodeinfo_t glslshadermodeinfo[SHADERMODE_COUNT] =
 {
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_GENERIC\n", " generic"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_POSTPROCESS\n", " postprocess"},
-	{"glsl/default.glsl", NULL, NULL               , "#define MODE_DEPTH_OR_SHADOW\n", " depth/shadow"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_DEPTH_OR_SHADOW\n", " depth/shadow"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_FLATCOLOR\n", " flatcolor"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_VERTEXCOLOR\n", " vertexcolor"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTMAP\n", " lightmap"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_FAKELIGHT\n", " fakelight"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_MODELSPACE\n", " lightdirectionmap_modelspace"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_TANGENTSPACE\n", " lightdirectionmap_tangentspace"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_FORCED_LIGHTMAP\n", " lightdirectionmap_forced_lightmap"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_FORCED_VERTEXCOLOR\n", " lightdirectionmap_forced_vertexcolor"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTION\n", " lightdirection"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTSOURCE\n", " lightsource"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_REFRACTION\n", " refraction"},
@@ -705,6 +713,8 @@ shadermodeinfo_t hlslshadermodeinfo[SHADERMODE_COUNT] =
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_FAKELIGHT\n", " fakelight"},
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_LIGHTDIRECTIONMAP_MODELSPACE\n", " lightdirectionmap_modelspace"},
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_LIGHTDIRECTIONMAP_TANGENTSPACE\n", " lightdirectionmap_tangentspace"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_FORCED_LIGHTMAP\n", " lightdirectionmap_forced_lightmap"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_LIGHTDIRECTIONMAP_FORCED_VERTEXCOLOR\n", " lightdirectionmap_forced_vertexcolor"},
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_LIGHTDIRECTION\n", " lightdirection"},
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_LIGHTSOURCE\n", " lightsource"},
 	{"hlsl/default.hlsl", NULL, "hlsl/default.hlsl", "#define MODE_REFRACTION\n", " refraction"},
@@ -1893,7 +1903,7 @@ void R_GLSL_DumpShader_f(void)
 		Con_Printf("failed to write to hlsl/default.hlsl\n");
 }
 
-void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemode, int rgbscale, qboolean notrippy)
+void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemode, int rgbscale, qboolean usegamma, qboolean notrippy)
 {
 	unsigned int permutation = 0;
 	if (r_trippy.integer && !notrippy)
@@ -1905,12 +1915,16 @@ void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemod
 		permutation |= SHADERPERMUTATION_SPECULAR;
 	if (texturemode == GL_MODULATE)
 		permutation |= SHADERPERMUTATION_COLORMAPPING;
+	if (usegamma && v_glslgamma.integer && v_glslgamma_2d.integer && !vid.sRGB2D && r_texture_gammaramps && !vid_gammatables_trivial)
+		permutation |= SHADERPERMUTATION_GAMMARAMPS;
 	else if (texturemode == GL_ADD)
 		permutation |= SHADERPERMUTATION_GLOW;
 	else if (texturemode == GL_DECAL)
 		permutation |= SHADERPERMUTATION_VERTEXTEXTUREBLEND;
 	if (!second)
 		texturemode = GL_MODULATE;
+	if (vid.allowalphatocoverage)
+		GL_AlphaToCoverage(false);
 	switch (vid.renderpath)
 	{
 	case RENDERPATH_D3D9:
@@ -1918,6 +1932,8 @@ void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemod
 		R_SetupShader_SetPermutationHLSL(SHADERMODE_GENERIC, permutation);
 		R_Mesh_TexBind(GL20TU_FIRST , first );
 		R_Mesh_TexBind(GL20TU_SECOND, second);
+		if (permutation & SHADERPERMUTATION_GAMMARAMPS)
+			R_Mesh_TexBind(r_glsl_permutation->tex_Texture_GammaRamps, r_texture_gammaramps);
 #endif
 		break;
 	case RENDERPATH_D3D10:
@@ -1931,6 +1947,8 @@ void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemod
 		R_SetupShader_SetPermutationGLSL(SHADERMODE_GENERIC, permutation);
 		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First , first );
 		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Second, second);
+		if (r_glsl_permutation->tex_Texture_GammaRamps >= 0)
+			R_Mesh_TexBind(r_glsl_permutation->tex_Texture_GammaRamps, r_texture_gammaramps);
 		break;
 	case RENDERPATH_GL13:
 	case RENDERPATH_GLES1:
@@ -1956,6 +1974,8 @@ void R_SetupShader_DepthOrShadow(qboolean notrippy)
 	unsigned int permutation = 0;
 	if (r_trippy.integer && !notrippy)
 		permutation |= SHADERPERMUTATION_TRIPPY;
+	if (vid.allowalphatocoverage)
+		GL_AlphaToCoverage(false);
 	switch (vid.renderpath)
 	{
 	case RENDERPATH_D3D9:
@@ -1992,8 +2012,8 @@ void R_SetupShader_ShowDepth(qboolean notrippy)
 	int permutation = 0;
 	if (r_trippy.integer && !notrippy)
 		permutation |= SHADERPERMUTATION_TRIPPY;
-	if (r_trippy.integer)
-		permutation |= SHADERPERMUTATION_TRIPPY;
+	if (vid.allowalphatocoverage)
+		GL_AlphaToCoverage(false);
 	switch (vid.renderpath)
 	{
 	case RENDERPATH_D3D9:
@@ -2145,6 +2165,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			GL_BlendFunc(GL_ONE, GL_ZERO);
 			blendfuncflags = R_BlendFuncFlags(GL_ONE, GL_ZERO);
 		}
+		if (vid.allowalphatocoverage)
+			GL_AlphaToCoverage(false);
 	}
 	else if (rsurfacepass == RSURFPASS_DEFERREDGEOMETRY)
 	{
@@ -2164,6 +2186,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		mode = SHADERMODE_DEFERREDGEOMETRY;
 		GL_BlendFunc(GL_ONE, GL_ZERO);
 		blendfuncflags = R_BlendFuncFlags(GL_ONE, GL_ZERO);
+		if (vid.allowalphatocoverage)
+			GL_AlphaToCoverage(false);
 	}
 	else if (rsurfacepass == RSURFPASS_RTLIGHT)
 	{
@@ -2208,6 +2232,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_REFLECTCUBE;
 		GL_BlendFunc(GL_SRC_ALPHA, GL_ONE);
 		blendfuncflags = R_BlendFuncFlags(GL_SRC_ALPHA, GL_ONE);
+		if (vid.allowalphatocoverage)
+			GL_AlphaToCoverage(false);
 	}
 	else if (rsurface.texture->currentmaterialflags & MATERIALFLAG_FULLBRIGHT)
 	{
@@ -2250,6 +2276,17 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_REFLECTCUBE;
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
 		blendfuncflags = R_BlendFuncFlags(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
+		// when using alphatocoverage, we don't need alphakill
+		if (vid.allowalphatocoverage)
+		{
+			if (r_transparent_alphatocoverage.integer)
+			{
+				GL_AlphaToCoverage((rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST) != 0);
+				permutation &= ~SHADERPERMUTATION_ALPHAKILL;
+			}
+			else
+				GL_AlphaToCoverage(false);
+		}
 	}
 	else if (rsurface.texture->currentmaterialflags & MATERIALFLAG_MODELLIGHT_DIRECTIONAL)
 	{
@@ -2302,6 +2339,17 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
 		blendfuncflags = R_BlendFuncFlags(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
+		// when using alphatocoverage, we don't need alphakill
+		if (vid.allowalphatocoverage)
+		{
+			if (r_transparent_alphatocoverage.integer)
+			{
+				GL_AlphaToCoverage((rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST) != 0);
+				permutation &= ~SHADERPERMUTATION_ALPHAKILL;
+			}
+			else
+				GL_AlphaToCoverage(false);
+		}
 	}
 	else if (rsurface.texture->currentmaterialflags & MATERIALFLAG_MODELLIGHT)
 	{
@@ -2351,6 +2399,17 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
 		blendfuncflags = R_BlendFuncFlags(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
+		// when using alphatocoverage, we don't need alphakill
+		if (vid.allowalphatocoverage)
+		{
+			if (r_transparent_alphatocoverage.integer)
+			{
+				GL_AlphaToCoverage((rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST) != 0);
+				permutation &= ~SHADERPERMUTATION_ALPHAKILL;
+			}
+			else
+				GL_AlphaToCoverage(false);
+		}
 	}
 	else
 	{
@@ -2410,10 +2469,13 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			if (specularscale > 0)
 				permutation |= SHADERPERMUTATION_SPECULAR | SHADERPERMUTATION_DIFFUSE;
 		}
-		else if (r_glsl_deluxemapping.integer >= 2 && rsurface.uselightmaptexture)
+		else if (r_glsl_deluxemapping.integer >= 2)
 		{
 			// fake deluxemapping (uniform light direction in tangentspace)
-			mode = SHADERMODE_LIGHTDIRECTIONMAP_TANGENTSPACE;
+			if (rsurface.uselightmaptexture)
+				mode = SHADERMODE_LIGHTDIRECTIONMAP_FORCED_LIGHTMAP;
+			else
+				mode = SHADERMODE_LIGHTDIRECTIONMAP_FORCED_VERTEXCOLOR;
 			permutation |= SHADERPERMUTATION_DIFFUSE;
 			if (specularscale > 0)
 				permutation |= SHADERPERMUTATION_SPECULAR | SHADERPERMUTATION_DIFFUSE;
@@ -2436,6 +2498,17 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
 		blendfuncflags = R_BlendFuncFlags(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
+		// when using alphatocoverage, we don't need alphakill
+		if (vid.allowalphatocoverage)
+		{
+			if (r_transparent_alphatocoverage.integer)
+			{
+				GL_AlphaToCoverage((rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST) != 0);
+				permutation &= ~SHADERPERMUTATION_ALPHAKILL;
+			}
+			else
+				GL_AlphaToCoverage(false);
+		}
 	}
 	if(!(blendfuncflags & BLENDFUNC_ALLOWS_COLORMOD))
 		colormod = dummy_colormod;
@@ -2936,6 +3009,8 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 		else if (r_shadow_shadowmappcf)
 			permutation |= SHADERPERMUTATION_SHADOWMAPPCF;
 	}
+	if (vid.allowalphatocoverage)
+		GL_AlphaToCoverage(false);
 	Matrix4x4_Transform(&r_refdef.view.viewport.viewmatrix, rtlight->shadoworigin, viewlightorigin);
 	Matrix4x4_Concat(&lighttoview, &r_refdef.view.viewport.viewmatrix, &rtlight->matrix_lighttoworld);
 	Matrix4x4_Invert_Simple(&viewtolight, &lighttoview);
@@ -3273,11 +3348,13 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 			}
 		}
 		R_SKINFRAME_LOAD_AVERAGE_COLORS(basepixels_width * basepixels_height, basepixels[4 * pix + comp]);
+#ifndef USE_GLES2
 		//Con_Printf("Texture %s has average colors %f %f %f alpha %f\n", name, skinframe->avgcolor[0], skinframe->avgcolor[1], skinframe->avgcolor[2], skinframe->avgcolor[3]);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->base)
 			R_SaveTextureDDSFile(skinframe->base, va("dds/%s.dds", skinframe->basename), r_texture_dds_save.integer < 2, skinframe->hasalpha);
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->fog)
 			R_SaveTextureDDSFile(skinframe->fog, va("dds/%s_mask.dds", skinframe->basename), r_texture_dds_save.integer < 2, true);
+#endif
 	}
 
 	if (r_loaddds)
@@ -3318,8 +3395,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 			skinframe->nmap = R_LoadTexture2D (r_main_texturepool, va("%s_nmap", skinframe->basename), basepixels_width, basepixels_height, pixels, TEXTYPE_BGRA, (TEXF_ALPHA | textureflags) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP) & (gl_texturecompression_normal.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
 			Mem_Free(pixels);
 		}
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->nmap)
 			R_SaveTextureDDSFile(skinframe->nmap, va("dds/%s_norm.dds", skinframe->basename), r_texture_dds_save.integer < 2, true);
+#endif
 	}
 
 	// _luma is supported only for tenebrae compatibility
@@ -3328,8 +3407,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	if (skinframe->glow == NULL && ((pixels = loadimagepixelsbgra(va("%s_glow",  skinframe->basename), false, false, false, &mymiplevel)) || (pixels = loadimagepixelsbgra(va("%s_luma", skinframe->basename), false, false, false, &mymiplevel))))
 	{
 		skinframe->glow = R_LoadTexture2D (r_main_texturepool, va("%s_glow", skinframe->basename), image_width, image_height, pixels, vid.sRGB3D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_glow.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->glow)
 			R_SaveTextureDDSFile(skinframe->glow, va("dds/%s_glow.dds", skinframe->basename), r_texture_dds_save.integer < 2, true);
+#endif
 		Mem_Free(pixels);pixels = NULL;
 	}
 
@@ -3337,8 +3418,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	if (skinframe->gloss == NULL && r_loadgloss && (pixels = loadimagepixelsbgra(va("%s_gloss", skinframe->basename), false, false, false, &mymiplevel)))
 	{
 		skinframe->gloss = R_LoadTexture2D (r_main_texturepool, va("%s_gloss", skinframe->basename), image_width, image_height, pixels, vid.sRGB3D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_gloss.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->gloss)
 			R_SaveTextureDDSFile(skinframe->gloss, va("dds/%s_gloss.dds", skinframe->basename), r_texture_dds_save.integer < 2, true);
+#endif
 		Mem_Free(pixels);
 		pixels = NULL;
 	}
@@ -3347,8 +3430,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	if (skinframe->pants == NULL && (pixels = loadimagepixelsbgra(va("%s_pants", skinframe->basename), false, false, false, &mymiplevel)))
 	{
 		skinframe->pants = R_LoadTexture2D (r_main_texturepool, va("%s_pants", skinframe->basename), image_width, image_height, pixels, vid.sRGB3D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->pants)
 			R_SaveTextureDDSFile(skinframe->pants, va("dds/%s_pants.dds", skinframe->basename), r_texture_dds_save.integer < 2, false);
+#endif
 		Mem_Free(pixels);
 		pixels = NULL;
 	}
@@ -3357,8 +3442,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	if (skinframe->shirt == NULL && (pixels = loadimagepixelsbgra(va("%s_shirt", skinframe->basename), false, false, false, &mymiplevel)))
 	{
 		skinframe->shirt = R_LoadTexture2D (r_main_texturepool, va("%s_shirt", skinframe->basename), image_width, image_height, pixels, vid.sRGB3D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_color.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->shirt)
 			R_SaveTextureDDSFile(skinframe->shirt, va("dds/%s_shirt.dds", skinframe->basename), r_texture_dds_save.integer < 2, false);
+#endif
 		Mem_Free(pixels);
 		pixels = NULL;
 	}
@@ -3367,8 +3454,10 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	if (skinframe->reflect == NULL && (pixels = loadimagepixelsbgra(va("%s_reflect", skinframe->basename), false, false, false, &mymiplevel)))
 	{
 		skinframe->reflect = R_LoadTexture2D (r_main_texturepool, va("%s_reflect", skinframe->basename), image_width, image_height, pixels, vid.sRGB3D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags & (gl_texturecompression_reflectmask.integer && gl_texturecompression.integer ? ~0 : ~TEXF_COMPRESS), mymiplevel, NULL);
+#ifndef USE_GLES2
 		if (r_savedds && qglGetCompressedTexImageARB && skinframe->reflect)
 			R_SaveTextureDDSFile(skinframe->reflect, va("dds/%s_reflect.dds", skinframe->basename), r_texture_dds_save.integer < 2, true);
+#endif
 		Mem_Free(pixels);
 		pixels = NULL;
 	}
@@ -3975,8 +4064,10 @@ void gl_main_shutdown(void)
 	case RENDERPATH_GL20:
 	case RENDERPATH_GLES1:
 	case RENDERPATH_GLES2:
+#ifdef GL_SAMPLES_PASSED_ARB
 		if (r_maxqueries)
 			qglDeleteQueriesARB(r_maxqueries, r_queries);
+#endif
 		break;
 	case RENDERPATH_D3D9:
 		//Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
@@ -4079,13 +4170,17 @@ void GL_Main_Init(void)
 		Cvar_RegisterVariable (&gl_skyclip);
 	}
 	Cvar_RegisterVariable(&r_motionblur);
-	Cvar_RegisterVariable(&r_motionblur_maxblur);
-	Cvar_RegisterVariable(&r_motionblur_bmin);
-	Cvar_RegisterVariable(&r_motionblur_vmin);
-	Cvar_RegisterVariable(&r_motionblur_vmax);
-	Cvar_RegisterVariable(&r_motionblur_vcoeff);
-	Cvar_RegisterVariable(&r_motionblur_randomize);
 	Cvar_RegisterVariable(&r_damageblur);
+	Cvar_RegisterVariable(&r_motionblur_averaging);
+	Cvar_RegisterVariable(&r_motionblur_randomize);
+	Cvar_RegisterVariable(&r_motionblur_minblur);
+	Cvar_RegisterVariable(&r_motionblur_maxblur);
+	Cvar_RegisterVariable(&r_motionblur_velocityfactor);
+	Cvar_RegisterVariable(&r_motionblur_velocityfactor_minspeed);
+	Cvar_RegisterVariable(&r_motionblur_velocityfactor_maxspeed);
+	Cvar_RegisterVariable(&r_motionblur_mousefactor);
+	Cvar_RegisterVariable(&r_motionblur_mousefactor_minspeed);
+	Cvar_RegisterVariable(&r_motionblur_mousefactor_maxspeed);
 	Cvar_RegisterVariable(&r_equalize_entities_fullbright);
 	Cvar_RegisterVariable(&r_equalize_entities_minambient);
 	Cvar_RegisterVariable(&r_equalize_entities_by);
@@ -4204,7 +4299,8 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_hdr_irisadaptation_minvalue);
 	Cvar_RegisterVariable(&r_hdr_irisadaptation_maxvalue);
 	Cvar_RegisterVariable(&r_hdr_irisadaptation_value);
-	Cvar_RegisterVariable(&r_hdr_irisadaptation_fade);
+	Cvar_RegisterVariable(&r_hdr_irisadaptation_fade_up);
+	Cvar_RegisterVariable(&r_hdr_irisadaptation_fade_down);
 	Cvar_RegisterVariable(&r_smoothnormals_areaweighting);
 	Cvar_RegisterVariable(&developer_texturelogging);
 	Cvar_RegisterVariable(&gl_lightmaps);
@@ -4254,6 +4350,7 @@ void Render_Init(void)
 GL_Init
 ===============
 */
+#ifndef USE_GLES2
 extern char *ENGINE_EXTENSIONS;
 void GL_Init (void)
 {
@@ -4281,6 +4378,7 @@ void GL_Init (void)
 	// clear to black (loading plaque will be seen over this)
 	GL_Clear(GL_COLOR_BUFFER_BIT, NULL, 1.0f, 128);
 }
+#endif
 
 int R_CullBox(const vec3_t mins, const vec3_t maxs)
 {
@@ -4949,19 +5047,17 @@ void R_HDR_UpdateIrisAdaptation(const vec3_t point)
 		vec3_t diffusenormal;
 		vec_t brightness;
 		vec_t goal;
-		vec_t adjust;
 		vec_t current;
 		R_CompleteLightPoint(ambient, diffuse, diffusenormal, point, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
 		brightness = (ambient[0] + ambient[1] + ambient[2] + diffuse[0] + diffuse[1] + diffuse[2]) * (1.0f / 3.0f);
 		brightness = max(0.0000001f, brightness);
 		goal = r_hdr_irisadaptation_multiplier.value / brightness;
 		goal = bound(r_hdr_irisadaptation_minvalue.value, goal, r_hdr_irisadaptation_maxvalue.value);
-		adjust = r_hdr_irisadaptation_fade.value * cl.realframetime;
 		current = r_hdr_irisadaptation_value.value;
 		if (current < goal)
-			current = min(current + adjust, goal);
+			current = min(current + r_hdr_irisadaptation_fade_up.value * cl.realframetime, goal);
 		else if (current > goal)
-			current = max(current - adjust, goal);
+			current = max(current - r_hdr_irisadaptation_fade_down.value * cl.realframetime, goal);
 		if (fabs(r_hdr_irisadaptation_value.value - current) > 0.0001f)
 			Cvar_SetValueQuick(&r_hdr_irisadaptation_value, current);
 	}
@@ -5935,16 +6031,18 @@ void R_Bloom_StartFrame(void)
 			r_bloomstate.texture_framebuffercolor = R_LoadTexture2D(r_main_texturepool, "framebuffercolor", r_bloomstate.screentexturewidth, r_bloomstate.screentextureheight, NULL, textype, TEXF_RENDERTARGET | TEXF_FORCELINEAR | TEXF_CLAMP, -1, NULL);
 			r_bloomstate.fbo_framebuffer = R_Mesh_CreateFramebufferObject(r_bloomstate.texture_framebufferdepth, r_bloomstate.texture_framebuffercolor, NULL, NULL, NULL);
 			R_Mesh_SetRenderTargets(r_bloomstate.fbo_framebuffer, r_bloomstate.texture_framebufferdepth, r_bloomstate.texture_framebuffercolor, NULL, NULL, NULL);
+#ifndef USE_GLES2
 			// render depth into one texture and normalmap into the other
 			if (qglDrawBuffer)
 			{
 				int status;
-				qglDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);CHECKGLERROR
-				qglReadBuffer(GL_COLOR_ATTACHMENT0_EXT);CHECKGLERROR
-				status = qglCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT);CHECKGLERROR
-				if (status != GL_FRAMEBUFFER_COMPLETE_EXT)
+				qglDrawBuffer(GL_COLOR_ATTACHMENT0);CHECKGLERROR
+				qglReadBuffer(GL_COLOR_ATTACHMENT0);CHECKGLERROR
+				status = qglCheckFramebufferStatusEXT(GL_FRAMEBUFFER);CHECKGLERROR
+				if (status != GL_FRAMEBUFFER_COMPLETE)
 					Con_Printf("R_Bloom_StartFrame: glCheckFramebufferStatusEXT returned %i\n", status);
 			}
+#endif
 		}
 		r_bloomstate.bloomtexturewidth = bloomtexturewidth;
 		r_bloomstate.bloomtextureheight = bloomtextureheight;
@@ -6048,7 +6146,7 @@ void R_Bloom_CopyBloomTexture(float colorscale)
 		break;
 	}
 	// TODO: do boxfilter scale-down in shader?
-	R_SetupShader_Generic(r_bloomstate.texture_screen, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(r_bloomstate.texture_screen, NULL, GL_MODULATE, 1, false, true);
 	R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	r_refdef.stats.bloom_drawpixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 
@@ -6084,7 +6182,7 @@ void R_Bloom_MakeTexture(void)
 		GL_BlendFunc(GL_DST_COLOR, GL_SRC_COLOR);
 		GL_Color(r,r,r,1);
 		R_Mesh_PrepareVertices_Generic_Arrays(4, r_screenvertex3f, NULL, r_bloomstate.bloomtexcoord2f);
-		R_SetupShader_Generic(r_bloomstate.texture_bloom, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(r_bloomstate.texture_bloom, NULL, GL_MODULATE, 1, false, true);
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 		r_refdef.stats.bloom_drawpixels += r_bloomstate.bloomwidth * r_bloomstate.bloomheight;
 
@@ -6100,7 +6198,7 @@ void R_Bloom_MakeTexture(void)
 	brighten = sqrt(brighten);
 	if(range >= 1)
 		brighten *= (3 * range) / (2 * range - 1); // compensate for the "dot particle"
-	R_SetupShader_Generic(r_bloomstate.texture_bloom, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(r_bloomstate.texture_bloom, NULL, GL_MODULATE, 1, false, true);
 
 	for (dir = 0;dir < 2;dir++)
 	{
@@ -6235,31 +6333,42 @@ static void R_BlendView(void)
 			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0))
 			{
 				// declare variables
-				float speed;
-				static float avgspeed;
+				float blur_factor, blur_mouseaccel, blur_velocity;
+				static float blur_average; 
+				static vec3_t blur_oldangles; // used to see how quickly the mouse is moving
 
-				speed = VectorLength(cl.movement_velocity);
+				// set a goal for the factoring
+				blur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value) 
+					/ max(1, r_motionblur_velocityfactor_maxspeed.value - r_motionblur_velocityfactor_minspeed.value), 1);
+				blur_mouseaccel = bound(0, ((fabs(VectorLength(cl.viewangles) - VectorLength(blur_oldangles)) * 10) - r_motionblur_mousefactor_minspeed.value) 
+					/ max(1, r_motionblur_mousefactor_maxspeed.value - r_motionblur_mousefactor_minspeed.value), 1);
+				blur_factor = ((blur_velocity * r_motionblur_velocityfactor.value) 
+					+ (blur_mouseaccel * r_motionblur_mousefactor.value));
 
-				cl.motionbluralpha = bound(0, (cl.time - cl.oldtime) / max(0.001, r_motionblur_vcoeff.value), 1);
-				avgspeed = avgspeed * (1 - cl.motionbluralpha) + speed * cl.motionbluralpha;
-
-				speed = (avgspeed - r_motionblur_vmin.value) / max(1, r_motionblur_vmax.value - r_motionblur_vmin.value);
-				speed = bound(0, speed, 1);
-				speed = speed * (1 - r_motionblur_bmin.value) + r_motionblur_bmin.value;
+				// from the goal, pick an averaged value between goal and last value
+				cl.motionbluralpha = bound(0, (cl.time - cl.oldtime) / max(0.001, r_motionblur_averaging.value), 1);
+				blur_average = blur_average * (1 - cl.motionbluralpha) + blur_factor * cl.motionbluralpha;
+				
+				// enforce minimum amount of blur 
+				blur_factor = blur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
+				
+				//Con_Printf("motionblur: direct factor: %f, averaged factor: %f, velocity: %f, mouse accel: %f \n", blur_factor, blur_average, blur_velocity, blur_mouseaccel);
 
 				// calculate values into a standard alpha
 				cl.motionbluralpha = 1 - exp(-
 						(
-						 (r_motionblur.value * speed / 80)
+						 (r_motionblur.value * blur_factor / 80)
 						 +
 						 (r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
 						)
 						/
 						max(0.0001, cl.time - cl.oldtime) // fps independent
-					   );
-
+					  );
+				
+				// randomization for the blur value to combat persistent ghosting
 				cl.motionbluralpha *= lhrandom(1 - r_motionblur_randomize.value, 1 + r_motionblur_randomize.value);
 				cl.motionbluralpha = bound(0, cl.motionbluralpha, r_motionblur_maxblur.value);
+				
 				// apply the blur
 				if (cl.motionbluralpha > 0 && !r_refdef.envmap)
 				{
@@ -6281,10 +6390,13 @@ static void R_BlendView(void)
 						R_Mesh_PrepareVertices_Generic_Arrays(4, r_d3dscreenvertex3f, NULL, r_bloomstate.screentexcoord2f);
 						break;
 					}
-					R_SetupShader_Generic(r_bloomstate.texture_screen, NULL, GL_MODULATE, 1, true);
+					R_SetupShader_Generic(r_bloomstate.texture_screen, NULL, GL_MODULATE, 1, false, true);
 					R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 					r_refdef.stats.bloom_drawpixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 				}
+				
+				// updates old view angles for next pass 
+				VectorCopy(cl.viewangles, blur_oldangles);
 			}
 
 			// copy view into the screen texture
@@ -6300,7 +6412,7 @@ static void R_BlendView(void)
 				R_ResetViewRendering2D();
 				GL_Color(r_refdef.viewblend[0], r_refdef.viewblend[1], r_refdef.viewblend[2], r_refdef.viewblend[3]);
 				R_Mesh_PrepareVertices_Generic_Arrays(4, r_screenvertex3f, NULL, NULL);
-				R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+				R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, true);
 				GL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 				R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 			}
@@ -6408,7 +6520,7 @@ static void R_BlendView(void)
 			R_ResetViewRendering2D();
 			GL_Color(r_refdef.viewblend[0], r_refdef.viewblend[1], r_refdef.viewblend[2], r_refdef.viewblend[3]);
 			R_Mesh_PrepareVertices_Generic_Arrays(4, r_screenvertex3f, NULL, NULL);
-			R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+			R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, true);
 			GL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 		}
@@ -6628,6 +6740,8 @@ R_RenderView
 ================
 */
 int dpsoftrast_test;
+extern void R_Shadow_UpdateBounceGridTexture(void);
+extern cvar_t r_shadow_bouncegrid;
 void R_RenderView(void)
 {
 	matrix4x4_t originalmatrix = r_refdef.view.matrix, offsetmatrix;
@@ -6716,6 +6830,10 @@ void R_RenderView(void)
 	R_View_Update();
 	if (r_timereport_active)
 		R_TimeReport("visibility");
+
+	R_Shadow_UpdateBounceGridTexture();
+	if (r_timereport_active && r_shadow_bouncegrid.integer)
+		R_TimeReport("bouncegrid");
 
 	r_waterstate.numwaterplanes = 0;
 	if (r_waterstate.enabled)
@@ -7060,7 +7178,7 @@ void R_DrawBBoxMesh(vec3_t mins, vec3_t maxs, float cr, float cg, float cb, floa
 	}
 	R_Mesh_PrepareVertices_Generic_Arrays(8, vertex3f, color4f, NULL);
 	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 	R_Mesh_Draw(0, 8, 0, 12, NULL, NULL, 0, bboxelements, NULL, 0);
 }
 
@@ -7076,14 +7194,14 @@ static void R_DrawEntityBBoxes_Callback(const entity_render_t *ent, const rtligh
 		return;
 
 	GL_CullFace(GL_NONE);
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 
 	prog = 0;
 	SV_VM_Begin();
 	for (i = 0;i < numsurfaces;i++)
 	{
 		edict = PRVM_EDICT_NUM(surfacelist[i]);
-		switch ((int)edict->fields.server->solid)
+		switch ((int)PRVM_serveredictfloat(edict, solid))
 		{
 			case SOLID_NOT:      Vector4Set(color, 1, 1, 1, 0.05);break;
 			case SOLID_TRIGGER:  Vector4Set(color, 1, 0, 1, 0.10);break;
@@ -7226,7 +7344,7 @@ void R_DrawNoModel_TransparentCallback(const entity_render_t *ent, const rtlight
 		}
 	}
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 	R_Mesh_PrepareVertices_Generic_Arrays(6, nomodelvertex3f, color4f, NULL);
 	R_Mesh_Draw(0, 6, 0, 8, nomodelelement3i, NULL, 0, nomodelelement3s, NULL, 0);
 }
@@ -7406,7 +7524,7 @@ static qboolean R_TestQ3WaveFunc(q3wavefunc_t func, const float *parms)
 	if(parms[0] == 0 && parms[1] == 0)
 		return false;
 	if(func >> Q3WAVEFUNC_USER_SHIFT) // assumes rsurface to be set!
-		if(rsurface.userwavefunc_param[bound(0, (func >> Q3WAVEFUNC_USER_SHIFT) - 1, Q3WAVEFUNC_USER_COUNT)] == 0)
+		if(rsurface.userwavefunc_param[bound(0, (func >> Q3WAVEFUNC_USER_SHIFT) - 1, Q3WAVEFUNC_USER_COUNT - 1)] == 0)
 			return false;
 	return true;
 }
@@ -7432,7 +7550,9 @@ static float R_EvaluateQ3WaveFunc(q3wavefunc_t func, const float *parms)
 		index *= 4;
 		f = index - floor(index);
 		if (index < 1)
-			f = f;
+		{
+			// f = f;
+		}
 		else if (index < 2)
 			f = 1 - f;
 		else if (index < 3)
@@ -7443,7 +7563,7 @@ static float R_EvaluateQ3WaveFunc(q3wavefunc_t func, const float *parms)
 	}
 	f = parms[0] + parms[1] * f;
 	if(func >> Q3WAVEFUNC_USER_SHIFT) // assumes rsurface to be set!
-		f *= rsurface.userwavefunc_param[bound(0, (func >> Q3WAVEFUNC_USER_SHIFT) - 1, Q3WAVEFUNC_USER_COUNT)];
+		f *= rsurface.userwavefunc_param[bound(0, (func >> Q3WAVEFUNC_USER_SHIFT) - 1, Q3WAVEFUNC_USER_COUNT - 1)];
 	return (float) f;
 }
 
@@ -7642,6 +7762,11 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	}
 	else
 		t->currentmaterialflags &= ~(MATERIALFLAG_REFRACTION | MATERIALFLAG_WATERSHADER | MATERIALFLAG_CAMERA);
+	if (vid.allowalphatocoverage && r_transparent_alphatocoverage.integer >= 2 && ((t->currentmaterialflags & (MATERIALFLAG_BLENDED | MATERIALFLAG_ALPHA | MATERIALFLAG_ADD | MATERIALFLAG_CUSTOMBLEND)) == (MATERIALFLAG_BLENDED | MATERIALFLAG_ALPHA)))
+	{
+		// promote alphablend to alphatocoverage (a type of alphatest) if antialiasing is on
+		t->currentmaterialflags = (t->currentmaterialflags & ~(MATERIALFLAG_BLENDED | MATERIALFLAG_ALPHA)) | MATERIALFLAG_ALPHATEST;
+	}
 	if ((t->currentmaterialflags & (MATERIALFLAG_BLENDED | MATERIALFLAG_NODEPTHTEST)) == MATERIALFLAG_BLENDED && r_transparentdepthmasking.integer && !(t->basematerialflags & MATERIALFLAG_BLENDED))
 		t->currentmaterialflags |= MATERIALFLAG_TRANSDEPTH;
 
@@ -9530,7 +9655,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, const msurface_
 	// transparent sky would be ridiculous
 	if (rsurface.texture->currentmaterialflags & MATERIALFLAGMASK_DEPTHSORTED)
 		return;
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 	skyrenderlater = true;
 	RSurf_SetupDepthAndCulling();
 	GL_DepthMask(true);
@@ -9559,7 +9684,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, const msurface_
 		}
 		else
 		{
-			R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+			R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 			// fog sky
 			GL_BlendFunc(GL_ONE, GL_ZERO);
 			RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_NOGAPS, texturenumsurfaces, texturesurfacelist);
@@ -9632,11 +9757,7 @@ static void R_DrawTextureSurfaceList_GL20(int texturenumsurfaces, const msurface
 	// render surface batch normally
 	GL_DepthMask(writedepth && !(rsurface.texture->currentmaterialflags & MATERIALFLAG_BLENDED));
 	R_SetupShader_Surface(vec3_origin, (rsurface.texture->currentmaterialflags & MATERIALFLAG_MODELLIGHT) != 0, 1, 1, rsurface.texture->specularscale, RSURFPASS_BASE, texturenumsurfaces, texturesurfacelist, NULL, (rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) != 0);
-	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST)
-		GL_AlphaTest(true);
 	RSurf_DrawBatch();
-	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST)
-		GL_AlphaTest(false);
 }
 
 static void R_DrawTextureSurfaceList_GL13(int texturenumsurfaces, const msurface_t **texturesurfacelist, qboolean writedepth)
@@ -9858,7 +9979,7 @@ static void R_DrawTextureSurfaceList_ShowSurfaces(int texturenumsurfaces, const 
 	float c[4];
 
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 
 	if(rsurface.texture && rsurface.texture->currentskinframe)
 	{
@@ -9964,7 +10085,7 @@ static void R_DrawTextureSurfaceList_ShowSurfaces(int texturenumsurfaces, const 
 		RSurf_DrawBatch_GL11_ClampColor();
 
 		R_Mesh_PrepareVertices_Generic_Arrays(rsurface.batchnumvertices, rsurface.batchvertex3f, rsurface.passcolor4f, NULL);
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 		RSurf_DrawBatch();
 	}
 	else if (!r_refdef.view.showdebug)
@@ -10479,7 +10600,7 @@ void R_DrawLoc_Callback(const entity_render_t *ent, const rtlight_t *rtlight, in
 			vertex3f[i] = mins[j] + size[j] * locboxvertex3f[i];
 
 	R_Mesh_PrepareVertices_Generic_Arrays(6*4, vertex3f, NULL, NULL);
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 	R_Mesh_Draw(0, 6*4, 0, 6*2, NULL, NULL, 0, locboxelements, NULL, 0);
 }
 
@@ -11106,7 +11227,7 @@ static void R_DrawModelDecals_Entity(entity_render_t *ent)
 		GL_DepthTest(true);
 		GL_CullFace(GL_NONE);
 		GL_BlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
-		R_SetupShader_Generic(decalskinframe->base, NULL, GL_MODULATE, 1, false);
+		R_SetupShader_Generic(decalskinframe->base, NULL, GL_MODULATE, 1, false, false);
 		R_Mesh_Draw(0, numtris * 3, 0, numtris, decalsystem->element3i, NULL, 0, decalsystem->element3s, NULL, 0);
 	}
 }
@@ -11163,7 +11284,7 @@ void R_DrawDebugModel(void)
 	{
 		float c = r_refdef.view.colorscale * r_showoverdraw.value * 0.125f;
 		flagsmask = MATERIALFLAG_SKY | MATERIALFLAG_WALL;
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 		GL_DepthTest(false);
 		GL_DepthMask(false);
 		GL_DepthRange(0, 1);
@@ -11193,7 +11314,7 @@ void R_DrawDebugModel(void)
 	flagsmask = MATERIALFLAG_SKY | MATERIALFLAG_WALL;
 
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, false, false);
 	GL_DepthRange(0, 1);
 	GL_DepthTest(!r_showdisabledepthtest.integer);
 	GL_DepthMask(false);
@@ -11249,6 +11370,7 @@ void R_DrawDebugModel(void)
 
 	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
 
+#ifndef USE_GLES2
 	if (r_showtris.integer && qglPolygonMode)
 	{
 		if (r_showdisabledepthtest.integer)
@@ -11359,6 +11481,7 @@ void R_DrawDebugModel(void)
 		}
 		rsurface.texture = NULL;
 	}
+#endif
 }
 
 extern void R_BuildLightMap(const entity_render_t *ent, msurface_t *surface);

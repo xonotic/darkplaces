@@ -164,7 +164,6 @@ cvar_t vid_width = {CVAR_SAVE, "vid_width", "640", "resolution"};
 cvar_t vid_height = {CVAR_SAVE, "vid_height", "480", "resolution"};
 cvar_t vid_bitsperpixel = {CVAR_SAVE, "vid_bitsperpixel", "32", "how many bits per pixel to render at (32 or 16, 32 is recommended)"};
 cvar_t vid_samples = {CVAR_SAVE, "vid_samples", "1", "how many anti-aliasing samples per pixel to request from the graphics driver (4 is recommended, 1 is faster)"};
-cvar_t vid_multisampling = {CVAR_SAVE, "vid_multisampling", "0", "Make use of GL_AGB_MULTISAMPLING for advaced anti-aliasing techniques such as Alpha-To-Coverage, not yet finished"};
 cvar_t vid_refreshrate = {CVAR_SAVE, "vid_refreshrate", "60", "refresh rate to use, in hz (higher values flicker less, if supported by your monitor)"};
 cvar_t vid_userefreshrate = {CVAR_SAVE, "vid_userefreshrate", "0", "set this to 1 to make vid_refreshrate used, or to 0 to let the engine choose a sane default"};
 cvar_t vid_stereobuffer = {CVAR_SAVE, "vid_stereobuffer", "0", "enables 'quad-buffered' stereo rendering for stereo shutterglasses, HMD (head mounted display) devices, or polarized stereo LCDs, if supported by your drivers"};
@@ -199,6 +198,8 @@ cvar_t v_color_white_g = {CVAR_SAVE, "v_color_white_g", "1", "desired color of w
 cvar_t v_color_white_b = {CVAR_SAVE, "v_color_white_b", "1", "desired color of white"};
 cvar_t v_hwgamma = {CVAR_SAVE, "v_hwgamma", "0", "enables use of hardware gamma correction ramps if available (note: does not work very well on Windows2000 and above), values are 0 = off, 1 = attempt to use hardware gamma, 2 = use hardware gamma whether it works or not"};
 cvar_t v_glslgamma = {CVAR_SAVE, "v_glslgamma", "1", "enables use of GLSL to apply gamma correction ramps if available (note: overrides v_hwgamma)"};
+cvar_t v_glslgamma_2d = {CVAR_SAVE, "v_glslgamma_2d", "0", "applies GLSL gamma to 2d pictures (HUD, fonts)"};
+
 cvar_t v_psycho = {0, "v_psycho", "0", "easter egg"};
 
 // brand of graphics chip
@@ -217,6 +218,7 @@ const char *gl_platformextensions;
 // name of driver library (opengl32.dll, libGL.so.1, or whatever)
 char gl_driver[256];
 
+#ifndef USE_GLES2
 // GL_ARB_multitexture
 void (GLAPIENTRY *qglMultiTexCoord1f) (GLenum, GLfloat);
 void (GLAPIENTRY *qglMultiTexCoord2f) (GLenum, GLfloat, GLfloat);
@@ -258,6 +260,7 @@ void (GLAPIENTRY *qglClearDepth)(GLclampd depth);
 void (GLAPIENTRY *qglDepthFunc)(GLenum func);
 void (GLAPIENTRY *qglDepthMask)(GLboolean flag);
 void (GLAPIENTRY *qglDepthRange)(GLclampd near_val, GLclampd far_val);
+void (GLAPIENTRY *qglDepthRangef)(GLclampf near_val, GLclampf far_val);
 void (GLAPIENTRY *qglColorMask)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
 
 void (GLAPIENTRY *qglDrawRangeElements)(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices);
@@ -504,6 +507,7 @@ void (GLAPIENTRY *qglGetQueryObjectivARB)(GLuint qid, GLenum pname, GLint *param
 void (GLAPIENTRY *qglGetQueryObjectuivARB)(GLuint qid, GLenum pname, GLuint *params);
 
 void (GLAPIENTRY *qglSampleCoverageARB)(GLclampf value, GLboolean invert);
+#endif
 
 #if _MSC_VER >= 1400
 #define sscanf sscanf_s
@@ -584,6 +588,7 @@ qboolean GL_CheckExtension(const char *minglver_or_ext, const dllfunction_t *fun
 	return true;
 }
 
+#ifndef USE_GLES2
 static dllfunction_t opengl110funcs[] =
 {
 	{"glClearColor", (void **) &qglClearColor},
@@ -918,6 +923,7 @@ static dllfunction_t multisamplefuncs[] =
 	{"glSampleCoverageARB",          (void **) &qglSampleCoverageARB},
 	{NULL, NULL}
 };
+#endif
 
 void VID_ClearExtensions(void)
 {
@@ -940,6 +946,7 @@ void VID_ClearExtensions(void)
 	vid.max_anisotropy = 1;
 	vid.maxdrawbuffers = 1;
 
+#ifndef USE_GLES2
 	// this is a complete list of all functions that are directly checked in the renderer
 	qglDrawRangeElements = NULL;
 	qglDrawBuffer = NULL;
@@ -949,13 +956,15 @@ void VID_ClearExtensions(void)
 	qglGetCompressedTexImageARB = NULL;
 	qglFramebufferTexture2DEXT = NULL;
 	qglDrawBuffersARB = NULL;
+#endif
 }
 
+#ifndef USE_GLES2
 void VID_CheckExtensions(void)
 {
 	if (!GL_CheckExtension("glbase", opengl110funcs, NULL, false))
 		Sys_Error("OpenGL 1.1.0 functions not found");
-	vid.support.gl20shaders = GL_CheckExtension("GL_ARB_fragment_shader", gl20shaderfuncs, "-noshaders", true);
+	vid.support.gl20shaders = GL_CheckExtension("2.0", gl20shaderfuncs, "-noshaders", true);
 
 	CHECKGLERROR
 
@@ -1007,6 +1016,7 @@ void VID_CheckExtensions(void)
 	vid.support.ext_texture_filter_anisotropic = GL_CheckExtension("GL_EXT_texture_filter_anisotropic", NULL, "-noanisotropy", false);
 	vid.support.ext_texture_srgb = GL_CheckExtension("GL_EXT_texture_sRGB", NULL, "-nosrgb", false);
 	vid.support.arb_multisample = GL_CheckExtension("GL_ARB_multisample", multisamplefuncs, "-nomultisample", false);
+	vid.allowalphatocoverage = false;
 
 // COMMANDLINEOPTION: GL: -noshaders disables use of OpenGL 2.0 shaders (which allow pixel shader effects, can improve per pixel lighting performance and capabilities)
 // COMMANDLINEOPTION: GL: -noanisotropy disables GL_EXT_texture_filter_anisotropic (allows higher quality texturing)
@@ -1055,7 +1065,7 @@ void VID_CheckExtensions(void)
 	if (vid.support.ext_texture_filter_anisotropic)
 		qglGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, (GLint*)&vid.max_anisotropy);
 	if (vid.support.arb_texture_cube_map)
-		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE_ARB, (GLint*)&vid.maxtexturesize_cubemap);
+		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_cubemap);
 	if (vid.support.ext_texture_3d)
 		qglGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_3d);
 
@@ -1068,10 +1078,10 @@ void VID_CheckExtensions(void)
 
 	vid.texunits = vid.teximageunits = vid.texarrayunits = 1;
 	if (vid.support.arb_multitexture)
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 	if (vid_gl20.integer && vid.support.gl20shaders)
 	{
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 		qglGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, (int *)&vid.teximageunits);CHECKGLERROR
 		qglGetIntegerv(GL_MAX_TEXTURE_COORDS, (int *)&vid.texarrayunits);CHECKGLERROR
 		vid.texunits = bound(4, vid.texunits, MAX_TEXTUREUNITS);
@@ -1082,10 +1092,14 @@ void VID_CheckExtensions(void)
 		vid.sRGBcapable2D = false;
 		vid.sRGBcapable3D = true;
 		vid.useinterleavedarrays = false;
+		Con_Printf("vid.support.arb_multisample %i\n", vid.support.arb_multisample);
+		Con_Printf("vid.mode.samples %i\n", vid.mode.samples);
+		Con_Printf("vid.support.gl20shaders %i\n", vid.support.gl20shaders);
+		vid.allowalphatocoverage = true; // but see below, it may get turned to false again if GL_SAMPLES_ARB is <= 1
 	}
 	else if (vid.support.arb_texture_env_combine && vid.texunits >= 2 && vid_gl13.integer)
 	{
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 		vid.texunits = bound(1, vid.texunits, MAX_TEXTUREUNITS);
 		vid.teximageunits = vid.texunits;
 		vid.texarrayunits = vid.texunits;
@@ -1107,6 +1121,19 @@ void VID_CheckExtensions(void)
 		vid.useinterleavedarrays = false;
 	}
 
+	// enable multisample antialiasing if possible
+	if(vid.support.arb_multisample)
+	{
+		int samples = 0;
+		qglGetIntegerv(GL_SAMPLES_ARB, &samples);
+		if (samples > 1)
+			qglEnable(GL_MULTISAMPLE_ARB);
+		else
+			vid.allowalphatocoverage = false;
+	}
+	else
+		vid.allowalphatocoverage = false;
+
 	// VorteX: set other info (maybe place them in VID_InitMode?)
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
 	Cvar_SetQuick(&gl_info_renderer, gl_renderer);
@@ -1114,6 +1141,7 @@ void VID_CheckExtensions(void)
 	Cvar_SetQuick(&gl_info_platform, gl_platform ? gl_platform : "");
 	Cvar_SetQuick(&gl_info_driver, gl_driver);
 }
+#endif
 
 float VID_JoyState_GetAxis(const vid_joystate_t *joystate, int axis, float sensitivity, float deadzone)
 {
@@ -1451,8 +1479,8 @@ void VID_UpdateGamma(qboolean force, int rampsize)
 		wantgamma = 0;
 #define BOUNDCVAR(cvar, m1, m2) c = &(cvar);f = bound(m1, c->value, m2);if (c->value != f) Cvar_SetValueQuick(c, f);
 	BOUNDCVAR(v_gamma, 0.1, 5);
-	BOUNDCVAR(v_contrast, 1, 5);
-	BOUNDCVAR(v_brightness, 0, 0.8);
+	BOUNDCVAR(v_contrast, 0.2, 5);
+	BOUNDCVAR(v_brightness, -v_contrast.value * 0.8, 0.8);
 	//BOUNDCVAR(v_contrastboost, 0.0625, 16);
 	BOUNDCVAR(v_color_black_r, 0, 0.8);
 	BOUNDCVAR(v_color_black_g, 0, 0.8);
@@ -1632,6 +1660,7 @@ void VID_Shared_Init(void)
 
 	Cvar_RegisterVariable(&v_hwgamma);
 	Cvar_RegisterVariable(&v_glslgamma);
+	Cvar_RegisterVariable(&v_glslgamma_2d);
 
 	Cvar_RegisterVariable(&v_psycho);
 
@@ -1640,7 +1669,6 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&vid_height);
 	Cvar_RegisterVariable(&vid_bitsperpixel);
 	Cvar_RegisterVariable(&vid_samples);
-	Cvar_RegisterVariable(&vid_multisampling);
 	Cvar_RegisterVariable(&vid_refreshrate);
 	Cvar_RegisterVariable(&vid_userefreshrate);
 	Cvar_RegisterVariable(&vid_stereobuffer);
@@ -1715,17 +1743,6 @@ int VID_Mode(int fullscreen, int width, int height, int bpp, float refreshrate, 
 {
 	viddef_mode_t mode;
 
-#if 0
-	// LordHavoc: FIXME: VorteX broke vid_restart with this, it is a mystery why it would ever work, commented out
-	// multisampling should set at least 2 samples
-	if (vid.support.arb_multisample)
-	{
-		GL_MultiSampling(false);
-		if (vid_multisampling.integer)
-			samples = max(2, samples);
-	}
-#endif
-
 	memset(&mode, 0, sizeof(mode));
 	mode.fullscreen = fullscreen != 0;
 	mode.width = width;
@@ -1763,10 +1780,6 @@ int VID_Mode(int fullscreen, int width, int height, int bpp, float refreshrate, 
 		if(vid_userefreshrate.integer)
 			Cvar_SetValueQuick(&vid_refreshrate, vid.mode.refreshrate);
 		Cvar_SetValueQuick(&vid_stereobuffer, vid.mode.stereobuffer);
-
-		// activate multisampling
-		if (vid_multisampling.integer)
-			GL_MultiSampling(true);
 
 		return true;
 	}

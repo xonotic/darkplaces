@@ -2006,7 +2006,7 @@ static void SCR_DrawLoadingStack(void)
 		sscanf(scr_loadingscreen_barcolor.string, "%f %f %f", &colors[12], &colors[13], &colors[14]);  colors[15] = 1;
 
 		R_Mesh_PrepareVertices_Generic_Arrays(4, verts, colors, NULL);
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true, true);
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 
 		// make sure everything is cleared, including the progress indicator
@@ -2105,11 +2105,11 @@ static void SCR_DrawLoadingScreen (qboolean clear)
 	if(loadingscreentexture)
 	{
 		R_Mesh_PrepareVertices_Generic_Arrays(4, loadingscreentexture_vertex3f, NULL, loadingscreentexture_texcoord2f);
-		R_SetupShader_Generic(loadingscreentexture, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(loadingscreentexture, NULL, GL_MODULATE, 1, true, true);
 		R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	}
 	R_Mesh_PrepareVertices_Generic_Arrays(4, loadingscreenpic_vertex3f, NULL, loadingscreenpic_texcoord2f);
-	R_SetupShader_Generic(Draw_GetPicTexture(loadingscreenpic), NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(Draw_GetPicTexture(loadingscreenpic), NULL, GL_MODULATE, 1, true, true);
 	R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	SCR_DrawLoadingStack();
 }
@@ -2151,6 +2151,10 @@ void SCR_UpdateLoadingScreen (qboolean clear)
 	}
 	loadingscreencleared = clear;
 
+#ifdef USE_GLES2
+	SCR_DrawLoadingScreen_SharedSetup(clear);
+	SCR_DrawLoadingScreen(clear);
+#else
 	if (qglDrawBuffer)
 		qglDrawBuffer(GL_BACK);
 	SCR_DrawLoadingScreen_SharedSetup(clear);
@@ -2167,6 +2171,7 @@ void SCR_UpdateLoadingScreen (qboolean clear)
 			qglDrawBuffer(GL_BACK);
 		SCR_DrawLoadingScreen(clear);
 	}
+#endif
 	SCR_DrawLoadingScreen_SharedFinish(clear);
 
 	// this goes into the event loop, and should prevent unresponsive cursor on vista
@@ -2277,6 +2282,7 @@ void CL_UpdateScreen(void)
 
 	SCR_SetUpToDrawConsole();
 
+#ifndef USE_GLES2
 	if (qglDrawBuffer)
 	{
 		CHECKGLERROR
@@ -2291,6 +2297,7 @@ void CL_UpdateScreen(void)
 			qglDisable(GL_DITHER);CHECKGLERROR
 		}
 	}
+#endif
 
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, 0, 0, vid.width, vid.height, 0, 0, vid_conwidth.integer, vid_conheight.integer, -10, 100, NULL);
 	R_Mesh_ResetRenderTargets();
@@ -2305,6 +2312,7 @@ void CL_UpdateScreen(void)
 	f = pow((float)cl_updatescreen_quality, cl_minfps_qualitypower.value) * cl_minfps_qualityscale.value;
 	r_refdef.view.quality = bound(cl_minfps_qualitymin.value, f, cl_minfps_qualitymax.value);
 
+#ifndef USE_GLES2
 	if (qglPolygonStipple)
 	{
 		if(scr_stipple.integer)
@@ -2331,10 +2339,12 @@ void CL_UpdateScreen(void)
 			qglDisable(GL_POLYGON_STIPPLE);CHECKGLERROR
 		}
 	}
+#endif
 
 	if (r_viewscale_fpsscaling.integer)
 		GL_Finish();
 	drawscreenstart = Sys_DoubleTime();
+#ifndef USE_GLES2
 	if (R_Stereo_Active())
 	{
 		r_stereo_side = 0;
@@ -2366,6 +2376,7 @@ void CL_UpdateScreen(void)
 		SCR_DrawScreen();
 	}
 	else
+#endif
 		SCR_DrawScreen();
 	if (r_viewscale_fpsscaling.integer)
 		GL_Finish();

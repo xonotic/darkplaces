@@ -143,7 +143,7 @@ void jam_close(void *stream)
 	Z_Free(s->prevframedata);
 	Z_Free(s->videopixels);
 	if (s->sndchan != -1)
-		S_StopChannel(s->sndchan, true);
+		S_StopChannel(s->sndchan, true, true);
 	if (s->file)
 		FS_Close(s->file);
 	Z_Free(s);
@@ -250,7 +250,7 @@ readframe:
 		{
 			compsize = LittleLong(*(frameHead + 8)) - 16;
 			outsize = LittleLong(*(frameHead + 12));
-			if (compsize < 0 || compsize > s->framesize || outsize < 0 || outsize > s->framesize)
+			if (compsize > s->framesize || outsize > s->framesize)
 				s->error = JAMDECODEERROR_BAD_FRAME_HEADER;
 			else if (FS_Read(s->file, s->compressed, compsize))
 			{

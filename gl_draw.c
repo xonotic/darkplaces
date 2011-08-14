@@ -334,8 +334,13 @@ cachepic_t *Draw_CachePic_Flags(const char *path, unsigned int cachepicflags)
 	crc = CRC_Block((unsigned char *)path, strlen(path));
 	hashkey = ((crc >> 8) ^ crc) % CACHEPICHASHSIZE;
 	for (pic = cachepichash[hashkey];pic;pic = pic->chain)
+	{
 		if (!strcmp (path, pic->name))
-			if(!((pic->texflags ^ texflags) & ~(TEXF_COMPRESS))) // ignore TEXF_COMPRESS when comparing, because fallback pics remove the flag
+		{
+			// if it was created (or replaced) by Draw_NewPic, just return it
+			if(pic->flags & CACHEPICFLAG_NEWPIC)
+				return pic;
+			if (!((pic->texflags ^ texflags) & ~(TEXF_COMPRESS))) // ignore TEXF_COMPRESS when comparing, because fallback pics remove the flag
 			{
 				if(!(cachepicflags & CACHEPICFLAG_NOTPERSISTENT))
 				{
@@ -346,6 +351,8 @@ cachepic_t *Draw_CachePic_Flags(const char *path, unsigned int cachepicflags)
 				}
 				return pic;
 			}
+		}
+	}
 
 	if (numcachepics == MAX_CACHED_PICS)
 	{
@@ -361,6 +368,7 @@ cachepic_t *Draw_CachePic_Flags(const char *path, unsigned int cachepicflags)
 
 reload:
 	// check whether it is an dynamic texture (if so, we can directly use its texture handler)
+	pic->flags = cachepicflags;
 	pic->tex = CL_GetDynTexture( path );
 	// if so, set the width/height, too
 	if( pic->tex ) {
@@ -405,8 +413,10 @@ reload:
 		if (!pic->autoload)
 		{
 			pic->tex = R_LoadTexture2D(drawtexturepool, pic->name, image_width, image_height, pixels, vid.sRGB2D ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, pic->texflags & (pic->hasalpha ? ~0 : ~TEXF_ALPHA), -1, NULL);
+#ifndef USE_GLES2
 			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
 				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+#endif
 		}
 	}
 	if (!loaded)
@@ -503,14 +513,18 @@ rtexture_t *Draw_GetPicTexture(cachepic_t *pic)
 		if (pic->tex == NULL)
 		{
 			pic->tex = loadtextureimage(drawtexturepool, pic->name, false, pic->texflags, true, vid.sRGB2D);
+#ifndef USE_GLES2
 			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
 				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+#endif
 		}
 		if (pic->tex == NULL && !strncmp(pic->name, "gfx/", 4))
 		{
 			pic->tex = loadtextureimage(drawtexturepool, pic->name+4, false, pic->texflags, true, vid.sRGB2D);
+#ifndef USE_GLES2
 			if (r_texture_dds_save.integer && qglGetCompressedTexImageARB && pic->tex)
 				R_SaveTextureDDSFile(pic->tex, va("dds/%s.dds", pic->name), r_texture_dds_save.integer < 2, pic->hasalpha);
+#endif
 		}
 		if (pic->tex == NULL)
 			pic->tex = draw_generatepic(pic->name, true);
@@ -551,7 +565,7 @@ cachepic_t *Draw_NewPic(const char *picname, int width, int height, int alpha, u
 
 	if (pic)
 	{
-		if (pic->tex && pic->width == width && pic->height == height)
+		if (pic->flags == CACHEPICFLAG_NEWPIC && pic->tex && pic->width == width && pic->height == height)
 		{
 			R_UpdateTexture(pic->tex, pixels_bgra, 0, 0, 0, width, height, 1);
 			return pic;
@@ -575,6 +589,7 @@ cachepic_t *Draw_NewPic(const char *picname, int width, int height, int alpha, u
 		}
 	}
 
+	pic->flags = CACHEPICFLAG_NEWPIC; // disable texflags checks in Draw_CachePic
 	pic->width = width;
 	pic->height = height;
 	if (pic->tex)
@@ -1132,7 +1147,7 @@ void DrawQ_Pic(float x, float y, cachepic_t *pic, float width, float height, flo
 			width = pic->width;
 		if (height == 0)
 			height = pic->height;
-		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 #if 0
       // AK07: lets be texel correct on the corners
@@ -1148,7 +1163,7 @@ void DrawQ_Pic(float x, float y, cachepic_t *pic, float width, float height, flo
 #endif
 	}
 	else
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	floats[2] = floats[5] = floats[8] = floats[11] = 0;
 	floats[0] = floats[9] = x;
@@ -1181,10 +1196,10 @@ void DrawQ_RotPic(float x, float y, cachepic_t *pic, float width, float height, 
 			width = pic->width;
 		if (height == 0)
 			height = pic->height;
-		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 	}
 	else
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	floats[2] = floats[5] = floats[8] = floats[11] = 0;
 
@@ -1226,7 +1241,7 @@ void DrawQ_Fill(float x, float y, float width, float height, float red, float gr
 		return;
 
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	floats[2] = floats[5] = floats[8] = floats[11] = 0;
 	floats[0] = floats[9] = x;
@@ -1553,7 +1568,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 //	R_Mesh_ResetTextureState();
 	if (!fontmap)
 		R_Mesh_TexBind(0, fnt->tex);
-	R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	ac = color4f;
 	at = texcoord2f;
@@ -1689,7 +1704,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 							at = texcoord2f;
 							av = vertex3f;
 						}
-						R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, true);
+						R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 						map = ft2_oldstyle_map;
 					}
 				}
@@ -1758,7 +1773,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 							break;
 						}
 					}
-					R_SetupShader_Generic(map->pic->tex, NULL, GL_MODULATE, 1, true);
+					R_SetupShader_Generic(map->pic->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 				}
 
 				mapch = ch - map->start;
@@ -1902,10 +1917,10 @@ void DrawQ_SuperPic(float x, float y, cachepic_t *pic, float width, float height
 			width = pic->width;
 		if (height == 0)
 			height = pic->height;
-		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(Draw_GetPicTexture(pic), NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 	}
 	else
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	floats[2] = floats[5] = floats[8] = floats[11] = 0;
 	floats[0] = floats[9] = x;
@@ -1934,7 +1949,7 @@ void DrawQ_Mesh (drawqueuemesh_t *mesh, int flags, qboolean hasalpha)
 	DrawQ_ProcessDrawFlag(flags, hasalpha);
 
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(mesh->texture, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(mesh->texture, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	R_Mesh_PrepareVertices_Generic_Arrays(mesh->num_vertices, mesh->data_vertex3f, mesh->data_color4f, mesh->data_texcoord2f);
 	R_Mesh_Draw(0, mesh->num_vertices, 0, mesh->num_triangles, mesh->data_element3i, NULL, 0, mesh->data_element3s, NULL, 0);
@@ -1954,6 +1969,7 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+#ifndef USE_GLES2
 		CHECKGLERROR
 		qglBegin(GL_LINE_LOOP);
 		for (num = 0;num < mesh->num_vertices;num++)
@@ -1964,6 +1980,7 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 		}
 		qglEnd();
 		CHECKGLERROR
+#endif
 		break;
 	case RENDERPATH_D3D9:
 		//Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
@@ -1991,13 +2008,14 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 	if(!r_draw2d.integer && !r_draw2d_force)
 		return;
 
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 	switch(vid.renderpath)
 	{
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
+#ifndef USE_GLES2
 		CHECKGLERROR
 
 		//qglLineWidth(width);CHECKGLERROR
@@ -2009,6 +2027,7 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 		qglVertex2f(x2, y2);
 		qglEnd();
 		CHECKGLERROR
+#endif
 		break;
 	case RENDERPATH_D3D9:
 		//Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
@@ -2049,7 +2068,7 @@ void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float 
 	case RENDERPATH_GL20:
 		CHECKGLERROR
 
-		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+		R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true);
 
 		//qglLineWidth(width);CHECKGLERROR
 
@@ -2154,11 +2173,41 @@ void R_DrawGamma(void)
 	}
 	// all the blends ignore depth
 //	R_Mesh_ResetTextureState();
-	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true);
+	R_SetupShader_Generic(NULL, NULL, GL_MODULATE, 1, true, true);
 	GL_DepthMask(true);
 	GL_DepthRange(0, 1);
 	GL_PolygonOffset(0, 0);
 	GL_DepthTest(false);
+
+	// interpretation of brightness and contrast:
+	//   color range := brightness .. (brightness + contrast)
+	// i.e. "c *= contrast; c += brightness"
+	// plausible values for brightness thus range from -contrast to 1
+
+	// apply pre-brightness (subtractive brightness, for where contrast was >= 1)
+	if (vid.support.ext_blend_subtract)
+	{
+		if (v_color_enable.integer)
+		{
+			c[0] = -v_color_black_r.value / v_color_white_r.value;
+			c[1] = -v_color_black_g.value / v_color_white_g.value;
+			c[2] = -v_color_black_b.value / v_color_white_b.value;
+		}
+		else
+			c[0] = c[1] = c[2] = -v_brightness.value / v_contrast.value;
+		if (c[0] >= 0.01f || c[1] >= 0.01f || c[2] >= 0.01f)
+		{
+			// need SUBTRACTIVE blending to do this!
+			GL_BlendEquationSubtract(true);
+			GL_BlendFunc(GL_ONE, GL_ONE);
+			GL_Color(c[0], c[1], c[2], 1);
+			R_Mesh_PrepareVertices_Generic_Arrays(3, blendvertex3f, NULL, NULL);
+			R_Mesh_Draw(0, 3, 0, 1, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
+			GL_BlendEquationSubtract(false);
+		}
+	}
+
+	// apply contrast
 	if (v_color_enable.integer)
 	{
 		c[0] = v_color_white_r.value;
@@ -2167,17 +2216,32 @@ void R_DrawGamma(void)
 	}
 	else
 		c[0] = c[1] = c[2] = v_contrast.value;
-	if (c[0] >= 1.01f || c[1] >= 1.01f || c[2] >= 1.01f)
+	if (c[0] >= 1.003f || c[1] >= 1.003f || c[2] >= 1.003f)
 	{
 		GL_BlendFunc(GL_DST_COLOR, GL_ONE);
-		while (c[0] >= 1.01f || c[1] >= 1.01f || c[2] >= 1.01f)
+		while (c[0] >= 1.003f || c[1] >= 1.003f || c[2] >= 1.003f)
 		{
-			GL_Color(c[0] - 1, c[1] - 1, c[2] - 1, 1);
+			float cc[4];
+			cc[0] = bound(0, c[0] - 1, 1);
+			cc[1] = bound(0, c[1] - 1, 1);
+			cc[2] = bound(0, c[2] - 1, 1);
+			GL_Color(cc[0], cc[1], cc[2], 1);
 			R_Mesh_PrepareVertices_Generic_Arrays(3, blendvertex3f, NULL, NULL);
 			R_Mesh_Draw(0, 3, 0, 1, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
-			VectorScale(c, 0.5, c);
+			c[0] /= 1 + cc[0];
+			c[1] /= 1 + cc[1];
+			c[2] /= 1 + cc[2];
 		}
 	}
+	if (c[0] <= 0.997f || c[1] <= 0.997f || c[2] <= 0.997f)
+	{
+		GL_BlendFunc(GL_DST_COLOR, GL_ZERO);
+		GL_Color(c[0], c[1], c[2], 1);
+		R_Mesh_PrepareVertices_Generic_Arrays(3, blendvertex3f, NULL, NULL);
+		R_Mesh_Draw(0, 3, 0, 1, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
+	}
+
+	// apply post-brightness (additive brightness, for where contrast was <= 1)
 	if (v_color_enable.integer)
 	{
 		c[0] = v_color_black_r.value;
@@ -2189,7 +2253,7 @@ void R_DrawGamma(void)
 	if (c[0] >= 0.01f || c[1] >= 0.01f || c[2] >= 0.01f)
 	{
 		GL_BlendFunc(GL_ONE, GL_ONE);
-		GL_Color(c[0] - 1, c[1] - 1, c[2] - 1, 1);
+		GL_Color(c[0], c[1], c[2], 1);
 		R_Mesh_PrepareVertices_Generic_Arrays(3, blendvertex3f, NULL, NULL);
 		R_Mesh_Draw(0, 3, 0, 1, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	}

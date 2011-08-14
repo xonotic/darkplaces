@@ -108,6 +108,7 @@ typedef struct viddef_s
 	renderpath_t renderpath;
 	qboolean forcevbo; // some renderpaths can not operate without it
 	qboolean useinterleavedarrays; // required by some renderpaths
+	qboolean allowalphatocoverage; // indicates the GL_AlphaToCoverage function works on this renderpath and framebuffer
 
 	unsigned int texunits;
 	unsigned int teximageunits;
@@ -180,7 +181,6 @@ extern cvar_t vid_width;
 extern cvar_t vid_height;
 extern cvar_t vid_bitsperpixel;
 extern cvar_t vid_samples;
-extern cvar_t vid_multisampling;
 extern cvar_t vid_refreshrate;
 extern cvar_t vid_userefreshrate;
 extern cvar_t vid_vsync;
