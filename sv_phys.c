@@ -919,7 +919,7 @@ static int SV_TestEntityPosition (prvm_edict_t *ent, vec3_t offset)
 	trace_t trace;
 	contents = SV_GenericHitSuperContentsMask(ent);
 	VectorAdd(PRVM_serveredictvector(ent, origin), offset, org);
-	trace = SV_TraceBox(org, PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), PRVM_serveredictvector(ent, origin), MOVE_NOMONSTERS, ent, contents);
+	trace = SV_TraceBox(org, PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), PRVM_serveredictvector(ent, origin), ((PRVM_serveredictfloat(ent, movetype) == MOVETYPE_SPECTATOR) ? MOVE_WORLDONLY : MOVE_NOMONSTERS), ent, contents);
 	if (trace.startsupercontents & contents)
 		return true;
 	else
@@ -2261,7 +2261,8 @@ void SV_WalkMove (prvm_edict_t *ent)
 	if (sv.frametime <= 0)
 		return;
 
-	SV_CheckStuck (ent);
+	//if(PRVM_serveredictfloat(ent, movetype) == MOVETYPE_SPECTATOR)
+		SV_CheckStuck (ent);
 
 	applygravity = !SV_CheckWater (ent) && PRVM_serveredictfloat(ent, movetype) == MOVETYPE_WALK && ! ((int)PRVM_serveredictfloat(ent, flags) & FL_WATERJUMP);
 
