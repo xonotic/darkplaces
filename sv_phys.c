@@ -2261,8 +2261,7 @@ void SV_WalkMove (prvm_edict_t *ent)
 	if (sv.frametime <= 0)
 		return;
 
-	//if(PRVM_serveredictfloat(ent, movetype) == MOVETYPE_SPECTATOR)
-		SV_CheckStuck (ent);
+	SV_CheckStuck (ent);
 
 	applygravity = !SV_CheckWater (ent) && PRVM_serveredictfloat(ent, movetype) == MOVETYPE_WALK && ! ((int)PRVM_serveredictfloat(ent, flags) & FL_WATERJUMP);
 
