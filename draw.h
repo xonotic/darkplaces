@@ -39,6 +39,8 @@ typedef struct cachepic_s
 	rtexture_t *tex;
 	// used for hash lookups
 	struct cachepic_s *chain;
+	// flags - CACHEPICFLAG_NEWPIC for example
+	unsigned int flags;
 	// has alpha?
 	qboolean hasalpha;
 	// name of pic
@@ -51,7 +53,8 @@ typedef enum cachepicflags_e
 	CACHEPICFLAG_NOTPERSISTENT = 1,
 	CACHEPICFLAG_QUIET = 2,
 	CACHEPICFLAG_NOCOMPRESSION = 4,
-	CACHEPICFLAG_NOCLAMP = 8
+	CACHEPICFLAG_NOCLAMP = 8,
+	CACHEPICFLAG_NEWPIC = 16 // disables matching texflags check, because a pic created with Draw_NewPic should not be subject to that
 }
 cachepicflags_t;
 
@@ -91,6 +94,7 @@ DRAWFLAG_NUMFLAGS,
 DRAWFLAG_MASK = 0xFF,   // ONLY R_BeginPolygon()
 DRAWFLAG_MIPMAP = 0x100 // ONLY R_BeginPolygon()
 };
+#define DRAWFLAGS_BLEND (DRAWFLAG_ADDITIVE + DRAWFLAG_MODULATE + DRAWFLAG_2XMODULATE + DRAWFLAG_SCREEN)
 
 typedef struct ft2_settings_s
 {
@@ -188,7 +192,11 @@ void DrawQ_Finish(void);
 void DrawQ_ProcessDrawFlag(int flags, qboolean alpha); // sets GL_DepthMask and GL_BlendFunc
 void DrawQ_RecalcView(void); // use this when changing r_refdef.view.* from e.g. csqc
 
+rtexture_t *Draw_GetPicTexture(cachepic_t *pic);
+
 void R_DrawGamma(void);
+
+extern rtexturepool_t *drawtexturepool; // used by ft2.c
 
 #endif
 

@@ -186,6 +186,11 @@ static qboolean SND_PaintChannel (channel_t *ch, portable_sampleframe_t *paint, 
 	int vol[SND_LISTENERS];
 	const snd_buffer_t *sb;
 	unsigned int i, sb_offset;
+	sfx_t *sfx;
+
+	sfx = ch->sfx; // fetch the volatile variable
+	if (!sfx) // given that this is called by the mixer thread, this never happens, but...
+		return false;
 
 	// move to the stack (do we need to?)
 	for (i = 0;i < SND_LISTENERS;i++)
@@ -199,11 +204,11 @@ static qboolean SND_PaintChannel (channel_t *ch, portable_sampleframe_t *paint, 
 		return false;
 
 	sb_offset = ch->pos;
-	sb = ch->sfx->fetcher->getsb (ch->sfx->fetcher_data, &ch->fetcher_data, &sb_offset, count);
+	sb = sfx->fetcher->getsb (sfx->fetcher_data, &ch->fetcher_data, &sb_offset, count);
 	if (sb == NULL)
 	{
 		Con_DPrintf("SND_PaintChannel: ERROR: can't get sound buffer from sfx \"%s\"\n",
-					ch->sfx->name); // , count); // or add this? FIXME
+					sfx->name); // , count); // or add this? FIXME
 		return false;
 	}
 	else
@@ -505,6 +510,8 @@ void S_MixToBuffer(void *stream, unsigned int bufferframes)
 				continue;
 			if (!sfx->total_length)
 				continue;
+			if (sfx->total_length > 1<<30)
+				Sys_Error("S_MixToBuffer: sfx corrupt\n");
 
 			ltime = 0;
 			if (ch->pos < 0)
@@ -520,15 +527,15 @@ void S_MixToBuffer(void *stream, unsigned int bufferframes)
 				// paint up to end of buffer or of input, whichever is lower
 				count = sfx->total_length - ch->pos;
 				count = bound(0, count, (int)frames - ltime);
+				// mix the remaining samples
 				if (count)
 				{
 					SND_PaintChannel (ch, paintbuffer + ltime, count);
 					ch->pos += count;
 					ltime += count;
 				}
-
 				// if at end of sfx, loop or stop the channel
-				if (ch->pos >= (int)sfx->total_length)
+				else
 				{
 					if (sfx->loopstart < sfx->total_length)
 						ch->pos = sfx->loopstart;
@@ -536,7 +543,7 @@ void S_MixToBuffer(void *stream, unsigned int bufferframes)
 						ch->pos = 0;
 					else
 					{
-						S_StopChannel (ch - channels, false);
+						S_StopChannel (ch - channels, false, false);
 						break;
 					}
 				}

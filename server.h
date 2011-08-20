@@ -317,6 +317,7 @@ typedef struct client_s
 #define MOVETYPE_FOLLOW			12		///< track movement of aiment
 #define MOVETYPE_FAKEPUSH		13		///< tenebrae's push that doesn't push
 #define MOVETYPE_PHYSICS		32		///< indicates this object is physics controlled
+#define MOVETYPE_FLY_WORLDONLY		33		///< like MOVETYPE_FLY, but uses MOVE_WORLDONLY for all its traces; objects of this movetype better be SOLID_NOT or SOLID_TRIGGER please, or else...
 
 // edict->solid values
 #define	SOLID_NOT				0		///< no interaction with other objects
@@ -330,6 +331,7 @@ typedef struct client_s
 #define	SOLID_PHYSICS_BOX		32		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
 #define	SOLID_PHYSICS_SPHERE	33		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
 #define	SOLID_PHYSICS_CAPSULE	34		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
+#define	SOLID_PHYSICS_TRIMESH	35		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
 
 // edict->deadflag values
 #define	DEAD_NO					0
@@ -431,13 +433,14 @@ extern cvar_t sv_gameplayfix_droptofloorstartsolid_nudgetocorrect;
 extern cvar_t sv_gameplayfix_easierwaterjump;
 extern cvar_t sv_gameplayfix_findradiusdistancetobox;
 extern cvar_t sv_gameplayfix_gravityunaffectedbyticrate;
-extern cvar_t sv_gameplayfix_nogravityonground;
 extern cvar_t sv_gameplayfix_grenadebouncedownslopes;
 extern cvar_t sv_gameplayfix_multiplethinksperframe;
 extern cvar_t sv_gameplayfix_noairborncorpse;
 extern cvar_t sv_gameplayfix_noairborncorpse_allowsuspendeditems;
 extern cvar_t sv_gameplayfix_nudgeoutofsolid;
-extern cvar_t sv_gameplayfix_nudgeoutofsolid_bias;
+extern cvar_t sv_gameplayfix_nudgeoutofsolid_separation;
+extern cvar_t sv_gameplayfix_q2airaccelerate;
+extern cvar_t sv_gameplayfix_nogravityonground;
 extern cvar_t sv_gameplayfix_setmodelrealbox;
 extern cvar_t sv_gameplayfix_slidemoveprojectiles;
 extern cvar_t sv_gameplayfix_stepdown;
@@ -447,6 +450,7 @@ extern cvar_t sv_gameplayfix_nostepmoveonsteepslopes;
 extern cvar_t sv_gameplayfix_swiminbmodels;
 extern cvar_t sv_gameplayfix_upwardvelocityclearsongroundflag;
 extern cvar_t sv_gameplayfix_downtracesupportsongroundflag;
+extern cvar_t sv_gameplayfix_q1bsptracelinereportstexture;
 extern cvar_t sv_gravity;
 extern cvar_t sv_idealpitchscale;
 extern cvar_t sv_jumpstep;
@@ -488,7 +492,7 @@ void SV_Init (void);
 
 void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count);
 void SV_StartEffect (vec3_t org, int modelindex, int startframe, int framecount, int framerate);
-void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int volume, float attenuation);
+void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int volume, float attenuation, qboolean reliable);
 void SV_StartPointSound (vec3_t origin, const char *sample, int volume, float attenuation);
 
 void SV_ConnectClient (int clientnum, netconn_t *netconnection);

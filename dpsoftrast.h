@@ -65,8 +65,6 @@ void DPSOFTRAST_DepthFunc(int comparemode);
 void DPSOFTRAST_DepthRange(float range0, float range1);
 void DPSOFTRAST_PolygonOffset(float alongnormal, float intoview);
 void DPSOFTRAST_CullFace(int mode);
-void DPSOFTRAST_AlphaTest(int enable);
-void DPSOFTRAST_AlphaFunc(int alphafunc, float alphavalue);
 void DPSOFTRAST_Color4f(float r, float g, float b, float a);
 void DPSOFTRAST_GetPixelsBGRA(int blockx, int blocky, int blockwidth, int blockheight, unsigned char *outpixels);
 void DPSOFTRAST_CopyRectangleToTexture(int index, int mip, int tx, int ty, int sx, int sy, int width, int height);
@@ -153,6 +151,8 @@ typedef enum shadermode_e
 	SHADERMODE_FAKELIGHT, ///< (fakelight) modulate texture by "fake" lighting (no lightmaps, no nothing)
 	SHADERMODE_LIGHTDIRECTIONMAP_MODELSPACE, ///< (lightmap) use directional pixel shading from texture containing modelspace light directions (q3bsp deluxemap)
 	SHADERMODE_LIGHTDIRECTIONMAP_TANGENTSPACE, ///< (lightmap) use directional pixel shading from texture containing tangentspace light directions (q1bsp deluxemap)
+	SHADERMODE_LIGHTDIRECTIONMAP_FORCED_LIGHTMAP, // forced deluxemapping for lightmapped surfaces
+	SHADERMODE_LIGHTDIRECTIONMAP_FORCED_VERTEXCOLOR, // forced deluxemapping for vertexlit surfaces
 	SHADERMODE_LIGHTDIRECTION, ///< (lightmap) use directional pixel shading from fixed light direction (q3bsp)
 	SHADERMODE_LIGHTSOURCE, ///< (lightsource) use directional pixel shading from light source (rtlight)
 	SHADERMODE_REFRACTION, ///< refract background (the material is rendered normally after this pass)
@@ -196,8 +196,9 @@ typedef enum shaderpermutation_e
 	SHADERPERMUTATION_NORMALMAPSCROLLBLEND = 1<<27, ///< (water) counter-direction normalmaps scrolling
 	SHADERPERMUTATION_BOUNCEGRID = 1<<28, ///< (lightmap) use Texture_BounceGrid as an additional source of ambient light
 	SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL = 1<<29, ///< (lightmap) use 16-component pixels in bouncegrid texture for directional lighting rather than standard 4-component
-	SHADERPERMUTATION_LIMIT = 1<<30, ///< size of permutations array
-	SHADERPERMUTATION_COUNT = 30 ///< size of shaderpermutationinfo array
+	SHADERPERMUTATION_TRIPPY = 1<<30, ///< use trippy vertex shader effect
+	SHADERPERMUTATION_LIMIT = 1<<31, ///< size of permutations array
+	SHADERPERMUTATION_COUNT = 31 ///< size of shaderpermutationinfo array
 }
 shaderpermutation_t;
 

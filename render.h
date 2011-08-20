@@ -54,6 +54,8 @@ extern cvar_t gl_flashblend;
 // vis stuff
 extern cvar_t r_novis;
 
+extern cvar_t r_trippy;
+
 extern cvar_t r_lerpsprites;
 extern cvar_t r_lerpmodels;
 extern cvar_t r_lerplightstyles;
@@ -200,14 +202,6 @@ extern cvar_t r_smoothnormals_areaweighting;
 
 extern cvar_t r_test;
 
-extern cvar_t r_texture_sRGB_2d;
-extern cvar_t r_texture_sRGB_skin_diffuse;
-extern cvar_t r_texture_sRGB_skin_gloss;
-extern cvar_t r_texture_sRGB_skin_glow;
-extern cvar_t r_texture_sRGB_skin_reflect;
-extern cvar_t r_texture_sRGB_cubemap;
-extern cvar_t r_texture_sRGB_skybox;
-
 #include "gl_backend.h"
 
 extern rtexture_t *r_texture_blanknormalmap;
@@ -335,8 +329,8 @@ typedef struct rsurfacestate_s
 	int ent_skinnum;
 	int ent_qwskin;
 	int ent_flags;
-	float ent_shadertime;
 	int ent_alttextures; // used by q1bsp animated textures (pressed buttons)
+	double shadertime; // r_refdef.scene.time - ent->shadertime
 	// transform matrices to render this entity and effects on this entity
 	matrix4x4_t matrix;
 	matrix4x4_t inversematrix;
@@ -447,10 +441,10 @@ typedef enum rsurfacepass_e
 }
 rsurfacepass_t;
 
-void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemode, int rgbscale);
-void R_SetupShader_DepthOrShadow(void);
-void R_SetupShader_ShowDepth(void);
-void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, float ambientscale, float diffusescale, float specularscale, rsurfacepass_t rsurfacepass, int texturenumsurfaces, const msurface_t **texturesurfacelist, void *waterplane);
+void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemode, int rgbscale, qboolean usegamma, qboolean notrippy);
+void R_SetupShader_DepthOrShadow(qboolean notrippy);
+void R_SetupShader_ShowDepth(qboolean notrippy);
+void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, float ambientscale, float diffusescale, float specularscale, rsurfacepass_t rsurfacepass, int texturenumsurfaces, const msurface_t **texturesurfacelist, void *waterplane, qboolean notrippy);
 void R_SetupShader_DeferredLight(const rtlight_t *rtlight);
 
 typedef struct r_waterstate_waterplane_s

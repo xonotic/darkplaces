@@ -625,8 +625,11 @@ void Con_MessageMode_f (void)
 {
 	key_dest = key_message;
 	chat_mode = 0; // "say"
-	chat_bufferlen = 0;
-	chat_buffer[0] = 0;
+	if(Cmd_Argc() > 1)
+	{
+		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
+		chat_bufferlen = strlen(chat_buffer);
+	}
 }
 
 
@@ -639,8 +642,11 @@ void Con_MessageMode2_f (void)
 {
 	key_dest = key_message;
 	chat_mode = 1; // "say_team"
-	chat_bufferlen = 0;
-	chat_buffer[0] = 0;
+	if(Cmd_Argc() > 1)
+	{
+		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
+		chat_bufferlen = strlen(chat_buffer);
+	}
 }
 
 /*
@@ -2842,7 +2848,7 @@ void Con_CompleteCommandLine (void)
 					}
 					else
 					{
-						stringlistsort(&resultbuf); // dirbuf is already sorted
+						stringlistsort(&resultbuf, true); // dirbuf is already sorted
 						Con_Printf("\n%i possible filenames\n", resultbuf.numstrings + dirbuf.numstrings);
 						for(i = 0; i < dirbuf.numstrings; ++i)
 						{

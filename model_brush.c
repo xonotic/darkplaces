@@ -38,6 +38,7 @@ cvar_t r_subdivisions_collision_tolerance = {0, "r_subdivisions_collision_tolera
 cvar_t r_subdivisions_collision_mintess = {0, "r_subdivisions_collision_mintess", "0", "minimum number of subdivisions (values above 0 will smooth curves that don't need it)"};
 cvar_t r_subdivisions_collision_maxtess = {0, "r_subdivisions_collision_maxtess", "1024", "maximum number of subdivisions (prevents curves beyond a certain detail level, limits smoothing)"};
 cvar_t r_subdivisions_collision_maxvertices = {0, "r_subdivisions_collision_maxvertices", "4225", "maximum vertices allowed per subdivided curve"};
+cvar_t r_trippy = {0, "r_trippy", "0", "easter egg"};
 cvar_t mod_noshader_default_offsetmapping = {CVAR_SAVE, "mod_noshader_default_offsetmapping", "1", "use offsetmapping by default on all surfaces that are not using q3 shader files"};
 cvar_t mod_q3bsp_curves_collisions = {0, "mod_q3bsp_curves_collisions", "1", "enables collisions with curves (SLOW)"};
 cvar_t mod_q3bsp_curves_collisions_stride = {0, "mod_q3bsp_curves_collisions_stride", "16", "collisions against curves: optimize performance by doing a combined collision check for this triangle amount first (-1 avoids any box tests)"};
@@ -75,6 +76,7 @@ void Mod_BrushInit(void)
 	Cvar_RegisterVariable(&r_subdivisions_collision_mintess);
 	Cvar_RegisterVariable(&r_subdivisions_collision_maxtess);
 	Cvar_RegisterVariable(&r_subdivisions_collision_maxvertices);
+	Cvar_RegisterVariable(&r_trippy);
 	Cvar_RegisterVariable(&mod_noshader_default_offsetmapping);
 	Cvar_RegisterVariable(&mod_q3bsp_curves_collisions);
 	Cvar_RegisterVariable(&mod_q3bsp_curves_collisions_stride);
@@ -1578,8 +1580,8 @@ void R_Q1BSP_LoadSplitSky (unsigned char *src, int width, int height, int bytesp
 		}
 	}
 
-	loadmodel->brush.solidskyskinframe = R_SkinFrame_LoadInternalBGRA("sky_solidtexture", 0         , (unsigned char *) solidpixels, w, h, bytesperpixel == 4 && r_texture_sRGB_skybox.integer);
-	loadmodel->brush.alphaskyskinframe = R_SkinFrame_LoadInternalBGRA("sky_alphatexture", TEXF_ALPHA, (unsigned char *) alphapixels, w, h, bytesperpixel == 4 && r_texture_sRGB_skybox.integer);
+	loadmodel->brush.solidskyskinframe = R_SkinFrame_LoadInternalBGRA("sky_solidtexture", 0         , (unsigned char *) solidpixels, w, h, vid.sRGB3D);
+	loadmodel->brush.alphaskyskinframe = R_SkinFrame_LoadInternalBGRA("sky_alphatexture", TEXF_ALPHA, (unsigned char *) alphapixels, w, h, vid.sRGB3D);
 	Mem_Free(solidpixels);
 	Mem_Free(alphapixels);
 }
@@ -1657,7 +1659,7 @@ static void Mod_Q1BSP_LoadTextures(lump_t *l)
 		tx->reflectfactor = 1;
 		Vector4Set(tx->reflectcolor4f, 1, 1, 1, 1);
 		tx->r_water_wateralpha = 1;
-		tx->offsetmapping = OFFSETMAPPING_OFF;
+		tx->offsetmapping = OFFSETMAPPING_DEFAULT;
 		tx->offsetscale = 1;
 		tx->specularscalemod = 1;
 		tx->specularpowermod = 1;
@@ -1770,9 +1772,9 @@ static void Mod_Q1BSP_LoadTextures(lump_t *l)
 			// LordHavoc: HL sky textures are entirely different than quake
 			if (!loadmodel->brush.ishlbsp && !strncmp(tx->name, "sky", 3) && mtwidth == mtheight * 2)
 			{
-				data = loadimagepixelsbgra(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s/%s", mapname, tx->name), false, false, r_texture_sRGB_skin_diffuse.integer != 0, NULL);
+				data = loadimagepixelsbgra(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s/%s", mapname, tx->name), false, false, false, NULL);
 				if (!data)
-					data = loadimagepixelsbgra(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s", tx->name), false, false, r_texture_sRGB_skin_diffuse.integer != 0, NULL);
+					data = loadimagepixelsbgra(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s", tx->name), false, false, false, NULL);
 				if (data && image_width == image_height * 2)
 				{
 					R_Q1BSP_LoadSplitSky(data, image_width, image_height, 4);
@@ -1786,6 +1788,8 @@ static void Mod_Q1BSP_LoadTextures(lump_t *l)
 				skinframe = R_SkinFrame_LoadExternal(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s/%s", mapname, tx->name), TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS, false);
 				if (!skinframe)
 					skinframe = R_SkinFrame_LoadExternal(gamemode == GAME_TENEBRAE ? tx->name : va("textures/%s", tx->name), TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS, false);
+				if (skinframe)
+					tx->offsetmapping = OFFSETMAPPING_DEFAULT; // allow offsetmapping on external textures without a q3 shader
 				if (!skinframe)
 				{
 					// did not find external texture, load it from the bsp or wad3
@@ -1814,43 +1818,44 @@ static void Mod_Q1BSP_LoadTextures(lump_t *l)
 				if (skinframe)
 					tx->skinframes[0] = skinframe;
 			}
-
-			tx->basematerialflags = MATERIALFLAG_WALL;
-			if (tx->name[0] == '*')
-			{
-				// LordHavoc: some turbulent textures should not be affected by wateralpha
-				if (!strncmp(tx->name, "*glassmirror", 12)) // Tenebrae
-				{
-					// replace the texture with transparent black
-					tx->skinframes[0] = R_SkinFrame_LoadInternalBGRA(tx->name, TEXF_MIPMAP | TEXF_ALPHA, zerotrans, 1, 1, false);
-					tx->basematerialflags |= MATERIALFLAG_NOSHADOW | MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_REFLECTION;
-				}
-				else if (!strncmp(tx->name,"*lava",5)
-				 || !strncmp(tx->name,"*teleport",9)
-				 || !strncmp(tx->name,"*rift",5)) // Scourge of Armagon texture
-					tx->basematerialflags |= MATERIALFLAG_WATERSCROLL | MATERIALFLAG_LIGHTBOTHSIDES | MATERIALFLAG_NOSHADOW;
-				else
-					tx->basematerialflags |= MATERIALFLAG_WATERSCROLL | MATERIALFLAG_LIGHTBOTHSIDES | MATERIALFLAG_NOSHADOW | MATERIALFLAG_WATERALPHA | MATERIALFLAG_WATERSHADER;
-				if (tx->skinframes[0] && tx->skinframes[0]->hasalpha)
-					tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
-			}
+			// LordHavoc: some Tenebrae textures get replaced by black
+			if (!strncmp(tx->name, "*glassmirror", 12)) // Tenebrae
+				tx->skinframes[0] = R_SkinFrame_LoadInternalBGRA(tx->name, TEXF_MIPMAP | TEXF_ALPHA, zerotrans, 1, 1, false);
 			else if (!strncmp(tx->name, "mirror", 6)) // Tenebrae
-			{
-				// replace the texture with black
 				tx->skinframes[0] = R_SkinFrame_LoadInternalBGRA(tx->name, 0, zeroopaque, 1, 1, false);
-				tx->basematerialflags |= MATERIALFLAG_REFLECTION;
-			}
-			else if (!strncmp(tx->name, "sky", 3))
-				tx->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
-			else if (!strcmp(tx->name, "caulk"))
-				tx->basematerialflags = MATERIALFLAG_NODRAW | MATERIALFLAG_NOSHADOW;
-			else if (tx->skinframes[0] && tx->skinframes[0]->hasalpha)
-				tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
-
-			// start out with no animation
-			tx->currentframe = tx;
-			tx->currentskinframe = tx->skinframes[0];
 		}
+
+		tx->basematerialflags = MATERIALFLAG_WALL;
+		if (tx->name[0] == '*')
+		{
+			// LordHavoc: some turbulent textures should not be affected by wateralpha
+			if (!strncmp(tx->name, "*glassmirror", 12)) // Tenebrae
+				tx->basematerialflags |= MATERIALFLAG_NOSHADOW | MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_REFLECTION;
+			else if (!strncmp(tx->name,"*lava",5)
+			 || !strncmp(tx->name,"*teleport",9)
+			 || !strncmp(tx->name,"*rift",5)) // Scourge of Armagon texture
+				tx->basematerialflags |= MATERIALFLAG_WATERSCROLL | MATERIALFLAG_LIGHTBOTHSIDES | MATERIALFLAG_NOSHADOW;
+			else
+				tx->basematerialflags |= MATERIALFLAG_WATERSCROLL | MATERIALFLAG_LIGHTBOTHSIDES | MATERIALFLAG_NOSHADOW | MATERIALFLAG_WATERALPHA | MATERIALFLAG_WATERSHADER;
+			if (tx->skinframes[0] && tx->skinframes[0]->hasalpha)
+				tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
+		}
+		else if (!strncmp(tx->name, "mirror", 6)) // Tenebrae
+		{
+			// replace the texture with black
+			tx->basematerialflags |= MATERIALFLAG_REFLECTION;
+		}
+		else if (!strncmp(tx->name, "sky", 3))
+			tx->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+		else if (!strcmp(tx->name, "caulk"))
+			tx->basematerialflags = MATERIALFLAG_NODRAW | MATERIALFLAG_NOSHADOW;
+		else if (tx->skinframes[0] && tx->skinframes[0]->hasalpha)
+			tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
+
+		// start out with no animation
+		tx->currentframe = tx;
+		tx->currentskinframe = tx->skinframes[0];
+		tx->currentmaterialflags = tx->basematerialflags;
 	}
 
 	// sequence the animations
@@ -3567,7 +3572,7 @@ static int Mod_Q1BSP_FatPVS(dp_model_t *model, const vec3_t org, vec_t radius, u
 {
 	int bytes = model->brush.num_pvsclusterbytes;
 	bytes = min(bytes, pvsbufferlength);
-	if (r_novis.integer || !model->brush.num_pvsclusters || !Mod_Q1BSP_GetPVS(model, org))
+	if (r_novis.integer || r_trippy.integer || !model->brush.num_pvsclusters || !Mod_Q1BSP_GetPVS(model, org))
 	{
 		memset(pvsbuffer, 0xFF, bytes);
 		return bytes;
@@ -3695,7 +3700,10 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 
 	mod->soundfromcenter = true;
 	mod->TraceBox = Mod_Q1BSP_TraceBox;
-	mod->TraceLine = Mod_Q1BSP_TraceLineAgainstSurfaces; // LordHavoc: use the surface-hitting version of TraceLine in all cases
+	if (sv_gameplayfix_q1bsptracelinereportstexture.integer)
+		mod->TraceLine = Mod_Q1BSP_TraceLineAgainstSurfaces; // LordHavoc: use the surface-hitting version of TraceLine in all cases
+	else
+		mod->TraceLine = Mod_Q1BSP_TraceLine;
 	mod->TracePoint = Mod_Q1BSP_TracePoint;
 	mod->PointSuperContents = Mod_Q1BSP_PointSuperContents;
 	mod->TraceLineAgainstSurfaces = Mod_Q1BSP_TraceLineAgainstSurfaces;
@@ -4972,7 +4980,7 @@ static void Mod_Q3BSP_LoadLightmaps(lump_t *l, lump_t *faceslump)
 		mergebuf = (loadmodel->brushq3.deluxemapping && (i & 1)) ? mergeddeluxepixels : mergedpixels;
 		mergebuf += 4 * (realindex & (mergedcolumns-1))*size + 4 * ((realindex >> powerx) & (mergedrows-1))*mergedwidth*size;
 		if ((i & 1) == 0 || !loadmodel->brushq3.deluxemapping)
-			Con_Printf("copying original lightmap %i (%ix%i) to %i (at %i,%i)\n", i, size, size, lightmapindex, (realindex & (mergedcolumns-1))*size, ((realindex >> powerx) & (mergedrows-1))*size);
+			Con_DPrintf("copying original lightmap %i (%ix%i) to %i (at %i,%i)\n", i, size, size, lightmapindex, (realindex & (mergedcolumns-1))*size, ((realindex >> powerx) & (mergedrows-1))*size);
 
 		// convert pixels from RGB or BGRA while copying them into the destination rectangle
 		for (j = 0;j < size;j++)

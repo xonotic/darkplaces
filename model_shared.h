@@ -445,6 +445,7 @@ typedef struct q3shaderinfo_s
 	// dp-specific additions:
 
 	// shadow control
+	qboolean dpnortlight;
 	qboolean dpshadow;
 	qboolean dpnoshadow;
 
@@ -474,6 +475,9 @@ typedef struct q3shaderinfo_s
 	// gloss
 	float specularscalemod;
 	float specularpowermod;
+
+	// rtlightning ambient addition
+	float rtlightambient;
 #define Q3SHADERINFO_COMPARE_END specularpowermod
 }
 q3shaderinfo_t;
@@ -612,6 +616,9 @@ typedef struct texture_s
 	// gloss
 	float specularscalemod;
 	float specularpowermod;
+
+	// diffuse and ambient
+	float rtlightambient;
 }
  texture_t;
 
@@ -1097,13 +1104,6 @@ qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qbool
 
 extern cvar_t r_mipskins;
 extern cvar_t r_mipnormalmaps;
-
-typedef struct skeleton_s
-{
-	const dp_model_t *model;
-	matrix4x4_t *relativetransforms;
-}
-skeleton_t;
 
 typedef struct skinfileitem_s
 {

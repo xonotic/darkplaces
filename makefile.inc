@@ -210,9 +210,9 @@ DO_CC=$(CC) $(CFLAGS) -c $< -o $@
 
 
 # Link
-LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=debug
-LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=profile
-LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`test -d .svn && svnversion || echo -` -DBUILDTYPE=release -lircclient
+LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=debug
+LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=profile
+LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=release -lircclient
 
 
 ##### UNIX specific variables #####
@@ -359,19 +359,19 @@ help:
 	@echo
 
 debug :
-	$(MAKE) sv-debug cl-debug sdl-debug
+	$(MAKE) $(TARGETS_DEBUG)
 
 profile :
-	$(MAKE) sv-profile cl-profile sdl-profile
+	$(MAKE) $(TARGETS_PROFILE)
 
 release :
-	$(MAKE) sv-release cl-release sdl-release
+	$(MAKE) $(TARGETS_RELEASE)
 
 release-profile :
-	$(MAKE) sv-release-profile cl-release-profile sdl-release-profile
+	$(MAKE) $(TARGETS_RELEASE_PROFILE)
 
 nexuiz :
-	$(MAKE) sv-nexuiz cl-nexuiz sdl-nexuiz
+	$(MAKE) $(TARGETS_NEXUIZ)
 
 cl-debug :
 	$(MAKE) bin-debug \

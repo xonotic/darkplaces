@@ -278,6 +278,16 @@ float EF_LOWPRECISION = 4194304;
 //description:
 //controls rendering scale of the object, 0 is forced to be 1, darkplaces uses 1/16th accuracy and a limit of 15.9375, can be used to make an object larger or smaller.
 
+//DP_ENT_TRAILEFFECTNUM
+//idea: LordHavoc
+//darkplaces implementation: LordHavoc
+//field definitions:
+.float traileffectnum;
+//description:
+//use a custom effectinfo.txt effect on this entity, assign it like this:
+//self.traileffectnum = particleeffectnum("mycustomeffect");
+//this will do both the dlight and particle trail as described in the effect, basically equivalent to trailparticles() in CSQC but performed on a server entity.
+
 //DP_ENT_VIEWMODEL
 //idea: LordHavoc
 //darkplaces implementation: LordHavoc
@@ -285,29 +295,6 @@ float EF_LOWPRECISION = 4194304;
 .entity viewmodelforclient;
 //description:
 //this is a very special capability, attachs the entity to the view of the client specified, origin and angles become relative to the view of that client, all effects can be used (multiple skins on a weapon model etc)...  the entity is not visible to any other client.
-
-//DP_GECKO_SUPPORT
-//idea: Res2k, BlackHC
-//darkplaces implementation: Res2k, BlackHC
-//constant definitions:
-float GECKO_BUTTON_DOWN         = 0;
-float GECKO_BUTTON_UP           = 1;
-// either use down and up or just press but not all of them!
-float GECKO_BUTTON_PRESS        = 2;
-// use this for mouse events if needed?
-float GECKO_BUTTON_DOUBLECLICK  = 3;
-//builtin definitions:
-float(string name) gecko_create( string name ) = #487;
-void(string name) gecko_destroy( string name ) = #488;
-void(string name) gecko_navigate( string name, string URI ) = #489;
-float(string name) gecko_keyevent( string name, float key, float eventtype ) = #490;
-void gecko_mousemove( string name, float x, float y ) = #491;
-void gecko_resize( string name, float w, float h ) = #492;
-vector gecko_get_texture_extent( string name ) = #493;
-//engine-called QC prototypes:
-//string(string name, string query) Qecko_Query;
-//description:
-//provides an interface to the offscreengecko library and allows for internet browsing in games
 
 //DP_GFX_EXTERNALTEXTURES
 //idea: LordHavoc
@@ -476,6 +463,14 @@ void(entity e, entity tagentity, string tagname) setattachment = #443; // attach
 .float button6;
 .float button7;
 .float button8;
+.float button9;
+.float button10;
+.float button11;
+.float button12;
+.float button13;
+.float button14;
+.float button15;
+.float button16;
 //description:
 //set to the state of the +button3, +button4, +button5, +button6, +button7, and +button8 buttons from the client, this does not involve protocol changes (the extra 6 button bits were simply not used).
 //the exact mapping of protocol button bits on the server is:
@@ -524,6 +519,14 @@ void(entity e, entity tagentity, string tagname) setattachment = #443; // attach
 //float MOVETYPE_BOUNCEMISSILE = 11; // already in defs.qc
 //description:
 //MOVETYPE_BOUNCE but without gravity, and with full reflection (no speed loss like grenades have), in other words - bouncing laser bolts.
+
+//DP_MOVETYPEFLYWORLDONLY
+//idea: Samual
+//darkplaces implementation: Samual
+//movetype definitions:
+float MOVETYPE_FLY_WORLDONLY = 33;
+//description:
+//like MOVETYPE_FLY, but does all traces with MOVE_WORLDONLY, and is ignored by MOVETYPE_PUSH. Should only be combined with SOLID_NOT and SOLID_TRIGGER.
 
 //DP_NULL_MODEL
 //idea: Chris
@@ -583,11 +586,11 @@ float(float a) tan = #475; // returns tangent value (which is simply sin(a)/cos(
 //NOTE: copying a string-typed autocvar to another variable/field, and then
 //changing the cvar or returning from progs is UNDEFINED. Writing to autocvar
 //globals is UNDEFINED.  Accessing autocvar globals after cvar_set()ing that
-//cvar is IMPLEMENTATION DEFINED (an implementation may either yield the
-//previous, or the current, value). Whether autocvar globals, after restoring
-//a savegame, have the cvar's current value, or the original value at time of
-//saving, is UNDEFINED. Restoring a savegame however must not restore the
-//cvar values themselves.
+//cvar in the same frame is IMPLEMENTATION DEFINED (an implementation may
+//either yield the previous, or the current, value). Whether autocvar globals,
+//after restoring a savegame, have the cvar's current value, or the original
+//value at time of saving, is UNDEFINED. Restoring a savegame however must not
+//restore the cvar values themselves.
 //In case the cvar does NOT exist, then it is automatically created with the
 //value of the autocvar initializer, if given. This is possible with e.g.
 //frikqcc and fteqcc the following way:
@@ -1211,6 +1214,33 @@ float(string name, string value) registercvar = #93;
 //the engine plays sound/cdtracks/track001.wav instead of cd track 1 and so on if found, this allows games and mods to have music tracks without using ambientsound.
 //Note: also plays .ogg with DP_SND_OGGVORBIS extension.
 
+//DP_SND_SOUND7_WIP1
+//idea: divVerent
+//darkplaces implementation: divVerent
+//builtin definitions:
+void(entity e, float chan, string samp, float vol, float atten, float speed, float flags) sound7 = #8;
+float SOUNDFLAG_RELIABLE = 1;
+//description:
+//plays a sound, with some more flags
+//extensions to sound():
+//- channel may be in the range from -128 to 127; channels -128 to 0 are "auto",
+//  i.e. support multiple sounds at once, but cannot be stopped/restarted
+//- a speed parameter has been reserved for later addition of pitch shifting.
+//  it MUST be set to 0 for now, meaning "no pitch change"
+//- the flag SOUNDFLAG_RELIABLE can be specified, which makes the sound send
+//  to MSG_ALL (reliable) instead of MSG_BROADCAST (unreliable, default);
+//  similarily, SOUNDFLAG_RELIABLE_TO_ONE sends to MSG_ONE
+//- channel 0 is controlled by snd_channel0volume; channel 1 and -1 by
+//  snd_channel1volume, etc. (so, a channel shares the cvar with its respective
+//  auto-channel); however, the mod MUST define snd_channel8volume and upwards
+//  in default.cfg if they are to be used, as the engine does not create them
+//  to not litter the cvar list
+//- this extension applies to CSQC as well; CSQC_Event_Sound will get speed and
+//  flags as extra 7th and 8th argument
+//- WIP2 ideas: SOUNDFLAG_RELIABLE_TO_ONE, SOUNDFLAG_NOPHS, SOUNDFLAG_FORCELOOP
+//- NOTE: to check for this, ALSO OR a check with DP_SND_SOUND7 to also support
+//  the finished extension once done
+
 //DP_SND_OGGVORBIS
 //idea: Transfusion
 //darkplaces implementation: Elric
@@ -1584,6 +1614,7 @@ const float MOVETYPE_PHYSICS = 32; // need to be set before any physics_* builti
 const float SOLID_PHYSICS_BOX = 32;
 const float SOLID_PHYSICS_SPHERE = 33;
 const float SOLID_PHYSICS_CAPSULE = 34;
+const float SOLID_PHYSICS_TRIMESH = 35;
 //SOLID_BSP;
 //joint types:
 const float JOINTTYPE_POINT = 1;
@@ -1592,6 +1623,18 @@ const float JOINTTYPE_SLIDER = 3;
 const float JOINTTYPE_UNIVERSAL = 4;
 const float JOINTTYPE_HINGE2 = 5;
 const float JOINTTYPE_FIXED = -1;
+// common joint properties:
+// .entity aiment, enemy; // connected objects
+// .vector movedir;
+//   for a spring:
+//     movedir_x = spring constant (force multiplier, must be > 0)
+//     movedir_y = spring dampening constant to prevent oscillation (must be > 0)
+//     movedir_z = spring stop position (+/-)
+//   for a motor:
+//     movedir_x = desired motor velocity
+//     movedir_y = -1 * max motor force to use
+//     movedir_z = stop position (+/-), set to 0 for no stop
+//   note that ODE does not support both in one anyway
 //field definitions:
 .float mass; // ODE mass, standart value is 1
 .float bouncefactor;
@@ -1602,7 +1645,7 @@ void(entity e, float physics_enabled) physics_enable = #540; // enable or disabl
 void(entity e, vector force, vector force_pos) physics_addforce = #541; // apply a force from certain origin, length of force vector is power of force
 void(entity e, vector torque) physics_addtorque = #542; // add relative torque
 //description: provides Open Dynamics Engine support, requires extenal dll to be present or engine compiled with statical link option
-//be sure to checkextension for it to know if library i loaded and ready, also to enable physics set "physice_ode" cvar to 1
+//be sure to checkextension for it to know if library is loaded and ready, also to enable physics set "physics_ode" cvar to 1
 //note: this extension is highly experimental and may be unstable
 //note: use SOLID_BSP on entities to get a trimesh collision models on them
 
@@ -2392,38 +2435,6 @@ void(float pause) setpause = #531;
 
 
 // EXPERIMENTAL (not finalized) EXTENSIONS:
-
-//DP_PHYSICS
-//idea: LordHavoc
-//darkplaces implementation: LordHavoc, divVerent
-//constant definitions:
-float SOLID_PHYSICS_BOX = 32;
-float SOLID_PHYSICS_SPHERE = 33;
-float SOLID_PHYSICS_CAPSULE = 34;
-float MOVETYPE_PHYSICS = 32;
-float JOINTTYPE_POINT = 1; // point; uses origin (anchor)
-float JOINTTYPE_HINGE = 2; // hinge; uses origin (anchor) and angles (axis)
-float JOINTTYPE_SLIDER = 3; // slider; uses angles (axis)
-float JOINTTYPE_UNIVERSAL = 4; // universal; uses origin (anchor) and angles (forward is axis1, up is axis2)
-float JOINTTYPE_HINGE2 = 5; // hinge2; uses origin (anchor), angles (axis1), velocity (axis2)
-//field definitions:
-.float mass;
-.float jointtype; // see JOINTTYPE_ definitions above
-// common joint properties:
-// .entity aiment, enemy; // connected objects
-// .vector movedir;
-//   for a spring:
-//     movedir_x = spring constant (force multiplier, must be > 0)
-//     movedir_y = spring dampening constant to prevent oscillation (must be > 0)
-//     movedir_z = spring stop position (+/-)
-//   for a motor:
-//     movedir_x = desired motor velocity
-//     movedir_y = -1 * max motor force to use
-//     movedir_z = stop position (+/-), set to 0 for no stop
-//   note that ODE does not support both in one anyway
-//description:
-//various physics properties can be defined in an entity and are executed via
-//ODE
 
 //DP_CRYPTO
 //idea: divVerent

@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "cl_collision.h"
+#include "image.h"
 
 void CL_VM_UpdateDmgGlobals (int dmg_take, int dmg_save, vec3_t dmg_origin);
 
@@ -369,7 +370,8 @@ static void V_BonusFlash_f (void)
 ==============================================================================
 */
 
-extern matrix4x4_t viewmodelmatrix;
+extern matrix4x4_t viewmodelmatrix_nobob;
+extern matrix4x4_t viewmodelmatrix_withbob;
 
 #include "cl_collision.h"
 #include "csprogs.h"
@@ -433,6 +435,7 @@ void V_CalcRefdef (void)
 	entity_t *ent;
 	float vieworg[3], viewangles[3], smoothtime;
 	float gunorg[3], gunangles[3];
+	matrix4x4_t tmpmatrix;
 	
 	static float viewheightavg;
 	float viewheight;	
@@ -444,7 +447,8 @@ void V_CalcRefdef (void)
 #endif
 	trace_t trace;
 	VectorClear(gunorg);
-	viewmodelmatrix = identitymatrix;
+	viewmodelmatrix_nobob = identitymatrix;
+	viewmodelmatrix_withbob = identitymatrix;
 	r_refdef.view.matrix = identitymatrix;
 	if (cls.state == ca_connected && cls.signon == SIGNONS)
 	{
@@ -473,7 +477,9 @@ void V_CalcRefdef (void)
 				r_refdef.view.matrix = ent->render.matrix;
 				Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, cl.stats[STAT_VIEWHEIGHT]);
 			}
-			viewmodelmatrix = r_refdef.view.matrix;
+			Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
+			Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
+			Matrix4x4_Copy(&viewmodelmatrix_withbob, &viewmodelmatrix_nobob);
 		}
 		else
 		{
@@ -793,13 +799,23 @@ void V_CalcRefdef (void)
 			}
 			// calculate a view matrix for rendering the scene
 			if (v_idlescale.value)
-				Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, vieworg[0], vieworg[1], vieworg[2], viewangles[0] + v_idlescale.value * sin(cl.time*v_ipitch_cycle.value) * v_ipitch_level.value, viewangles[1] + v_idlescale.value * sin(cl.time*v_iyaw_cycle.value) * v_iyaw_level.value, viewangles[2] + v_idlescale.value * sin(cl.time*v_iroll_cycle.value) * v_iroll_level.value, 1);
-			else
-				Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, vieworg[0], vieworg[1], vieworg[2], viewangles[0], viewangles[1], viewangles[2], 1);
+			{
+				viewangles[0] += v_idlescale.value * sin(cl.time*v_ipitch_cycle.value) * v_ipitch_level.value;
+				viewangles[1] += v_idlescale.value * sin(cl.time*v_iyaw_cycle.value) * v_iyaw_level.value;
+				viewangles[2] += v_idlescale.value * sin(cl.time*v_iroll_cycle.value) * v_iroll_level.value;
+			}
+			Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, vieworg[0], vieworg[1], vieworg[2], viewangles[0], viewangles[1], viewangles[2], 1);
+
 			// calculate a viewmodel matrix for use in view-attached entities
-			Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix, gunorg[0], gunorg[1], gunorg[2], gunangles[0], gunangles[1], gunangles[2], cl_viewmodel_scale.value);
-			VectorCopy(vieworg, cl.csqc_origin);
-			VectorCopy(viewangles, cl.csqc_angles);
+			Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
+			Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
+
+			Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix_withbob, gunorg[0], gunorg[1], gunorg[2], gunangles[0], gunangles[1], gunangles[2], cl_viewmodel_scale.value);
+			VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
+			VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
+
+			Matrix4x4_Invert_Simple(&tmpmatrix, &r_refdef.view.matrix);
+			Matrix4x4_Concat(&cl.csqc_viewmodelmatrixfromengine, &tmpmatrix, &viewmodelmatrix_withbob);
 		}
 	}
 }
@@ -923,10 +939,22 @@ void V_CalcViewBlend(void)
 			a2 = 1 / r_refdef.viewblend[3];
 			VectorScale(r_refdef.viewblend, a2, r_refdef.viewblend);
 		}
-		r_refdef.viewblend[0] = bound(0.0f, r_refdef.viewblend[0] * (1.0f/255.0f), 1.0f);
-		r_refdef.viewblend[1] = bound(0.0f, r_refdef.viewblend[1] * (1.0f/255.0f), 1.0f);
-		r_refdef.viewblend[2] = bound(0.0f, r_refdef.viewblend[2] * (1.0f/255.0f), 1.0f);
+		r_refdef.viewblend[0] = bound(0.0f, r_refdef.viewblend[0], 255.0f);
+		r_refdef.viewblend[1] = bound(0.0f, r_refdef.viewblend[1], 255.0f);
+		r_refdef.viewblend[2] = bound(0.0f, r_refdef.viewblend[2], 255.0f);
 		r_refdef.viewblend[3] = bound(0.0f, r_refdef.viewblend[3] * gl_polyblend.value, 1.0f);
+		if (vid.sRGB3D)
+		{
+			r_refdef.viewblend[0] = Image_LinearFloatFromsRGB(r_refdef.viewblend[0]);
+			r_refdef.viewblend[1] = Image_LinearFloatFromsRGB(r_refdef.viewblend[1]);
+			r_refdef.viewblend[2] = Image_LinearFloatFromsRGB(r_refdef.viewblend[2]);
+		}
+		else
+		{
+			r_refdef.viewblend[0] *= (1.0f/256.0f);
+			r_refdef.viewblend[1] *= (1.0f/256.0f);
+			r_refdef.viewblend[2] *= (1.0f/256.0f);
+		}
 		
 		// Samual: Ugly hack, I know. But it's the best we can do since
 		// there is no way to detect client states from the engine.

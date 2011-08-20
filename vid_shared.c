@@ -11,6 +11,63 @@
 LPDIRECT3DDEVICE9 vid_d3d9dev;
 #endif
 
+#ifdef WIN32
+//#include <XInput.h>
+#define XINPUT_GAMEPAD_DPAD_UP          0x0001
+#define XINPUT_GAMEPAD_DPAD_DOWN        0x0002
+#define XINPUT_GAMEPAD_DPAD_LEFT        0x0004
+#define XINPUT_GAMEPAD_DPAD_RIGHT       0x0008
+#define XINPUT_GAMEPAD_START            0x0010
+#define XINPUT_GAMEPAD_BACK             0x0020
+#define XINPUT_GAMEPAD_LEFT_THUMB       0x0040
+#define XINPUT_GAMEPAD_RIGHT_THUMB      0x0080
+#define XINPUT_GAMEPAD_LEFT_SHOULDER    0x0100
+#define XINPUT_GAMEPAD_RIGHT_SHOULDER   0x0200
+#define XINPUT_GAMEPAD_A                0x1000
+#define XINPUT_GAMEPAD_B                0x2000
+#define XINPUT_GAMEPAD_X                0x4000
+#define XINPUT_GAMEPAD_Y                0x8000
+#define XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE  7849
+#define XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE 8689
+#define XINPUT_GAMEPAD_TRIGGER_THRESHOLD    30
+#define XUSER_INDEX_ANY                 0x000000FF
+
+typedef struct xinput_gamepad_s
+{
+	WORD wButtons;
+	BYTE bLeftTrigger;
+	BYTE bRightTrigger;
+	SHORT sThumbLX;
+	SHORT sThumbLY;
+	SHORT sThumbRX;
+	SHORT sThumbRY;
+}
+xinput_gamepad_t;
+
+typedef struct xinput_state_s
+{
+	DWORD dwPacketNumber;
+	xinput_gamepad_t Gamepad;
+}
+xinput_state_t;
+
+typedef struct xinput_keystroke_s
+{
+    WORD    VirtualKey;
+    WCHAR   Unicode;
+    WORD    Flags;
+    BYTE    UserIndex;
+    BYTE    HidCode;
+}
+xinput_keystroke_t;
+
+DWORD (WINAPI *qXInputGetState)(DWORD index, xinput_state_t *state);
+DWORD (WINAPI *qXInputGetKeystroke)(DWORD index, DWORD reserved, xinput_keystroke_t *keystroke);
+
+qboolean vid_xinputinitialized = false;
+int vid_xinputindex = -1;
+#endif
+
 // global video state
 viddef_t vid;
 
@@ -30,6 +87,54 @@ qboolean vid_hidden = true;
 // LordHavoc: if window is not the active window, don't hog as much CPU time,
 // let go of the mouse, turn off sound, and restore system gamma ramps...
 qboolean vid_activewindow = true;
+
+vid_joystate_t vid_joystate;
+
+#ifdef WIN32
+cvar_t joy_xinputavailable = {CVAR_READONLY, "joy_xinputavailable", "0", "indicates which devices are being reported by the Windows XInput API (first controller = 1, second = 2, third = 4, fourth = 8, added together)"};
+#endif
+cvar_t joy_active = {CVAR_READONLY, "joy_active", "0", "indicates that a joystick is active (detected and enabled)"};
+cvar_t joy_detected = {CVAR_READONLY, "joy_detected", "0", "number of joysticks detected by engine"};
+cvar_t joy_enable = {CVAR_SAVE, "joy_enable", "0", "enables joystick support"};
+cvar_t joy_index = {0, "joy_index", "0", "selects which joystick to use if you have multiple (0 uses the first controller, 1 uses the second, ...)"};
+cvar_t joy_axisforward = {0, "joy_axisforward", "1", "which joystick axis to query for forward/backward movement"};
+cvar_t joy_axisside = {0, "joy_axisside", "0", "which joystick axis to query for right/left movement"};
+cvar_t joy_axisup = {0, "joy_axisup", "-1", "which joystick axis to query for up/down movement"};
+cvar_t joy_axispitch = {0, "joy_axispitch", "3", "which joystick axis to query for looking up/down"};
+cvar_t joy_axisyaw = {0, "joy_axisyaw", "2", "which joystick axis to query for looking right/left"};
+cvar_t joy_axisroll = {0, "joy_axisroll", "-1", "which joystick axis to query for tilting head right/left"};
+cvar_t joy_deadzoneforward = {0, "joy_deadzoneforward", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_deadzoneside = {0, "joy_deadzoneside", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_deadzoneup = {0, "joy_deadzoneup", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_deadzonepitch = {0, "joy_deadzonepitch", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_deadzoneyaw = {0, "joy_deadzoneyaw", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_deadzoneroll = {0, "joy_deadzoneroll", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_sensitivityforward = {0, "joy_sensitivityforward", "-1", "movement multiplier"};
+cvar_t joy_sensitivityside = {0, "joy_sensitivityside", "1", "movement multiplier"};
+cvar_t joy_sensitivityup = {0, "joy_sensitivityup", "1", "movement multiplier"};
+cvar_t joy_sensitivitypitch = {0, "joy_sensitivitypitch", "1", "movement multiplier"};
+cvar_t joy_sensitivityyaw = {0, "joy_sensitivityyaw", "-1", "movement multiplier"};
+cvar_t joy_sensitivityroll = {0, "joy_sensitivityroll", "1", "movement multiplier"};
+cvar_t joy_axiskeyevents = {CVAR_SAVE, "joy_axiskeyevents", "0", "generate uparrow/leftarrow etc. keyevents for joystick axes, use if your joystick driver is not generating them"};
+cvar_t joy_axiskeyevents_deadzone = {CVAR_SAVE, "joy_axiskeyevents_deadzone", "0.5", "deadzone value for axes"};
+cvar_t joy_x360_axisforward = {0, "joy_x360_axisforward", "1", "which joystick axis to query for forward/backward movement"};
+cvar_t joy_x360_axisside = {0, "joy_x360_axisside", "0", "which joystick axis to query for right/left movement"};
+cvar_t joy_x360_axisup = {0, "joy_x360_axisup", "-1", "which joystick axis to query for up/down movement"};
+cvar_t joy_x360_axispitch = {0, "joy_x360_axispitch", "3", "which joystick axis to query for looking up/down"};
+cvar_t joy_x360_axisyaw = {0, "joy_x360_axisyaw", "2", "which joystick axis to query for looking right/left"};
+cvar_t joy_x360_axisroll = {0, "joy_x360_axisroll", "-1", "which joystick axis to query for tilting head right/left"};
+cvar_t joy_x360_deadzoneforward = {0, "joy_x360_deadzoneforward", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_deadzoneside = {0, "joy_x360_deadzoneside", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_deadzoneup = {0, "joy_x360_deadzoneup", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_deadzonepitch = {0, "joy_x360_deadzonepitch", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_deadzoneyaw = {0, "joy_x360_deadzoneyaw", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_deadzoneroll = {0, "joy_x360_deadzoneroll", "0.266", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
+cvar_t joy_x360_sensitivityforward = {0, "joy_x360_sensitivityforward", "1", "movement multiplier"};
+cvar_t joy_x360_sensitivityside = {0, "joy_x360_sensitivityside", "1", "movement multiplier"};
+cvar_t joy_x360_sensitivityup = {0, "joy_x360_sensitivityup", "1", "movement multiplier"};
+cvar_t joy_x360_sensitivitypitch = {0, "joy_x360_sensitivitypitch", "-1", "movement multiplier"};
+cvar_t joy_x360_sensitivityyaw = {0, "joy_x360_sensitivityyaw", "-1", "movement multiplier"};
+cvar_t joy_x360_sensitivityroll = {0, "joy_x360_sensitivityroll", "1", "movement multiplier"};
 
 // cvars for DPSOFTRAST
 cvar_t vid_soft = {CVAR_SAVE, "vid_soft", "0", "enables use of the DarkPlaces Software Rasterizer rather than OpenGL or Direct3D"};
@@ -71,6 +176,7 @@ cvar_t vid_minheight = {0, "vid_minheight", "0", "minimum vid_height that is acc
 cvar_t vid_gl13 = {0, "vid_gl13", "1", "enables faster rendering using OpenGL 1.3 features (such as GL_ARB_texture_env_combine extension)"};
 cvar_t vid_gl20 = {0, "vid_gl20", "1", "enables faster rendering using OpenGL 2.0 features (such as GL_ARB_fragment_shader extension)"};
 cvar_t gl_finish = {0, "gl_finish", "0", "make the cpu wait for the graphics processor at the end of each rendered frame (can help with strange input or video lag problems on some machines)"};
+cvar_t vid_sRGB = {CVAR_SAVE, "vid_sRGB", "0", "if hardware is capable, modify rendering to be gamma corrected for the sRGB color standard (computer monitors, TVs), recommended"};
 
 cvar_t vid_touchscreen = {0, "vid_touchscreen", "0", "Use touchscreen-style input (no mouse grab, track mouse motion only while button is down, screen areas for mimicing joystick axes and buttons"};
 cvar_t vid_stick_mouse = {CVAR_SAVE, "vid_stick_mouse", "0", "have the mouse stuck in the center of the screen" };
@@ -90,8 +196,10 @@ cvar_t v_color_grey_b = {CVAR_SAVE, "v_color_grey_b", "0.5", "desired color of g
 cvar_t v_color_white_r = {CVAR_SAVE, "v_color_white_r", "1", "desired color of white"};
 cvar_t v_color_white_g = {CVAR_SAVE, "v_color_white_g", "1", "desired color of white"};
 cvar_t v_color_white_b = {CVAR_SAVE, "v_color_white_b", "1", "desired color of white"};
-cvar_t v_hwgamma = {CVAR_SAVE, "v_hwgamma", "1", "enables use of hardware gamma correction ramps if available (note: does not work very well on Windows2000 and above), values are 0 = off, 1 = attempt to use hardware gamma, 2 = use hardware gamma whether it works or not"};
-cvar_t v_glslgamma = {CVAR_SAVE, "v_glslgamma", "0", "enables use of GLSL to apply gamma correction ramps if available (note: overrides v_hwgamma)"};
+cvar_t v_hwgamma = {CVAR_SAVE, "v_hwgamma", "0", "enables use of hardware gamma correction ramps if available (note: does not work very well on Windows2000 and above), values are 0 = off, 1 = attempt to use hardware gamma, 2 = use hardware gamma whether it works or not"};
+cvar_t v_glslgamma = {CVAR_SAVE, "v_glslgamma", "1", "enables use of GLSL to apply gamma correction ramps if available (note: overrides v_hwgamma)"};
+cvar_t v_glslgamma_2d = {CVAR_SAVE, "v_glslgamma_2d", "0", "applies GLSL gamma to 2d pictures (HUD, fonts)"};
+
 cvar_t v_psycho = {0, "v_psycho", "0", "easter egg"};
 
 // brand of graphics chip
@@ -110,6 +218,7 @@ const char *gl_platformextensions;
 // name of driver library (opengl32.dll, libGL.so.1, or whatever)
 char gl_driver[256];
 
+#ifndef USE_GLES2
 // GL_ARB_multitexture
 void (GLAPIENTRY *qglMultiTexCoord1f) (GLenum, GLfloat);
 void (GLAPIENTRY *qglMultiTexCoord2f) (GLenum, GLfloat, GLfloat);
@@ -151,6 +260,7 @@ void (GLAPIENTRY *qglClearDepth)(GLclampd depth);
 void (GLAPIENTRY *qglDepthFunc)(GLenum func);
 void (GLAPIENTRY *qglDepthMask)(GLboolean flag);
 void (GLAPIENTRY *qglDepthRange)(GLclampd near_val, GLclampd far_val);
+void (GLAPIENTRY *qglDepthRangef)(GLclampf near_val, GLclampf far_val);
 void (GLAPIENTRY *qglColorMask)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
 
 void (GLAPIENTRY *qglDrawRangeElements)(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices);
@@ -396,6 +506,9 @@ void (GLAPIENTRY *qglGetQueryivARB)(GLenum target, GLenum pname, GLint *params);
 void (GLAPIENTRY *qglGetQueryObjectivARB)(GLuint qid, GLenum pname, GLint *params);
 void (GLAPIENTRY *qglGetQueryObjectuivARB)(GLuint qid, GLenum pname, GLuint *params);
 
+void (GLAPIENTRY *qglSampleCoverageARB)(GLclampf value, GLboolean invert);
+#endif
+
 #if _MSC_VER >= 1400
 #define sscanf sscanf_s
 #endif
@@ -475,6 +588,7 @@ qboolean GL_CheckExtension(const char *minglver_or_ext, const dllfunction_t *fun
 	return true;
 }
 
+#ifndef USE_GLES2
 static dllfunction_t opengl110funcs[] =
 {
 	{"glClearColor", (void **) &qglClearColor},
@@ -804,6 +918,13 @@ static dllfunction_t drawbuffersfuncs[] =
 	{NULL, NULL}
 };
 
+static dllfunction_t multisamplefuncs[] =
+{
+	{"glSampleCoverageARB",          (void **) &qglSampleCoverageARB},
+	{NULL, NULL}
+};
+#endif
+
 void VID_ClearExtensions(void)
 {
 	// VorteX: reset extensions info cvar, it got filled by GL_CheckExtension
@@ -812,6 +933,8 @@ void VID_ClearExtensions(void)
 	// clear the extension flags
 	memset(&vid.support, 0, sizeof(vid.support));
 	vid.renderpath = RENDERPATH_GL11;
+	vid.sRGBcapable2D = false;
+	vid.sRGBcapable3D = false;
 	vid.useinterleavedarrays = false;
 	vid.forcevbo = false;
 	vid.maxtexturesize_2d = 0;
@@ -823,6 +946,7 @@ void VID_ClearExtensions(void)
 	vid.max_anisotropy = 1;
 	vid.maxdrawbuffers = 1;
 
+#ifndef USE_GLES2
 	// this is a complete list of all functions that are directly checked in the renderer
 	qglDrawRangeElements = NULL;
 	qglDrawBuffer = NULL;
@@ -832,30 +956,35 @@ void VID_ClearExtensions(void)
 	qglGetCompressedTexImageARB = NULL;
 	qglFramebufferTexture2DEXT = NULL;
 	qglDrawBuffersARB = NULL;
+#endif
 }
 
+#ifndef USE_GLES2
 void VID_CheckExtensions(void)
 {
-	if (!GL_CheckExtension("1.1", opengl110funcs, NULL, false))
+	if (!GL_CheckExtension("glbase", opengl110funcs, NULL, false))
 		Sys_Error("OpenGL 1.1.0 functions not found");
-	vid.support.gl20shaders = GL_CheckExtension("2.0", gl20shaderfuncs, "-noshaders", false);
+	vid.support.gl20shaders = GL_CheckExtension("2.0", gl20shaderfuncs, "-noshaders", true);
 
 	CHECKGLERROR
 
 	Con_DPrint("Checking OpenGL extensions...\n");
 
-	// this one is purely optional, needed for GLSL 1.3 support (#version 130), so we don't even check the return value of GL_CheckExtension
-	vid.support.gl20shaders130 = GL_CheckExtension("2.0", glsl130funcs, "-noglsl130", false);
-	if(vid.support.gl20shaders130)
+	if (vid.support.gl20shaders)
 	{
-		char *s = (char *) qglGetString(GL_SHADING_LANGUAGE_VERSION);
-		if(!s || atof(s) < 1.30 - 0.00001)
-			vid.support.gl20shaders130 = 0;
+		// this one is purely optional, needed for GLSL 1.3 support (#version 130), so we don't even check the return value of GL_CheckExtension
+		vid.support.gl20shaders130 = GL_CheckExtension("glshaders130", glsl130funcs, "-noglsl130", true);
+		if(vid.support.gl20shaders130)
+		{
+			char *s = (char *) qglGetString(GL_SHADING_LANGUAGE_VERSION);
+			if(!s || atof(s) < 1.30 - 0.00001)
+				vid.support.gl20shaders130 = 0;
+		}
+		if(vid.support.gl20shaders130)
+			Con_DPrintf("Using GLSL 1.30\n");
+		else
+			Con_DPrintf("Using GLSL 1.00\n");
 	}
-	if(vid.support.gl20shaders130)
-		Con_DPrintf("Using GLSL 1.30\n");
-	else
-		Con_DPrintf("Using GLSL 1.00\n");
 
 	// GL drivers generally prefer GL_BGRA
 	vid.forcetextype = GL_BGRA;
@@ -870,12 +999,15 @@ void VID_CheckExtensions(void)
 	vid.support.arb_texture_cube_map = GL_CheckExtension("GL_ARB_texture_cube_map", NULL, "-nocubemap", false);
 	vid.support.arb_texture_env_combine = GL_CheckExtension("GL_ARB_texture_env_combine", NULL, "-nocombine", false) || GL_CheckExtension("GL_EXT_texture_env_combine", NULL, "-nocombine", false);
 	vid.support.arb_texture_gather = GL_CheckExtension("GL_ARB_texture_gather", NULL, "-notexturegather", false);
+#ifndef __APPLE__
+	// LordHavoc: too many bugs on OSX!
 	vid.support.arb_texture_non_power_of_two = GL_CheckExtension("GL_ARB_texture_non_power_of_two", NULL, "-notexturenonpoweroftwo", false);
+#endif
 	vid.support.arb_vertex_buffer_object = GL_CheckExtension("GL_ARB_vertex_buffer_object", vbofuncs, "-novbo", false);
-	vid.support.ati_separate_stencil = GL_CheckExtension("2.0", gl2separatestencilfuncs, "-noseparatestencil", true) || GL_CheckExtension("GL_ATI_separate_stencil", atiseparatestencilfuncs, "-noseparatestencil", false);
+	vid.support.ati_separate_stencil = GL_CheckExtension("separatestencil", gl2separatestencilfuncs, "-noseparatestencil", true) || GL_CheckExtension("GL_ATI_separate_stencil", atiseparatestencilfuncs, "-noseparatestencil", false);
 	vid.support.ext_blend_minmax = GL_CheckExtension("GL_EXT_blend_minmax", blendequationfuncs, "-noblendminmax", false);
 	vid.support.ext_blend_subtract = GL_CheckExtension("GL_EXT_blend_subtract", blendequationfuncs, "-noblendsubtract", false);
-	vid.support.ext_draw_range_elements = GL_CheckExtension("1.2", drawrangeelementsfuncs, "-nodrawrangeelements", true) || GL_CheckExtension("GL_EXT_draw_range_elements", drawrangeelementsextfuncs, "-nodrawrangeelements", false);
+	vid.support.ext_draw_range_elements = GL_CheckExtension("drawrangeelements", drawrangeelementsfuncs, "-nodrawrangeelements", true) || GL_CheckExtension("GL_EXT_draw_range_elements", drawrangeelementsextfuncs, "-nodrawrangeelements", false);
 	vid.support.ext_framebuffer_object = GL_CheckExtension("GL_EXT_framebuffer_object", fbofuncs, "-nofbo", false);
 	vid.support.ext_stencil_two_side = GL_CheckExtension("GL_EXT_stencil_two_side", stenciltwosidefuncs, "-nostenciltwoside", false);
 	vid.support.ext_texture_3d = GL_CheckExtension("GL_EXT_texture3D", texture3dextfuncs, "-notexture3d", false);
@@ -883,6 +1015,9 @@ void VID_CheckExtensions(void)
 	vid.support.ext_texture_edge_clamp = GL_CheckExtension("GL_EXT_texture_edge_clamp", NULL, "-noedgeclamp", false) || GL_CheckExtension("GL_SGIS_texture_edge_clamp", NULL, "-noedgeclamp", false);
 	vid.support.ext_texture_filter_anisotropic = GL_CheckExtension("GL_EXT_texture_filter_anisotropic", NULL, "-noanisotropy", false);
 	vid.support.ext_texture_srgb = GL_CheckExtension("GL_EXT_texture_sRGB", NULL, "-nosrgb", false);
+	vid.support.arb_multisample = GL_CheckExtension("GL_ARB_multisample", multisamplefuncs, "-nomultisample", false);
+	vid.allowalphatocoverage = false;
+
 // COMMANDLINEOPTION: GL: -noshaders disables use of OpenGL 2.0 shaders (which allow pixel shader effects, can improve per pixel lighting performance and capabilities)
 // COMMANDLINEOPTION: GL: -noanisotropy disables GL_EXT_texture_filter_anisotropic (allows higher quality texturing)
 // COMMANDLINEOPTION: GL: -noblendminmax disables GL_EXT_blend_minmax
@@ -907,6 +1042,7 @@ void VID_CheckExtensions(void)
 // COMMANDLINEOPTION: GL: -notexturenonpoweroftwo disables GL_ARB_texture_non_power_of_two (which saves video memory if it is supported, but crashes on some buggy drivers)
 // COMMANDLINEOPTION: GL: -novbo disables GL_ARB_vertex_buffer_object (which accelerates rendering)
 // COMMANDLINEOPTION: GL: -nosrgb disables GL_EXT_texture_sRGB (which is used for higher quality non-linear texture gamma)
+// COMMANDLINEOPTION: GL: -nomultisample disables GL_ARB_multisample
 
 	if (vid.support.arb_draw_buffers)
 		qglGetIntegerv(GL_MAX_DRAW_BUFFERS_ARB, (GLint*)&vid.maxdrawbuffers);
@@ -929,7 +1065,7 @@ void VID_CheckExtensions(void)
 	if (vid.support.ext_texture_filter_anisotropic)
 		qglGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, (GLint*)&vid.max_anisotropy);
 	if (vid.support.arb_texture_cube_map)
-		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE_ARB, (GLint*)&vid.maxtexturesize_cubemap);
+		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_cubemap);
 	if (vid.support.ext_texture_3d)
 		qglGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_3d);
 
@@ -942,10 +1078,10 @@ void VID_CheckExtensions(void)
 
 	vid.texunits = vid.teximageunits = vid.texarrayunits = 1;
 	if (vid.support.arb_multitexture)
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 	if (vid_gl20.integer && vid.support.gl20shaders)
 	{
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 		qglGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, (int *)&vid.teximageunits);CHECKGLERROR
 		qglGetIntegerv(GL_MAX_TEXTURE_COORDS, (int *)&vid.texarrayunits);CHECKGLERROR
 		vid.texunits = bound(4, vid.texunits, MAX_TEXTUREUNITS);
@@ -953,16 +1089,24 @@ void VID_CheckExtensions(void)
 		vid.texarrayunits = bound(8, vid.texarrayunits, MAX_TEXTUREUNITS);
 		Con_DPrintf("Using GL2.0 rendering path - %i texture matrix, %i texture images, %i texcoords%s\n", vid.texunits, vid.teximageunits, vid.texarrayunits, vid.support.ext_framebuffer_object ? ", shadowmapping supported" : "");
 		vid.renderpath = RENDERPATH_GL20;
+		vid.sRGBcapable2D = false;
+		vid.sRGBcapable3D = true;
 		vid.useinterleavedarrays = false;
+		Con_Printf("vid.support.arb_multisample %i\n", vid.support.arb_multisample);
+		Con_Printf("vid.mode.samples %i\n", vid.mode.samples);
+		Con_Printf("vid.support.gl20shaders %i\n", vid.support.gl20shaders);
+		vid.allowalphatocoverage = true; // but see below, it may get turned to false again if GL_SAMPLES_ARB is <= 1
 	}
 	else if (vid.support.arb_texture_env_combine && vid.texunits >= 2 && vid_gl13.integer)
 	{
-		qglGetIntegerv(GL_MAX_TEXTURE_UNITS_ARB, (GLint*)&vid.texunits);
+		qglGetIntegerv(GL_MAX_TEXTURE_UNITS, (GLint*)&vid.texunits);
 		vid.texunits = bound(1, vid.texunits, MAX_TEXTUREUNITS);
 		vid.teximageunits = vid.texunits;
 		vid.texarrayunits = vid.texunits;
 		Con_DPrintf("Using GL1.3 rendering path - %i texture units, single pass rendering\n", vid.texunits);
 		vid.renderpath = RENDERPATH_GL13;
+		vid.sRGBcapable2D = false;
+		vid.sRGBcapable3D = false;
 		vid.useinterleavedarrays = false;
 	}
 	else
@@ -972,8 +1116,23 @@ void VID_CheckExtensions(void)
 		vid.texarrayunits = vid.texunits;
 		Con_DPrintf("Using GL1.1 rendering path - %i texture units, two pass rendering\n", vid.texunits);
 		vid.renderpath = RENDERPATH_GL11;
+		vid.sRGBcapable2D = false;
+		vid.sRGBcapable3D = false;
 		vid.useinterleavedarrays = false;
 	}
+
+	// enable multisample antialiasing if possible
+	if(vid.support.arb_multisample)
+	{
+		int samples = 0;
+		qglGetIntegerv(GL_SAMPLES_ARB, &samples);
+		if (samples > 1)
+			qglEnable(GL_MULTISAMPLE_ARB);
+		else
+			vid.allowalphatocoverage = false;
+	}
+	else
+		vid.allowalphatocoverage = false;
 
 	// VorteX: set other info (maybe place them in VID_InitMode?)
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
@@ -982,6 +1141,244 @@ void VID_CheckExtensions(void)
 	Cvar_SetQuick(&gl_info_platform, gl_platform ? gl_platform : "");
 	Cvar_SetQuick(&gl_info_driver, gl_driver);
 }
+#endif
+
+float VID_JoyState_GetAxis(const vid_joystate_t *joystate, int axis, float sensitivity, float deadzone)
+{
+	float value;
+	value = (axis >= 0 && axis < MAXJOYAXIS) ? joystate->axis[axis] : 0.0f;
+	value = value > deadzone ? (value - deadzone) : (value < -deadzone ? (value + deadzone) : 0.0f);
+	value *= deadzone > 0 ? (1.0f / (1.0f - deadzone)) : 1.0f;
+	value = bound(-1, value, 1);
+	return value * sensitivity;
+}
+
+qboolean VID_JoyBlockEmulatedKeys(int keycode)
+{
+	int j;
+	vid_joystate_t joystate;
+
+	if (!joy_axiskeyevents.integer)
+		return false;
+	if (vid_joystate.is360)
+		return false;
+	if (keycode != K_UPARROW && keycode != K_DOWNARROW && keycode != K_RIGHTARROW && keycode != K_LEFTARROW)
+		return false;
+
+	// block system-generated key events for arrow keys if we're emulating the arrow keys ourselves
+	VID_BuildJoyState(&joystate);
+	for (j = 32;j < 36;j++)
+		if (vid_joystate.button[j] || joystate.button[j])
+			return true;
+
+	return false;
+}
+
+void VID_Shared_BuildJoyState_Begin(vid_joystate_t *joystate)
+{
+#ifdef WIN32
+	xinput_state_t xinputstate;
+#endif
+	memset(joystate, 0, sizeof(*joystate));
+#ifdef WIN32
+	if (vid_xinputindex >= 0 && qXInputGetState && qXInputGetState(vid_xinputindex, &xinputstate) == S_OK)
+	{
+		joystate->is360 = true;
+		joystate->button[ 0] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP) != 0;
+		joystate->button[ 1] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN) != 0;
+		joystate->button[ 2] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT) != 0;
+		joystate->button[ 3] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT) != 0;
+		joystate->button[ 4] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_START) != 0;
+		joystate->button[ 5] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_BACK) != 0;
+		joystate->button[ 6] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_THUMB) != 0;
+		joystate->button[ 7] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_THUMB) != 0;
+		joystate->button[ 8] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER) != 0;
+		joystate->button[ 9] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER) != 0;
+		joystate->button[10] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_A) != 0;
+		joystate->button[11] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_B) != 0;
+		joystate->button[12] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_X) != 0;
+		joystate->button[13] = (xinputstate.Gamepad.wButtons & XINPUT_GAMEPAD_Y) != 0;
+		joystate->button[14] = xinputstate.Gamepad.bLeftTrigger >= XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
+		joystate->button[15] = xinputstate.Gamepad.bRightTrigger >= XINPUT_GAMEPAD_TRIGGER_THRESHOLD;
+		joystate->button[16] = xinputstate.Gamepad.sThumbLY < -16384;
+		joystate->button[17] = xinputstate.Gamepad.sThumbLY >  16384;
+		joystate->button[18] = xinputstate.Gamepad.sThumbLX < -16384;
+		joystate->button[19] = xinputstate.Gamepad.sThumbLX >  16384;
+		joystate->button[20] = xinputstate.Gamepad.sThumbRY < -16384;
+		joystate->button[21] = xinputstate.Gamepad.sThumbRY >  16384;
+		joystate->button[22] = xinputstate.Gamepad.sThumbRX < -16384;
+		joystate->button[23] = xinputstate.Gamepad.sThumbRX >  16384;
+		joystate->axis[ 4] = xinputstate.Gamepad.bLeftTrigger * (1.0f / 255.0f);
+		joystate->axis[ 5] = xinputstate.Gamepad.bRightTrigger * (1.0f / 255.0f);
+		joystate->axis[ 0] = xinputstate.Gamepad.sThumbLX * (1.0f / 32767.0f);
+		joystate->axis[ 1] = xinputstate.Gamepad.sThumbLY * (1.0f / 32767.0f);
+		joystate->axis[ 2] = xinputstate.Gamepad.sThumbRX * (1.0f / 32767.0f);
+		joystate->axis[ 3] = xinputstate.Gamepad.sThumbRY * (1.0f / 32767.0f);
+	}
+#endif
+}
+
+void VID_Shared_BuildJoyState_Finish(vid_joystate_t *joystate)
+{
+	float f, r;
+	if (joystate->is360)
+		return;
+	// emulate key events for thumbstick
+	f = VID_JoyState_GetAxis(joystate, joy_axisforward.integer, 1, joy_axiskeyevents_deadzone.value) * joy_sensitivityforward.value;
+	r = VID_JoyState_GetAxis(joystate, joy_axisside.integer   , 1, joy_axiskeyevents_deadzone.value) * joy_sensitivityside.value;
+#if MAXJOYBUTTON != 36
+#error this code must be updated if MAXJOYBUTTON changes!
+#endif
+	joystate->button[32] = f > 0.0f;
+	joystate->button[33] = f < 0.0f;
+	joystate->button[34] = r > 0.0f;
+	joystate->button[35] = r < 0.0f;
+}
+
+void VID_KeyEventForButton(qboolean oldbutton, qboolean newbutton, int key, double *timer)
+{
+	if (oldbutton)
+	{
+		if (newbutton)
+		{
+			if (realtime >= *timer)
+			{
+				Key_Event(key, 0, true);
+				*timer = realtime + 0.1;
+			}
+		}
+		else
+		{
+			Key_Event(key, 0, false);
+			*timer = 0;
+		}
+	}
+	else
+	{
+		if (newbutton)
+		{
+			Key_Event(key, 0, true);
+			*timer = realtime + 0.5;
+		}
+	}
+}
+
+#if MAXJOYBUTTON != 36
+#error this code must be updated if MAXJOYBUTTON changes!
+#endif
+static int joybuttonkey[MAXJOYBUTTON][2] =
+{
+	{K_JOY1, K_ENTER}, {K_JOY2, K_ESCAPE}, {K_JOY3, 0}, {K_JOY4, 0}, {K_JOY5, 0}, {K_JOY6, 0}, {K_JOY7, 0}, {K_JOY8, 0}, {K_JOY9, 0}, {K_JOY10, 0}, {K_JOY11, 0}, {K_JOY12, 0}, {K_JOY13, 0}, {K_JOY14, 0}, {K_JOY15, 0}, {K_JOY16, 0},
+	{K_AUX1, 0}, {K_AUX2, 0}, {K_AUX3, 0}, {K_AUX4, 0}, {K_AUX5, 0}, {K_AUX6, 0}, {K_AUX7, 0}, {K_AUX8, 0}, {K_AUX9, 0}, {K_AUX10, 0}, {K_AUX11, 0}, {K_AUX12, 0}, {K_AUX13, 0}, {K_AUX14, 0}, {K_AUX15, 0}, {K_AUX16, 0},
+	{K_JOY_UP, K_UPARROW}, {K_JOY_DOWN, K_DOWNARROW}, {K_JOY_RIGHT, K_RIGHTARROW}, {K_JOY_LEFT, K_LEFTARROW},
+};
+
+static int joybuttonkey360[][2] =
+{
+	{K_X360_DPAD_UP, K_UPARROW},
+	{K_X360_DPAD_DOWN, K_DOWNARROW},
+	{K_X360_DPAD_LEFT, K_LEFTARROW},
+	{K_X360_DPAD_RIGHT, K_RIGHTARROW},
+	{K_X360_START, K_ESCAPE},
+	{K_X360_BACK, K_ESCAPE},
+	{K_X360_LEFT_THUMB, 0},
+	{K_X360_RIGHT_THUMB, 0},
+	{K_X360_LEFT_SHOULDER, 0},
+	{K_X360_RIGHT_SHOULDER, 0},
+	{K_X360_A, K_ENTER},
+	{K_X360_B, K_ESCAPE},
+	{K_X360_X, 0},
+	{K_X360_Y, 0},
+	{K_X360_LEFT_TRIGGER, 0},
+	{K_X360_RIGHT_TRIGGER, 0},
+	{K_X360_LEFT_THUMB_DOWN, K_DOWNARROW},
+	{K_X360_LEFT_THUMB_UP, K_UPARROW},
+	{K_X360_LEFT_THUMB_LEFT, K_LEFTARROW},
+	{K_X360_LEFT_THUMB_RIGHT, K_RIGHTARROW},
+	{K_X360_RIGHT_THUMB_DOWN, 0},
+	{K_X360_RIGHT_THUMB_UP, 0},
+	{K_X360_RIGHT_THUMB_LEFT, 0},
+	{K_X360_RIGHT_THUMB_RIGHT, 0},
+};
+
+double vid_joybuttontimer[MAXJOYBUTTON];
+void VID_ApplyJoyState(vid_joystate_t *joystate)
+{
+	int j;
+	int c = joy_axiskeyevents.integer != 0;
+	if (joystate->is360)
+	{
+#if 0
+		// keystrokes (chatpad)
+		// DOES NOT WORK - no driver support in xinput1_3.dll :(
+		xinput_keystroke_t keystroke;
+		while (qXInputGetKeystroke && qXInputGetKeystroke(XUSER_INDEX_ANY, 0, &keystroke) == S_OK)
+			Con_Printf("XInput KeyStroke: VirtualKey %i, Unicode %i, Flags %x, UserIndex %i, HidCode %i\n", keystroke.VirtualKey, keystroke.Unicode, keystroke.Flags, keystroke.UserIndex, keystroke.HidCode);
+#endif
+
+		// emit key events for buttons
+		for (j = 0;j < (int)(sizeof(joybuttonkey360)/sizeof(joybuttonkey360[0]));j++)
+			VID_KeyEventForButton(vid_joystate.button[j] != 0, joystate->button[j] != 0, joybuttonkey360[j][c], &vid_joybuttontimer[j]);
+
+		// axes
+		cl.cmd.forwardmove += VID_JoyState_GetAxis(joystate, joy_x360_axisforward.integer, joy_x360_sensitivityforward.value, joy_x360_deadzoneforward.value) * cl_forwardspeed.value;
+		cl.cmd.sidemove    += VID_JoyState_GetAxis(joystate, joy_x360_axisside.integer, joy_x360_sensitivityside.value, joy_x360_deadzoneside.value) * cl_sidespeed.value;
+		cl.cmd.upmove      += VID_JoyState_GetAxis(joystate, joy_x360_axisup.integer, joy_x360_sensitivityup.value, joy_x360_deadzoneup.value) * cl_upspeed.value;
+		cl.viewangles[0]   += VID_JoyState_GetAxis(joystate, joy_x360_axispitch.integer, joy_x360_sensitivitypitch.value, joy_x360_deadzonepitch.value) * cl.realframetime * cl_pitchspeed.value;
+		cl.viewangles[1]   += VID_JoyState_GetAxis(joystate, joy_x360_axisyaw.integer, joy_x360_sensitivityyaw.value, joy_x360_deadzoneyaw.value) * cl.realframetime * cl_yawspeed.value;
+		//cl.viewangles[2]   += VID_JoyState_GetAxis(joystate, joy_x360_axisroll.integer, joy_x360_sensitivityroll.value, joy_x360_deadzoneroll.value) * cl.realframetime * cl_rollspeed.value;
+	}
+	else
+	{
+		// emit key events for buttons
+		for (j = 0;j < MAXJOYBUTTON;j++)
+			VID_KeyEventForButton(vid_joystate.button[j] != 0, joystate->button[j] != 0, joybuttonkey[j][c], &vid_joybuttontimer[j]);
+
+		// axes
+		cl.cmd.forwardmove += VID_JoyState_GetAxis(joystate, joy_axisforward.integer, joy_sensitivityforward.value, joy_deadzoneforward.value) * cl_forwardspeed.value;
+		cl.cmd.sidemove    += VID_JoyState_GetAxis(joystate, joy_axisside.integer, joy_sensitivityside.value, joy_deadzoneside.value) * cl_sidespeed.value;
+		cl.cmd.upmove      += VID_JoyState_GetAxis(joystate, joy_axisup.integer, joy_sensitivityup.value, joy_deadzoneup.value) * cl_upspeed.value;
+		cl.viewangles[0]   += VID_JoyState_GetAxis(joystate, joy_axispitch.integer, joy_sensitivitypitch.value, joy_deadzonepitch.value) * cl.realframetime * cl_pitchspeed.value;
+		cl.viewangles[1]   += VID_JoyState_GetAxis(joystate, joy_axisyaw.integer, joy_sensitivityyaw.value, joy_deadzoneyaw.value) * cl.realframetime * cl_yawspeed.value;
+		//cl.viewangles[2]   += VID_JoyState_GetAxis(joystate, joy_axisroll.integer, joy_sensitivityroll.value, joy_deadzoneroll.value) * cl.realframetime * cl_rollspeed.value;
+	}
+
+	vid_joystate = *joystate;
+}
+
+int VID_Shared_SetJoystick(int index)
+{
+#ifdef WIN32
+	int i;
+	int xinputcount = 0;
+	int xinputindex = -1;
+	int xinputavailable = 0;
+	xinput_state_t state;
+	// detect available XInput controllers
+	for (i = 0;i < 4;i++)
+	{
+		if (qXInputGetState && qXInputGetState(i, &state) == S_OK)
+		{
+			xinputavailable |= 1<<i;
+			if (index == xinputcount)
+				xinputindex = i;
+			xinputcount++;
+		}
+	}
+	if (joy_xinputavailable.integer != xinputavailable)
+		Cvar_SetValueQuick(&joy_xinputavailable, xinputavailable);
+	if (vid_xinputindex != xinputindex)
+	{
+		vid_xinputindex = xinputindex;
+		if (xinputindex >= 0)
+			Con_Printf("Joystick %i opened (XInput Device %i)\n", index, xinputindex);
+	}
+	return xinputcount;
+#else
+	return 0;
+#endif
+}
+
 
 void Force_CenterView_f (void)
 {
@@ -996,17 +1393,18 @@ unsigned int vid_gammatables_serial = 0; // so other subsystems can poll if gamm
 qboolean vid_gammatables_trivial = true;
 void VID_BuildGammaTables(unsigned short *ramps, int rampsize)
 {
+	float srgbmul = (vid.sRGB2D || vid.sRGB3D) ? 2.2f : 1.0f;
 	if (cachecolorenable)
 	{
-		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[0]), cachewhite[0], cacheblack[0], cachecontrastboost, ramps, rampsize);
-		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[1]), cachewhite[1], cacheblack[1], cachecontrastboost, ramps + rampsize, rampsize);
-		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[2]), cachewhite[2], cacheblack[2], cachecontrastboost, ramps + rampsize*2, rampsize);
+		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[0]) * srgbmul, cachewhite[0], cacheblack[0], cachecontrastboost, ramps, rampsize);
+		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[1]) * srgbmul, cachewhite[1], cacheblack[1], cachecontrastboost, ramps + rampsize, rampsize);
+		BuildGammaTable16(1.0f, invpow(0.5, 1 - cachegrey[2]) * srgbmul, cachewhite[2], cacheblack[2], cachecontrastboost, ramps + rampsize*2, rampsize);
 	}
 	else
 	{
-		BuildGammaTable16(1.0f, cachegamma, cachecontrast, cachebrightness, cachecontrastboost, ramps, rampsize);
-		BuildGammaTable16(1.0f, cachegamma, cachecontrast, cachebrightness, cachecontrastboost, ramps + rampsize, rampsize);
-		BuildGammaTable16(1.0f, cachegamma, cachecontrast, cachebrightness, cachecontrastboost, ramps + rampsize*2, rampsize);
+		BuildGammaTable16(1.0f, cachegamma * srgbmul, cachecontrast, cachebrightness, cachecontrastboost, ramps, rampsize);
+		BuildGammaTable16(1.0f, cachegamma * srgbmul, cachecontrast, cachebrightness, cachecontrastboost, ramps + rampsize, rampsize);
+		BuildGammaTable16(1.0f, cachegamma * srgbmul, cachecontrast, cachebrightness, cachecontrastboost, ramps + rampsize*2, rampsize);
 	}
 
 	// LordHavoc: this code came from Ben Winslow and Zinx Verituse, I have
@@ -1081,8 +1479,8 @@ void VID_UpdateGamma(qboolean force, int rampsize)
 		wantgamma = 0;
 #define BOUNDCVAR(cvar, m1, m2) c = &(cvar);f = bound(m1, c->value, m2);if (c->value != f) Cvar_SetValueQuick(c, f);
 	BOUNDCVAR(v_gamma, 0.1, 5);
-	BOUNDCVAR(v_contrast, 1, 5);
-	BOUNDCVAR(v_brightness, 0, 0.8);
+	BOUNDCVAR(v_contrast, 0.2, 5);
+	BOUNDCVAR(v_brightness, -v_contrast.value * 0.8, 0.8);
 	//BOUNDCVAR(v_contrastboost, 0.0625, 16);
 	BOUNDCVAR(v_color_black_r, 0, 0.8);
 	BOUNDCVAR(v_color_black_g, 0, 0.8);
@@ -1099,6 +1497,8 @@ void VID_UpdateGamma(qboolean force, int rampsize)
 	vid_gammatables_trivial = false;
 	if(v_psycho.integer == 0)
 	if(v_contrastboost.value == 1)
+	if(!vid.sRGB2D)
+	if(!vid.sRGB3D)
 	{
 		if(v_color_enable.integer)
 		{
@@ -1202,6 +1602,23 @@ void VID_RestoreSystemGamma(void)
 	}
 }
 
+#ifdef WIN32
+static dllfunction_t xinputdllfuncs[] =
+{
+	{"XInputGetState", (void **) &qXInputGetState},
+	{"XInputGetKeystroke", (void **) &qXInputGetKeystroke},
+	{NULL, NULL}
+};
+static const char* xinputdllnames [] =
+{
+	"xinput1_3.dll",
+	"xinput1_2.dll",
+	"xinput1_1.dll",
+	NULL
+};
+static dllhandle_t xinputdll_dll = NULL;
+#endif
+
 void VID_Shared_Init(void)
 {
 #ifdef SSE_POSSIBLE
@@ -1243,6 +1660,7 @@ void VID_Shared_Init(void)
 
 	Cvar_RegisterVariable(&v_hwgamma);
 	Cvar_RegisterVariable(&v_glslgamma);
+	Cvar_RegisterVariable(&v_glslgamma_2d);
 
 	Cvar_RegisterVariable(&v_psycho);
 
@@ -1265,6 +1683,58 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&vid_gl13);
 	Cvar_RegisterVariable(&vid_gl20);
 	Cvar_RegisterVariable(&gl_finish);
+	Cvar_RegisterVariable(&vid_sRGB);
+
+	Cvar_RegisterVariable(&joy_active);
+#ifdef WIN32
+	Cvar_RegisterVariable(&joy_xinputavailable);
+#endif
+	Cvar_RegisterVariable(&joy_detected);
+	Cvar_RegisterVariable(&joy_enable);
+	Cvar_RegisterVariable(&joy_index);
+	Cvar_RegisterVariable(&joy_axisforward);
+	Cvar_RegisterVariable(&joy_axisside);
+	Cvar_RegisterVariable(&joy_axisup);
+	Cvar_RegisterVariable(&joy_axispitch);
+	Cvar_RegisterVariable(&joy_axisyaw);
+	//Cvar_RegisterVariable(&joy_axisroll);
+	Cvar_RegisterVariable(&joy_deadzoneforward);
+	Cvar_RegisterVariable(&joy_deadzoneside);
+	Cvar_RegisterVariable(&joy_deadzoneup);
+	Cvar_RegisterVariable(&joy_deadzonepitch);
+	Cvar_RegisterVariable(&joy_deadzoneyaw);
+	//Cvar_RegisterVariable(&joy_deadzoneroll);
+	Cvar_RegisterVariable(&joy_sensitivityforward);
+	Cvar_RegisterVariable(&joy_sensitivityside);
+	Cvar_RegisterVariable(&joy_sensitivityup);
+	Cvar_RegisterVariable(&joy_sensitivitypitch);
+	Cvar_RegisterVariable(&joy_sensitivityyaw);
+	//Cvar_RegisterVariable(&joy_sensitivityroll);
+	Cvar_RegisterVariable(&joy_axiskeyevents);
+	Cvar_RegisterVariable(&joy_axiskeyevents_deadzone);
+	Cvar_RegisterVariable(&joy_x360_axisforward);
+	Cvar_RegisterVariable(&joy_x360_axisside);
+	Cvar_RegisterVariable(&joy_x360_axisup);
+	Cvar_RegisterVariable(&joy_x360_axispitch);
+	Cvar_RegisterVariable(&joy_x360_axisyaw);
+	//Cvar_RegisterVariable(&joy_x360_axisroll);
+	Cvar_RegisterVariable(&joy_x360_deadzoneforward);
+	Cvar_RegisterVariable(&joy_x360_deadzoneside);
+	Cvar_RegisterVariable(&joy_x360_deadzoneup);
+	Cvar_RegisterVariable(&joy_x360_deadzonepitch);
+	Cvar_RegisterVariable(&joy_x360_deadzoneyaw);
+	//Cvar_RegisterVariable(&joy_x360_deadzoneroll);
+	Cvar_RegisterVariable(&joy_x360_sensitivityforward);
+	Cvar_RegisterVariable(&joy_x360_sensitivityside);
+	Cvar_RegisterVariable(&joy_x360_sensitivityup);
+	Cvar_RegisterVariable(&joy_x360_sensitivitypitch);
+	Cvar_RegisterVariable(&joy_x360_sensitivityyaw);
+	//Cvar_RegisterVariable(&joy_x360_sensitivityroll);
+
+#ifdef WIN32
+	Sys_LoadLibrary(xinputdllnames, &xinputdll_dll, xinputdllfuncs);
+#endif
+
 	Cmd_AddCommand("force_centerview", Force_CenterView_f, "recenters view (stops looking up/down)");
 	Cmd_AddCommand("vid_restart", VID_Restart_f, "restarts video system (closes and reopens the window, restarts renderer)");
 }
@@ -1272,6 +1742,7 @@ void VID_Shared_Init(void)
 int VID_Mode(int fullscreen, int width, int height, int bpp, float refreshrate, int stereobuffer, int samples)
 {
 	viddef_mode_t mode;
+
 	memset(&mode, 0, sizeof(mode));
 	mode.fullscreen = fullscreen != 0;
 	mode.width = width;
@@ -1296,6 +1767,8 @@ int VID_Mode(int fullscreen, int width, int height, int bpp, float refreshrate, 
 		vid.stereobuffer   = vid.mode.stereobuffer;
 		vid.samples        = vid.mode.samples;
 		vid.stencil        = vid.mode.bitsperpixel > 16;
+		vid.sRGB2D         = vid_sRGB.integer >= 1 && vid.sRGBcapable2D;
+		vid.sRGB3D         = vid_sRGB.integer >= 1 && vid.sRGBcapable3D;
 
 		Con_Printf("Video Mode: %s %dx%dx%dx%.2fhz%s%s\n", mode.fullscreen ? "fullscreen" : "window", mode.width, mode.height, mode.bitsperpixel, mode.refreshrate, mode.stereobuffer ? " stereo" : "", mode.samples > 1 ? va(" (%ix AA)", mode.samples) : "");
 
@@ -1534,6 +2007,8 @@ void VID_Soft_SharedSetup(void)
 	vid.texarrayunits = bound(8, vid.texarrayunits, MAX_TEXTUREUNITS);
 	Con_DPrintf("Using DarkPlaces Software Rasterizer rendering path\n");
 	vid.renderpath = RENDERPATH_SOFT;
+	vid.sRGBcapable2D = false;
+	vid.sRGBcapable3D = false;
 	vid.useinterleavedarrays = false;
 
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);

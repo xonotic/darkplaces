@@ -39,6 +39,7 @@ cvar_t csqc_progsize = {CVAR_READONLY, "csqc_progsize","-1","file size of csprog
 
 cvar_t cl_shownet = {0, "cl_shownet","0","1 = print packet size, 2 = print packet message list"};
 cvar_t cl_nolerp = {0, "cl_nolerp", "0","network update smoothing"};
+cvar_t cl_lerpexcess = {0, "cl_lerpexcess", "0","maximum allowed lerp excess (hides, not fixes, some packet loss)"};
 cvar_t cl_lerpanim_maxdelta_server = {0, "cl_lerpanim_maxdelta_server", "0.1","maximum frame delta for smoothing between server-controlled animation frames (when 0, one network frame)"};
 cvar_t cl_lerpanim_maxdelta_framegroups = {0, "cl_lerpanim_maxdelta_framegroups", "0.1","maximum frame delta for smoothing between framegroups (when 0, one network frame)"};
 
@@ -629,7 +630,7 @@ static float CL_LerpPoint(void)
 	}
 
 	f = (cl.time - cl.mtime[1]) / (cl.mtime[0] - cl.mtime[1]);
-	return bound(0, f, 1);
+	return bound(0, f, 1 + cl_lerpexcess.value);
 }
 
 void CL_ClearTempEntities (void)
@@ -908,7 +909,8 @@ void CL_AddQWCTFFlagModel(entity_t *player, int skin)
 	CL_UpdateRenderEntity(flagrender);
 }
 
-matrix4x4_t viewmodelmatrix;
+matrix4x4_t viewmodelmatrix_withbob;
+matrix4x4_t viewmodelmatrix_nobob;
 
 static const vec3_t muzzleflashorigin = {18, 0, 0};
 
@@ -1011,9 +1013,9 @@ void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qboolean interpolat
 	{
 		// view-relative entity (guns and such)
 		if (e->render.effects & EF_NOGUNBOB)
-			matrix = &r_refdef.view.matrix; // really attached to view
+			matrix = &viewmodelmatrix_nobob; // really attached to view
 		else
-			matrix = &viewmodelmatrix; // attached to gun bob matrix
+			matrix = &viewmodelmatrix_withbob; // attached to gun bob matrix
 	}
 	else
 	{
@@ -1034,7 +1036,7 @@ void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qboolean interpolat
 		VectorCopy(cl.movement_origin, origin);
 		VectorSet(angles, 0, cl.viewangles[1], 0);
 	}
-	else if (interpolate && e->persistent.lerpdeltatime > 0 && (lerp = (cl.time - e->persistent.lerpstarttime) / e->persistent.lerpdeltatime) < 1)
+	else if (interpolate && e->persistent.lerpdeltatime > 0 && (lerp = (cl.time - e->persistent.lerpstarttime) / e->persistent.lerpdeltatime) < 1 + cl_lerpexcess.value)
 	{
 		// interpolate the origin and angles
 		lerp = max(0, lerp);
@@ -1099,7 +1101,17 @@ void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qboolean interpolat
 	}
 
 	// animation lerp
-	if (e->render.framegroupblend[0].frame == frame)
+	e->render.skeleton = NULL;
+	if (e->render.flags & RENDER_COMPLEXANIMATION)
+	{
+		e->render.framegroupblend[0] = e->state_current.framegroupblend[0];
+		e->render.framegroupblend[1] = e->state_current.framegroupblend[1];
+		e->render.framegroupblend[2] = e->state_current.framegroupblend[2];
+		e->render.framegroupblend[3] = e->state_current.framegroupblend[3];
+		if (e->state_current.skeletonobject.model && e->state_current.skeletonobject.relativetransforms)
+			e->render.skeleton = &e->state_current.skeletonobject;
+	}
+	else if (e->render.framegroupblend[0].frame == frame)
 	{
 		// update frame lerp fraction
 		e->render.framegroupblend[0].lerp = 1;
@@ -1250,6 +1262,8 @@ void CL_UpdateNetworkEntityTrail(entity_t *e)
 	// do trails
 	if (e->render.flags & RENDER_GLOWTRAIL)
 		trailtype = EFFECT_TR_GLOWTRAIL;
+	if (e->state_current.traileffectnum)
+		trailtype = (effectnameindex_t)e->state_current.traileffectnum;
 	// check if a trail is allowed (it is not after a teleport for example)
 	if (trailtype && e->persistent.trail_allowed)
 	{
@@ -1547,6 +1561,8 @@ void CL_LinkNetworkEntity(entity_t *e)
 	// do trail light
 	if (e->render.flags & RENDER_GLOWTRAIL)
 		trailtype = EFFECT_TR_GLOWTRAIL;
+	if (e->state_current.traileffectnum)
+		trailtype = (effectnameindex_t)e->state_current.traileffectnum;
 	if (trailtype)
 		CL_ParticleTrail(trailtype, 1, origin, origin, vec3_origin, vec3_origin, NULL, e->state_current.glowcolor, true, false, NULL, NULL);
 
@@ -2405,6 +2421,7 @@ void CL_Init (void)
 	Cvar_RegisterVariable (&cl_anglespeedkey);
 	Cvar_RegisterVariable (&cl_shownet);
 	Cvar_RegisterVariable (&cl_nolerp);
+	Cvar_RegisterVariable (&cl_lerpexcess);
 	Cvar_RegisterVariable (&cl_lerpanim_maxdelta_server);
 	Cvar_RegisterVariable (&cl_lerpanim_maxdelta_framegroups);
 	Cvar_RegisterVariable (&cl_deathfade);

@@ -247,7 +247,7 @@ void CL_ParseStartSoundPacket(int largesoundindex)
 		if (field_mask & SND_LARGEENTITY)
 		{
 			ent = (unsigned short) MSG_ReadShort ();
-			channel = MSG_ReadByte ();
+			channel = MSG_ReadChar ();
 		}
 		else
 		{
@@ -261,6 +261,8 @@ void CL_ParseStartSoundPacket(int largesoundindex)
 		else
 			sound_num = MSG_ReadByte ();
 	}
+
+	channel = CHAN_NET2ENGINE(channel);
 
 	MSG_ReadVector(pos, cls.protocol);
 
@@ -3202,6 +3204,7 @@ qboolean CL_ExaminePrintString(const char *text)
 }
 
 extern cvar_t slowmo;
+extern cvar_t cl_lerpexcess;
 extern void CSQC_UpdateNetworkTimes(double newtime, double oldtime);
 static void CL_NetworkTimeReceived(double newtime)
 {
@@ -3285,6 +3288,20 @@ static void CL_NetworkTimeReceived(double newtime)
 
 	if (cl.mtime[0] > cl.mtime[1])
 		World_Physics_Frame(&cl.world, cl.mtime[0] - cl.mtime[1], cl.movevars_gravity);
+
+	// only lerp entities that also get an update in this frame, when lerp excess is used
+	if(cl_lerpexcess.value > 0)
+	{
+		int i;
+		for (i = 1;i < cl.num_entities;i++)
+		{
+			if (cl.entities_active[i])
+			{
+				entity_t *ent = cl.entities + i;
+				ent->persistent.lerpdeltatime = 0;
+			}
+		}
+	}
 }
 
 #define SHOWNET(x) if(cl_shownet.integer==2)Con_Printf("%3i:%s(%i)\n", msg_readcount-1, x, cmd);

@@ -473,6 +473,36 @@ static const keyname_t   keynames[] = {
 	{"AUX31", K_AUX31},
 	{"AUX32", K_AUX32},
 
+	{"X360_DPAD_UP", K_X360_DPAD_UP},
+	{"X360_DPAD_DOWN", K_X360_DPAD_DOWN},
+	{"X360_DPAD_LEFT", K_X360_DPAD_LEFT},
+	{"X360_DPAD_RIGHT", K_X360_DPAD_RIGHT},
+	{"X360_START", K_X360_START},
+	{"X360_BACK", K_X360_BACK},
+	{"X360_LEFT_THUMB", K_X360_LEFT_THUMB},
+	{"X360_RIGHT_THUMB", K_X360_RIGHT_THUMB},
+	{"X360_LEFT_SHOULDER", K_X360_LEFT_SHOULDER},
+	{"X360_RIGHT_SHOULDER", K_X360_RIGHT_SHOULDER},
+	{"X360_A", K_X360_A},
+	{"X360_B", K_X360_B},
+	{"X360_X", K_X360_X},
+	{"X360_Y", K_X360_Y},
+	{"X360_LEFT_TRIGGER", K_X360_LEFT_TRIGGER},
+	{"X360_RIGHT_TRIGGER", K_X360_RIGHT_TRIGGER},
+	{"X360_LEFT_THUMB_UP", K_X360_LEFT_THUMB_UP},
+	{"X360_LEFT_THUMB_DOWN", K_X360_LEFT_THUMB_DOWN},
+	{"X360_LEFT_THUMB_LEFT", K_X360_LEFT_THUMB_LEFT},
+	{"X360_LEFT_THUMB_RIGHT", K_X360_LEFT_THUMB_RIGHT},
+	{"X360_RIGHT_THUMB_UP", K_X360_RIGHT_THUMB_UP},
+	{"X360_RIGHT_THUMB_DOWN", K_X360_RIGHT_THUMB_DOWN},
+	{"X360_RIGHT_THUMB_LEFT", K_X360_RIGHT_THUMB_LEFT},
+	{"X360_RIGHT_THUMB_RIGHT", K_X360_RIGHT_THUMB_RIGHT},
+
+	{"JOY_UP", K_JOY_UP},
+	{"JOY_DOWN", K_JOY_DOWN},
+	{"JOY_LEFT", K_JOY_LEFT},
+	{"JOY_RIGHT", K_JOY_RIGHT},
+
 	{"SEMICOLON", ';'},			// because a raw semicolon separates commands
 	{"TILDE", '~'},
 	{"BACKQUOTE", '`'},
@@ -1669,7 +1699,7 @@ void Key_FindKeysForCommand (const char *command, int *keys, int numkeys, int bi
 	}
 }
 
-qboolean CL_VM_InputEvent (qboolean down, int key, int ascii);
+extern qboolean CL_VM_InputEvent (int eventtype, int x, int y);
 
 /*
 ===================
@@ -1835,7 +1865,7 @@ Key_Event (int key, int ascii, qboolean down)
 
 			case key_game:
 				// csqc has priority over toggle menu if it wants to (e.g. handling escape for UI stuff in-game.. :sick:)
-				q = CL_VM_InputEvent(down, key, ascii);
+				q = CL_VM_InputEvent(down ? 0 : 1, key, ascii);
 				if (!q && down)
 					MR_ToggleMenu(1);
 				break;
@@ -1919,7 +1949,7 @@ Key_Event (int key, int ascii, qboolean down)
 			MR_KeyEvent (key, ascii, down);
 			break;
 		case key_game:
-			q = CL_VM_InputEvent(down, key, ascii);
+			q = CL_VM_InputEvent(down ? 0 : 1, key, ascii);
 			// ignore key repeats on binds and only send the bind if the event hasnt been already processed by csqc
 			if (!q && bind)
 			{
@@ -1940,6 +1970,21 @@ Key_Event (int key, int ascii, qboolean down)
 		default:
 			Con_Printf ("Key_Event: Bad key_dest\n");
 	}
+}
+
+// a helper to simulate release of ALL keys
+void
+Key_ReleaseAll (void)
+{
+	int key;
+	// clear the event queue first
+	eventqueue_idx = 0;
+	// then send all down events (possibly into the event queue)
+	for(key = 0; key < MAX_KEYS; ++key)
+		if(keydown[key])
+			Key_Event(key, 0, false);
+	// now all keys are guaranteed down (once the event queue is unblocked)
+	// and only future events count
 }
 
 /*

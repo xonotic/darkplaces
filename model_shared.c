@@ -2073,6 +2073,8 @@ void Mod_LoadQ3Shaders(void)
 					shader.dpshadow = true;
 				else if (!strcasecmp(parameter[0], "dpnoshadow"))
 					shader.dpnoshadow = true;
+				else if (!strcasecmp(parameter[0], "dpnortlight"))
+					shader.dpnortlight = true;
 				else if (!strcasecmp(parameter[0], "dpreflectcube"))
 					strlcpy(shader.dpreflectcube, parameter[1], sizeof(shader.dpreflectcube));
 				else if (!strcasecmp(parameter[0], "dpmeshcollisions"))
@@ -2152,6 +2154,10 @@ void Mod_LoadQ3Shaders(void)
 				else if (!strcasecmp(parameter[0], "dpglossexponentmod") && numparameters >= 2)
 				{
 					shader.specularpowermod = atof(parameter[1]);
+				}
+				else if (!strcasecmp(parameter[0], "dprtlightambient") && numparameters >= 2)
+				{
+					shader.rtlightambient = atof(parameter[1]);
 				}
 				else if (!strcasecmp(parameter[0], "dpoffsetmapping") && numparameters >= 3)
 				{
@@ -2420,6 +2426,8 @@ nothing                GL_ZERO GL_ONE
 			texture->basematerialflags &= ~MATERIALFLAG_NOSHADOW;
 		if (shader->dpnoshadow)
 			texture->basematerialflags |= MATERIALFLAG_NOSHADOW;
+		if (shader->dpnortlight)
+			texture->basematerialflags |= MATERIALFLAG_NORTLIGHT;
 		memcpy(texture->deforms, shader->deforms, sizeof(texture->deforms));
 		texture->reflectmin = shader->reflectmin;
 		texture->reflectmax = shader->reflectmax;
@@ -2433,6 +2441,7 @@ nothing                GL_ZERO GL_ONE
 		texture->offsetscale = shader->offsetscale;
 		texture->specularscalemod = shader->specularscalemod;
 		texture->specularpowermod = shader->specularpowermod;
+		texture->rtlightambient = shader->rtlightambient;
 		if (shader->dpreflectcube[0])
 			texture->reflectcubetexture = R_GetCubemap(shader->dpreflectcube);
 
@@ -2521,6 +2530,7 @@ nothing                GL_ZERO GL_ONE
 		if(cls.state == ca_dedicated)
 		{
 			texture->skinframes[0] = NULL;
+			success = false;
 		}
 		else
 		{

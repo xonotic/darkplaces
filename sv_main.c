@@ -53,6 +53,7 @@ cvar_t slowmo = {0, "slowmo", "1.0", "controls game speed, 0.5 is half speed, 2 
 cvar_t sv_accelerate = {0, "sv_accelerate", "10", "rate at which a player accelerates to sv_maxspeed"};
 cvar_t sv_aim = {CVAR_SAVE, "sv_aim", "2", "maximum cosine angle for quake's vertical autoaim, a value above 1 completely disables the autoaim, quake used 0.93"};
 cvar_t sv_airaccel_qw = {0, "sv_airaccel_qw", "1", "ratio of QW-style air control as opposed to simple acceleration; when < 0, the speed is clamped against the maximum allowed forward speed after the move"};
+cvar_t sv_airaccel_qw_stretchfactor = {0, "sv_airaccel_qw_stretchfactor", "0", "when set, the maximum acceleration increase the player may get compared to forward-acceleration when strafejumping"};
 cvar_t sv_airaccel_sideways_friction = {0, "sv_airaccel_sideways_friction", "", "anti-sideways movement stabilization (reduces speed gain when zigzagging); when < 0, only so much friction is applied that braking (by accelerating backwards) cannot be stronger"};
 cvar_t sv_airaccelerate = {0, "sv_airaccelerate", "-1", "rate at which a player accelerates to sv_maxairspeed while in the air, if less than 0 the sv_accelerate variable is used instead"};
 cvar_t sv_airstopaccelerate = {0, "sv_airstopaccelerate", "0", "when set, replacement for sv_airaccelerate when moving backwards"};
@@ -106,8 +107,8 @@ cvar_t sv_gameplayfix_grenadebouncedownslopes = {0, "sv_gameplayfix_grenadebounc
 cvar_t sv_gameplayfix_multiplethinksperframe = {0, "sv_gameplayfix_multiplethinksperframe", "1", "allows entities to think more often than the server framerate, primarily useful for very high fire rate weapons"};
 cvar_t sv_gameplayfix_noairborncorpse = {0, "sv_gameplayfix_noairborncorpse", "1", "causes entities (corpses, items, etc) sitting ontop of moving entities (players) to fall when the moving entity (player) is no longer supporting them"};
 cvar_t sv_gameplayfix_noairborncorpse_allowsuspendeditems = {0, "sv_gameplayfix_noairborncorpse_allowsuspendeditems", "1", "causes entities sitting ontop of objects that are instantaneously remove to float in midair (special hack to allow a common level design trick for floating items)"};
-cvar_t sv_gameplayfix_nudgeoutofsolid = {0, "sv_gameplayfix_nudgeoutofsolid", "1", "attempts to fix physics errors (where an object ended up in solid for some reason)"};
-cvar_t sv_gameplayfix_nudgeoutofsolid_bias = {0, "sv_gameplayfix_nudgeoutofsolid_bias", "0", "over-correction on nudgeoutofsolid logic, to prevent constant contact"};
+cvar_t sv_gameplayfix_nudgeoutofsolid = {0, "sv_gameplayfix_nudgeoutofsolid", "0", "attempts to fix physics errors (where an object ended up in solid for some reason)"};
+cvar_t sv_gameplayfix_nudgeoutofsolid_separation = {0, "sv_gameplayfix_nudgeoutofsolid_separation", "0.03125", "keep objects this distance apart to prevent collision issues on seams"};
 cvar_t sv_gameplayfix_q2airaccelerate = {0, "sv_gameplayfix_q2airaccelerate", "0", "Quake2-style air acceleration"};
 cvar_t sv_gameplayfix_nogravityonground = {0, "sv_gameplayfix_nogravityonground", "0", "turn off gravity when on ground (to get rid of sliding)"};
 cvar_t sv_gameplayfix_setmodelrealbox = {0, "sv_gameplayfix_setmodelrealbox", "1", "fixes a bug in Quake that made setmodel always set the entity box to ('-16 -16 -16', '16 16 16') rather than properly checking the model box, breaks some poorly coded mods"};
@@ -119,6 +120,7 @@ cvar_t sv_gameplayfix_nostepmoveonsteepslopes = {0, "sv_gameplayfix_nostepmoveon
 cvar_t sv_gameplayfix_swiminbmodels = {0, "sv_gameplayfix_swiminbmodels", "1", "causes pointcontents (used to determine if you are in a liquid) to check bmodel entities as well as the world model, so you can swim around in (possibly moving) water bmodel entities"};
 cvar_t sv_gameplayfix_upwardvelocityclearsongroundflag = {0, "sv_gameplayfix_upwardvelocityclearsongroundflag", "1", "prevents monsters, items, and most other objects from being stuck to the floor when pushed around by damage, and other situations in mods"};
 cvar_t sv_gameplayfix_downtracesupportsongroundflag = {0, "sv_gameplayfix_downtracesupportsongroundflag", "1", "prevents very short moves from clearing onground (which may make the player stick to the floor at high netfps)"};
+cvar_t sv_gameplayfix_q1bsptracelinereportstexture = {0, "sv_gameplayfix_q1bsptracelinereportstexture", "1", "enables mods to get accurate trace_texture results on q1bsp by using a surface-hitting traceline implementation rather than the standard solidbsp method, q3bsp always reports texture accurately"};
 cvar_t sv_gravity = {CVAR_NOTIFY, "sv_gravity","800", "how fast you fall (512 = roughly earth gravity)"};
 cvar_t sv_idealpitchscale = {0, "sv_idealpitchscale","0.8", "how much to look up/down slopes and stairs when not using freelook"};
 cvar_t sv_jumpstep = {CVAR_NOTIFY, "sv_jumpstep", "0", "whether you can step up while jumping (sv_gameplayfix_stepwhilejumping must also be 1)"};
@@ -238,94 +240,169 @@ static const char *standardeffectnames[EFFECT_TOTAL] =
 	"SVC_PARTICLE"
 };
 
-#define REQFIELDS (sizeof(reqfields) / sizeof(prvm_required_field_t))
+#define SV_REQFUNCS 0
+#define sv_reqfuncs NULL
 
-prvm_required_field_t reqfields[] =
+//#define SV_REQFUNCS (sizeof(sv_reqfuncs) / sizeof(const char *))
+//static const char *sv_reqfuncs[] = {
+//};
+
+#define SV_REQFIELDS (sizeof(sv_reqfields) / sizeof(prvm_required_field_t))
+
+prvm_required_field_t sv_reqfields[] =
 {
-	{ev_entity, "cursor_trace_ent"},
-	{ev_entity, "drawonlytoclient"},
-	{ev_entity, "exteriormodeltoclient"},
-	{ev_entity, "nodrawtoclient"},
-	{ev_entity, "tag_entity"},
-	{ev_entity, "viewmodelforclient"},
-	{ev_float, "SendFlags"},
-	{ev_float, "Version"},
-	{ev_float, "alpha"},
-	{ev_float, "ammo_cells1"},
-	{ev_float, "ammo_lava_nails"},
-	{ev_float, "ammo_multi_rockets"},
-	{ev_float, "ammo_nails1"},
-	{ev_float, "ammo_plasma"},
-	{ev_float, "ammo_rockets1"},
-	{ev_float, "ammo_shells1"},
-	{ev_float, "button3"},
-	{ev_float, "button4"},
-	{ev_float, "button5"},
-	{ev_float, "button6"},
-	{ev_float, "button7"},
-	{ev_float, "button8"},
-	{ev_float, "button9"},
-	{ev_float, "button10"},
-	{ev_float, "button11"},
-	{ev_float, "button12"},
-	{ev_float, "button13"},
-	{ev_float, "button14"},
-	{ev_float, "button15"},
-	{ev_float, "button16"},
-	{ev_float, "buttonchat"},
-	{ev_float, "buttonuse"},
-	{ev_float, "clientcolors"},
-	{ev_float, "cursor_active"},
-	{ev_float, "disableclientprediction"},
-	{ev_float, "fullbright"},
-	{ev_float, "glow_color"},
-	{ev_float, "glow_size"},
-	{ev_float, "glow_trail"},
-	{ev_float, "gravity"},
-	{ev_float, "idealpitch"},
-	{ev_float, "items2"},
-	{ev_float, "light_lev"},
-	{ev_float, "modelflags"},
-	{ev_float, "pflags"},
-	{ev_float, "ping"},
-	{ev_float, "pitch_speed"},
-	{ev_float, "pmodel"},
-	{ev_float, "renderamt"}, // HalfLife support
-	{ev_float, "rendermode"}, // HalfLife support
-	{ev_float, "scale"},
-	{ev_float, "style"},
-	{ev_float, "tag_index"},
-	{ev_float, "viewzoom"},
-	{ev_function, "SendEntity"},
-	{ev_function, "contentstransition"}, // DRESK - Support for Entity Contents Transition Event
-	{ev_function, "customizeentityforclient"},
-	{ev_function, "movetypesteplandevent"}, // DRESK - Support for MOVETYPE_STEP Entity Land Event
-	{ev_string, "netaddress"},
-	{ev_string, "playermodel"},
-	{ev_string, "playerskin"},
-	{ev_vector, "color"},
-	{ev_vector, "colormod"},
-	{ev_vector, "cursor_screen"},
-	{ev_vector, "cursor_trace_endpos"},
-	{ev_vector, "cursor_trace_start"},
-	{ev_vector, "glowmod"},
-	{ev_vector, "movement"},
-	{ev_vector, "punchvector"},
+#define PRVM_DECLARE_serverglobalfloat(x)
+#define PRVM_DECLARE_serverglobalvector(x)
+#define PRVM_DECLARE_serverglobalstring(x)
+#define PRVM_DECLARE_serverglobaledict(x)
+#define PRVM_DECLARE_serverglobalfunction(x)
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x)
+#define PRVM_DECLARE_menuglobalvector(x)
+#define PRVM_DECLARE_menuglobalstring(x)
+#define PRVM_DECLARE_menuglobaledict(x)
+#define PRVM_DECLARE_menuglobalfunction(x)
+#define PRVM_DECLARE_serverfieldfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_serverfieldvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_serverfieldstring(x) {ev_string, #x},
+#define PRVM_DECLARE_serverfieldedict(x) {ev_entity, #x},
+#define PRVM_DECLARE_serverfieldfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x)
+#define PRVM_DECLARE_menufieldvector(x)
+#define PRVM_DECLARE_menufieldstring(x)
+#define PRVM_DECLARE_menufieldedict(x)
+#define PRVM_DECLARE_menufieldfunction(x)
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
+};
 
-	// physics
-	//{ev_float, "solid"},
-	//{ev_float, "movetype"},
-	//{ev_float, "modelindex"},
-	{ev_vector, "mass"},
-	//{ev_vector, "origin"},
-	//{ev_vector, "velocity"},
-	//{ev_vector, "axis_forward"},
-	//{ev_vector, "axis_left"},
-	//{ev_vector, "axis_up"},
-	//{ev_vector, "spinvelocity"},
-	//{ev_vector, "angles"},
-	//{ev_vector, "avelocity"},
+#define SV_REQGLOBALS (sizeof(sv_reqglobals) / sizeof(prvm_required_field_t))
 
+prvm_required_field_t sv_reqglobals[] =
+{
+#define PRVM_DECLARE_serverglobalfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_serverglobalvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_serverglobalstring(x) {ev_string, #x},
+#define PRVM_DECLARE_serverglobaledict(x) {ev_entity, #x},
+#define PRVM_DECLARE_serverglobalfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x)
+#define PRVM_DECLARE_menuglobalvector(x)
+#define PRVM_DECLARE_menuglobalstring(x)
+#define PRVM_DECLARE_menuglobaledict(x)
+#define PRVM_DECLARE_menuglobalfunction(x)
+#define PRVM_DECLARE_serverfieldfloat(x)
+#define PRVM_DECLARE_serverfieldvector(x)
+#define PRVM_DECLARE_serverfieldstring(x)
+#define PRVM_DECLARE_serverfieldedict(x)
+#define PRVM_DECLARE_serverfieldfunction(x)
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x)
+#define PRVM_DECLARE_menufieldvector(x)
+#define PRVM_DECLARE_menufieldstring(x)
+#define PRVM_DECLARE_menufieldedict(x)
+#define PRVM_DECLARE_menufieldfunction(x)
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
 };
 
 
@@ -378,6 +455,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_accelerate);
 	Cvar_RegisterVariable (&sv_aim);
 	Cvar_RegisterVariable (&sv_airaccel_qw);
+	Cvar_RegisterVariable (&sv_airaccel_qw_stretchfactor);
 	Cvar_RegisterVariable (&sv_airaccel_sideways_friction);
 	Cvar_RegisterVariable (&sv_airaccelerate);
 	Cvar_RegisterVariable (&sv_airstopaccelerate);
@@ -432,7 +510,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_gameplayfix_noairborncorpse);
 	Cvar_RegisterVariable (&sv_gameplayfix_noairborncorpse_allowsuspendeditems);
 	Cvar_RegisterVariable (&sv_gameplayfix_nudgeoutofsolid);
-	Cvar_RegisterVariable (&sv_gameplayfix_nudgeoutofsolid_bias);
+	Cvar_RegisterVariable (&sv_gameplayfix_nudgeoutofsolid_separation);
 	Cvar_RegisterVariable (&sv_gameplayfix_q2airaccelerate);
 	Cvar_RegisterVariable (&sv_gameplayfix_nogravityonground);
 	Cvar_RegisterVariable (&sv_gameplayfix_setmodelrealbox);
@@ -444,6 +522,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_gameplayfix_swiminbmodels);
 	Cvar_RegisterVariable (&sv_gameplayfix_upwardvelocityclearsongroundflag);
 	Cvar_RegisterVariable (&sv_gameplayfix_downtracesupportsongroundflag);
+	Cvar_RegisterVariable (&sv_gameplayfix_q1bsptracelinereportstexture);
 	Cvar_RegisterVariable (&sv_gravity);
 	Cvar_RegisterVariable (&sv_idealpitchscale);
 	Cvar_RegisterVariable (&sv_jumpstep);
@@ -614,9 +693,12 @@ Larger attenuations will drop off.  (max 4 attenuation)
 
 ==================
 */
-void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int volume, float attenuation)
+void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int volume, float attenuation, qboolean reliable)
 {
+	sizebuf_t *dest;
 	int sound_num, field_mask, i, ent;
+
+	dest = (reliable ? &sv.reliable_datagram : &sv.datagram);
 
 	if (volume < 0 || volume > 255)
 	{
@@ -630,11 +712,13 @@ void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int v
 		return;
 	}
 
-	if (channel < 0 || channel > 7)
+	if (!IS_CHAN(channel))
 	{
 		Con_Printf ("SV_StartSound: channel = %i\n", channel);
 		return;
 	}
+
+	channel = CHAN_ENGINE2NET(channel);
 
 	if (sv.datagram.cursize > MAX_PACKETFRAGMENT-21)
 		return;
@@ -651,32 +735,35 @@ void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int v
 		field_mask |= SND_VOLUME;
 	if (attenuation != DEFAULT_SOUND_PACKET_ATTENUATION)
 		field_mask |= SND_ATTENUATION;
-	if (ent >= 8192)
+	if (ent >= 8192 || channel < 0 || channel > 7)
 		field_mask |= SND_LARGEENTITY;
-	if (sound_num >= 256 || channel >= 8)
+	if (sound_num >= 256)
 		field_mask |= SND_LARGESOUND;
 
 // directed messages go only to the entity they are targeted on
-	MSG_WriteByte (&sv.datagram, svc_sound);
-	MSG_WriteByte (&sv.datagram, field_mask);
+	MSG_WriteByte (dest, svc_sound);
+	MSG_WriteByte (dest, field_mask);
 	if (field_mask & SND_VOLUME)
-		MSG_WriteByte (&sv.datagram, volume);
+		MSG_WriteByte (dest, volume);
 	if (field_mask & SND_ATTENUATION)
-		MSG_WriteByte (&sv.datagram, (int)(attenuation*64));
+		MSG_WriteByte (dest, (int)(attenuation*64));
 	if (field_mask & SND_LARGEENTITY)
 	{
-		MSG_WriteShort (&sv.datagram, ent);
-		MSG_WriteByte (&sv.datagram, channel);
+		MSG_WriteShort (dest, ent);
+		MSG_WriteChar (dest, channel);
 	}
 	else
-		MSG_WriteShort (&sv.datagram, (ent<<3) | channel);
+		MSG_WriteShort (dest, (ent<<3) | channel);
 	if ((field_mask & SND_LARGESOUND) || sv.protocol == PROTOCOL_NEHAHRABJP2)
-		MSG_WriteShort (&sv.datagram, sound_num);
+		MSG_WriteShort (dest, sound_num);
 	else
-		MSG_WriteByte (&sv.datagram, sound_num);
+		MSG_WriteByte (dest, sound_num);
 	for (i = 0;i < 3;i++)
-		MSG_WriteCoord (&sv.datagram, entity->fields.server->origin[i]+0.5*(entity->fields.server->mins[i]+entity->fields.server->maxs[i]), sv.protocol);
-	SV_FlushBroadcastMessages();
+		MSG_WriteCoord (dest, PRVM_serveredictvector(entity, origin)[i]+0.5*(PRVM_serveredictvector(entity, mins)[i]+PRVM_serveredictvector(entity, maxs)[i]), sv.protocol);
+
+	// TODO do we have to do anything here when dest is &sv.reliable_datagram?
+	if(!reliable)
+		SV_FlushBroadcastMessages();
 }
 
 /*
@@ -838,7 +925,6 @@ void SV_SendServerinfo (client_t *client)
 	//[515]: init csprogs according to version of svprogs, check the crc, etc.
 	if (sv.csqc_progname[0])
 	{
-		prvm_eval_t *val;
 		Con_DPrintf("sending csqc info to client (\"%s\" with size %i and crc %i)\n", sv.csqc_progname, sv.csqc_progsize, sv.csqc_progcrc);
 		MSG_WriteByte (&client->netconnection->message, svc_stufftext);
 		MSG_WriteString (&client->netconnection->message, va("csqc_progname %s\n", sv.csqc_progname));
@@ -861,11 +947,10 @@ void SV_SendServerinfo (client_t *client)
 		}
 
 		//[515]: init stufftext string (it is sent before svc_serverinfo)
-		val = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.SV_InitCmd);
-		if (val)
+		if (PRVM_GetString(PRVM_serverglobalstring(SV_InitCmd)))
 		{
 			MSG_WriteByte (&client->netconnection->message, svc_stufftext);
-			MSG_WriteString (&client->netconnection->message, va("%s\n", PRVM_GetString(val->string)));
+			MSG_WriteString (&client->netconnection->message, va("%s\n", PRVM_GetString(PRVM_serverglobalstring(SV_InitCmd))));
 		}
 	}
 
@@ -895,7 +980,7 @@ void SV_SendServerinfo (client_t *client)
 	else
 		MSG_WriteByte (&client->netconnection->message, GAME_COOP);
 
-	MSG_WriteString (&client->netconnection->message,PRVM_GetString(prog->edicts->fields.server->message));
+	MSG_WriteString (&client->netconnection->message,PRVM_GetString(PRVM_serveredictstring(prog->edicts, message)));
 
 	for (i = 1;i < MAX_MODELS && sv.model_precache[i][0];i++)
 		MSG_WriteString (&client->netconnection->message, sv.model_precache[i]);
@@ -907,8 +992,8 @@ void SV_SendServerinfo (client_t *client)
 
 // send music
 	MSG_WriteByte (&client->netconnection->message, svc_cdtrack);
-	MSG_WriteByte (&client->netconnection->message, (int)prog->edicts->fields.server->sounds);
-	MSG_WriteByte (&client->netconnection->message, (int)prog->edicts->fields.server->sounds);
+	MSG_WriteByte (&client->netconnection->message, (int)PRVM_serveredictfloat(prog->edicts, sounds));
+	MSG_WriteByte (&client->netconnection->message, (int)PRVM_serveredictfloat(prog->edicts, sounds));
 
 // set view
 // store this in clientcamera, too
@@ -1000,10 +1085,10 @@ void SV_ConnectClient (int clientnum, netconn_t *netconnection)
 	{
 		// call the progs to get default spawn parms for the new client
 		// set self to world to intentionally cause errors with broken SetNewParms code in some mods
-		prog->globals.server->self = 0;
-		PRVM_ExecuteProgram (prog->globals.server->SetNewParms, "QC function SetNewParms is missing");
+		PRVM_serverglobaledict(self) = 0;
+		PRVM_ExecuteProgram (PRVM_serverfunction(SetNewParms), "QC function SetNewParms is missing");
 		for (i=0 ; i<NUM_SPAWN_PARMS ; i++)
-			client->spawn_parms[i] = (&prog->globals.server->parm1)[i];
+			client->spawn_parms[i] = (&PRVM_serverglobalfloat(parm1))[i];
 
 		// set up the entity for this client (including .colormap, .team, etc)
 		PRVM_ED_ClearEdict(client->edict);
@@ -1046,49 +1131,50 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 	unsigned int customizeentityforclient;
 	unsigned int sendentity;
 	float f;
+	float *v;
 	vec3_t cullmins, cullmaxs;
 	dp_model_t *model;
-	prvm_eval_t *val, *val2;
 
 	// fast path for games that do not use legacy entity networking
 	// note: still networks clients even if they are legacy
-	sendentity = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.SendEntity)->function;
+	sendentity = PRVM_serveredictfunction(ent, SendEntity);
 	if (sv_onlycsqcnetworking.integer && !sendentity && enumber > svs.maxclients)
 		return false;
 
 	// this 2 billion unit check is actually to detect NAN origins
 	// (we really don't want to send those)
-	if (!(VectorLength2(ent->fields.server->origin) < 2000000000.0*2000000000.0))
+	if (!(VectorLength2(PRVM_serveredictvector(ent, origin)) < 2000000000.0*2000000000.0))
 		return false;
 
 	// EF_NODRAW prevents sending for any reason except for your own
 	// client, so we must keep all clients in this superset
-	effects = (unsigned)ent->fields.server->effects;
+	effects = (unsigned)PRVM_serveredictfloat(ent, effects);
 
 	// we can omit invisible entities with no effects that are not clients
 	// LordHavoc: this could kill tags attached to an invisible entity, I
 	// just hope we never have to support that case
-	i = (int)ent->fields.server->modelindex;
-	modelindex = (i >= 1 && i < MAX_MODELS && ent->fields.server->model && *PRVM_GetString(ent->fields.server->model) && sv.models[i]) ? i : 0;
+	i = (int)PRVM_serveredictfloat(ent, modelindex);
+	modelindex = (i >= 1 && i < MAX_MODELS && PRVM_serveredictstring(ent, model) && *PRVM_GetString(PRVM_serveredictstring(ent, model)) && sv.models[i]) ? i : 0;
 
 	flags = 0;
-	i = (int)(PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.glow_size)->_float * 0.25f);
+	i = (int)(PRVM_serveredictfloat(ent, glow_size) * 0.25f);
 	glowsize = (unsigned char)bound(0, i, 255);
-	if (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.glow_trail)->_float)
+	if (PRVM_serveredictfloat(ent, glow_trail))
 		flags |= RENDER_GLOWTRAIL;
-	if (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.viewmodelforclient)->edict)
+	if (PRVM_serveredictedict(ent, viewmodelforclient))
 		flags |= RENDER_VIEWMODEL;
 
-	f = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.color)->vector[0]*256;
+	v = PRVM_serveredictvector(ent, color);
+	f = v[0]*256;
 	light[0] = (unsigned short)bound(0, f, 65535);
-	f = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.color)->vector[1]*256;
+	f = v[1]*256;
 	light[1] = (unsigned short)bound(0, f, 65535);
-	f = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.color)->vector[2]*256;
+	f = v[2]*256;
 	light[2] = (unsigned short)bound(0, f, 65535);
-	f = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.light_lev)->_float;
+	f = PRVM_serveredictfloat(ent, light_lev);
 	light[3] = (unsigned short)bound(0, f, 65535);
-	lightstyle = (unsigned char)PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.style)->_float;
-	lightpflags = (unsigned char)PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.pflags)->_float;
+	lightstyle = (unsigned char)PRVM_serveredictfloat(ent, style);
+	lightpflags = (unsigned char)PRVM_serveredictfloat(ent, pflags);
 
 	if (gamemode == GAME_TENEBRAE)
 	{
@@ -1139,61 +1225,62 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 
 	// early culling checks
 	// (final culling is done by SV_MarkWriteEntityStateToClient)
-	customizeentityforclient = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.customizeentityforclient)->function;
+	customizeentityforclient = PRVM_serveredictfunction(ent, customizeentityforclient);
 	if (!customizeentityforclient && enumber > svs.maxclients && (!modelindex && !specialvisibilityradius))
 		return false;
 
 	*cs = defaultstate;
 	cs->active = ACTIVE_NETWORK;
 	cs->number = enumber;
-	VectorCopy(ent->fields.server->origin, cs->origin);
-	VectorCopy(ent->fields.server->angles, cs->angles);
+	VectorCopy(PRVM_serveredictvector(ent, origin), cs->origin);
+	VectorCopy(PRVM_serveredictvector(ent, angles), cs->angles);
 	cs->flags = flags;
 	cs->effects = effects;
-	cs->colormap = (unsigned)ent->fields.server->colormap;
+	cs->colormap = (unsigned)PRVM_serveredictfloat(ent, colormap);
 	cs->modelindex = modelindex;
-	cs->skin = (unsigned)ent->fields.server->skin;
-	cs->frame = (unsigned)ent->fields.server->frame;
-	cs->viewmodelforclient = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.viewmodelforclient)->edict;
-	cs->exteriormodelforclient = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.exteriormodeltoclient)->edict;
-	cs->nodrawtoclient = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.nodrawtoclient)->edict;
-	cs->drawonlytoclient = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.drawonlytoclient)->edict;
+	cs->skin = (unsigned)PRVM_serveredictfloat(ent, skin);
+	cs->frame = (unsigned)PRVM_serveredictfloat(ent, frame);
+	cs->viewmodelforclient = PRVM_serveredictedict(ent, viewmodelforclient);
+	cs->exteriormodelforclient = PRVM_serveredictedict(ent, exteriormodeltoclient);
+	cs->nodrawtoclient = PRVM_serveredictedict(ent, nodrawtoclient);
+	cs->drawonlytoclient = PRVM_serveredictedict(ent, drawonlytoclient);
 	cs->customizeentityforclient = customizeentityforclient;
-	cs->tagentity = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_entity)->edict;
-	cs->tagindex = (unsigned char)PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.tag_index)->_float;
+	cs->tagentity = PRVM_serveredictedict(ent, tag_entity);
+	cs->tagindex = (unsigned char)PRVM_serveredictfloat(ent, tag_index);
 	cs->glowsize = glowsize;
+	cs->traileffectnum = PRVM_serveredictfloat(ent, traileffectnum);
 
 	// don't need to init cs->colormod because the defaultstate did that for us
 	//cs->colormod[0] = cs->colormod[1] = cs->colormod[2] = 32;
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.colormod);
-	if (val->vector[0] || val->vector[1] || val->vector[2])
+	v = PRVM_serveredictvector(ent, colormod);
+	if (VectorLength2(v))
 	{
-		i = (int)(val->vector[0] * 32.0f);cs->colormod[0] = bound(0, i, 255);
-		i = (int)(val->vector[1] * 32.0f);cs->colormod[1] = bound(0, i, 255);
-		i = (int)(val->vector[2] * 32.0f);cs->colormod[2] = bound(0, i, 255);
+		i = (int)(v[0] * 32.0f);cs->colormod[0] = bound(0, i, 255);
+		i = (int)(v[1] * 32.0f);cs->colormod[1] = bound(0, i, 255);
+		i = (int)(v[2] * 32.0f);cs->colormod[2] = bound(0, i, 255);
 	}
 
 	// don't need to init cs->glowmod because the defaultstate did that for us
 	//cs->glowmod[0] = cs->glowmod[1] = cs->glowmod[2] = 32;
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.glowmod);
-	if (val->vector[0] || val->vector[1] || val->vector[2])
+	v = PRVM_serveredictvector(ent, glowmod);
+	if (VectorLength2(v))
 	{
-		i = (int)(val->vector[0] * 32.0f);cs->glowmod[0] = bound(0, i, 255);
-		i = (int)(val->vector[1] * 32.0f);cs->glowmod[1] = bound(0, i, 255);
-		i = (int)(val->vector[2] * 32.0f);cs->glowmod[2] = bound(0, i, 255);
+		i = (int)(v[0] * 32.0f);cs->glowmod[0] = bound(0, i, 255);
+		i = (int)(v[1] * 32.0f);cs->glowmod[1] = bound(0, i, 255);
+		i = (int)(v[2] * 32.0f);cs->glowmod[2] = bound(0, i, 255);
 	}
 
 	cs->modelindex = modelindex;
 
 	cs->alpha = 255;
-	f = (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.alpha)->_float * 255.0f);
+	f = (PRVM_serveredictfloat(ent, alpha) * 255.0f);
 	if (f)
 	{
 		i = (int)f;
 		cs->alpha = (unsigned char)bound(0, i, 255);
 	}
 	// halflife
-	f = (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.renderamt)->_float);
+	f = (PRVM_serveredictfloat(ent, renderamt));
 	if (f)
 	{
 		i = (int)f;
@@ -1201,7 +1288,7 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 	}
 
 	cs->scale = 16;
-	f = (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.scale)->_float * 16.0f);
+	f = (PRVM_serveredictfloat(ent, scale) * 16.0f);
 	if (f)
 	{
 		i = (int)f;
@@ -1209,25 +1296,44 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 	}
 
 	cs->glowcolor = 254;
-	f = (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.glow_color)->_float);
+	f = PRVM_serveredictfloat(ent, glow_color);
 	if (f)
 		cs->glowcolor = (int)f;
 
-	if (PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.fullbright)->_float)
+	if (PRVM_serveredictfloat(ent, fullbright))
 		cs->effects |= EF_FULLBRIGHT;
 
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.modelflags);
-	if (val && val->_float)
-		cs->effects |= ((unsigned int)val->_float & 0xff) << 24;
+	f = PRVM_serveredictfloat(ent, modelflags);
+	if (f)
+		cs->effects |= ((unsigned int)f & 0xff) << 24;
 
-	if (ent->fields.server->movetype == MOVETYPE_STEP)
+	if (PRVM_serveredictfloat(ent, movetype) == MOVETYPE_STEP)
 		cs->flags |= RENDER_STEP;
 	if (cs->number != sv.writeentitiestoclient_cliententitynumber && (cs->effects & EF_LOWPRECISION) && cs->origin[0] >= -32768 && cs->origin[1] >= -32768 && cs->origin[2] >= -32768 && cs->origin[0] <= 32767 && cs->origin[1] <= 32767 && cs->origin[2] <= 32767)
 		cs->flags |= RENDER_LOWPRECISION;
-	if (ent->fields.server->colormap >= 1024)
+	if (PRVM_serveredictfloat(ent, colormap) >= 1024)
 		cs->flags |= RENDER_COLORMAPPED;
 	if (cs->viewmodelforclient)
 		cs->flags |= RENDER_VIEWMODEL; // show relative to the view
+
+	if (PRVM_serveredictfloat(ent, sendcomplexanimation))
+	{
+		cs->flags |= RENDER_COMPLEXANIMATION;
+		if (PRVM_serveredictfloat(ent, skeletonindex) >= 1)
+			cs->skeletonobject = ent->priv.server->skeleton;
+		cs->framegroupblend[0].frame = PRVM_serveredictfloat(ent, frame);
+		cs->framegroupblend[1].frame = PRVM_serveredictfloat(ent, frame2);
+		cs->framegroupblend[2].frame = PRVM_serveredictfloat(ent, frame3);
+		cs->framegroupblend[3].frame = PRVM_serveredictfloat(ent, frame4);
+		cs->framegroupblend[0].start = PRVM_serveredictfloat(ent, frame1time);
+		cs->framegroupblend[1].start = PRVM_serveredictfloat(ent, frame2time);
+		cs->framegroupblend[2].start = PRVM_serveredictfloat(ent, frame3time);
+		cs->framegroupblend[3].start = PRVM_serveredictfloat(ent, frame4time);
+		cs->framegroupblend[1].lerp = PRVM_serveredictfloat(ent, lerpfrac);
+		cs->framegroupblend[2].lerp = PRVM_serveredictfloat(ent, lerpfrac3);
+		cs->framegroupblend[3].lerp = PRVM_serveredictfloat(ent, lerpfrac4);
+		cs->framegroupblend[0].lerp = 1.0f - cs->framegroupblend[1].lerp - cs->framegroupblend[2].lerp - cs->framegroupblend[3].lerp;
+	}
 
 	cs->light[0] = light[0];
 	cs->light[1] = light[1];
@@ -1263,8 +1369,8 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 	else
 	{
 		// if there is no model (or it could not be loaded), use the physics box
-		VectorAdd(cs->origin, ent->fields.server->mins, cullmins);
-		VectorAdd(cs->origin, ent->fields.server->maxs, cullmaxs);
+		VectorAdd(cs->origin, PRVM_serveredictvector(ent, mins), cullmins);
+		VectorAdd(cs->origin, PRVM_serveredictvector(ent, maxs), cullmaxs);
 	}
 	if (specialvisibilityradius)
 	{
@@ -1302,14 +1408,11 @@ static qboolean SV_PrepareEntityForSending (prvm_edict_t *ent, entity_state_t *c
 	// (to let the QC know that they've been read)
 	if (sendentity)
 	{
-		val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.SendFlags);
-		sendflags = (unsigned int)val->_float;
-		val->_float = 0;
+		sendflags = (unsigned int)PRVM_serveredictfloat(ent, SendFlags);
+		PRVM_serveredictfloat(ent, SendFlags) = 0;
 		// legacy self.Version system
-		val2 = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.Version);
-		if (val2->_float)
+		if ((version = (unsigned int)PRVM_serveredictfloat(ent, Version)))
 		{
-			version = (unsigned int)val2->_float;
 			if (sv.csqcentityversion[enumber] != version)
 				sendflags = 0xFFFFFF;
 			sv.csqcentityversion[enumber] = version;
@@ -1405,16 +1508,16 @@ qboolean SV_CanSeeBox(int numtraces, vec_t enlarge, vec3_t eye, vec3_t entboxmin
 	for (touchindex = 0;touchindex < originalnumtouchedicts;touchindex++)
 	{
 		touch = touchedicts[touchindex];
-		if (touch->fields.server->solid != SOLID_BSP)
+		if (PRVM_serveredictfloat(touch, solid) != SOLID_BSP)
 			continue;
 		model = SV_GetModelFromEdict(touch);
 		if (!model || !model->brush.TraceLineOfSight)
 			continue;
 		// skip obviously transparent entities
-		alpha = PRVM_EDICTFIELDVALUE(touch, prog->fieldoffsets.alpha)->_float;
+		alpha = PRVM_serveredictfloat(touch, alpha);
 		if (alpha && alpha < 1)
 			continue;
-		if ((int)touch->fields.server->effects & EF_ADDITIVE)
+		if ((int)PRVM_serveredictfloat(touch, effects) & EF_ADDITIVE)
 			continue;
 		touchedicts[numtouchedicts++] = touch;
 	}
@@ -1437,7 +1540,7 @@ qboolean SV_CanSeeBox(int numtraces, vec_t enlarge, vec3_t eye, vec3_t entboxmin
 			{
 				// get the entity matrix
 				pitchsign = SV_GetPitchSign(touch);
-				Matrix4x4_CreateFromQuakeEntity(&matrix, touch->fields.server->origin[0], touch->fields.server->origin[1], touch->fields.server->origin[2], pitchsign * touch->fields.server->angles[0], touch->fields.server->angles[1], touch->fields.server->angles[2], 1);
+				Matrix4x4_CreateFromQuakeEntity(&matrix, PRVM_serveredictvector(touch, origin)[0], PRVM_serveredictvector(touch, origin)[1], PRVM_serveredictvector(touch, origin)[2], pitchsign * PRVM_serveredictvector(touch, angles)[0], PRVM_serveredictvector(touch, angles)[1], PRVM_serveredictvector(touch, angles)[2], 1);
 				Matrix4x4_Invert_Simple(&imatrix, &matrix);
 				// see if the ray hits this entity
 				Matrix4x4_Transform(&imatrix, eye, starttransformed);
@@ -1472,8 +1575,8 @@ void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 
 	if (s->customizeentityforclient)
 	{
-		prog->globals.server->self = s->number;
-		prog->globals.server->other = sv.writeentitiestoclient_cliententitynumber;
+		PRVM_serverglobaledict(self) = s->number;
+		PRVM_serverglobaledict(other) = sv.writeentitiestoclient_cliententitynumber;
 		PRVM_ExecuteProgram(s->customizeentityforclient, "customizeentityforclient: NULL function");
 		if(!PRVM_G_FLOAT(OFS_RETURN) || !SV_PrepareEntityForSending(PRVM_EDICT_NUM(s->number), s, s->number))
 			return;
@@ -1518,7 +1621,7 @@ void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 			ed = PRVM_EDICT_NUM(s->number);
 
 			// if not touching a visible leaf
-			if (sv_cullentities_pvs.integer && !r_novis.integer && sv.writeentitiestoclient_pvsbytes)
+			if (sv_cullentities_pvs.integer && !r_novis.integer && !r_trippy.integer && sv.writeentitiestoclient_pvsbytes)
 			{
 				if (ed->priv.server->pvs_numclusters < 0)
 				{
@@ -1545,7 +1648,7 @@ void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 			}
 
 			// or not seen by random tracelines
-			if (sv_cullentities_trace.integer && !isbmodel && sv.worldmodel->brush.TraceLineOfSight)
+			if (sv_cullentities_trace.integer && !isbmodel && sv.worldmodel->brush.TraceLineOfSight && !r_trippy.integer)
 			{
 				int samples =
 					s->number <= svs.maxclients
@@ -1597,13 +1700,6 @@ void SV_AddCameraEyes(void)
 	static int eye_levels[MAX_CLIENTNETWORKEYES];
 	int n_cameras = 0;
 	vec3_t mi, ma;
-	prvm_eval_t *valendpos, *val;
-
-	if(!prog->fieldoffsets.camera_transform)
-		return;
-	valendpos = PRVM_GLOBALFIELDVALUE(prog->globaloffsets.trace_endpos);
-	if(!valendpos)
-		return;
 
 	for(i = 0; i < sv.writeentitiestoclient_numeyes; ++i)
 		eye_levels[i] = 0;
@@ -1613,17 +1709,17 @@ void SV_AddCameraEyes(void)
 	{
 		if (!ed->priv.server->free)
 		{
-			if((val = PRVM_EDICTFIELDVALUE(ed, prog->fieldoffsets.camera_transform)) && val->function)
+			if(PRVM_serveredictfunction(ed, camera_transform))
 			{
-				prog->globals.server->self = e;
-				prog->globals.server->other = sv.writeentitiestoclient_cliententitynumber;
-				VectorCopy(sv.writeentitiestoclient_eyes[0], valendpos->vector);
+				PRVM_serverglobaledict(self) = e;
+				PRVM_serverglobaledict(other) = sv.writeentitiestoclient_cliententitynumber;
+				VectorCopy(sv.writeentitiestoclient_eyes[0], PRVM_serverglobalvector(trace_endpos));
 				VectorCopy(sv.writeentitiestoclient_eyes[0], PRVM_G_VECTOR(OFS_PARM0));
 				VectorClear(PRVM_G_VECTOR(OFS_PARM1));
-				PRVM_ExecuteProgram(val->function, "QC function e.camera_transform is missing");
-				if(!VectorCompare(valendpos->vector, sv.writeentitiestoclient_eyes[0]))
+				PRVM_ExecuteProgram(PRVM_serveredictfunction(ed, camera_transform), "QC function e.camera_transform is missing");
+				if(!VectorCompare(PRVM_serverglobalvector(trace_endpos), sv.writeentitiestoclient_eyes[0]))
 				{
-					VectorCopy(valendpos->vector, camera_origins[n_cameras]);
+					VectorCopy(PRVM_serverglobalvector(trace_endpos), camera_origins[n_cameras]);
 					cameras[n_cameras] = e;
 					++n_cameras;
 					if(n_cameras >= MAX_LEVELNETWORKEYES)
@@ -1643,8 +1739,8 @@ void SV_AddCameraEyes(void)
 		if(!cameras[j])
 			continue;
 		ed = PRVM_EDICT_NUM(cameras[j]);
-		VectorAdd(ed->fields.server->origin, ed->fields.server->mins, mi);
-		VectorAdd(ed->fields.server->origin, ed->fields.server->maxs, ma);
+		VectorAdd(PRVM_serveredictvector(ed, origin), PRVM_serveredictvector(ed, mins), mi);
+		VectorAdd(PRVM_serveredictvector(ed, origin), PRVM_serveredictvector(ed, maxs), ma);
 		for(k = 0; k < sv.writeentitiestoclient_numeyes; ++k)
 		if(eye_levels[k] <= MAX_EYE_RECURSION)
 		{
@@ -1692,7 +1788,7 @@ void SV_WriteEntitiesToClient(client_t *client, prvm_edict_t *clent, sizebuf_t *
 	// get eye location
 	sv.writeentitiestoclient_cliententitynumber = PRVM_EDICT_TO_PROG(clent); // LordHavoc: for comparison purposes
 	camera = PRVM_EDICT_NUM( client->clientcamera );
-	VectorAdd(camera->fields.server->origin, clent->fields.server->view_ofs, eye);
+	VectorAdd(PRVM_serveredictvector(camera, origin), PRVM_serveredictvector(clent, view_ofs), eye);
 	sv.writeentitiestoclient_pvsbytes = 0;
 	// get the PVS values for the eye location, later FatPVS calls will merge
 	if (sv.worldmodel && sv.worldmodel->brush.FatPVS)
@@ -1707,7 +1803,7 @@ void SV_WriteEntitiesToClient(client_t *client, prvm_edict_t *clent, sizebuf_t *
 	{
 		vec_t predtime = bound(0, host_client->ping, sv_cullentities_trace_prediction_time.value);
 		vec3_t predeye;
-		VectorMA(eye, predtime, camera->fields.server->velocity, predeye);
+		VectorMA(eye, predtime, PRVM_serveredictvector(camera, velocity), predeye);
 		if (SV_CanSeeBox(1, 0, eye, predeye, predeye))
 		{
 			VectorCopy(predeye, sv.writeentitiestoclient_eyes[sv.writeentitiestoclient_numeyes]);
@@ -1802,7 +1898,7 @@ static void SV_CleanupEnts (void)
 
 	ent = PRVM_NEXT_EDICT(prog->edicts);
 	for (e=1 ; e<prog->num_edicts ; e++, ent = PRVM_NEXT_EDICT(ent))
-		ent->fields.server->effects = (int)ent->fields.server->effects & ~EF_MUZZLEFLASH;
+		PRVM_serveredictfloat(ent, effects) = (int)PRVM_serveredictfloat(ent, effects) & ~EF_MUZZLEFLASH;
 }
 
 /*
@@ -1817,26 +1913,26 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	int		i;
 	prvm_edict_t	*other;
 	int		items;
-	prvm_eval_t	*val;
 	vec3_t	punchvector;
 	int		viewzoom;
 	const char *s;
 	float	*statsf = (float *)stats;
+	float gravity;
 
 //
 // send a damage message
 //
-	if (ent->fields.server->dmg_take || ent->fields.server->dmg_save)
+	if (PRVM_serveredictfloat(ent, dmg_take) || PRVM_serveredictfloat(ent, dmg_save))
 	{
-		other = PRVM_PROG_TO_EDICT(ent->fields.server->dmg_inflictor);
+		other = PRVM_PROG_TO_EDICT(PRVM_serveredictedict(ent, dmg_inflictor));
 		MSG_WriteByte (msg, svc_damage);
-		MSG_WriteByte (msg, (int)ent->fields.server->dmg_save);
-		MSG_WriteByte (msg, (int)ent->fields.server->dmg_take);
+		MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, dmg_save));
+		MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, dmg_take));
 		for (i=0 ; i<3 ; i++)
-			MSG_WriteCoord (msg, other->fields.server->origin[i] + 0.5*(other->fields.server->mins[i] + other->fields.server->maxs[i]), sv.protocol);
+			MSG_WriteCoord (msg, PRVM_serveredictvector(other, origin)[i] + 0.5*(PRVM_serveredictvector(other, mins)[i] + PRVM_serveredictvector(other, maxs)[i]), sv.protocol);
 
-		ent->fields.server->dmg_take = 0;
-		ent->fields.server->dmg_save = 0;
+		PRVM_serveredictfloat(ent, dmg_take) = 0;
+		PRVM_serveredictfloat(ent, dmg_save) = 0;
 	}
 
 //
@@ -1845,15 +1941,15 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	SV_SetIdealPitch ();		// how much to look up / down ideally
 
 // a fixangle might get lost in a dropped packet.  Oh well.
-	if(ent->fields.server->fixangle)
+	if(PRVM_serveredictfloat(ent, fixangle))
 	{
 		// angle fixing was requested by global thinking code...
 		// so store the current angles for later use
-		memcpy(host_client->fixangle_angles, ent->fields.server->angles, sizeof(host_client->fixangle_angles));
+		memcpy(host_client->fixangle_angles, PRVM_serveredictvector(ent, angles), sizeof(host_client->fixangle_angles));
 		host_client->fixangle_angles_set = TRUE;
 
 		// and clear fixangle for the next frame
-		ent->fields.server->fixangle = 0;
+		PRVM_serveredictfloat(ent, fixangle) = 0;
 	}
 
 	if (host_client->fixangle_angles_set)
@@ -1866,71 +1962,68 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 
 	// stuff the sigil bits into the high bits of items for sbar, or else
 	// mix in items2
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.items2);
 	if (gamemode == GAME_HIPNOTIC || gamemode == GAME_ROGUE)
-		items = (int)ent->fields.server->items | ((int)val->_float << 23);
+		items = (int)PRVM_serveredictfloat(ent, items) | ((int)PRVM_serveredictfloat(ent, items2) << 23);
 	else
-		items = (int)ent->fields.server->items | ((int)prog->globals.server->serverflags << 28);
+		items = (int)PRVM_serveredictfloat(ent, items) | ((int)PRVM_serverglobalfloat(serverflags) << 28);
 
-	VectorClear(punchvector);
-	if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.punchvector)))
-		VectorCopy(val->vector, punchvector);
+	VectorCopy(PRVM_serveredictvector(ent, punchvector), punchvector);
 
 	// cache weapon model name and index in client struct to save time
 	// (this search can be almost 1% of cpu time!)
-	s = PRVM_GetString(ent->fields.server->weaponmodel);
+	s = PRVM_GetString(PRVM_serveredictstring(ent, weaponmodel));
 	if (strcmp(s, client->weaponmodel))
 	{
 		strlcpy(client->weaponmodel, s, sizeof(client->weaponmodel));
 		client->weaponmodelindex = SV_ModelIndex(s, 1);
 	}
 
-	viewzoom = 255;
-	if ((val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.viewzoom)))
-		viewzoom = (int)(val->_float * 255.0f);
+	viewzoom = (int)(PRVM_serveredictfloat(ent, viewzoom) * 255.0f);
 	if (viewzoom == 0)
 		viewzoom = 255;
 
 	bits = 0;
 
-	if ((int)ent->fields.server->flags & FL_ONGROUND)
+	if ((int)PRVM_serveredictfloat(ent, flags) & FL_ONGROUND)
 		bits |= SU_ONGROUND;
-	if (ent->fields.server->waterlevel >= 2)
+	if (PRVM_serveredictfloat(ent, waterlevel) >= 2)
 		bits |= SU_INWATER;
-	if (ent->fields.server->idealpitch)
+	if (PRVM_serveredictfloat(ent, idealpitch))
 		bits |= SU_IDEALPITCH;
 
 	for (i=0 ; i<3 ; i++)
 	{
-		if (ent->fields.server->punchangle[i])
+		if (PRVM_serveredictvector(ent, punchangle)[i])
 			bits |= (SU_PUNCH1<<i);
 		if (sv.protocol != PROTOCOL_QUAKE && sv.protocol != PROTOCOL_QUAKEDP && sv.protocol != PROTOCOL_NEHAHRAMOVIE && sv.protocol != PROTOCOL_NEHAHRABJP && sv.protocol != PROTOCOL_NEHAHRABJP2 && sv.protocol != PROTOCOL_NEHAHRABJP3)
 			if (punchvector[i])
 				bits |= (SU_PUNCHVEC1<<i);
-		if (ent->fields.server->velocity[i])
+		if (PRVM_serveredictvector(ent, velocity)[i])
 			bits |= (SU_VELOCITY1<<i);
 	}
 
+	gravity = PRVM_serveredictfloat(ent, gravity);if (!gravity) gravity = 1.0f;
+
 	memset(stats, 0, sizeof(int[MAX_CL_STATS]));
-	stats[STAT_VIEWHEIGHT] = (int)ent->fields.server->view_ofs[2];
+	stats[STAT_VIEWHEIGHT] = (int)PRVM_serveredictvector(ent, view_ofs)[2];
 	stats[STAT_ITEMS] = items;
-	stats[STAT_WEAPONFRAME] = (int)ent->fields.server->weaponframe;
-	stats[STAT_ARMOR] = (int)ent->fields.server->armorvalue;
+	stats[STAT_WEAPONFRAME] = (int)PRVM_serveredictfloat(ent, weaponframe);
+	stats[STAT_ARMOR] = (int)PRVM_serveredictfloat(ent, armorvalue);
 	stats[STAT_WEAPON] = client->weaponmodelindex;
-	stats[STAT_HEALTH] = (int)ent->fields.server->health;
-	stats[STAT_AMMO] = (int)ent->fields.server->currentammo;
-	stats[STAT_SHELLS] = (int)ent->fields.server->ammo_shells;
-	stats[STAT_NAILS] = (int)ent->fields.server->ammo_nails;
-	stats[STAT_ROCKETS] = (int)ent->fields.server->ammo_rockets;
-	stats[STAT_CELLS] = (int)ent->fields.server->ammo_cells;
-	stats[STAT_ACTIVEWEAPON] = (int)ent->fields.server->weapon;
+	stats[STAT_HEALTH] = (int)PRVM_serveredictfloat(ent, health);
+	stats[STAT_AMMO] = (int)PRVM_serveredictfloat(ent, currentammo);
+	stats[STAT_SHELLS] = (int)PRVM_serveredictfloat(ent, ammo_shells);
+	stats[STAT_NAILS] = (int)PRVM_serveredictfloat(ent, ammo_nails);
+	stats[STAT_ROCKETS] = (int)PRVM_serveredictfloat(ent, ammo_rockets);
+	stats[STAT_CELLS] = (int)PRVM_serveredictfloat(ent, ammo_cells);
+	stats[STAT_ACTIVEWEAPON] = (int)PRVM_serveredictfloat(ent, weapon);
 	stats[STAT_VIEWZOOM] = viewzoom;
-	stats[STAT_TOTALSECRETS] = (int)prog->globals.server->total_secrets;
-	stats[STAT_TOTALMONSTERS] = (int)prog->globals.server->total_monsters;
+	stats[STAT_TOTALSECRETS] = (int)PRVM_serverglobalfloat(total_secrets);
+	stats[STAT_TOTALMONSTERS] = (int)PRVM_serverglobalfloat(total_monsters);
 	// the QC bumps these itself by sending svc_'s, so we have to keep them
 	// zero or they'll be corrected by the engine
-	//stats[STAT_SECRETS] = prog->globals.server->found_secrets;
-	//stats[STAT_MONSTERS] = prog->globals.server->killed_monsters;
+	//stats[STAT_SECRETS] = PRVM_serverglobalfloat(found_secrets);
+	//stats[STAT_MONSTERS] = PRVM_serverglobalfloat(killed_monsters);
 
 	// movement settings for prediction
 	// note: these are not sent in protocols with lower MAX_CL_STATS limits
@@ -1948,13 +2041,13 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	statsf[STAT_MOVEVARS_ACCELERATE] = sv_accelerate.value;
 	statsf[STAT_MOVEVARS_AIRACCELERATE] = sv_airaccelerate.value >= 0 ? sv_airaccelerate.value : sv_accelerate.value;
 	statsf[STAT_MOVEVARS_WATERACCELERATE] = sv_wateraccelerate.value >= 0 ? sv_wateraccelerate.value : sv_accelerate.value;
-	val = PRVM_EDICTFIELDVALUE(ent, prog->fieldoffsets.gravity);
-	statsf[STAT_MOVEVARS_ENTGRAVITY] = (val && val->_float != 0) ? val->_float : 1.0f;
+	statsf[STAT_MOVEVARS_ENTGRAVITY] = gravity;
 	statsf[STAT_MOVEVARS_JUMPVELOCITY] = sv_jumpvelocity.value;
 	statsf[STAT_MOVEVARS_EDGEFRICTION] = sv_edgefriction.value;
 	statsf[STAT_MOVEVARS_MAXAIRSPEED] = sv_maxairspeed.value;
 	statsf[STAT_MOVEVARS_STEPHEIGHT] = sv_stepheight.value;
 	statsf[STAT_MOVEVARS_AIRACCEL_QW] = sv_airaccel_qw.value;
+	statsf[STAT_MOVEVARS_AIRACCEL_QW_STRETCHFACTOR] = sv_airaccel_qw_stretchfactor.value;
 	statsf[STAT_MOVEVARS_AIRACCEL_SIDEWAYS_FRICTION] = sv_airaccel_sideways_friction.value;
 	statsf[STAT_MOVEVARS_FRICTION] = sv_friction.value;
 	statsf[STAT_MOVEVARS_WATERFRICTION] = sv_waterfriction.value >= 0 ? sv_waterfriction.value : sv_friction.value;
@@ -2004,16 +2097,16 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		MSG_WriteChar (msg, stats[STAT_VIEWHEIGHT]);
 
 	if (bits & SU_IDEALPITCH)
-		MSG_WriteChar (msg, (int)ent->fields.server->idealpitch);
+		MSG_WriteChar (msg, (int)PRVM_serveredictfloat(ent, idealpitch));
 
 	for (i=0 ; i<3 ; i++)
 	{
 		if (bits & (SU_PUNCH1<<i))
 		{
 			if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
-				MSG_WriteChar(msg, (int)ent->fields.server->punchangle[i]);
+				MSG_WriteChar(msg, (int)PRVM_serveredictvector(ent, punchangle)[i]);
 			else
-				MSG_WriteAngle16i(msg, ent->fields.server->punchangle[i]);
+				MSG_WriteAngle16i(msg, PRVM_serveredictvector(ent, punchangle)[i]);
 		}
 		if (bits & (SU_PUNCHVEC1<<i))
 		{
@@ -2025,9 +2118,9 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		if (bits & (SU_VELOCITY1<<i))
 		{
 			if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4)
-				MSG_WriteChar(msg, (int)(ent->fields.server->velocity[i] * (1.0f / 16.0f)));
+				MSG_WriteChar(msg, (int)(PRVM_serveredictvector(ent, velocity)[i] * (1.0f / 16.0f)));
 			else
-				MSG_WriteCoord32f(msg, ent->fields.server->velocity[i]);
+				MSG_WriteCoord32f(msg, PRVM_serveredictvector(ent, velocity)[i]);
 		}
 	}
 
@@ -2300,10 +2393,10 @@ static void SV_UpdateToReliableMessages (void)
 {
 	int i, j;
 	client_t *client;
-	prvm_eval_t *val;
 	const char *name;
 	const char *model;
 	const char *skin;
+	int clientcamera;
 
 // check for changes to be sent over the reliable streams
 	for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
@@ -2312,12 +2405,12 @@ static void SV_UpdateToReliableMessages (void)
 		host_client->edict = PRVM_EDICT_NUM(i+1);
 
 		// DP_SV_CLIENTNAME
-		name = PRVM_GetString(host_client->edict->fields.server->netname);
+		name = PRVM_GetString(PRVM_serveredictstring(host_client->edict, netname));
 		if (name == NULL)
 			name = "";
 		// always point the string back at host_client->name to keep it safe
 		strlcpy (host_client->name, name, sizeof (host_client->name));
-		host_client->edict->fields.server->netname = PRVM_SetEngineString(host_client->name);
+		PRVM_serveredictstring(host_client->edict, netname) = PRVM_SetEngineString(host_client->name);
 		if (strcmp(host_client->old_name, host_client->name))
 		{
 			if (host_client->spawned)
@@ -2331,9 +2424,7 @@ static void SV_UpdateToReliableMessages (void)
 		}
 
 		// DP_SV_CLIENTCOLORS
-		// this is always found (since it's added by the progs loader)
-		if ((val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.clientcolors)))
-			host_client->colors = (int)val->_float;
+		host_client->colors = (int)PRVM_serveredictfloat(host_client->edict, clientcolors);
 		if (host_client->old_colors != host_client->colors)
 		{
 			host_client->old_colors = host_client->colors;
@@ -2344,42 +2435,39 @@ static void SV_UpdateToReliableMessages (void)
 		}
 
 		// NEXUIZ_PLAYERMODEL
-		if( prog->fieldoffsets.playermodel >= 0 ) {
-			model = PRVM_GetString(PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playermodel)->string);
-			if (model == NULL)
-				model = "";
-			// always point the string back at host_client->name to keep it safe
-			strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
-			PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playermodel)->string = PRVM_SetEngineString(host_client->playermodel);
-		}
+		model = PRVM_GetString(PRVM_serveredictstring(host_client->edict, playermodel));
+		if (model == NULL)
+			model = "";
+		// always point the string back at host_client->name to keep it safe
+		strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
+		PRVM_serveredictstring(host_client->edict, playermodel) = PRVM_SetEngineString(host_client->playermodel);
 
 		// NEXUIZ_PLAYERSKIN
-		if( prog->fieldoffsets.playerskin >= 0 ) {
-			skin = PRVM_GetString(PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playerskin)->string);
-			if (skin == NULL)
-				skin = "";
-			// always point the string back at host_client->name to keep it safe
-			strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
-			PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.playerskin)->string = PRVM_SetEngineString(host_client->playerskin);
-		}
+		skin = PRVM_GetString(PRVM_serveredictstring(host_client->edict, playerskin));
+		if (skin == NULL)
+			skin = "";
+		// always point the string back at host_client->name to keep it safe
+		strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
+		PRVM_serveredictstring(host_client->edict, playerskin) = PRVM_SetEngineString(host_client->playerskin);
 
 		// TODO: add an extension name for this [1/17/2008 Black]
-		if ((val = PRVM_EDICTFIELDVALUE(host_client->edict, prog->fieldoffsets.clientcamera)) && val->edict > 0 ) {
+		clientcamera = PRVM_serveredictedict(host_client->edict, clientcamera);
+		if (clientcamera > 0)
+		{
 			int oldclientcamera = host_client->clientcamera;
-			if( val->edict >= prog->max_edicts || PRVM_EDICT_NUM( val->edict )->priv.required->free ) {
-				val->edict = host_client->clientcamera = PRVM_NUM_FOR_EDICT( host_client->edict );
-			} else {
-				host_client->clientcamera = val->edict;
-			}
+			if (clientcamera >= prog->max_edicts || PRVM_EDICT_NUM(clientcamera)->priv.required->free)
+				clientcamera = PRVM_NUM_FOR_EDICT(host_client->edict);
+			host_client->clientcamera = clientcamera;
 
-			if( oldclientcamera != host_client->clientcamera ) {
-				MSG_WriteByte (&host_client->netconnection->message, svc_setview );
-				MSG_WriteShort (&host_client->netconnection->message, host_client->clientcamera);
+			if (oldclientcamera != host_client->clientcamera)
+			{
+				MSG_WriteByte(&host_client->netconnection->message, svc_setview);
+				MSG_WriteShort(&host_client->netconnection->message, host_client->clientcamera);
 			}
 		}
 
 		// frags
-		host_client->frags = (int)host_client->edict->fields.server->frags;
+		host_client->frags = (int)PRVM_serveredictfloat(host_client->edict, frags);
 		if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
 			if(!host_client->spawned && host_client->netconnection)
 				host_client->frags = -666;
@@ -2888,7 +2976,7 @@ dp_model_t *SV_GetModelFromEdict(prvm_edict_t *ed)
 	int modelindex;
 	if (!ed || ed->priv.server->free)
 		return NULL;
-	modelindex = (int)ed->fields.server->modelindex;
+	modelindex = (int)PRVM_serveredictfloat(ed, modelindex);
 	return (modelindex > 0 && modelindex < MAX_MODELS) ? sv.models[modelindex] : NULL;
 }
 
@@ -2914,14 +3002,14 @@ static void SV_CreateBaseline (void)
 
 		if (svent->priv.server->free)
 			continue;
-		if (entnum > svs.maxclients && !svent->fields.server->modelindex)
+		if (entnum > svs.maxclients && !PRVM_serveredictfloat(svent, modelindex))
 			continue;
 
 		// create entity baseline
-		VectorCopy (svent->fields.server->origin, svent->priv.server->baseline.origin);
-		VectorCopy (svent->fields.server->angles, svent->priv.server->baseline.angles);
-		svent->priv.server->baseline.frame = (int)svent->fields.server->frame;
-		svent->priv.server->baseline.skin = (int)svent->fields.server->skin;
+		VectorCopy (PRVM_serveredictvector(svent, origin), svent->priv.server->baseline.origin);
+		VectorCopy (PRVM_serveredictvector(svent, angles), svent->priv.server->baseline.angles);
+		svent->priv.server->baseline.frame = (int)PRVM_serveredictfloat(svent, frame);
+		svent->priv.server->baseline.skin = (int)PRVM_serveredictfloat(svent, skin);
 		if (entnum > 0 && entnum <= svs.maxclients)
 		{
 			svent->priv.server->baseline.colormap = entnum;
@@ -2930,7 +3018,7 @@ static void SV_CreateBaseline (void)
 		else
 		{
 			svent->priv.server->baseline.colormap = 0;
-			svent->priv.server->baseline.modelindex = (int)svent->fields.server->modelindex;
+			svent->priv.server->baseline.modelindex = (int)PRVM_serveredictfloat(svent, modelindex);
 		}
 
 		large = false;
@@ -3034,7 +3122,7 @@ void SV_SaveSpawnparms (void)
 {
 	int		i, j;
 
-	svs.serverflags = (int)prog->globals.server->serverflags;
+	svs.serverflags = (int)PRVM_serverglobalfloat(serverflags);
 
 	for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
 	{
@@ -3042,10 +3130,10 @@ void SV_SaveSpawnparms (void)
 			continue;
 
 	// call the progs to get default spawn parms for the new client
-		prog->globals.server->self = PRVM_EDICT_TO_PROG(host_client->edict);
-		PRVM_ExecuteProgram (prog->globals.server->SetChangeParms, "QC function SetChangeParms is missing");
+		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		PRVM_ExecuteProgram (PRVM_serverfunction(SetChangeParms), "QC function SetChangeParms is missing");
 		for (j=0 ; j<NUM_SPAWN_PARMS ; j++)
-			host_client->spawn_parms[j] = (&prog->globals.server->parm1)[j];
+			host_client->spawn_parms[j] = (&PRVM_serverglobalfloat(parm1))[j];
 	}
 }
 
@@ -3089,10 +3177,10 @@ void SV_SpawnServer (const char *server)
 	{
 		SV_VM_Begin();
 		World_End(&sv.world);
-		if(prog->funcoffsets.SV_Shutdown)
+		if(PRVM_serverfunction(SV_Shutdown))
 		{
-			func_t s = prog->funcoffsets.SV_Shutdown;
-			prog->funcoffsets.SV_Shutdown = 0; // prevent it from getting called again
+			func_t s = PRVM_serverfunction(SV_Shutdown);
+			PRVM_serverfunction(SV_Shutdown) = 0; // prevent it from getting called again
 			PRVM_ExecuteProgram(s,"SV_Shutdown() required");
 		}
 		SV_VM_End();
@@ -3215,7 +3303,7 @@ void SV_SpawnServer (const char *server)
 	prog->allowworldwrites = true;
 	sv.paused = false;
 
-	prog->globals.server->time = sv.time = 1.0;
+	PRVM_serverglobalfloat(time) = sv.time = 1.0;
 
 	Mod_ClearUsed();
 	worldmodel->used = true;
@@ -3246,26 +3334,26 @@ void SV_SpawnServer (const char *server)
 //
 	// AK possible hack since num_edicts is still 0
 	ent = PRVM_EDICT_NUM(0);
-	memset (ent->fields.server, 0, prog->progs->entityfields * 4);
+	memset (ent->fields.vp, 0, prog->entityfields * 4);
 	ent->priv.server->free = false;
-	ent->fields.server->model = PRVM_SetEngineString(sv.worldname);
-	ent->fields.server->modelindex = 1;		// world model
-	ent->fields.server->solid = SOLID_BSP;
-	ent->fields.server->movetype = MOVETYPE_PUSH;
-	VectorCopy(sv.world.mins, ent->fields.server->mins);
-	VectorCopy(sv.world.maxs, ent->fields.server->maxs);
-	VectorCopy(sv.world.mins, ent->fields.server->absmin);
-	VectorCopy(sv.world.maxs, ent->fields.server->absmax);
+	PRVM_serveredictstring(ent, model) = PRVM_SetEngineString(sv.worldname);
+	PRVM_serveredictfloat(ent, modelindex) = 1;		// world model
+	PRVM_serveredictfloat(ent, solid) = SOLID_BSP;
+	PRVM_serveredictfloat(ent, movetype) = MOVETYPE_PUSH;
+	VectorCopy(sv.world.mins, PRVM_serveredictvector(ent, mins));
+	VectorCopy(sv.world.maxs, PRVM_serveredictvector(ent, maxs));
+	VectorCopy(sv.world.mins, PRVM_serveredictvector(ent, absmin));
+	VectorCopy(sv.world.maxs, PRVM_serveredictvector(ent, absmax));
 
 	if (coop.value)
-		prog->globals.server->coop = coop.integer;
+		PRVM_serverglobalfloat(coop) = coop.integer;
 	else
-		prog->globals.server->deathmatch = deathmatch.integer;
+		PRVM_serverglobalfloat(deathmatch) = deathmatch.integer;
 
-	prog->globals.server->mapname = PRVM_SetEngineString(sv.name);
+	PRVM_serverglobalstring(mapname) = PRVM_SetEngineString(sv.name);
 
 // serverflags are for cross level information (sigils)
-	prog->globals.server->serverflags = svs.serverflags;
+	PRVM_serverglobalfloat(serverflags) = svs.serverflags;
 
 	// we need to reset the spawned flag on all connected clients here so that
 	// their thinks don't run during startup (before PutClientInServer)
@@ -3290,14 +3378,14 @@ void SV_SpawnServer (const char *server)
 
 
 	// LordHavoc: clear world angles (to fix e3m3.bsp)
-	VectorClear(prog->edicts->fields.server->angles);
+	VectorClear(PRVM_serveredictvector(prog->edicts, angles));
 
 // all setup is completed, any further precache statements are errors
 //	sv.state = ss_active; // LordHavoc: workaround for svc_precache bug
 	prog->allowworldwrites = false;
 
 // run two frames to allow everything to settle
-	prog->globals.server->time = sv.time = 1.0001;
+	PRVM_serverglobalfloat(time) = sv.time = 1.0001;
 	for (i = 0;i < 2;i++)
 	{
 		sv.frametime = 0.1;
@@ -3332,20 +3420,20 @@ void SV_SpawnServer (const char *server)
 
 			// copy spawn parms out of the client_t
 			for (j=0 ; j< NUM_SPAWN_PARMS ; j++)
-				(&prog->globals.server->parm1)[j] = host_client->spawn_parms[j];
+				(&PRVM_serverglobalfloat(parm1))[j] = host_client->spawn_parms[j];
 
 			// call the spawn function
 			host_client->clientconnectcalled = true;
-			prog->globals.server->time = sv.time;
-			prog->globals.server->self = PRVM_EDICT_TO_PROG(host_client->edict);
-			PRVM_ExecuteProgram (prog->globals.server->ClientConnect, "QC function ClientConnect is missing");
-			PRVM_ExecuteProgram (prog->globals.server->PutClientInServer, "QC function PutClientInServer is missing");
+			PRVM_serverglobalfloat(time) = sv.time;
+			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+			PRVM_ExecuteProgram (PRVM_serverfunction(ClientConnect), "QC function ClientConnect is missing");
+			PRVM_ExecuteProgram (PRVM_serverfunction(PutClientInServer), "QC function PutClientInServer is missing");
 			host_client->spawned = true;
 		}
 	}
 
 	// update the map title cvar
-	strlcpy(sv.worldmessage, PRVM_GetString(prog->edicts->fields.server->message), sizeof(sv.worldmessage)); // map title (not related to filename)
+	strlcpy(sv.worldmessage, PRVM_GetString(PRVM_serveredictstring(prog->edicts, message)), sizeof(sv.worldmessage)); // map title (not related to filename)
 	Cvar_SetQuick(&sv_worldmessage, sv.worldmessage);
 
 	Con_DPrint("Server spawned.\n");
@@ -3383,69 +3471,46 @@ static void SV_VM_CB_InitEdict(prvm_edict_t *e)
 
 	if (num >= 0 && num < svs.maxclients)
 	{
-		prvm_eval_t *val;
 		// set colormap and team on newly created player entity
-		e->fields.server->colormap = num + 1;
-		e->fields.server->team = (svs.clients[num].colors & 15) + 1;
+		PRVM_serveredictfloat(e, colormap) = num + 1;
+		PRVM_serveredictfloat(e, team) = (svs.clients[num].colors & 15) + 1;
 		// set netname/clientcolors back to client values so that
 		// DP_SV_CLIENTNAME and DP_SV_CLIENTCOLORS will not immediately
 		// reset them
-		e->fields.server->netname = PRVM_SetEngineString(svs.clients[num].name);
-		if ((val = PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.clientcolors)))
-			val->_float = svs.clients[num].colors;
+		PRVM_serveredictstring(e, netname) = PRVM_SetEngineString(svs.clients[num].name);
+		PRVM_serveredictfloat(e, clientcolors) = svs.clients[num].colors;
 		// NEXUIZ_PLAYERMODEL and NEXUIZ_PLAYERSKIN
-		if( prog->fieldoffsets.playermodel >= 0 )
-			PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.playermodel)->string = PRVM_SetEngineString(svs.clients[num].playermodel);
-		if( prog->fieldoffsets.playerskin >= 0 )
-			PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.playerskin)->string = PRVM_SetEngineString(svs.clients[num].playerskin);
+		PRVM_serveredictstring(e, playermodel) = PRVM_SetEngineString(svs.clients[num].playermodel);
+		PRVM_serveredictstring(e, playerskin) = PRVM_SetEngineString(svs.clients[num].playerskin);
 		// Assign netaddress (IP Address, etc)
-		if(prog->fieldoffsets.netaddress >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL)
-			{// Valid Address; Assign
-				// Acquire Readable Address
-				LHNETADDRESS_ToString(&svs.clients[num].netconnection->peeraddress, svs.clients[num].netaddress, sizeof(svs.clients[num].netaddress), false);
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.netaddress)->string = PRVM_SetEngineString(svs.clients[num].netaddress);
-			}
-			else
-				// Invalid / Bot
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.netaddress)->string = PRVM_SetEngineString("null/botclient");
+		if(svs.clients[num].netconnection != NULL)
+		{
+			// Acquire Readable Address
+			LHNETADDRESS_ToString(&svs.clients[num].netconnection->peeraddress, svs.clients[num].netaddress, sizeof(svs.clients[num].netaddress), false);
+			PRVM_serveredictstring(e, netaddress) = PRVM_SetEngineString(svs.clients[num].netaddress);
 		}
-		if(prog->fieldoffsets.crypto_idfp >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_idfp[0])
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_idfp)->string = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.client_idfp);
-			else
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_idfp)->string = 0;
-		}
-		if(prog->fieldoffsets.crypto_keyfp >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_keyfp[0])
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_keyfp)->string = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.client_keyfp);
-			else
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_keyfp)->string = 0;
-		}
-		if(prog->fieldoffsets.crypto_mykeyfp >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.server_keyfp[0])
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_mykeyfp)->string = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.server_keyfp);
-			else
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_mykeyfp)->string = 0;
-		}
-		if(prog->fieldoffsets.crypto_encryptmethod >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.use_aes)
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_encryptmethod)->string = PRVM_SetEngineString("AES128");
-			else
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_encryptmethod)->string = 0;
-		}
-		if(prog->fieldoffsets.crypto_signmethod >= 0)
-		{ // Valid Field; Process
-			if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated)
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_signmethod)->string = PRVM_SetEngineString("HMAC-SHA256");
-			else
-				PRVM_EDICTFIELDVALUE(e, prog->fieldoffsets.crypto_signmethod)->string = 0;
-		}
+		else
+			PRVM_serveredictstring(e, netaddress) = PRVM_SetEngineString("null/botclient");
+		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_idfp[0])
+			PRVM_serveredictstring(e, crypto_idfp) = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.client_idfp);
+		else
+			PRVM_serveredictstring(e, crypto_idfp) = 0;
+		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_keyfp[0])
+			PRVM_serveredictstring(e, crypto_keyfp) = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.client_keyfp);
+		else
+			PRVM_serveredictstring(e, crypto_keyfp) = 0;
+		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.server_keyfp[0])
+			PRVM_serveredictstring(e, crypto_mykeyfp) = PRVM_SetEngineString(svs.clients[num].netconnection->crypto.server_keyfp);
+		else
+			PRVM_serveredictstring(e, crypto_mykeyfp) = 0;
+		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.use_aes)
+			PRVM_serveredictstring(e, crypto_encryptmethod) = PRVM_SetEngineString("AES128");
+		else
+			PRVM_serveredictstring(e, crypto_encryptmethod) = 0;
+		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated)
+			PRVM_serveredictstring(e, crypto_signmethod) = PRVM_SetEngineString("HMAC-SHA256");
+		else
+			PRVM_serveredictstring(e, crypto_signmethod) = 0;
 	}
 }
 
@@ -3456,16 +3521,16 @@ static void SV_VM_CB_FreeEdict(prvm_edict_t *ed)
 
 	World_UnlinkEdict(ed);		// unlink from world bsp
 
-	ed->fields.server->model = 0;
-	ed->fields.server->takedamage = 0;
-	ed->fields.server->modelindex = 0;
-	ed->fields.server->colormap = 0;
-	ed->fields.server->skin = 0;
-	ed->fields.server->frame = 0;
-	VectorClear(ed->fields.server->origin);
-	VectorClear(ed->fields.server->angles);
-	ed->fields.server->nextthink = -1;
-	ed->fields.server->solid = 0;
+	PRVM_serveredictstring(ed, model) = 0;
+	PRVM_serveredictfloat(ed, takedamage) = 0;
+	PRVM_serveredictfloat(ed, modelindex) = 0;
+	PRVM_serveredictfloat(ed, colormap) = 0;
+	PRVM_serveredictfloat(ed, skin) = 0;
+	PRVM_serveredictfloat(ed, frame) = 0;
+	VectorClear(PRVM_serveredictvector(ed, origin));
+	VectorClear(PRVM_serveredictvector(ed, angles));
+	PRVM_serveredictfloat(ed, nextthink) = -1;
+	PRVM_serveredictfloat(ed, solid) = 0;
 
 	VM_RemoveEdictSkeleton(ed);
 	World_Physics_RemoveFromEntity(&sv.world, ed);
@@ -3495,11 +3560,11 @@ static void SV_VM_CB_CountEdicts(void)
 		if (ent->priv.server->free)
 			continue;
 		active++;
-		if (ent->fields.server->solid)
+		if (PRVM_serveredictfloat(ent, solid))
 			solid++;
-		if (ent->fields.server->model)
+		if (PRVM_serveredictstring(ent, model))
 			models++;
-		if (ent->fields.server->movetype == MOVETYPE_STEP)
+		if (PRVM_serveredictfloat(ent, movetype) == MOVETYPE_STEP)
 			step++;
 	}
 
@@ -3517,14 +3582,14 @@ static qboolean SV_VM_CB_LoadEdict(prvm_edict_t *ent)
 	{
 		if (deathmatch.integer)
 		{
-			if (((int)ent->fields.server->spawnflags & SPAWNFLAG_NOT_DEATHMATCH))
+			if (((int)PRVM_serveredictfloat(ent, spawnflags) & SPAWNFLAG_NOT_DEATHMATCH))
 			{
 				return false;
 			}
 		}
-		else if ((current_skill <= 0 && ((int)ent->fields.server->spawnflags & SPAWNFLAG_NOT_EASY  ))
-			|| (current_skill == 1 && ((int)ent->fields.server->spawnflags & SPAWNFLAG_NOT_MEDIUM))
-			|| (current_skill >= 2 && ((int)ent->fields.server->spawnflags & SPAWNFLAG_NOT_HARD  )))
+		else if ((current_skill <= 0 && ((int)PRVM_serveredictfloat(ent, spawnflags) & SPAWNFLAG_NOT_EASY  ))
+			|| (current_skill == 1 && ((int)PRVM_serveredictfloat(ent, spawnflags) & SPAWNFLAG_NOT_MEDIUM))
+			|| (current_skill >= 2 && ((int)PRVM_serveredictfloat(ent, spawnflags) & SPAWNFLAG_NOT_HARD  )))
 		{
 			return false;
 		}
@@ -3542,8 +3607,6 @@ static void SV_VM_Setup(void)
 	prog->progs_mempool = Mem_AllocPool("Server Progs", 0, NULL);
 	prog->builtins = vm_sv_builtins;
 	prog->numbuiltins = vm_sv_numbuiltins;
-	prog->headercrc = PROGHEADER_CRC;
-	prog->headercrc2 = PROGHEADER_CRC_TENEBRAE;
 	prog->max_edicts = 512;
 	if (sv.protocol == PROTOCOL_QUAKE)
 		prog->limit_edicts = 640; // before quake mission pack 1 this was 512
@@ -3572,36 +3635,150 @@ static void SV_VM_Setup(void)
 	prog->error_cmd = Host_Error;
 	prog->ExecuteProgram = SVVM_ExecuteProgram;
 
-	// TODO: add a requiredfuncs list (ask LH if this is necessary at all)
-	PRVM_LoadProgs( sv_progs.string, 0, NULL, REQFIELDS, reqfields, 0, NULL );
+	PRVM_LoadProgs( sv_progs.string, SV_REQFUNCS, sv_reqfuncs, SV_REQFIELDS, sv_reqfields, SV_REQGLOBALS, sv_reqglobals);
 
 	// some mods compiled with scrambling compilers lack certain critical
 	// global names and field names such as "self" and "time" and "nextthink"
 	// so we have to set these offsets manually, matching the entvars_t
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, angles);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, chain);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, classname);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, frame);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, groundentity);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ideal_yaw);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, nextthink);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, think);
-	PRVM_ED_FindFieldOffset_FromStruct(entvars_t, yaw_speed);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, self);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, time);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_forward);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_right);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_up);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_allsolid);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_startsolid);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_fraction);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_inwater);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_inopen);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_endpos);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_plane_normal);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_plane_dist);
-	PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_ent);
-	// OP_STATE is always supported on server (due to entvars_t)
+	// but we only do this if the prog header crc matches, otherwise it's totally freeform
+	if (prog->progs_crc == PROGHEADER_CRC || prog->progs_crc == PROGHEADER_CRC_TENEBRAE)
+	{
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, modelindex);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, absmin);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, absmax);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ltime);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, movetype);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, solid);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, origin);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, oldorigin);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, velocity);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, angles);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, avelocity);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, punchangle);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, classname);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, model);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, frame);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, skin);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, effects);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, mins);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, maxs);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, size);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, touch);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, use);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, think);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, blocked);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, nextthink);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, groundentity);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, health);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, frags);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, weapon);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, weaponmodel);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, weaponframe);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, currentammo);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ammo_shells);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ammo_nails);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ammo_rockets);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ammo_cells);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, items);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, takedamage);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, chain);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, deadflag);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, view_ofs);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, button0);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, button1);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, button2);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, impulse);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, fixangle);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, v_angle);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, idealpitch);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, netname);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, enemy);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, flags);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, colormap);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, team);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, max_health);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, teleport_time);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, armortype);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, armorvalue);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, waterlevel);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, watertype);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, ideal_yaw);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, yaw_speed);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, aiment);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, goalentity);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, spawnflags);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, target);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, targetname);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, dmg_take);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, dmg_save);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, dmg_inflictor);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, owner);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, movedir);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, message);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, sounds);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, noise);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, noise1);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, noise2);
+		PRVM_ED_FindFieldOffset_FromStruct(entvars_t, noise3);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, self);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, other);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, world);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, time);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, frametime);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, force_retouch);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, mapname);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, deathmatch);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, coop);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, teamplay);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, serverflags);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, total_secrets);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, total_monsters);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, found_secrets);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, killed_monsters);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm1);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm2);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm3);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm4);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm5);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm6);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm7);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm8);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm9);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm10);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm11);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm12);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm13);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm14);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm15);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, parm16);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_forward);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_up);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, v_right);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_allsolid);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_startsolid);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_fraction);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_endpos);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_plane_normal);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_plane_dist);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_ent);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_inopen);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, trace_inwater);
+		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, msg_entity);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, main);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, StartFrame);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, PlayerPreThink);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, PlayerPostThink);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, ClientKill);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, ClientConnect);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, PutClientInServer);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, ClientDisconnect);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, SetNewParms);
+//		PRVM_ED_FindGlobalOffset_FromStruct(globalvars_t, SetChangeParms);
+	}
+	else
+		Con_DPrintf("%s: %s system vars have been modified (CRC %i != engine %i), will not load in other engines", PRVM_NAME, sv_progs.string, prog->progs_crc, PROGHEADER_CRC);
+
+	// OP_STATE is always supported on server because we add fields/globals for it
 	prog->flag |= PRVM_OP_STATE;
 
 	VM_CustomStats_Clear();//[515]: csqc
@@ -3616,7 +3793,7 @@ void SV_VM_Begin(void)
 	PRVM_Begin;
 	PRVM_SetProg( PRVM_SERVERPROG );
 
-	prog->globals.server->time = (float) sv.time;
+	PRVM_serverglobalfloat(time) = (float) sv.time;
 }
 
 void SV_VM_End(void)

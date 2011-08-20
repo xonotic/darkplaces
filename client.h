@@ -215,6 +215,10 @@ typedef struct rtlight_s
 	int particlecache_maxparticles;
 	int particlecache_updateparticle;
 	rtlight_particle_t *particlecache_particles;
+
+	/// bouncegrid light info
+	float photoncolor[3];
+	float photons;
 }
 rtlight_t;
 
@@ -290,18 +294,6 @@ typedef struct dlight_s
 	rtlight_t rtlight;
 }
 dlight_t;
-
-#define MAX_FRAMEGROUPBLENDS 4
-typedef struct framegroupblend_s
-{
-	// animation number and blend factor
-	// (for most models this is the frame number)
-	int frame;
-	float lerp;
-	// time frame began playing (for framegroup animations)
-	double start;
-}
-framegroupblend_t;
 
 // this is derived from processing of the framegroupblend array
 // note: technically each framegroupblend can produce two of these, but that
@@ -1216,6 +1208,7 @@ typedef struct client_state_s
 	float movevars_maxairspeed;
 	float movevars_stepheight;
 	float movevars_airaccel_qw;
+	float movevars_airaccel_qw_stretchfactor;
 	float movevars_airaccel_sideways_friction;
 	float movevars_airstopaccelerate;
 	float movevars_airstrafeaccelerate;
@@ -1255,8 +1248,11 @@ typedef struct client_state_s
 	// server entity number corresponding to a clientside entity
 	unsigned short csqc_server2csqcentitynumber[MAX_EDICTS];
 	qboolean csqc_loaded;
-	vec3_t csqc_origin;
-	vec3_t csqc_angles;
+	vec3_t csqc_vieworigin;
+	vec3_t csqc_viewangles;
+	vec3_t csqc_vieworiginfromengine;
+	vec3_t csqc_viewanglesfromengine;
+	matrix4x4_t csqc_viewmodelmatrixfromengine;
 	qboolean csqc_usecsqclistener;
 	matrix4x4_t csqc_listenermatrix;
 	char csqc_printtextbuf[MAX_INPUTLINE];
@@ -1274,6 +1270,9 @@ typedef struct client_state_s
 	// freed on each level change
 	size_t buildlightmapmemorysize;
 	unsigned char *buildlightmapmemory;
+
+	// used by EntityState5_ReadUpdate
+	skeleton_t *engineskeletonobjects;
 }
 client_state_t;
 

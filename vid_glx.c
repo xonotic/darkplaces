@@ -278,7 +278,9 @@ static int XLateKey(XKeyEvent *ev, Uchar *ascii)
 		case XK_KP_Subtract: key = K_KP_MINUS; break;
 		case XK_KP_Divide: key = K_KP_SLASH; break;
 
-		case XK_section:	key = '~'; break;
+		case XK_asciicircum:	*ascii = key = '^'; break; // for some reason, XLookupString returns "" on this one for Grunt|2
+
+		case XK_section:	*ascii = key = '~'; break;
 
 		default:
 			if (keysym < 32)
@@ -832,6 +834,7 @@ void VID_Shutdown(void)
 	if (!vidx11_display)
 		return;
 
+	VID_EnableJoystick(false);
 	VID_SetMouse(false, false, false);
 	VID_RestoreSystemGamma();
 
@@ -1670,8 +1673,34 @@ void Sys_SendKeyEvents(void)
 	HandleEvents();
 }
 
+void VID_BuildJoyState(vid_joystate_t *joystate)
+{
+	VID_Shared_BuildJoyState_Begin(joystate);
+	VID_Shared_BuildJoyState_Finish(joystate);
+}
+
+void VID_EnableJoystick(qboolean enable)
+{
+	int index = joy_enable.integer > 0 ? joy_index.integer : -1;
+	qboolean success = false;
+	int sharedcount = 0;
+	sharedcount = VID_Shared_SetJoystick(index);
+	if (index >= 0 && index < sharedcount)
+		success = true;
+
+	// update cvar containing count of XInput joysticks
+	if (joy_detected.integer != sharedcount)
+		Cvar_SetValueQuick(&joy_detected, sharedcount);
+
+	Cvar_SetValueQuick(&joy_active, success ? 1 : 0);
+}
+
 void IN_Move (void)
 {
+	vid_joystate_t joystate;
+	VID_EnableJoystick(true);
+	VID_BuildJoyState(&joystate);
+	VID_ApplyJoyState(&joystate);
 }
 
 size_t VID_ListModes(vid_mode_t *modes, size_t maxcount)

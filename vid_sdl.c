@@ -66,42 +66,18 @@ int cl_available = true;
 
 qboolean vid_supportrefreshrate = false;
 
-cvar_t joy_detected = {CVAR_READONLY, "joy_detected", "0", "number of joysticks detected by engine"};
-cvar_t joy_enable = {CVAR_SAVE, "joy_enable", "0", "enables joystick support"};
-cvar_t joy_index = {0, "joy_index", "0", "selects which joystick to use if you have multiple"};
-cvar_t joy_axisforward = {0, "joy_axisforward", "1", "which joystick axis to query for forward/backward movement"};
-cvar_t joy_axisside = {0, "joy_axisside", "0", "which joystick axis to query for right/left movement"};
-cvar_t joy_axisup = {0, "joy_axisup", "-1", "which joystick axis to query for up/down movement"};
-cvar_t joy_axispitch = {0, "joy_axispitch", "3", "which joystick axis to query for looking up/down"};
-cvar_t joy_axisyaw = {0, "joy_axisyaw", "2", "which joystick axis to query for looking right/left"};
-cvar_t joy_axisroll = {0, "joy_axisroll", "-1", "which joystick axis to query for tilting head right/left"};
-cvar_t joy_deadzoneforward = {0, "joy_deadzoneforward", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneside = {0, "joy_deadzoneside", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneup = {0, "joy_deadzoneup", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzonepitch = {0, "joy_deadzonepitch", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneyaw = {0, "joy_deadzoneyaw", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_deadzoneroll = {0, "joy_deadzoneroll", "0", "deadzone tolerance, suggested values are in the range 0 to 0.01"};
-cvar_t joy_sensitivityforward = {0, "joy_sensitivityforward", "-1", "movement multiplier"};
-cvar_t joy_sensitivityside = {0, "joy_sensitivityside", "1", "movement multiplier"};
-cvar_t joy_sensitivityup = {0, "joy_sensitivityup", "1", "movement multiplier"};
-cvar_t joy_sensitivitypitch = {0, "joy_sensitivitypitch", "1", "movement multiplier"};
-cvar_t joy_sensitivityyaw = {0, "joy_sensitivityyaw", "-1", "movement multiplier"};
-cvar_t joy_sensitivityroll = {0, "joy_sensitivityroll", "1", "movement multiplier"};
-cvar_t joy_axiskeyevents = {CVAR_SAVE, "joy_axiskeyevents", "0", "generate uparrow/leftarrow etc. keyevents for joystick axes, use if your joystick driver is not generating them"};
-cvar_t joy_axiskeyevents_deadzone = {CVAR_SAVE, "joy_axiskeyevents_deadzone", "0.5", "deadzone value for axes"};
-
-#ifdef USE_GLES2
-# define SETVIDEOMODE 0
+#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+# define SETVIDEOMODE 1
 #else
-# if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
-#  define SETVIDEOMODE 1
+# ifdef USE_GLES2
+#  define SETVIDEOMODE 0
 # else
 // LordHavoc: SDL 1.3's SDL_CreateWindow API is not finished enough to use yet, but you can set this to 0 if you want to try it...
-#  ifndef SETVIDEOMODE
-#   define SETVIDEOMODE 1
+#   ifndef SETVIDEOMODE
+#    define SETVIDEOMODE 1
+#   endif
 #  endif
 # endif
-#endif
 
 static qboolean vid_usingmouse = false;
 static qboolean vid_usinghidecursor = false;
@@ -111,9 +87,7 @@ static qboolean vid_isfullscreen;
 #else
 static qboolean vid_usingvsync = false;
 #endif
-static int vid_numjoysticks = 0;
-#define MAX_JOYSTICKS 8
-static SDL_Joystick *vid_joysticks[MAX_JOYSTICKS];
+static SDL_Joystick *vid_sdljoystick = NULL;
 
 static int win_half_width = 50;
 static int win_half_height = 50;
@@ -129,20 +103,9 @@ static int window_flags;
 #endif
 static SDL_Surface *vid_softsurface;
 
-// joystick axes state
-#define MAX_JOYSTICK_AXES	16
-typedef struct
-{
-	float oldmove;
-	float move;
-	double keytime;
-}joy_axiscache_t;
-static joy_axiscache_t joy_axescache[MAX_JOYSTICK_AXES];
-
 /////////////////////////
 // Input handling
 ////
-//TODO: Add joystick support
 //TODO: Add error checking
 
 #ifndef SDLK_PERCENT
@@ -518,80 +481,6 @@ void VID_SetMouse(qboolean fullscreengrab, qboolean relative, qboolean hidecurso
 #endif
 }
 
-static double IN_JoystickGetAxis(SDL_Joystick *joy, int axis, double sensitivity, double deadzone)
-{
-	double value;
-	if (axis < 0 || axis >= SDL_JoystickNumAxes(joy))
-		return 0; // no such axis on this joystick
-	value = SDL_JoystickGetAxis(joy, axis) * (1.0 / 32767.0);
-	value = bound(-1, value, 1);
-	if (fabs(value) < deadzone)
-		return 0; // within deadzone around center
-	return value * sensitivity;
-}
-
-/////////////////////
-// Joystick axis keyevents
-// a sort of hack emulating Arrow keys for joystick axises
-// as some drives dont send such keyevents for them
-// additionally we should block drivers that do send arrow keyevents to prevent double events
-////
-
-static void IN_JoystickKeyeventForAxis(SDL_Joystick *joy, int axis, int key_pos, int key_neg)
-{
-	double joytime;
-
-	if (axis < 0 || axis >= SDL_JoystickNumAxes(joy))
-		return; // no such axis on this joystick
-
-	joytime = Sys_DoubleTime();
-	// no key event, continuous keydown event
-	if (joy_axescache[axis].move == joy_axescache[axis].oldmove)
-	{
-		if (joy_axescache[axis].move != 0 && joytime > joy_axescache[axis].keytime)
-		{
-			//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-			Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-			joy_axescache[axis].keytime = joytime + 0.5 / 20;
-		}
-		return;
-	}
-	// generate key up event
-	if (joy_axescache[axis].oldmove)
-	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].oldmove > 0) ? key_pos : key_neg, 0, 0);
-	}
-	// generate key down event
-	if (joy_axescache[axis].move)
-	{
-		//Con_Printf("joy %s %i %f\n", Key_KeynumToString((joy_axescache[axis].move > 0) ? key_pos : key_neg), 1, cl.time);
-		Key_Event((joy_axescache[axis].move > 0) ? key_pos : key_neg, 0, 1);
-		joy_axescache[axis].keytime = joytime + 0.5;
-	}
-}
-
-static qboolean IN_JoystickBlockDoubledKeyEvents(int keycode)
-{
-	if (!joy_axiskeyevents.integer)
-		return false;
-
-	// block keyevent if it's going to be provided by joystick keyevent system
-	if (vid_numjoysticks && joy_enable.integer && joy_index.integer >= 0 && joy_index.integer < vid_numjoysticks)
-	{
-		SDL_Joystick *joy = vid_joysticks[joy_index.integer];
-
-		if (keycode == K_UPARROW || keycode == K_DOWNARROW)
-			if (IN_JoystickGetAxis(joy, joy_axisforward.integer, 1, joy_axiskeyevents_deadzone.value) || joy_axescache[joy_axisforward.integer].move || joy_axescache[joy_axisforward.integer].oldmove)
-				return true;
-		if (keycode == K_RIGHTARROW || keycode == K_LEFTARROW)
-			if (IN_JoystickGetAxis(joy, joy_axisside.integer, 1, joy_axiskeyevents_deadzone.value) || joy_axescache[joy_axisside.integer].move || joy_axescache[joy_axisside.integer].oldmove)
-				return true;
-	}
-
-	return false;
-}
-
 // multitouch[10][] represents the mouse pointer
 // X and Y coordinates are 0-32767 as per SDL spec
 #define MAXFINGERS 11
@@ -656,16 +545,37 @@ qboolean VID_TouchscreenArea(int corner, float px, float py, float pwidth, float
 	return button;
 }
 
+void VID_BuildJoyState(vid_joystate_t *joystate)
+{
+	VID_Shared_BuildJoyState_Begin(joystate);
+
+	if (vid_sdljoystick)
+	{
+		SDL_Joystick *joy = vid_sdljoystick;
+		int j;
+		int numaxes;
+		int numbuttons;
+		numaxes = SDL_JoystickNumAxes(joy);
+		for (j = 0;j < numaxes;j++)
+			joystate->axis[j] = SDL_JoystickGetAxis(joy, j) * (1.0f / 32767.0f);
+		numbuttons = SDL_JoystickNumButtons(joy);
+		for (j = 0;j < numbuttons;j++)
+			joystate->button[j] = SDL_JoystickGetButton(joy, j);
+	}
+
+	VID_Shared_BuildJoyState_Finish(joystate);
+}
+
 /////////////////////
 // Movement handling
 ////
 
 void IN_Move( void )
 {
-	int j;
 	static int old_x = 0, old_y = 0;
 	static int stuck = 0;
-	int x, y, numaxes, numballs;
+	int x, y;
+	vid_joystate_t joystate;
 
 	scr_numtouchscreenareas = 0;
 	if (vid_touchscreen.integer)
@@ -798,42 +708,8 @@ void IN_Move( void )
 		in_windowmouse_y = y;
 	}
 
-	if (vid_numjoysticks && joy_enable.integer && joy_index.integer >= 0 && joy_index.integer < vid_numjoysticks)
-	{
-		SDL_Joystick *joy = vid_joysticks[joy_index.integer];
-
-		// balls convert to mousemove
-		numballs = SDL_JoystickNumBalls(joy);
-		for (j = 0;j < numballs;j++)
-		{
-			SDL_JoystickGetBall(joy, j, &x, &y);
-			in_mouse_x += x;
-			in_mouse_y += y;
-		}
-
-		// axes
-		cl.cmd.forwardmove += IN_JoystickGetAxis(joy, joy_axisforward.integer, joy_sensitivityforward.value, joy_deadzoneforward.value) * cl_forwardspeed.value;
-		cl.cmd.sidemove    += IN_JoystickGetAxis(joy, joy_axisside.integer, joy_sensitivityside.value, joy_deadzoneside.value) * cl_sidespeed.value;
-		cl.cmd.upmove      += IN_JoystickGetAxis(joy, joy_axisup.integer, joy_sensitivityup.value, joy_deadzoneup.value) * cl_upspeed.value;
-		cl.viewangles[0]   += IN_JoystickGetAxis(joy, joy_axispitch.integer, joy_sensitivitypitch.value, joy_deadzonepitch.value) * cl.realframetime * cl_pitchspeed.value;
-		cl.viewangles[1]   += IN_JoystickGetAxis(joy, joy_axisyaw.integer, joy_sensitivityyaw.value, joy_deadzoneyaw.value) * cl.realframetime * cl_yawspeed.value;
-		//cl.viewangles[2]   += IN_JoystickGetAxis(joy, joy_axisroll.integer, joy_sensitivityroll.value, joy_deadzoneroll.value) * cl.realframetime * cl_rollspeed.value;
-	
-		// cache state of axes to emulate button events for them
-		numaxes = min(MAX_JOYSTICK_AXES, SDL_JoystickNumAxes(joy));
-		for (j = 0; j < numaxes; j++)
-		{
-			joy_axescache[j].oldmove = joy_axescache[j].move;
-			joy_axescache[j].move = IN_JoystickGetAxis(joy, j, 1, joy_axiskeyevents_deadzone.value);
-		}
-
-		// run keyevents
-		if (joy_axiskeyevents.integer)
-		{
-			IN_JoystickKeyeventForAxis(joy, joy_axisforward.integer, K_DOWNARROW, K_UPARROW);
-			IN_JoystickKeyeventForAxis(joy, joy_axisside.integer, K_RIGHTARROW, K_LEFTARROW);
-		}
-	}
+	VID_BuildJoyState(&joystate);
+	VID_ApplyJoyState(&joystate);
 }
 
 /////////////////////
@@ -886,6 +762,8 @@ void Sys_SendKeyEvents( void )
 	int keycode;
 	SDL_Event event;
 
+	VID_EnableJoystick(true);
+
 	while( SDL_PollEvent( &event ) )
 		switch( event.type ) {
 			case SDL_QUIT:
@@ -894,7 +772,7 @@ void Sys_SendKeyEvents( void )
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
 				keycode = MapKey(event.key.keysym.sym);
-				if (!IN_JoystickBlockDoubledKeyEvents(keycode))
+				if (!VID_JoyBlockEmulatedKeys(keycode))
 					Key_Event(keycode, event.key.keysym.unicode, (event.key.state == SDL_PRESSED));
 				break;
 			case SDL_ACTIVEEVENT:
@@ -913,12 +791,7 @@ void Sys_SendKeyEvents( void )
 					Key_Event( buttonremap[event.button.button - 1], 0, event.button.state == SDL_PRESSED );
 				break;
 			case SDL_JOYBUTTONDOWN:
-				if (!joy_enable.integer)
-					break; // ignore down events if joystick has been disabled
 			case SDL_JOYBUTTONUP:
-				if (event.jbutton.button < 48)
-					Key_Event( event.jbutton.button + (event.jbutton.button < 16 ? K_JOY1 : K_AUX1 - 16), 0, (event.jbutton.state == SDL_PRESSED) );
-				break;
 			case SDL_JOYAXISMOTION:
 			case SDL_JOYBALLMOTION:
 			case SDL_JOYHATMOTION:
@@ -1000,6 +873,8 @@ void Sys_SendKeyEvents( void )
 	int unicode;
 	SDL_Event event;
 
+	VID_EnableJoystick(true);
+
 	while( SDL_PollEvent( &event ) )
 		switch( event.type ) {
 			case SDL_QUIT:
@@ -1008,16 +883,7 @@ void Sys_SendKeyEvents( void )
 			case SDL_KEYDOWN:
 			case SDL_KEYUP:
 				keycode = MapKey(event.key.keysym.sym);
-				if (!IN_JoystickBlockDoubledKeyEvents(keycode))
-#ifdef __IPHONEOS__
-				// the virtual keyboard seems to produce no unicode values...
-				if (missingunicodehack && keycode >= ' ' && keycode < 0x7F && event.key.keysym.unicode == 0)
-				{
-					Con_DPrintf("SDL hack: no unicode value reported, substituting ascii value %i\n", keycode);
-					Key_Event(keycode, keycode, (event.key.state == SDL_PRESSED));
-				}
-				else
-#endif
+				if (!VID_JoyBlockEmulatedKeys(keycode))
 					Key_Event(keycode, 0, (event.key.state == SDL_PRESSED));
 				break;
 			case SDL_MOUSEBUTTONDOWN:
@@ -1027,12 +893,7 @@ void Sys_SendKeyEvents( void )
 					Key_Event( buttonremap[event.button.button - 1], 0, event.button.state == SDL_PRESSED );
 				break;
 			case SDL_JOYBUTTONDOWN:
-				if (!joy_enable.integer)
-					break; // ignore down events if joystick has been disabled
 			case SDL_JOYBUTTONUP:
-				if (event.jbutton.button < 48)
-					Key_Event( event.jbutton.button + (event.jbutton.button < 16 ? K_JOY1 : K_AUX1 - 16), 0, (event.jbutton.state == SDL_PRESSED) );
-				break;
 			case SDL_JOYAXISMOTION:
 			case SDL_JOYBALLMOTION:
 			case SDL_JOYHATMOTION:
@@ -1182,15 +1043,6 @@ void Sys_SendKeyEvents( void )
 			case SDL_TOUCHBUTTONUP:
 				// not sure what to do with this...
 				break;
-			case SDL_JOYAXISMOTION:
-				// we poll the joystick instead
-				break;
-			case SDL_JOYBALLMOTION:
-				// we poll the joystick instead
-				break;
-			case SDL_JOYHATMOTION:
-				// we poll the joystick instead
-				break;
 			default:
 				Con_DPrintf("Received unrecognized SDL_Event type 0x%x\n", event.type);
 				break;
@@ -1221,234 +1073,245 @@ void Sys_SendKeyEvents( void )
 ////
 
 #ifdef USE_GLES2
+#ifndef qglClear
 #ifdef __IPHONEOS__
 #include <OpenGLES/ES2/gl.h>
 #else
 #include <SDL_opengles.h>
 #endif
 
-GLboolean wrapglIsBuffer(GLuint buffer) {return glIsBuffer(buffer);}
-GLboolean wrapglIsEnabled(GLenum cap) {return glIsEnabled(cap);}
-GLboolean wrapglIsFramebuffer(GLuint framebuffer) {return glIsFramebuffer(framebuffer);}
-//GLboolean wrapglIsQuery(GLuint qid) {return glIsQuery(qid);}
-GLboolean wrapglIsRenderbuffer(GLuint renderbuffer) {return glIsRenderbuffer(renderbuffer);}
-//GLboolean wrapglUnmapBuffer(GLenum target) {return glUnmapBuffer(target);}
-GLenum wrapglCheckFramebufferStatus(GLenum target) {return glCheckFramebufferStatus(target);}
-GLenum wrapglGetError(void) {return glGetError();}
-GLuint wrapglCreateProgram(void) {return glCreateProgram();}
-GLuint wrapglCreateShader(GLenum shaderType) {return glCreateShader(shaderType);}
-//GLuint wrapglGetHandle(GLenum pname) {return glGetHandle(pname);}
-GLint wrapglGetAttribLocation(GLuint programObj, const GLchar *name) {return glGetAttribLocation(programObj, name);}
-GLint wrapglGetUniformLocation(GLuint programObj, const GLchar *name) {return glGetUniformLocation(programObj, name);}
-//GLvoid* wrapglMapBuffer(GLenum target, GLenum access) {return glMapBuffer(target, access);}
-const GLubyte* wrapglGetString(GLenum name) {return glGetString(name);}
-void wrapglActiveStencilFace(GLenum e) {Con_Printf("glActiveStencilFace(e)\n");}
-void wrapglActiveTexture(GLenum e) {glActiveTexture(e);}
-void wrapglAlphaFunc(GLenum func, GLclampf ref) {Con_Printf("glAlphaFunc(func, ref)\n");}
-void wrapglArrayElement(GLint i) {Con_Printf("glArrayElement(i)\n");}
-void wrapglAttachShader(GLuint containerObj, GLuint obj) {glAttachShader(containerObj, obj);}
-//void wrapglBegin(GLenum mode) {Con_Printf("glBegin(mode)\n");}
-//void wrapglBeginQuery(GLenum target, GLuint qid) {glBeginQuery(target, qid);}
-void wrapglBindAttribLocation(GLuint programObj, GLuint index, const GLchar *name) {glBindAttribLocation(programObj, index, name);}
-void wrapglBindFragDataLocation(GLuint programObj, GLuint index, const GLchar *name) {glBindFragDataLocation(programObj, index, name);}
-void wrapglBindBuffer(GLenum target, GLuint buffer) {glBindBuffer(target, buffer);}
-void wrapglBindFramebuffer(GLenum target, GLuint framebuffer) {glBindFramebuffer(target, framebuffer);}
-void wrapglBindRenderbuffer(GLenum target, GLuint renderbuffer) {glBindRenderbuffer(target, renderbuffer);}
-void wrapglBindTexture(GLenum target, GLuint texture) {glBindTexture(target, texture);}
-void wrapglBlendEquation(GLenum e) {glBlendEquation(e);}
-void wrapglBlendFunc(GLenum sfactor, GLenum dfactor) {glBlendFunc(sfactor, dfactor);}
-void wrapglBufferData(GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage) {glBufferData(target, size, data, usage);}
-void wrapglBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data) {glBufferSubData(target, offset, size, data);}
-void wrapglClear(GLbitfield mask) {glClear(mask);}
-void wrapglClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha) {glClearColor(red, green, blue, alpha);}
-void wrapglClearDepth(GLclampd depth) {glClearDepthf((float)depth);}
-void wrapglClearStencil(GLint s) {glClearStencil(s);}
-void wrapglClientActiveTexture(GLenum target) {Con_Printf("glClientActiveTexture(target)\n");}
-void wrapglColor4f(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) {Con_Printf("glColor4f(red, green, blue, alpha)\n");}
-void wrapglColor4ub(GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha) {Con_Printf("glColor4ub(red, green, blue, alpha)\n");}
-void wrapglColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) {glColorMask(red, green, blue, alpha);}
-void wrapglColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {Con_Printf("glColorPointer(size, type, stride, ptr)\n");}
-void wrapglCompileShader(GLuint shaderObj) {glCompileShader(shaderObj);}
-void wrapglCompressedTexImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border,  GLsizei imageSize, const void *data) {glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data);}
-void wrapglCompressedTexImage3D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const void *data) {Con_Printf("glCompressedTexImage3D(target, level, internalformat, width, height, depth, border, imageSize, data)\n");}
-void wrapglCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *data) {glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize, data);}
-void wrapglCompressedTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void *data) {Con_Printf("glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data)\n");}
-void wrapglCopyTexImage2D(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border) {glCopyTexImage2D(target, level, internalformat, x, y, width, height, border);}
-void wrapglCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) {glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);}
-void wrapglCopyTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height) {Con_Printf("glCopyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height)\n");}
-void wrapglCullFace(GLenum mode) {glCullFace(mode);}
-void wrapglDeleteBuffers(GLsizei n, const GLuint *buffers) {glDeleteBuffers(n, buffers);}
-void wrapglDeleteFramebuffers(GLsizei n, const GLuint *framebuffers) {glDeleteFramebuffers(n, framebuffers);}
-void wrapglDeleteShader(GLuint obj) {glDeleteShader(obj);}
-void wrapglDeleteProgram(GLuint obj) {glDeleteProgram(obj);}
-//void wrapglDeleteQueries(GLsizei n, const GLuint *ids) {glDeleteQueries(n, ids);}
-void wrapglDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers) {glDeleteRenderbuffers(n, renderbuffers);}
-void wrapglDeleteTextures(GLsizei n, const GLuint *textures) {glDeleteTextures(n, textures);}
-void wrapglDepthFunc(GLenum func) {glDepthFunc(func);}
-void wrapglDepthMask(GLboolean flag) {glDepthMask(flag);}
-void wrapglDepthRange(GLclampd near_val, GLclampd far_val) {glDepthRangef((float)near_val, (float)far_val);}
-void wrapglDetachShader(GLuint containerObj, GLuint attachedObj) {glDetachShader(containerObj, attachedObj);}
-void wrapglDisable(GLenum cap) {glDisable(cap);}
-void wrapglDisableClientState(GLenum cap) {Con_Printf("glDisableClientState(cap)\n");}
-void wrapglDisableVertexAttribArray(GLuint index) {glDisableVertexAttribArray(index);}
-void wrapglDrawArrays(GLenum mode, GLint first, GLsizei count) {glDrawArrays(mode, first, count);}
-void wrapglDrawBuffer(GLenum mode) {Con_Printf("glDrawBuffer(mode)\n");}
-void wrapglDrawBuffers(GLsizei n, const GLenum *bufs) {Con_Printf("glDrawBuffers(n, bufs)\n");}
-void wrapglDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices) {glDrawElements(mode, count, type, indices);}
-//void wrapglDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices) {glDrawRangeElements(mode, start, end, count, type, indices);}
-//void wrapglDrawRangeElementsEXT(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices) {glDrawRangeElements(mode, start, end, count, type, indices);}
-void wrapglEnable(GLenum cap) {glEnable(cap);}
-void wrapglEnableClientState(GLenum cap) {Con_Printf("glEnableClientState(cap)\n");}
-void wrapglEnableVertexAttribArray(GLuint index) {glEnableVertexAttribArray(index);}
-//void wrapglEnd(void) {Con_Printf("glEnd()\n");}
-//void wrapglEndQuery(GLenum target) {glEndQuery(target);}
-void wrapglFinish(void) {glFinish();}
-void wrapglFlush(void) {glFlush();}
-void wrapglFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer) {glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);}
-void wrapglFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) {glFramebufferTexture2D(target, attachment, textarget, texture, level);}
-void wrapglFramebufferTexture3D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset) {Con_Printf("glFramebufferTexture3D()\n");}
-void wrapglGenBuffers(GLsizei n, GLuint *buffers) {glGenBuffers(n, buffers);}
-void wrapglGenFramebuffers(GLsizei n, GLuint *framebuffers) {glGenFramebuffers(n, framebuffers);}
-//void wrapglGenQueries(GLsizei n, GLuint *ids) {glGenQueries(n, ids);}
-void wrapglGenRenderbuffers(GLsizei n, GLuint *renderbuffers) {glGenRenderbuffers(n, renderbuffers);}
-void wrapglGenTextures(GLsizei n, GLuint *textures) {glGenTextures(n, textures);}
-void wrapglGenerateMipmap(GLenum target) {glGenerateMipmap(target);}
-void wrapglGetActiveAttrib(GLuint programObj, GLuint index, GLsizei maxLength, GLsizei *length, GLint *size, GLenum *type, GLchar *name) {glGetActiveAttrib(programObj, index, maxLength, length, size, type, name);}
-void wrapglGetActiveUniform(GLuint programObj, GLuint index, GLsizei maxLength, GLsizei *length, GLint *size, GLenum *type, GLchar *name) {glGetActiveUniform(programObj, index, maxLength, length, size, type, name);}
-void wrapglGetAttachedShaders(GLuint containerObj, GLsizei maxCount, GLsizei *count, GLuint *obj) {glGetAttachedShaders(containerObj, maxCount, count, obj);}
-void wrapglGetBooleanv(GLenum pname, GLboolean *params) {glGetBooleanv(pname, params);}
-void wrapglGetCompressedTexImage(GLenum target, GLint lod, void *img) {Con_Printf("glGetCompressedTexImage(target, lod, img)\n");}
-void wrapglGetDoublev(GLenum pname, GLdouble *params) {Con_Printf("glGetDoublev(pname, params)\n");}
-void wrapglGetFloatv(GLenum pname, GLfloat *params) {glGetFloatv(pname, params);}
-void wrapglGetFramebufferAttachmentParameteriv(GLenum target, GLenum attachment, GLenum pname, GLint *params) {glGetFramebufferAttachmentParameteriv(target, attachment, pname, params);}
-void wrapglGetShaderInfoLog(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *infoLog) {glGetShaderInfoLog(obj, maxLength, length, infoLog);}
-void wrapglGetProgramInfoLog(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *infoLog) {glGetProgramInfoLog(obj, maxLength, length, infoLog);}
-void wrapglGetIntegerv(GLenum pname, GLint *params) {glGetIntegerv(pname, params);}
-void wrapglGetShaderiv(GLuint obj, GLenum pname, GLint *params) {glGetShaderiv(obj, pname, params);}
-void wrapglGetProgramiv(GLuint obj, GLenum pname, GLint *params) {glGetProgramiv(obj, pname, params);}
-//void wrapglGetQueryObjectiv(GLuint qid, GLenum pname, GLint *params) {glGetQueryObjectiv(qid, pname, params);}
-//void wrapglGetQueryObjectuiv(GLuint qid, GLenum pname, GLuint *params) {glGetQueryObjectuiv(qid, pname, params);}
-//void wrapglGetQueryiv(GLenum target, GLenum pname, GLint *params) {glGetQueryiv(target, pname, params);}
-void wrapglGetRenderbufferParameteriv(GLenum target, GLenum pname, GLint *params) {glGetRenderbufferParameteriv(target, pname, params);}
-void wrapglGetShaderSource(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *source) {glGetShaderSource(obj, maxLength, length, source);}
-void wrapglGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels) {Con_Printf("glGetTexImage(target, level, format, type, pixels)\n");}
-void wrapglGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat *params) {Con_Printf("glGetTexLevelParameterfv(target, level, pname, params)\n");}
-void wrapglGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *params) {Con_Printf("glGetTexLevelParameteriv(target, level, pname, params)\n");}
-void wrapglGetTexParameterfv(GLenum target, GLenum pname, GLfloat *params) {glGetTexParameterfv(target, pname, params);}
-void wrapglGetTexParameteriv(GLenum target, GLenum pname, GLint *params) {glGetTexParameteriv(target, pname, params);}
-void wrapglGetUniformfv(GLuint programObj, GLint location, GLfloat *params) {glGetUniformfv(programObj, location, params);}
-void wrapglGetUniformiv(GLuint programObj, GLint location, GLint *params) {glGetUniformiv(programObj, location, params);}
-void wrapglHint(GLenum target, GLenum mode) {glHint(target, mode);}
-void wrapglLineWidth(GLfloat width) {glLineWidth(width);}
-void wrapglLinkProgram(GLuint programObj) {glLinkProgram(programObj);}
-void wrapglLoadIdentity(void) {Con_Printf("glLoadIdentity()\n");}
-void wrapglLoadMatrixf(const GLfloat *m) {Con_Printf("glLoadMatrixf(m)\n");}
-void wrapglMatrixMode(GLenum mode) {Con_Printf("glMatrixMode(mode)\n");}
-void wrapglMultiTexCoord1f(GLenum target, GLfloat s) {Con_Printf("glMultiTexCoord1f(target, s)\n");}
-void wrapglMultiTexCoord2f(GLenum target, GLfloat s, GLfloat t) {Con_Printf("glMultiTexCoord2f(target, s, t)\n");}
-void wrapglMultiTexCoord3f(GLenum target, GLfloat s, GLfloat t, GLfloat r) {Con_Printf("glMultiTexCoord3f(target, s, t, r)\n");}
-void wrapglMultiTexCoord4f(GLenum target, GLfloat s, GLfloat t, GLfloat r, GLfloat q) {Con_Printf("glMultiTexCoord4f(target, s, t, r, q)\n");}
-void wrapglNormalPointer(GLenum type, GLsizei stride, const GLvoid *ptr) {Con_Printf("glNormalPointer(type, stride, ptr)\n");}
-void wrapglPixelStorei(GLenum pname, GLint param) {glPixelStorei(pname, param);}
-void wrapglPointSize(GLfloat size) {Con_Printf("glPointSize(size)\n");}
-//void wrapglPolygonMode(GLenum face, GLenum mode) {Con_Printf("glPolygonMode(face, mode)\n");}
-void wrapglPolygonOffset(GLfloat factor, GLfloat units) {glPolygonOffset(factor, units);}
-void wrapglPolygonStipple(const GLubyte *mask) {Con_Printf("glPolygonStipple(mask)\n");}
-void wrapglReadBuffer(GLenum mode) {Con_Printf("glReadBuffer(mode)\n");}
-void wrapglReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels) {glReadPixels(x, y, width, height, format, type, pixels);}
-void wrapglRenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height) {glRenderbufferStorage(target, internalformat, width, height);}
-void wrapglScissor(GLint x, GLint y, GLsizei width, GLsizei height) {glScissor(x, y, width, height);}
-void wrapglShaderSource(GLuint shaderObj, GLsizei count, const GLchar **string, const GLint *length) {glShaderSource(shaderObj, count, string, length);}
-void wrapglStencilFunc(GLenum func, GLint ref, GLuint mask) {glStencilFunc(func, ref, mask);}
-void wrapglStencilFuncSeparate(GLenum func1, GLenum func2, GLint ref, GLuint mask) {Con_Printf("glStencilFuncSeparate(func1, func2, ref, mask)\n");}
-void wrapglStencilMask(GLuint mask) {glStencilMask(mask);}
-void wrapglStencilOp(GLenum fail, GLenum zfail, GLenum zpass) {glStencilOp(fail, zfail, zpass);}
-void wrapglStencilOpSeparate(GLenum e1, GLenum e2, GLenum e3, GLenum e4) {Con_Printf("glStencilOpSeparate(e1, e2, e3, e4)\n");}
-void wrapglTexCoord1f(GLfloat s) {Con_Printf("glTexCoord1f(s)\n");}
-void wrapglTexCoord2f(GLfloat s, GLfloat t) {Con_Printf("glTexCoord2f(s, t)\n");}
-void wrapglTexCoord3f(GLfloat s, GLfloat t, GLfloat r) {Con_Printf("glTexCoord3f(s, t, r)\n");}
-void wrapglTexCoord4f(GLfloat s, GLfloat t, GLfloat r, GLfloat q) {Con_Printf("glTexCoord4f(s, t, r, q)\n");}
-void wrapglTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {Con_Printf("glTexCoordPointer(size, type, stride, ptr)\n");}
-void wrapglTexEnvf(GLenum target, GLenum pname, GLfloat param) {Con_Printf("glTexEnvf(target, pname, param)\n");}
-void wrapglTexEnvfv(GLenum target, GLenum pname, const GLfloat *params) {Con_Printf("glTexEnvfv(target, pname, params)\n");}
-void wrapglTexEnvi(GLenum target, GLenum pname, GLint param) {Con_Printf("glTexEnvi(target, pname, param)\n");}
-void wrapglTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels) {glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);}
-void wrapglTexImage3D(GLenum target, GLint level, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels) {Con_Printf("glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels)\n");}
-void wrapglTexParameterf(GLenum target, GLenum pname, GLfloat param) {glTexParameterf(target, pname, param);}
-void wrapglTexParameterfv(GLenum target, GLenum pname, GLfloat *params) {glTexParameterfv(target, pname, params);}
-void wrapglTexParameteri(GLenum target, GLenum pname, GLint param) {glTexParameteri(target, pname, param);}
-void wrapglTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels) {glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);}
-void wrapglTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels) {Con_Printf("glTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels)\n");}
-void wrapglUniform1f(GLint location, GLfloat v0) {glUniform1f(location, v0);}
-void wrapglUniform1fv(GLint location, GLsizei count, const GLfloat *value) {glUniform1fv(location, count, value);}
-void wrapglUniform1i(GLint location, GLint v0) {glUniform1i(location, v0);}
-void wrapglUniform1iv(GLint location, GLsizei count, const GLint *value) {glUniform1iv(location, count, value);}
-void wrapglUniform2f(GLint location, GLfloat v0, GLfloat v1) {glUniform2f(location, v0, v1);}
-void wrapglUniform2fv(GLint location, GLsizei count, const GLfloat *value) {glUniform2fv(location, count, value);}
-void wrapglUniform2i(GLint location, GLint v0, GLint v1) {glUniform2i(location, v0, v1);}
-void wrapglUniform2iv(GLint location, GLsizei count, const GLint *value) {glUniform2iv(location, count, value);}
-void wrapglUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {glUniform3f(location, v0, v1, v2);}
-void wrapglUniform3fv(GLint location, GLsizei count, const GLfloat *value) {glUniform3fv(location, count, value);}
-void wrapglUniform3i(GLint location, GLint v0, GLint v1, GLint v2) {glUniform3i(location, v0, v1, v2);}
-void wrapglUniform3iv(GLint location, GLsizei count, const GLint *value) {glUniform3iv(location, count, value);}
-void wrapglUniform4f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {glUniform4f(location, v0, v1, v2, v3);}
-void wrapglUniform4fv(GLint location, GLsizei count, const GLfloat *value) {glUniform4fv(location, count, value);}
-void wrapglUniform4i(GLint location, GLint v0, GLint v1, GLint v2, GLint v3) {glUniform4i(location, v0, v1, v2, v3);}
-void wrapglUniform4iv(GLint location, GLsizei count, const GLint *value) {glUniform4iv(location, count, value);}
-void wrapglUniformMatrix2fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {glUniformMatrix2fv(location, count, transpose, value);}
-void wrapglUniformMatrix3fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {glUniformMatrix3fv(location, count, transpose, value);}
-void wrapglUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {glUniformMatrix4fv(location, count, transpose, value);}
-void wrapglUseProgram(GLuint programObj) {glUseProgram(programObj);}
-void wrapglValidateProgram(GLuint programObj) {glValidateProgram(programObj);}
-void wrapglVertex2f(GLfloat x, GLfloat y) {Con_Printf("glVertex2f(x, y)\n");}
-void wrapglVertex3f(GLfloat x, GLfloat y, GLfloat z) {Con_Printf("glVertex3f(x, y, z)\n");}
-void wrapglVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w) {Con_Printf("glVertex4f(x, y, z, w)\n");}
-void wrapglVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer) {glVertexAttribPointer(index, size, type, normalized, stride, pointer);}
-void wrapglVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {Con_Printf("glVertexPointer(size, type, stride, ptr)\n");}
-void wrapglViewport(GLint x, GLint y, GLsizei width, GLsizei height) {glViewport(x, y, width, height);}
-void wrapglVertexAttrib1f(GLuint index, GLfloat v0) {glVertexAttrib1f(index, v0);}
-//void wrapglVertexAttrib1s(GLuint index, GLshort v0) {glVertexAttrib1s(index, v0);}
-//void wrapglVertexAttrib1d(GLuint index, GLdouble v0) {glVertexAttrib1d(index, v0);}
-void wrapglVertexAttrib2f(GLuint index, GLfloat v0, GLfloat v1) {glVertexAttrib2f(index, v0, v1);}
-//void wrapglVertexAttrib2s(GLuint index, GLshort v0, GLshort v1) {glVertexAttrib2s(index, v0, v1);}
-//void wrapglVertexAttrib2d(GLuint index, GLdouble v0, GLdouble v1) {glVertexAttrib2d(index, v0, v1);}
-void wrapglVertexAttrib3f(GLuint index, GLfloat v0, GLfloat v1, GLfloat v2) {glVertexAttrib3f(index, v0, v1, v2);}
-//void wrapglVertexAttrib3s(GLuint index, GLshort v0, GLshort v1, GLshort v2) {glVertexAttrib3s(index, v0, v1, v2);}
-//void wrapglVertexAttrib3d(GLuint index, GLdouble v0, GLdouble v1, GLdouble v2) {glVertexAttrib3d(index, v0, v1, v2);}
-void wrapglVertexAttrib4f(GLuint index, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {glVertexAttrib4f(index, v0, v1, v2, v3);}
-//void wrapglVertexAttrib4s(GLuint index, GLshort v0, GLshort v1, GLshort v2, GLshort v3) {glVertexAttrib4s(index, v0, v1, v2, v3);}
-//void wrapglVertexAttrib4d(GLuint index, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3) {glVertexAttrib4d(index, v0, v1, v2, v3);}
-//void wrapglVertexAttrib4Nub(GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w) {glVertexAttrib4Nub(index, x, y, z, w);}
-void wrapglVertexAttrib1fv(GLuint index, const GLfloat *v) {glVertexAttrib1fv(index, v);}
-//void wrapglVertexAttrib1sv(GLuint index, const GLshort *v) {glVertexAttrib1sv(index, v);}
-//void wrapglVertexAttrib1dv(GLuint index, const GLdouble *v) {glVertexAttrib1dv(index, v);}
-void wrapglVertexAttrib2fv(GLuint index, const GLfloat *v) {glVertexAttrib2fv(index, v);}
-//void wrapglVertexAttrib2sv(GLuint index, const GLshort *v) {glVertexAttrib2sv(index, v);}
-//void wrapglVertexAttrib2dv(GLuint index, const GLdouble *v) {glVertexAttrib2dv(index, v);}
-void wrapglVertexAttrib3fv(GLuint index, const GLfloat *v) {glVertexAttrib3fv(index, v);}
-//void wrapglVertexAttrib3sv(GLuint index, const GLshort *v) {glVertexAttrib3sv(index, v);}
-//void wrapglVertexAttrib3dv(GLuint index, const GLdouble *v) {glVertexAttrib3dv(index, v);}
-void wrapglVertexAttrib4fv(GLuint index, const GLfloat *v) {glVertexAttrib4fv(index, v);}
-//void wrapglVertexAttrib4sv(GLuint index, const GLshort *v) {glVertexAttrib4sv(index, v);}
-//void wrapglVertexAttrib4dv(GLuint index, const GLdouble *v) {glVertexAttrib4dv(index, v);}
-//void wrapglVertexAttrib4iv(GLuint index, const GLint *v) {glVertexAttrib4iv(index, v);}
-//void wrapglVertexAttrib4bv(GLuint index, const GLbyte *v) {glVertexAttrib4bv(index, v);}
-//void wrapglVertexAttrib4ubv(GLuint index, const GLubyte *v) {glVertexAttrib4ubv(index, v);}
-//void wrapglVertexAttrib4usv(GLuint index, const GLushort *v) {glVertexAttrib4usv(index, GLushort v);}
-//void wrapglVertexAttrib4uiv(GLuint index, const GLuint *v) {glVertexAttrib4uiv(index, v);}
-//void wrapglVertexAttrib4Nbv(GLuint index, const GLbyte *v) {glVertexAttrib4Nbv(index, v);}
-//void wrapglVertexAttrib4Nsv(GLuint index, const GLshort *v) {glVertexAttrib4Nsv(index, v);}
-//void wrapglVertexAttrib4Niv(GLuint index, const GLint *v) {glVertexAttrib4Niv(index, v);}
-//void wrapglVertexAttrib4Nubv(GLuint index, const GLubyte *v) {glVertexAttrib4Nubv(index, v);}
-//void wrapglVertexAttrib4Nusv(GLuint index, const GLushort *v) {glVertexAttrib4Nusv(index, GLushort v);}
-//void wrapglVertexAttrib4Nuiv(GLuint index, const GLuint *v) {glVertexAttrib4Nuiv(index, v);}
-//void wrapglGetVertexAttribdv(GLuint index, GLenum pname, GLdouble *params) {glGetVertexAttribdv(index, pname, params);}
-void wrapglGetVertexAttribfv(GLuint index, GLenum pname, GLfloat *params) {glGetVertexAttribfv(index, pname, params);}
-void wrapglGetVertexAttribiv(GLuint index, GLenum pname, GLint *params) {glGetVertexAttribiv(index, pname, params);}
-void wrapglGetVertexAttribPointerv(GLuint index, GLenum pname, GLvoid **pointer) {glGetVertexAttribPointerv(index, pname, pointer);}
+//#define PRECALL //Con_Printf("GLCALL %s:%i\n", __FILE__, __LINE__)
+#define PRECALL
+#define POSTCALL
+GLboolean wrapglIsBuffer(GLuint buffer) {PRECALL;return glIsBuffer(buffer);POSTCALL;}
+GLboolean wrapglIsEnabled(GLenum cap) {PRECALL;return glIsEnabled(cap);POSTCALL;}
+GLboolean wrapglIsFramebuffer(GLuint framebuffer) {PRECALL;return glIsFramebuffer(framebuffer);POSTCALL;}
+//GLboolean wrapglIsQuery(GLuint qid) {PRECALL;return glIsQuery(qid);POSTCALL;}
+GLboolean wrapglIsRenderbuffer(GLuint renderbuffer) {PRECALL;return glIsRenderbuffer(renderbuffer);POSTCALL;}
+//GLboolean wrapglUnmapBuffer(GLenum target) {PRECALL;return glUnmapBuffer(target);POSTCALL;}
+GLenum wrapglCheckFramebufferStatus(GLenum target) {PRECALL;return glCheckFramebufferStatus(target);POSTCALL;}
+GLenum wrapglGetError(void) {PRECALL;return glGetError();POSTCALL;}
+GLuint wrapglCreateProgram(void) {PRECALL;return glCreateProgram();POSTCALL;}
+GLuint wrapglCreateShader(GLenum shaderType) {PRECALL;return glCreateShader(shaderType);POSTCALL;}
+//GLuint wrapglGetHandle(GLenum pname) {PRECALL;return glGetHandle(pname);POSTCALL;}
+GLint wrapglGetAttribLocation(GLuint programObj, const GLchar *name) {PRECALL;return glGetAttribLocation(programObj, name);POSTCALL;}
+GLint wrapglGetUniformLocation(GLuint programObj, const GLchar *name) {PRECALL;return glGetUniformLocation(programObj, name);POSTCALL;}
+//GLvoid* wrapglMapBuffer(GLenum target, GLenum access) {PRECALL;return glMapBuffer(target, access);POSTCALL;}
+const GLubyte* wrapglGetString(GLenum name) {PRECALL;return (const GLubyte*)glGetString(name);POSTCALL;}
+void wrapglActiveStencilFace(GLenum e) {PRECALL;Con_Printf("glActiveStencilFace(e)\n");POSTCALL;}
+void wrapglActiveTexture(GLenum e) {PRECALL;glActiveTexture(e);POSTCALL;}
+void wrapglAlphaFunc(GLenum func, GLclampf ref) {PRECALL;Con_Printf("glAlphaFunc(func, ref)\n");POSTCALL;}
+void wrapglArrayElement(GLint i) {PRECALL;Con_Printf("glArrayElement(i)\n");POSTCALL;}
+void wrapglAttachShader(GLuint containerObj, GLuint obj) {PRECALL;glAttachShader(containerObj, obj);POSTCALL;}
+//void wrapglBegin(GLenum mode) {PRECALL;Con_Printf("glBegin(mode)\n");POSTCALL;}
+//void wrapglBeginQuery(GLenum target, GLuint qid) {PRECALL;glBeginQuery(target, qid);POSTCALL;}
+void wrapglBindAttribLocation(GLuint programObj, GLuint index, const GLchar *name) {PRECALL;glBindAttribLocation(programObj, index, name);POSTCALL;}
+//void wrapglBindFragDataLocation(GLuint programObj, GLuint index, const GLchar *name) {PRECALL;glBindFragDataLocation(programObj, index, name);POSTCALL;}
+void wrapglBindBuffer(GLenum target, GLuint buffer) {PRECALL;glBindBuffer(target, buffer);POSTCALL;}
+void wrapglBindFramebuffer(GLenum target, GLuint framebuffer) {PRECALL;glBindFramebuffer(target, framebuffer);POSTCALL;}
+void wrapglBindRenderbuffer(GLenum target, GLuint renderbuffer) {PRECALL;glBindRenderbuffer(target, renderbuffer);POSTCALL;}
+void wrapglBindTexture(GLenum target, GLuint texture) {PRECALL;glBindTexture(target, texture);POSTCALL;}
+void wrapglBlendEquation(GLenum e) {PRECALL;glBlendEquation(e);POSTCALL;}
+void wrapglBlendFunc(GLenum sfactor, GLenum dfactor) {PRECALL;glBlendFunc(sfactor, dfactor);POSTCALL;}
+void wrapglBufferData(GLenum target, GLsizeiptrARB size, const GLvoid *data, GLenum usage) {PRECALL;glBufferData(target, size, data, usage);POSTCALL;}
+void wrapglBufferSubData(GLenum target, GLintptrARB offset, GLsizeiptrARB size, const GLvoid *data) {PRECALL;glBufferSubData(target, offset, size, data);POSTCALL;}
+void wrapglClear(GLbitfield mask) {PRECALL;glClear(mask);POSTCALL;}
+void wrapglClearColor(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha) {PRECALL;glClearColor(red, green, blue, alpha);POSTCALL;}
+void wrapglClearDepth(GLclampd depth) {PRECALL;/*Con_Printf("glClearDepth(%f)\n", depth);glClearDepthf((float)depth);*/POSTCALL;}
+void wrapglClearStencil(GLint s) {PRECALL;glClearStencil(s);POSTCALL;}
+void wrapglClientActiveTexture(GLenum target) {PRECALL;Con_Printf("glClientActiveTexture(target)\n");POSTCALL;}
+void wrapglColor4f(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) {PRECALL;Con_Printf("glColor4f(red, green, blue, alpha)\n");POSTCALL;}
+void wrapglColor4ub(GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha) {PRECALL;Con_Printf("glColor4ub(red, green, blue, alpha)\n");POSTCALL;}
+void wrapglColorMask(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) {PRECALL;glColorMask(red, green, blue, alpha);POSTCALL;}
+void wrapglColorPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {PRECALL;Con_Printf("glColorPointer(size, type, stride, ptr)\n");POSTCALL;}
+void wrapglCompileShader(GLuint shaderObj) {PRECALL;glCompileShader(shaderObj);POSTCALL;}
+void wrapglCompressedTexImage2D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border,  GLsizei imageSize, const void *data) {PRECALL;glCompressedTexImage2D(target, level, internalformat, width, height, border, imageSize, data);POSTCALL;}
+void wrapglCompressedTexImage3D(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLsizei imageSize, const void *data) {PRECALL;Con_Printf("glCompressedTexImage3D(target, level, internalformat, width, height, depth, border, imageSize, data)\n");POSTCALL;}
+void wrapglCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *data) {PRECALL;glCompressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, imageSize, data);POSTCALL;}
+void wrapglCompressedTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void *data) {PRECALL;Con_Printf("glCompressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data)\n");POSTCALL;}
+void wrapglCopyTexImage2D(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border) {PRECALL;glCopyTexImage2D(target, level, internalformat, x, y, width, height, border);POSTCALL;}
+void wrapglCopyTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) {PRECALL;glCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);POSTCALL;}
+void wrapglCopyTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height) {PRECALL;Con_Printf("glCopyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height)\n");POSTCALL;}
+void wrapglCullFace(GLenum mode) {PRECALL;glCullFace(mode);POSTCALL;}
+void wrapglDeleteBuffers(GLsizei n, const GLuint *buffers) {PRECALL;glDeleteBuffers(n, buffers);POSTCALL;}
+void wrapglDeleteFramebuffers(GLsizei n, const GLuint *framebuffers) {PRECALL;glDeleteFramebuffers(n, framebuffers);POSTCALL;}
+void wrapglDeleteShader(GLuint obj) {PRECALL;glDeleteShader(obj);POSTCALL;}
+void wrapglDeleteProgram(GLuint obj) {PRECALL;glDeleteProgram(obj);POSTCALL;}
+//void wrapglDeleteQueries(GLsizei n, const GLuint *ids) {PRECALL;glDeleteQueries(n, ids);POSTCALL;}
+void wrapglDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers) {PRECALL;glDeleteRenderbuffers(n, renderbuffers);POSTCALL;}
+void wrapglDeleteTextures(GLsizei n, const GLuint *textures) {PRECALL;glDeleteTextures(n, textures);POSTCALL;}
+void wrapglDepthFunc(GLenum func) {PRECALL;glDepthFunc(func);POSTCALL;}
+void wrapglDepthMask(GLboolean flag) {PRECALL;glDepthMask(flag);POSTCALL;}
+//void wrapglDepthRange(GLclampd near_val, GLclampd far_val) {PRECALL;glDepthRangef((float)near_val, (float)far_val);POSTCALL;}
+void wrapglDepthRangef(GLclampf near_val, GLclampf far_val) {PRECALL;glDepthRangef(near_val, far_val);POSTCALL;}
+void wrapglDetachShader(GLuint containerObj, GLuint attachedObj) {PRECALL;glDetachShader(containerObj, attachedObj);POSTCALL;}
+void wrapglDisable(GLenum cap) {PRECALL;glDisable(cap);POSTCALL;}
+void wrapglDisableClientState(GLenum cap) {PRECALL;Con_Printf("glDisableClientState(cap)\n");POSTCALL;}
+void wrapglDisableVertexAttribArray(GLuint index) {PRECALL;glDisableVertexAttribArray(index);POSTCALL;}
+void wrapglDrawArrays(GLenum mode, GLint first, GLsizei count) {PRECALL;glDrawArrays(mode, first, count);POSTCALL;}
+void wrapglDrawBuffer(GLenum mode) {PRECALL;Con_Printf("glDrawBuffer(mode)\n");POSTCALL;}
+void wrapglDrawBuffers(GLsizei n, const GLenum *bufs) {PRECALL;Con_Printf("glDrawBuffers(n, bufs)\n");POSTCALL;}
+void wrapglDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices) {PRECALL;glDrawElements(mode, count, type, indices);POSTCALL;}
+//void wrapglDrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices) {PRECALL;glDrawRangeElements(mode, start, end, count, type, indices);POSTCALL;}
+//void wrapglDrawRangeElementsEXT(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const GLvoid *indices) {PRECALL;glDrawRangeElements(mode, start, end, count, type, indices);POSTCALL;}
+void wrapglEnable(GLenum cap) {PRECALL;glEnable(cap);POSTCALL;}
+void wrapglEnableClientState(GLenum cap) {PRECALL;Con_Printf("glEnableClientState(cap)\n");POSTCALL;}
+void wrapglEnableVertexAttribArray(GLuint index) {PRECALL;glEnableVertexAttribArray(index);POSTCALL;}
+//void wrapglEnd(void) {PRECALL;Con_Printf("glEnd()\n");POSTCALL;}
+//void wrapglEndQuery(GLenum target) {PRECALL;glEndQuery(target);POSTCALL;}
+void wrapglFinish(void) {PRECALL;glFinish();POSTCALL;}
+void wrapglFlush(void) {PRECALL;glFlush();POSTCALL;}
+void wrapglFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer) {PRECALL;glFramebufferRenderbuffer(target, attachment, renderbuffertarget, renderbuffer);POSTCALL;}
+void wrapglFramebufferTexture2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level) {PRECALL;glFramebufferTexture2D(target, attachment, textarget, texture, level);POSTCALL;}
+void wrapglFramebufferTexture3D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset) {PRECALL;Con_Printf("glFramebufferTexture3D()\n");POSTCALL;}
+void wrapglGenBuffers(GLsizei n, GLuint *buffers) {PRECALL;glGenBuffers(n, buffers);POSTCALL;}
+void wrapglGenFramebuffers(GLsizei n, GLuint *framebuffers) {PRECALL;glGenFramebuffers(n, framebuffers);POSTCALL;}
+//void wrapglGenQueries(GLsizei n, GLuint *ids) {PRECALL;glGenQueries(n, ids);POSTCALL;}
+void wrapglGenRenderbuffers(GLsizei n, GLuint *renderbuffers) {PRECALL;glGenRenderbuffers(n, renderbuffers);POSTCALL;}
+void wrapglGenTextures(GLsizei n, GLuint *textures) {PRECALL;glGenTextures(n, textures);POSTCALL;}
+void wrapglGenerateMipmap(GLenum target) {PRECALL;glGenerateMipmap(target);POSTCALL;}
+void wrapglGetActiveAttrib(GLuint programObj, GLuint index, GLsizei maxLength, GLsizei *length, GLint *size, GLenum *type, GLchar *name) {PRECALL;glGetActiveAttrib(programObj, index, maxLength, length, size, type, name);POSTCALL;}
+void wrapglGetActiveUniform(GLuint programObj, GLuint index, GLsizei maxLength, GLsizei *length, GLint *size, GLenum *type, GLchar *name) {PRECALL;glGetActiveUniform(programObj, index, maxLength, length, size, type, name);POSTCALL;}
+void wrapglGetAttachedShaders(GLuint containerObj, GLsizei maxCount, GLsizei *count, GLuint *obj) {PRECALL;glGetAttachedShaders(containerObj, maxCount, count, obj);POSTCALL;}
+void wrapglGetBooleanv(GLenum pname, GLboolean *params) {PRECALL;glGetBooleanv(pname, params);POSTCALL;}
+void wrapglGetCompressedTexImage(GLenum target, GLint lod, void *img) {PRECALL;Con_Printf("glGetCompressedTexImage(target, lod, img)\n");POSTCALL;}
+void wrapglGetDoublev(GLenum pname, GLdouble *params) {PRECALL;Con_Printf("glGetDoublev(pname, params)\n");POSTCALL;}
+void wrapglGetFloatv(GLenum pname, GLfloat *params) {PRECALL;glGetFloatv(pname, params);POSTCALL;}
+void wrapglGetFramebufferAttachmentParameteriv(GLenum target, GLenum attachment, GLenum pname, GLint *params) {PRECALL;glGetFramebufferAttachmentParameteriv(target, attachment, pname, params);POSTCALL;}
+void wrapglGetShaderInfoLog(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *infoLog) {PRECALL;glGetShaderInfoLog(obj, maxLength, length, infoLog);POSTCALL;}
+void wrapglGetProgramInfoLog(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *infoLog) {PRECALL;glGetProgramInfoLog(obj, maxLength, length, infoLog);POSTCALL;}
+void wrapglGetIntegerv(GLenum pname, GLint *params) {PRECALL;glGetIntegerv(pname, params);POSTCALL;}
+void wrapglGetShaderiv(GLuint obj, GLenum pname, GLint *params) {PRECALL;glGetShaderiv(obj, pname, params);POSTCALL;}
+void wrapglGetProgramiv(GLuint obj, GLenum pname, GLint *params) {PRECALL;glGetProgramiv(obj, pname, params);POSTCALL;}
+//void wrapglGetQueryObjectiv(GLuint qid, GLenum pname, GLint *params) {PRECALL;glGetQueryObjectiv(qid, pname, params);POSTCALL;}
+//void wrapglGetQueryObjectuiv(GLuint qid, GLenum pname, GLuint *params) {PRECALL;glGetQueryObjectuiv(qid, pname, params);POSTCALL;}
+//void wrapglGetQueryiv(GLenum target, GLenum pname, GLint *params) {PRECALL;glGetQueryiv(target, pname, params);POSTCALL;}
+void wrapglGetRenderbufferParameteriv(GLenum target, GLenum pname, GLint *params) {PRECALL;glGetRenderbufferParameteriv(target, pname, params);POSTCALL;}
+void wrapglGetShaderSource(GLuint obj, GLsizei maxLength, GLsizei *length, GLchar *source) {PRECALL;glGetShaderSource(obj, maxLength, length, source);POSTCALL;}
+void wrapglGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels) {PRECALL;Con_Printf("glGetTexImage(target, level, format, type, pixels)\n");POSTCALL;}
+void wrapglGetTexLevelParameterfv(GLenum target, GLint level, GLenum pname, GLfloat *params) {PRECALL;Con_Printf("glGetTexLevelParameterfv(target, level, pname, params)\n");POSTCALL;}
+void wrapglGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *params) {PRECALL;Con_Printf("glGetTexLevelParameteriv(target, level, pname, params)\n");POSTCALL;}
+void wrapglGetTexParameterfv(GLenum target, GLenum pname, GLfloat *params) {PRECALL;glGetTexParameterfv(target, pname, params);POSTCALL;}
+void wrapglGetTexParameteriv(GLenum target, GLenum pname, GLint *params) {PRECALL;glGetTexParameteriv(target, pname, params);POSTCALL;}
+void wrapglGetUniformfv(GLuint programObj, GLint location, GLfloat *params) {PRECALL;glGetUniformfv(programObj, location, params);POSTCALL;}
+void wrapglGetUniformiv(GLuint programObj, GLint location, GLint *params) {PRECALL;glGetUniformiv(programObj, location, params);POSTCALL;}
+void wrapglHint(GLenum target, GLenum mode) {PRECALL;glHint(target, mode);POSTCALL;}
+void wrapglLineWidth(GLfloat width) {PRECALL;glLineWidth(width);POSTCALL;}
+void wrapglLinkProgram(GLuint programObj) {PRECALL;glLinkProgram(programObj);POSTCALL;}
+void wrapglLoadIdentity(void) {PRECALL;Con_Printf("glLoadIdentity()\n");POSTCALL;}
+void wrapglLoadMatrixf(const GLfloat *m) {PRECALL;Con_Printf("glLoadMatrixf(m)\n");POSTCALL;}
+void wrapglMatrixMode(GLenum mode) {PRECALL;Con_Printf("glMatrixMode(mode)\n");POSTCALL;}
+void wrapglMultiTexCoord1f(GLenum target, GLfloat s) {PRECALL;Con_Printf("glMultiTexCoord1f(target, s)\n");POSTCALL;}
+void wrapglMultiTexCoord2f(GLenum target, GLfloat s, GLfloat t) {PRECALL;Con_Printf("glMultiTexCoord2f(target, s, t)\n");POSTCALL;}
+void wrapglMultiTexCoord3f(GLenum target, GLfloat s, GLfloat t, GLfloat r) {PRECALL;Con_Printf("glMultiTexCoord3f(target, s, t, r)\n");POSTCALL;}
+void wrapglMultiTexCoord4f(GLenum target, GLfloat s, GLfloat t, GLfloat r, GLfloat q) {PRECALL;Con_Printf("glMultiTexCoord4f(target, s, t, r, q)\n");POSTCALL;}
+void wrapglNormalPointer(GLenum type, GLsizei stride, const GLvoid *ptr) {PRECALL;Con_Printf("glNormalPointer(type, stride, ptr)\n");POSTCALL;}
+void wrapglPixelStorei(GLenum pname, GLint param) {PRECALL;glPixelStorei(pname, param);POSTCALL;}
+void wrapglPointSize(GLfloat size) {PRECALL;Con_Printf("glPointSize(size)\n");POSTCALL;}
+//void wrapglPolygonMode(GLenum face, GLenum mode) {PRECALL;Con_Printf("glPolygonMode(face, mode)\n");POSTCALL;}
+void wrapglPolygonOffset(GLfloat factor, GLfloat units) {PRECALL;glPolygonOffset(factor, units);POSTCALL;}
+void wrapglPolygonStipple(const GLubyte *mask) {PRECALL;Con_Printf("glPolygonStipple(mask)\n");POSTCALL;}
+void wrapglReadBuffer(GLenum mode) {PRECALL;Con_Printf("glReadBuffer(mode)\n");POSTCALL;}
+void wrapglReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels) {PRECALL;glReadPixels(x, y, width, height, format, type, pixels);POSTCALL;}
+void wrapglRenderbufferStorage(GLenum target, GLenum internalformat, GLsizei width, GLsizei height) {PRECALL;glRenderbufferStorage(target, internalformat, width, height);POSTCALL;}
+void wrapglScissor(GLint x, GLint y, GLsizei width, GLsizei height) {PRECALL;glScissor(x, y, width, height);POSTCALL;}
+void wrapglShaderSource(GLuint shaderObj, GLsizei count, const GLchar **string, const GLint *length) {PRECALL;glShaderSource(shaderObj, count, string, length);POSTCALL;}
+void wrapglStencilFunc(GLenum func, GLint ref, GLuint mask) {PRECALL;glStencilFunc(func, ref, mask);POSTCALL;}
+void wrapglStencilFuncSeparate(GLenum func1, GLenum func2, GLint ref, GLuint mask) {PRECALL;Con_Printf("glStencilFuncSeparate(func1, func2, ref, mask)\n");POSTCALL;}
+void wrapglStencilMask(GLuint mask) {PRECALL;glStencilMask(mask);POSTCALL;}
+void wrapglStencilOp(GLenum fail, GLenum zfail, GLenum zpass) {PRECALL;glStencilOp(fail, zfail, zpass);POSTCALL;}
+void wrapglStencilOpSeparate(GLenum e1, GLenum e2, GLenum e3, GLenum e4) {PRECALL;Con_Printf("glStencilOpSeparate(e1, e2, e3, e4)\n");POSTCALL;}
+void wrapglTexCoord1f(GLfloat s) {PRECALL;Con_Printf("glTexCoord1f(s)\n");POSTCALL;}
+void wrapglTexCoord2f(GLfloat s, GLfloat t) {PRECALL;Con_Printf("glTexCoord2f(s, t)\n");POSTCALL;}
+void wrapglTexCoord3f(GLfloat s, GLfloat t, GLfloat r) {PRECALL;Con_Printf("glTexCoord3f(s, t, r)\n");POSTCALL;}
+void wrapglTexCoord4f(GLfloat s, GLfloat t, GLfloat r, GLfloat q) {PRECALL;Con_Printf("glTexCoord4f(s, t, r, q)\n");POSTCALL;}
+void wrapglTexCoordPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {PRECALL;Con_Printf("glTexCoordPointer(size, type, stride, ptr)\n");POSTCALL;}
+void wrapglTexEnvf(GLenum target, GLenum pname, GLfloat param) {PRECALL;Con_Printf("glTexEnvf(target, pname, param)\n");POSTCALL;}
+void wrapglTexEnvfv(GLenum target, GLenum pname, const GLfloat *params) {PRECALL;Con_Printf("glTexEnvfv(target, pname, params)\n");POSTCALL;}
+void wrapglTexEnvi(GLenum target, GLenum pname, GLint param) {PRECALL;Con_Printf("glTexEnvi(target, pname, param)\n");POSTCALL;}
+void wrapglTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels) {PRECALL;glTexImage2D(target, level, internalFormat, width, height, border, format, type, pixels);POSTCALL;}
+void wrapglTexImage3D(GLenum target, GLint level, GLenum internalFormat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const GLvoid *pixels) {PRECALL;Con_Printf("glTexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels)\n");POSTCALL;}
+void wrapglTexParameterf(GLenum target, GLenum pname, GLfloat param) {PRECALL;glTexParameterf(target, pname, param);POSTCALL;}
+void wrapglTexParameterfv(GLenum target, GLenum pname, GLfloat *params) {PRECALL;glTexParameterfv(target, pname, params);POSTCALL;}
+void wrapglTexParameteri(GLenum target, GLenum pname, GLint param) {PRECALL;glTexParameteri(target, pname, param);POSTCALL;}
+void wrapglTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels) {PRECALL;glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);POSTCALL;}
+void wrapglTexSubImage3D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const GLvoid *pixels) {PRECALL;Con_Printf("glTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels)\n");POSTCALL;}
+void wrapglUniform1f(GLint location, GLfloat v0) {PRECALL;glUniform1f(location, v0);POSTCALL;}
+void wrapglUniform1fv(GLint location, GLsizei count, const GLfloat *value) {PRECALL;glUniform1fv(location, count, value);POSTCALL;}
+void wrapglUniform1i(GLint location, GLint v0) {PRECALL;glUniform1i(location, v0);POSTCALL;}
+void wrapglUniform1iv(GLint location, GLsizei count, const GLint *value) {PRECALL;glUniform1iv(location, count, value);POSTCALL;}
+void wrapglUniform2f(GLint location, GLfloat v0, GLfloat v1) {PRECALL;glUniform2f(location, v0, v1);POSTCALL;}
+void wrapglUniform2fv(GLint location, GLsizei count, const GLfloat *value) {PRECALL;glUniform2fv(location, count, value);POSTCALL;}
+void wrapglUniform2i(GLint location, GLint v0, GLint v1) {PRECALL;glUniform2i(location, v0, v1);POSTCALL;}
+void wrapglUniform2iv(GLint location, GLsizei count, const GLint *value) {PRECALL;glUniform2iv(location, count, value);POSTCALL;}
+void wrapglUniform3f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {PRECALL;glUniform3f(location, v0, v1, v2);POSTCALL;}
+void wrapglUniform3fv(GLint location, GLsizei count, const GLfloat *value) {PRECALL;glUniform3fv(location, count, value);POSTCALL;}
+void wrapglUniform3i(GLint location, GLint v0, GLint v1, GLint v2) {PRECALL;glUniform3i(location, v0, v1, v2);POSTCALL;}
+void wrapglUniform3iv(GLint location, GLsizei count, const GLint *value) {PRECALL;glUniform3iv(location, count, value);POSTCALL;}
+void wrapglUniform4f(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {PRECALL;glUniform4f(location, v0, v1, v2, v3);POSTCALL;}
+void wrapglUniform4fv(GLint location, GLsizei count, const GLfloat *value) {PRECALL;glUniform4fv(location, count, value);POSTCALL;}
+void wrapglUniform4i(GLint location, GLint v0, GLint v1, GLint v2, GLint v3) {PRECALL;glUniform4i(location, v0, v1, v2, v3);POSTCALL;}
+void wrapglUniform4iv(GLint location, GLsizei count, const GLint *value) {PRECALL;glUniform4iv(location, count, value);POSTCALL;}
+void wrapglUniformMatrix2fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {PRECALL;glUniformMatrix2fv(location, count, transpose, value);POSTCALL;}
+void wrapglUniformMatrix3fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {PRECALL;glUniformMatrix3fv(location, count, transpose, value);POSTCALL;}
+void wrapglUniformMatrix4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {PRECALL;glUniformMatrix4fv(location, count, transpose, value);POSTCALL;}
+void wrapglUseProgram(GLuint programObj) {PRECALL;glUseProgram(programObj);POSTCALL;}
+void wrapglValidateProgram(GLuint programObj) {PRECALL;glValidateProgram(programObj);POSTCALL;}
+void wrapglVertex2f(GLfloat x, GLfloat y) {PRECALL;Con_Printf("glVertex2f(x, y)\n");POSTCALL;}
+void wrapglVertex3f(GLfloat x, GLfloat y, GLfloat z) {PRECALL;Con_Printf("glVertex3f(x, y, z)\n");POSTCALL;}
+void wrapglVertex4f(GLfloat x, GLfloat y, GLfloat z, GLfloat w) {PRECALL;Con_Printf("glVertex4f(x, y, z, w)\n");POSTCALL;}
+void wrapglVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer) {PRECALL;glVertexAttribPointer(index, size, type, normalized, stride, pointer);POSTCALL;}
+void wrapglVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr) {PRECALL;Con_Printf("glVertexPointer(size, type, stride, ptr)\n");POSTCALL;}
+void wrapglViewport(GLint x, GLint y, GLsizei width, GLsizei height) {PRECALL;glViewport(x, y, width, height);POSTCALL;}
+void wrapglVertexAttrib1f(GLuint index, GLfloat v0) {PRECALL;glVertexAttrib1f(index, v0);POSTCALL;}
+//void wrapglVertexAttrib1s(GLuint index, GLshort v0) {PRECALL;glVertexAttrib1s(index, v0);POSTCALL;}
+//void wrapglVertexAttrib1d(GLuint index, GLdouble v0) {PRECALL;glVertexAttrib1d(index, v0);POSTCALL;}
+void wrapglVertexAttrib2f(GLuint index, GLfloat v0, GLfloat v1) {PRECALL;glVertexAttrib2f(index, v0, v1);POSTCALL;}
+//void wrapglVertexAttrib2s(GLuint index, GLshort v0, GLshort v1) {PRECALL;glVertexAttrib2s(index, v0, v1);POSTCALL;}
+//void wrapglVertexAttrib2d(GLuint index, GLdouble v0, GLdouble v1) {PRECALL;glVertexAttrib2d(index, v0, v1);POSTCALL;}
+void wrapglVertexAttrib3f(GLuint index, GLfloat v0, GLfloat v1, GLfloat v2) {PRECALL;glVertexAttrib3f(index, v0, v1, v2);POSTCALL;}
+//void wrapglVertexAttrib3s(GLuint index, GLshort v0, GLshort v1, GLshort v2) {PRECALL;glVertexAttrib3s(index, v0, v1, v2);POSTCALL;}
+//void wrapglVertexAttrib3d(GLuint index, GLdouble v0, GLdouble v1, GLdouble v2) {PRECALL;glVertexAttrib3d(index, v0, v1, v2);POSTCALL;}
+void wrapglVertexAttrib4f(GLuint index, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {PRECALL;glVertexAttrib4f(index, v0, v1, v2, v3);POSTCALL;}
+//void wrapglVertexAttrib4s(GLuint index, GLshort v0, GLshort v1, GLshort v2, GLshort v3) {PRECALL;glVertexAttrib4s(index, v0, v1, v2, v3);POSTCALL;}
+//void wrapglVertexAttrib4d(GLuint index, GLdouble v0, GLdouble v1, GLdouble v2, GLdouble v3) {PRECALL;glVertexAttrib4d(index, v0, v1, v2, v3);POSTCALL;}
+//void wrapglVertexAttrib4Nub(GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w) {PRECALL;glVertexAttrib4Nub(index, x, y, z, w);POSTCALL;}
+void wrapglVertexAttrib1fv(GLuint index, const GLfloat *v) {PRECALL;glVertexAttrib1fv(index, v);POSTCALL;}
+//void wrapglVertexAttrib1sv(GLuint index, const GLshort *v) {PRECALL;glVertexAttrib1sv(index, v);POSTCALL;}
+//void wrapglVertexAttrib1dv(GLuint index, const GLdouble *v) {PRECALL;glVertexAttrib1dv(index, v);POSTCALL;}
+void wrapglVertexAttrib2fv(GLuint index, const GLfloat *v) {PRECALL;glVertexAttrib2fv(index, v);POSTCALL;}
+//void wrapglVertexAttrib2sv(GLuint index, const GLshort *v) {PRECALL;glVertexAttrib2sv(index, v);POSTCALL;}
+//void wrapglVertexAttrib2dv(GLuint index, const GLdouble *v) {PRECALL;glVertexAttrib2dv(index, v);POSTCALL;}
+void wrapglVertexAttrib3fv(GLuint index, const GLfloat *v) {PRECALL;glVertexAttrib3fv(index, v);POSTCALL;}
+//void wrapglVertexAttrib3sv(GLuint index, const GLshort *v) {PRECALL;glVertexAttrib3sv(index, v);POSTCALL;}
+//void wrapglVertexAttrib3dv(GLuint index, const GLdouble *v) {PRECALL;glVertexAttrib3dv(index, v);POSTCALL;}
+void wrapglVertexAttrib4fv(GLuint index, const GLfloat *v) {PRECALL;glVertexAttrib4fv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4sv(GLuint index, const GLshort *v) {PRECALL;glVertexAttrib4sv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4dv(GLuint index, const GLdouble *v) {PRECALL;glVertexAttrib4dv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4iv(GLuint index, const GLint *v) {PRECALL;glVertexAttrib4iv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4bv(GLuint index, const GLbyte *v) {PRECALL;glVertexAttrib4bv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4ubv(GLuint index, const GLubyte *v) {PRECALL;glVertexAttrib4ubv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4usv(GLuint index, const GLushort *v) {PRECALL;glVertexAttrib4usv(index, GLushort v);POSTCALL;}
+//void wrapglVertexAttrib4uiv(GLuint index, const GLuint *v) {PRECALL;glVertexAttrib4uiv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4Nbv(GLuint index, const GLbyte *v) {PRECALL;glVertexAttrib4Nbv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4Nsv(GLuint index, const GLshort *v) {PRECALL;glVertexAttrib4Nsv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4Niv(GLuint index, const GLint *v) {PRECALL;glVertexAttrib4Niv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4Nubv(GLuint index, const GLubyte *v) {PRECALL;glVertexAttrib4Nubv(index, v);POSTCALL;}
+//void wrapglVertexAttrib4Nusv(GLuint index, const GLushort *v) {PRECALL;glVertexAttrib4Nusv(index, GLushort v);POSTCALL;}
+//void wrapglVertexAttrib4Nuiv(GLuint index, const GLuint *v) {PRECALL;glVertexAttrib4Nuiv(index, v);POSTCALL;}
+//void wrapglGetVertexAttribdv(GLuint index, GLenum pname, GLdouble *params) {PRECALL;glGetVertexAttribdv(index, pname, params);POSTCALL;}
+void wrapglGetVertexAttribfv(GLuint index, GLenum pname, GLfloat *params) {PRECALL;glGetVertexAttribfv(index, pname, params);POSTCALL;}
+void wrapglGetVertexAttribiv(GLuint index, GLenum pname, GLint *params) {PRECALL;glGetVertexAttribiv(index, pname, params);POSTCALL;}
+void wrapglGetVertexAttribPointerv(GLuint index, GLenum pname, GLvoid **pointer) {PRECALL;glGetVertexAttribPointerv(index, pname, pointer);POSTCALL;}
+#endif
+
+#if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
+#define SDL_GL_ExtensionSupported(x) (strstr(gl_extensions, x) || strstr(gl_platformextensions, x))
+#endif
 
 void GLES_Init(void)
 {
+#ifndef qglClear
 	qglIsBufferARB = wrapglIsBuffer;
 	qglIsEnabled = wrapglIsEnabled;
 	qglIsFramebufferEXT = wrapglIsFramebuffer;
@@ -1472,7 +1335,7 @@ void GLES_Init(void)
 //	qglBegin = wrapglBegin;
 //	qglBeginQueryARB = wrapglBeginQuery;
 	qglBindAttribLocation = wrapglBindAttribLocation;
-	qglBindFragDataLocation = wrapglBindFragDataLocation;
+//	qglBindFragDataLocation = wrapglBindFragDataLocation;
 	qglBindBufferARB = wrapglBindBuffer;
 	qglBindFramebufferEXT = wrapglBindFramebuffer;
 	qglBindRenderbufferEXT = wrapglBindRenderbuffer;
@@ -1508,7 +1371,7 @@ void GLES_Init(void)
 	qglDeleteTextures = wrapglDeleteTextures;
 	qglDepthFunc = wrapglDepthFunc;
 	qglDepthMask = wrapglDepthMask;
-	qglDepthRange = wrapglDepthRange;
+	qglDepthRangef = wrapglDepthRangef;
 	qglDetachShader = wrapglDetachShader;
 	qglDisable = wrapglDisable;
 	qglDisableClientState = wrapglDisableClientState;
@@ -1667,6 +1530,7 @@ void GLES_Init(void)
 	qglGetVertexAttribfv = wrapglGetVertexAttribfv;
 	qglGetVertexAttribiv = wrapglGetVertexAttribiv;
 	qglGetVertexAttribPointerv = wrapglGetVertexAttribPointerv;
+#endif
 
 	gl_renderer = (const char *)qglGetString(GL_RENDERER);
 	gl_vendor = (const char *)qglGetString(GL_VENDOR);
@@ -1709,8 +1573,8 @@ void GLES_Init(void)
 	vid.support.ext_draw_range_elements = true;
 	vid.support.ext_framebuffer_object = false;//true;
 	vid.support.ext_stencil_two_side = false;
-	vid.support.ext_texture_3d = false;//SDL_GL_ExtensionSupported("GL_OES_texture_3D"); // iPhoneOS does not support 3D textures, odd...
-	vid.support.ext_texture_compression_s3tc = false;
+	vid.support.ext_texture_3d = SDL_GL_ExtensionSupported("GL_OES_texture_3D");
+	vid.support.ext_texture_compression_s3tc = SDL_GL_ExtensionSupported("GL_EXT_texture_compression_s3tc");
 	vid.support.ext_texture_edge_clamp = true;
 	vid.support.ext_texture_filter_anisotropic = false; // probably don't want to use it...
 	vid.support.ext_texture_srgb = false;
@@ -1719,11 +1583,29 @@ void GLES_Init(void)
 	if (vid.support.ext_texture_filter_anisotropic)
 		qglGetIntegerv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, (GLint*)&vid.max_anisotropy);
 	if (vid.support.arb_texture_cube_map)
-		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE_ARB, (GLint*)&vid.maxtexturesize_cubemap);
+		qglGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_cubemap);
+#ifdef GL_MAX_3D_TEXTURE_SIZE
 	if (vid.support.ext_texture_3d)
 		qglGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_3d);
+#endif
 	Con_Printf("GL_MAX_CUBE_MAP_TEXTURE_SIZE = %i\n", vid.maxtexturesize_cubemap);
 	Con_Printf("GL_MAX_3D_TEXTURE_SIZE = %i\n", vid.maxtexturesize_3d);
+	{
+#define GL_ALPHA_BITS                           0x0D55
+#define GL_RED_BITS                             0x0D52
+#define GL_GREEN_BITS                           0x0D53
+#define GL_BLUE_BITS                            0x0D54
+#define GL_DEPTH_BITS                           0x0D56
+#define GL_STENCIL_BITS                         0x0D57
+		int fb_r = -1, fb_g = -1, fb_b = -1, fb_a = -1, fb_d = -1, fb_s = -1;
+		qglGetIntegerv(GL_RED_BITS    , &fb_r);
+		qglGetIntegerv(GL_GREEN_BITS  , &fb_g);
+		qglGetIntegerv(GL_BLUE_BITS   , &fb_b);
+		qglGetIntegerv(GL_ALPHA_BITS  , &fb_a);
+		qglGetIntegerv(GL_DEPTH_BITS  , &fb_d);
+		qglGetIntegerv(GL_STENCIL_BITS, &fb_s);
+		Con_Printf("Framebuffer depth is R%iG%iB%iA%iD%iS%i\n", fb_r, fb_g, fb_b, fb_a, fb_d, fb_s);
+	}
 
 	// verify that cubemap textures are really supported
 	if (vid.support.arb_texture_cube_map && vid.maxtexturesize_cubemap < 256)
@@ -1745,6 +1627,8 @@ void GLES_Init(void)
 	Con_DPrintf("Using GLES2.0 rendering path - %i texture matrix, %i texture images, %i texcoords%s\n", vid.texunits, vid.teximageunits, vid.texarrayunits, vid.support.ext_framebuffer_object ? ", shadowmapping supported" : "");
 	vid.renderpath = RENDERPATH_GLES2;
 	vid.useinterleavedarrays = false;
+	vid.sRGBcapable2D = false;
+	vid.sRGBcapable3D = false;
 
 	// VorteX: set other info (maybe place them in VID_InitMode?)
 	extern cvar_t gl_info_vendor;
@@ -1776,29 +1660,6 @@ void VID_Init (void)
 	Cvar_RegisterVariable(&apple_mouse_noaccel);
 #endif
 #endif
-	Cvar_RegisterVariable(&joy_detected);
-	Cvar_RegisterVariable(&joy_enable);
-	Cvar_RegisterVariable(&joy_index);
-	Cvar_RegisterVariable(&joy_axisforward);
-	Cvar_RegisterVariable(&joy_axisside);
-	Cvar_RegisterVariable(&joy_axisup);
-	Cvar_RegisterVariable(&joy_axispitch);
-	Cvar_RegisterVariable(&joy_axisyaw);
-	//Cvar_RegisterVariable(&joy_axisroll);
-	Cvar_RegisterVariable(&joy_deadzoneforward);
-	Cvar_RegisterVariable(&joy_deadzoneside);
-	Cvar_RegisterVariable(&joy_deadzoneup);
-	Cvar_RegisterVariable(&joy_deadzonepitch);
-	Cvar_RegisterVariable(&joy_deadzoneyaw);
-	//Cvar_RegisterVariable(&joy_deadzoneroll);
-	Cvar_RegisterVariable(&joy_sensitivityforward);
-	Cvar_RegisterVariable(&joy_sensitivityside);
-	Cvar_RegisterVariable(&joy_sensitivityup);
-	Cvar_RegisterVariable(&joy_sensitivitypitch);
-	Cvar_RegisterVariable(&joy_sensitivityyaw);
-	//Cvar_RegisterVariable(&joy_sensitivityroll);
-	Cvar_RegisterVariable(&joy_axiskeyevents);
-	Cvar_RegisterVariable(&joy_axiskeyevents_deadzone);
 #ifdef __IPHONEOS__
 	Cvar_SetValueQuick(&vid_touchscreen, 1);
 #endif
@@ -1813,6 +1674,54 @@ void VID_Init (void)
 	if (vid_sdl_initjoysticksystem)
 		Con_Printf("Failed to init SDL joystick subsystem: %s\n", SDL_GetError());
 	vid_isfullscreen = false;
+}
+
+static int vid_sdljoystickindex = -1;
+void VID_EnableJoystick(qboolean enable)
+{
+	int index = joy_enable.integer > 0 ? joy_index.integer : -1;
+	int numsdljoysticks;
+	qboolean success = false;
+	int sharedcount = 0;
+	int sdlindex = -1;
+	sharedcount = VID_Shared_SetJoystick(index);
+	if (index >= 0 && index < sharedcount)
+		success = true;
+	sdlindex = index - sharedcount;
+
+	numsdljoysticks = SDL_NumJoysticks();
+	if (sdlindex < 0 || sdlindex >= numsdljoysticks)
+		sdlindex = -1;
+
+	// update cvar containing count of XInput joysticks + SDL joysticks
+	if (joy_detected.integer != sharedcount + numsdljoysticks)
+		Cvar_SetValueQuick(&joy_detected, sharedcount + numsdljoysticks);
+
+	if (vid_sdljoystickindex != sdlindex)
+	{
+		vid_sdljoystickindex = sdlindex;
+		// close SDL joystick if active
+		if (vid_sdljoystick)
+			SDL_JoystickClose(vid_sdljoystick);
+		vid_sdljoystick = NULL;
+		if (sdlindex >= 0)
+		{
+			vid_sdljoystick = SDL_JoystickOpen(sdlindex);
+			if (vid_sdljoystick)
+				Con_Printf("Joystick %i opened (SDL_Joystick %i is \"%s\" with %i axes, %i buttons, %i balls)\n", index, sdlindex, SDL_JoystickName(sdlindex), (int)SDL_JoystickNumAxes(vid_sdljoystick), (int)SDL_JoystickNumButtons(vid_sdljoystick), (int)SDL_JoystickNumBalls(vid_sdljoystick));
+			else
+			{
+				Con_Printf("Joystick %i failed (SDL_JoystickOpen(%i) returned: %s)\n", index, sdlindex, SDL_GetError());
+				sdlindex = -1;
+			}
+		}
+	}
+
+	if (sdlindex >= 0)
+		success = true;
+
+	if (joy_active.integer != (success ? 1 : 0))
+		Cvar_SetValueQuick(&joy_active, success ? 1 : 0);
 }
 
 #if SETVIDEOMODE
@@ -1848,6 +1757,15 @@ static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, 
 			SetClassLongPtr( info.window, GCLP_HICON, (LONG_PTR)icon );
 		}
 	}
+	return screen;
+}
+#elif defined(MACOSX)
+static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, int screenbpp, int screenflags)
+{
+	SDL_Surface *screen = NULL;
+	SDL_WM_SetCaption( gamename, NULL );
+	screen = SDL_SetVideoMode(screenwidth, screenheight, screenbpp, screenflags);
+	// we don't use SDL_WM_SetIcon here because the icon in the .app should be used
 	return screen;
 }
 #else
@@ -2127,6 +2045,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	notfirstvideomode = true;
 #endif
 
+#ifndef USE_GLES2
 	// SDL usually knows best
 	drivername = NULL;
 
@@ -2139,6 +2058,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 		Con_Printf("Unable to load GL driver \"%s\": %s\n", drivername, SDL_GetError());
 		return false;
 	}
+#endif
 
 #ifdef __IPHONEOS__
 	// mobile platforms are always fullscreen, we'll get the resolution after opening the window
@@ -2192,6 +2112,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLEBUFFERS, 1);
 		SDL_GL_SetAttribute (SDL_GL_MULTISAMPLESAMPLES, mode->samples);
 	}
+
 #if SDL_MAJOR_VERSION == 1 && SDL_MINOR_VERSION == 2
 	if (vid_vsync.integer)
 		SDL_GL_SetAttribute (SDL_GL_SWAP_CONTROL, 1);
@@ -2258,29 +2179,12 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	GL_Init();
 #endif
 
-	vid_numjoysticks = SDL_NumJoysticks();
-	vid_numjoysticks = bound(0, vid_numjoysticks, MAX_JOYSTICKS);
-	Cvar_SetValueQuick(&joy_detected, vid_numjoysticks);
-	Con_Printf("%d SDL joystick(s) found:\n", vid_numjoysticks);
-	memset(vid_joysticks, 0, sizeof(vid_joysticks));
-	for (i = 0;i < vid_numjoysticks;i++)
-	{
-		SDL_Joystick *joy;
-		joy = vid_joysticks[i] = SDL_JoystickOpen(i);
-		if (!joy)
-		{
-			Con_Printf("joystick #%i: open failed: %s\n", i, SDL_GetError());
-			continue;
-		}
-		Con_Printf("joystick #%i: opened \"%s\" with %i axes, %i buttons, %i balls\n", i, SDL_JoystickName(i), (int)SDL_JoystickNumAxes(joy), (int)SDL_JoystickNumButtons(joy), (int)SDL_JoystickNumBalls(joy));
-	}
-
 	vid_hidden = false;
 	vid_activewindow = false;
 	vid_hasfocus = true;
 	vid_usingmouse = false;
 	vid_usinghidecursor = false;
-
+		
 #if SETVIDEOMODE
 	SDL_WM_GrabInput(SDL_GRAB_OFF);
 #endif
@@ -2296,7 +2200,6 @@ extern cvar_t gl_info_driver;
 
 qboolean VID_InitModeSoft(viddef_mode_t *mode)
 {
-	int i;
 #if SETVIDEOMODE
 	int flags = SDL_HWSURFACE;
 	if(!COM_CheckParm("-noasyncblit")) flags |= SDL_ASYNCBLIT;
@@ -2376,23 +2279,6 @@ qboolean VID_InitModeSoft(viddef_mode_t *mode)
 
 	VID_Soft_SharedSetup();
 
-	vid_numjoysticks = SDL_NumJoysticks();
-	vid_numjoysticks = bound(0, vid_numjoysticks, MAX_JOYSTICKS);
-	Cvar_SetValueQuick(&joy_detected, vid_numjoysticks);
-	Con_Printf("%d SDL joystick(s) found:\n", vid_numjoysticks);
-	memset(vid_joysticks, 0, sizeof(vid_joysticks));
-	for (i = 0;i < vid_numjoysticks;i++)
-	{
-		SDL_Joystick *joy;
-		joy = vid_joysticks[i] = SDL_JoystickOpen(i);
-		if (!joy)
-		{
-			Con_Printf("joystick #%i: open failed: %s\n", i, SDL_GetError());
-			continue;
-		}
-		Con_Printf("joystick #%i: opened \"%s\" with %i axes, %i buttons, %i balls\n", i, SDL_JoystickName(i), (int)SDL_JoystickNumAxes(joy), (int)SDL_JoystickNumButtons(joy), (int)SDL_JoystickNumBalls(joy));
-	}
-
 	vid_hidden = false;
 	vid_activewindow = false;
 	vid_hasfocus = true;
@@ -2419,14 +2305,17 @@ qboolean VID_InitMode(viddef_mode_t *mode)
 
 void VID_Shutdown (void)
 {
+	VID_EnableJoystick(false);
 	VID_SetMouse(false, false, false);
 	VID_RestoreSystemGamma();
 
 #if SETVIDEOMODE
 #ifndef WIN32
+#ifndef MACOSX
 	if (icon)
 		SDL_FreeSurface(icon);
 	icon = NULL;
+#endif
 #endif
 #endif
 
@@ -2542,7 +2431,7 @@ size_t VID_ListModes(vid_mode_t *modes, size_t maxcount)
 	int bpp = SDL_GetVideoInfo()->vfmt->BitsPerPixel;
 
 	k = 0;
-	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); vidmodes && *vidmodes; ++vidmodes)
+	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); vidmodes && vidmodes != (SDL_Rect**)(-1) && *vidmodes; ++vidmodes)
 	{
 		if(k >= maxcount)
 			break;

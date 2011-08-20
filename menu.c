@@ -4515,7 +4515,7 @@ void ModList_RebuildList(void)
 
 	stringlistinit(&list);
 	listdirectory(&list, fs_basedir, "");
-	stringlistsort(&list);
+	stringlistsort(&list, true);
 	modlist_count = 0;
 	modlist_numenabled = fs_numgamedirs;
 	for (i = 0;i < list.numstrings;i++)
@@ -5015,6 +5015,164 @@ static const char *m_required_func[] = {
 
 static int m_numrequiredfunc = sizeof(m_required_func) / sizeof(char*);
 
+static prvm_required_field_t m_required_fields[] =
+{
+#define PRVM_DECLARE_serverglobalfloat(x)
+#define PRVM_DECLARE_serverglobalvector(x)
+#define PRVM_DECLARE_serverglobalstring(x)
+#define PRVM_DECLARE_serverglobaledict(x)
+#define PRVM_DECLARE_serverglobalfunction(x)
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x)
+#define PRVM_DECLARE_menuglobalvector(x)
+#define PRVM_DECLARE_menuglobalstring(x)
+#define PRVM_DECLARE_menuglobaledict(x)
+#define PRVM_DECLARE_menuglobalfunction(x)
+#define PRVM_DECLARE_serverfieldfloat(x)
+#define PRVM_DECLARE_serverfieldvector(x)
+#define PRVM_DECLARE_serverfieldstring(x)
+#define PRVM_DECLARE_serverfieldedict(x)
+#define PRVM_DECLARE_serverfieldfunction(x)
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_menufieldvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_menufieldstring(x) {ev_string, #x},
+#define PRVM_DECLARE_menufieldedict(x) {ev_entity, #x},
+#define PRVM_DECLARE_menufieldfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
+};
+
+static int m_numrequiredfields = sizeof(m_required_fields) / sizeof(m_required_fields[0]);
+
+static prvm_required_field_t m_required_globals[] =
+{
+#define PRVM_DECLARE_serverglobalfloat(x)
+#define PRVM_DECLARE_serverglobalvector(x)
+#define PRVM_DECLARE_serverglobalstring(x)
+#define PRVM_DECLARE_serverglobaledict(x)
+#define PRVM_DECLARE_serverglobalfunction(x)
+#define PRVM_DECLARE_clientglobalfloat(x)
+#define PRVM_DECLARE_clientglobalvector(x)
+#define PRVM_DECLARE_clientglobalstring(x)
+#define PRVM_DECLARE_clientglobaledict(x)
+#define PRVM_DECLARE_clientglobalfunction(x)
+#define PRVM_DECLARE_menuglobalfloat(x) {ev_float, #x},
+#define PRVM_DECLARE_menuglobalvector(x) {ev_vector, #x},
+#define PRVM_DECLARE_menuglobalstring(x) {ev_string, #x},
+#define PRVM_DECLARE_menuglobaledict(x) {ev_entity, #x},
+#define PRVM_DECLARE_menuglobalfunction(x) {ev_function, #x},
+#define PRVM_DECLARE_serverfieldfloat(x)
+#define PRVM_DECLARE_serverfieldvector(x)
+#define PRVM_DECLARE_serverfieldstring(x)
+#define PRVM_DECLARE_serverfieldedict(x)
+#define PRVM_DECLARE_serverfieldfunction(x)
+#define PRVM_DECLARE_clientfieldfloat(x)
+#define PRVM_DECLARE_clientfieldvector(x)
+#define PRVM_DECLARE_clientfieldstring(x)
+#define PRVM_DECLARE_clientfieldedict(x)
+#define PRVM_DECLARE_clientfieldfunction(x)
+#define PRVM_DECLARE_menufieldfloat(x)
+#define PRVM_DECLARE_menufieldvector(x)
+#define PRVM_DECLARE_menufieldstring(x)
+#define PRVM_DECLARE_menufieldedict(x)
+#define PRVM_DECLARE_menufieldfunction(x)
+#define PRVM_DECLARE_serverfunction(x)
+#define PRVM_DECLARE_clientfunction(x)
+#define PRVM_DECLARE_menufunction(x)
+#define PRVM_DECLARE_field(x)
+#define PRVM_DECLARE_global(x)
+#define PRVM_DECLARE_function(x)
+#include "prvm_offsets.h"
+#undef PRVM_DECLARE_serverglobalfloat
+#undef PRVM_DECLARE_serverglobalvector
+#undef PRVM_DECLARE_serverglobalstring
+#undef PRVM_DECLARE_serverglobaledict
+#undef PRVM_DECLARE_serverglobalfunction
+#undef PRVM_DECLARE_clientglobalfloat
+#undef PRVM_DECLARE_clientglobalvector
+#undef PRVM_DECLARE_clientglobalstring
+#undef PRVM_DECLARE_clientglobaledict
+#undef PRVM_DECLARE_clientglobalfunction
+#undef PRVM_DECLARE_menuglobalfloat
+#undef PRVM_DECLARE_menuglobalvector
+#undef PRVM_DECLARE_menuglobalstring
+#undef PRVM_DECLARE_menuglobaledict
+#undef PRVM_DECLARE_menuglobalfunction
+#undef PRVM_DECLARE_serverfieldfloat
+#undef PRVM_DECLARE_serverfieldvector
+#undef PRVM_DECLARE_serverfieldstring
+#undef PRVM_DECLARE_serverfieldedict
+#undef PRVM_DECLARE_serverfieldfunction
+#undef PRVM_DECLARE_clientfieldfloat
+#undef PRVM_DECLARE_clientfieldvector
+#undef PRVM_DECLARE_clientfieldstring
+#undef PRVM_DECLARE_clientfieldedict
+#undef PRVM_DECLARE_clientfieldfunction
+#undef PRVM_DECLARE_menufieldfloat
+#undef PRVM_DECLARE_menufieldvector
+#undef PRVM_DECLARE_menufieldstring
+#undef PRVM_DECLARE_menufieldedict
+#undef PRVM_DECLARE_menufieldfunction
+#undef PRVM_DECLARE_serverfunction
+#undef PRVM_DECLARE_clientfunction
+#undef PRVM_DECLARE_menufunction
+#undef PRVM_DECLARE_field
+#undef PRVM_DECLARE_global
+#undef PRVM_DECLARE_function
+};
+
+static int m_numrequiredglobals = sizeof(m_required_globals) / sizeof(m_required_globals[0]);
+
 void MR_SetRouting (qboolean forceold);
 
 void MP_Error(const char *format, ...) DP_FUNC_PRINTF(1);
@@ -5062,9 +5220,9 @@ void MP_KeyEvent (int key, int ascii, qboolean downevent)
 	prog->globals.generic[OFS_PARM0] = (float) key;
 	prog->globals.generic[OFS_PARM1] = (float) ascii;
 	if (downevent)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_keydown,"m_keydown(float key, float ascii) required");
-	else if (prog->funcoffsets.m_keyup)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_keyup,"m_keyup(float key, float ascii) required");
+		PRVM_ExecuteProgram(PRVM_menufunction(m_keydown),"m_keydown(float key, float ascii) required");
+	else if (PRVM_menufunction(m_keyup))
+		PRVM_ExecuteProgram(PRVM_menufunction(m_keyup),"m_keyup(float key, float ascii) required");
 
 	PRVM_End;
 }
@@ -5091,7 +5249,7 @@ void MP_Draw (void)
 
 	// FIXME: this really shouldnt error out lest we have a very broken refdef state...?
 	// or does it kill the server too?
-	PRVM_ExecuteProgram(prog->funcoffsets.m_draw,"m_draw() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_draw),"m_draw() required");
 
 	PRVM_End;
 
@@ -5107,7 +5265,7 @@ void MP_ToggleMenu(int mode)
 	PRVM_SetProg(PRVM_MENUPROG);
 
 	prog->globals.generic[OFS_PARM0] = (float) mode;
-	PRVM_ExecuteProgram(prog->funcoffsets.m_toggle,"m_toggle() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_toggle),"m_toggle() required");
 
 	PRVM_End;
 }
@@ -5116,8 +5274,8 @@ void MP_NewMap(void)
 {
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
-	if (prog->funcoffsets.m_newmap)
-		PRVM_ExecuteProgram(prog->funcoffsets.m_newmap,"m_newmap() required");
+	if (PRVM_menufunction(m_newmap))
+		PRVM_ExecuteProgram(PRVM_menufunction(m_newmap),"m_newmap() required");
 	PRVM_End;
 }
 
@@ -5126,7 +5284,7 @@ void MP_Shutdown (void)
 	PRVM_Begin;
 	PRVM_SetProg(PRVM_MENUPROG);
 
-	PRVM_ExecuteProgram(prog->funcoffsets.m_shutdown,"m_shutdown() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_shutdown),"m_shutdown() required");
 
 	// reset key_dest
 	key_dest = key_game;
@@ -5142,7 +5300,6 @@ void MP_Init (void)
 	PRVM_Begin;
 	PRVM_InitProg(PRVM_MENUPROG);
 
-	prog->headercrc = M_PROGHEADER_CRC;
 	prog->edictprivate_size = 0; // no private struct used
 	prog->name = M_NAME;
 	prog->num_edicts = 1;
@@ -5158,7 +5315,7 @@ void MP_Init (void)
 	// allocate the mempools
 	prog->progs_mempool = Mem_AllocPool(M_PROG_FILENAME, 0, NULL);
 
-	PRVM_LoadProgs(M_PROG_FILENAME, m_numrequiredfunc, m_required_func, 0, NULL, 0, NULL);
+	PRVM_LoadProgs(M_PROG_FILENAME, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
 
 	// note: OP_STATE is not supported by menu qc, we don't even try to detect
 	// it here
@@ -5166,7 +5323,7 @@ void MP_Init (void)
 	in_client_mouse = true;
 
 	// call the prog init
-	PRVM_ExecuteProgram(prog->funcoffsets.m_init,"m_init() required");
+	PRVM_ExecuteProgram(PRVM_menufunction(m_init),"m_init() required");
 
 	PRVM_End;
 }
