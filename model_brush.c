@@ -2632,7 +2632,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 		int stainmapsize = 0;
 		mod_alloclightmap_state_t allocState;
 
-		Mod_AllocLightmap_Init(&allocState, lightmapsize, lightmapsize);
+		Mod_AllocLightmap_Init(&allocState, lightmapsize, lightmapsize, loadmodel->mempool);
 		for (surfacenum = 0, surface = loadmodel->data_surfaces;surfacenum < count;surfacenum++, surface++)
 		{
 			int i, iu, iv, lightmapx = 0, lightmapy = 0;

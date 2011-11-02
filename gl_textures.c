@@ -2015,6 +2015,36 @@ rtexture_t *R_LoadTextureRenderBuffer(rtexturepool_t *rtexturepool, const char *
 	return (rtexture_t *)glt;
 }
 
+void R_SaveTextureTGAFile(rtexture_t *rt, const char *filename, qboolean hasalpha)
+{
+#ifdef USE_GLES2
+	return -1;
+#else
+	GLint internalformat;
+	GLint oldbindtexnum;
+	unsigned char *data;
+	gltexture_t *glt = (gltexture_t *)rt;
+
+	GL_ActiveTexture(0);
+	oldbindtexnum = R_Mesh_TexBound(0, gltexturetypeenums[glt->texturetype]);
+	qglBindTexture(gltexturetypeenums[glt->texturetype], glt->texnum);CHECKGLERROR
+	qglGetTexLevelParameteriv(gltexturetypeenums[glt->texturetype], 0, GL_TEXTURE_INTERNAL_FORMAT, &internalformat);
+	if (hasalpha)
+	{
+		data = Mem_Alloc(tempmempool, glt->tilewidth * glt->tileheight * 4);
+		qglGetTexImage(gltexturetypeenums[glt->texturetype], 0, GL_BGRA, GL_UNSIGNED_BYTE, data); CHECKGLERROR
+		Image_WriteTGABGRA(filename, glt->tilewidth, glt->tileheight, data);
+		Mem_Free(data);
+	} else {
+		data = Mem_Alloc(tempmempool, glt->tilewidth * glt->tileheight * 3);
+		qglGetTexImage(gltexturetypeenums[glt->texturetype], 0, GL_BGR, GL_UNSIGNED_BYTE, data); CHECKGLERROR
+		Image_WriteTGABGR_preflipped(filename, glt->tilewidth, glt->tileheight, data);
+		Mem_Free(data);
+	}
+	qglBindTexture(gltexturetypeenums[glt->texturetype], oldbindtexnum);CHECKGLERROR
+#endif
+}
+
 int R_SaveTextureDDSFile(rtexture_t *rt, const char *filename, qboolean skipuncompressed, qboolean hasalpha)
 {
 #ifdef USE_GLES2

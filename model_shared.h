@@ -1153,7 +1153,7 @@ typedef struct mod_alloclightmap_state_s
 }
 mod_alloclightmap_state_t;
 
-void Mod_AllocLightmap_Init(mod_alloclightmap_state_t *state, int width, int height);
+void Mod_AllocLightmap_Init(mod_alloclightmap_state_t *state, int width, int height, mempool_t *mempool);
 void Mod_AllocLightmap_Free(mod_alloclightmap_state_t *state);
 void Mod_AllocLightmap_Reset(mod_alloclightmap_state_t *state);
 qboolean Mod_AllocLightmap_Block(mod_alloclightmap_state_t *state, int blockwidth, int blockheight, int *outx, int *outy);

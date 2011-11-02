@@ -142,6 +142,11 @@ static mempool_t *font_mempool= NULL;
 /// FreeType library handle
 static FT_Library font_ft2lib = NULL;
 
+/// GlyphTex texture list
+static ft2_glyphtex_t *font_glyphtex_start = NULL;
+static ft2_glyphtex_t *font_glyphtex_end = NULL;
+static int font_glyphtex_counter = 0;
+
 #define POSTPROCESS_MAXRADIUS 8
 typedef struct
 {
@@ -313,6 +318,8 @@ void font_start(void)
 		Font_CloseLibrary();
 		return;
 	}
+
+	font_glyphtex_start = font_glyphtex_end = NULL;
 }
 
 void font_shutdown(void)
@@ -363,6 +370,88 @@ ft2_font_t *Font_Alloc(void)
 	return (ft2_font_t *)Mem_Alloc(font_mempool, sizeof(ft2_font_t));
 }
 
+ft2_glyphtex_t *Font_New_GlyphTex(int width, int height)
+{
+	int bytesPerPixel = 4;
+	int tp;
+	char vabuf[512];
+	unsigned char *gtdata;
+	int gtpitch;
+
+	ft2_glyphtex_t *gt = (ft2_glyphtex_t *)Mem_Alloc(font_mempool, sizeof(ft2_glyphtex_t));
+	if (!font_glyphtex_start)
+		font_glyphtex_start = gt;
+	if (font_glyphtex_end) {
+		font_glyphtex_end->next = gt;
+		gt->prev = font_glyphtex_end;
+		font_glyphtex_end = gt;
+	} else {
+		font_glyphtex_end = gt;
+	}
+
+	if (r_font_use_alpha_textures.integer)
+		bytesPerPixel = 1;
+
+	gt->width = width;
+	gt->height = height;
+	gt->texflags = TEXF_ALPHA | (r_font_compress.integer > 0 ? TEXF_COMPRESS : 0);
+	gt->bytesPerPixel = bytesPerPixel;
+	gtpitch = width * bytesPerPixel;
+	gt->tex = NULL;
+	gtdata = (unsigned char*)Mem_Alloc(font_mempool, width * height * bytesPerPixel);
+	//memset(gt->data, 0, width * height * bytesPerPixel);
+	// Initialize as white texture with zero alpha
+	tp = 0;
+	while (tp < height*gtpitch)
+	{
+		if (bytesPerPixel == 4)
+		{
+			gtdata[tp++] = 0xFF;
+			gtdata[tp++] = 0xFF;
+			gtdata[tp++] = 0xFF;
+		}
+		gtdata[tp++] = 0x00;
+	}
+	// now load the texture
+	gt->tex = R_LoadTexture2D(drawtexturepool, va(vabuf, sizeof(vabuf), "*font-%i", font_glyphtex_counter),
+	                          gt->width, gt->height, gtdata,
+	                          (r_font_use_alpha_textures.integer ? TEXTYPE_ALPHA : TEXTYPE_RGBA),
+	                          gt->texflags, -1, NULL);
+	Mem_Free(gtdata);
+
+	Mod_AllocLightmap_Init(&gt->blockstate, width, height, font_mempool);
+
+	gt->glyph_count = 0;
+	//gt->lastusedframe = 0;
+
+	gt->first_glyph = gt->last_glyph = NULL;
+
+	++font_glyphtex_counter;
+	Con_Printf("Glyphtextures: %i\n", font_glyphtex_counter);
+	return gt;
+}
+
+void Font_Free_GlyphTex(ft2_glyphtex_t *gt);
+void Font_Free_GlyphTex(ft2_glyphtex_t *gt)
+{
+	ft2_glyphtex_t *prev = gt->prev;
+	ft2_glyphtex_t *next = gt->next;
+
+	if (prev)
+		prev->next = next;
+	if (next)
+		next->prev = prev;
+
+	//Mem_Free(gt->data);
+	Mod_AllocLightmap_Free(&gt->blockstate);
+
+	// FIXME: Go through glyphs now
+
+	R_FreeTexture(gt->tex);
+	gt->tex = NULL;
+	Mem_Free(gt);
+}
+
 static qboolean Font_Attach(ft2_font_t *font, ft2_attachment_t *attachment)
 {
 	ft2_attachment_t *na;
@@ -405,7 +494,8 @@ float Font_SnapTo(float val, float snapwidth)
 }
 
 static qboolean Font_LoadFile(const char *name, int _face, ft2_settings_t *settings, ft2_font_t *font);
-static qboolean Font_LoadSize(ft2_font_t *font, float size, qboolean check_only);
+static void Font_Postprocess(ft2_font_t *fnt, unsigned char *imagedata, int pitch, int bpp, int w, int h, int *pad_l, int *pad_r, int *pad_t, int *pad_b);
+//static qboolean Font_LoadSize(ft2_font_t *font, float size, qboolean check_only);
 qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 {
 	int s, count, i;
@@ -469,7 +559,10 @@ qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 		count = 0;
 		for (s = 0; s < MAX_FONT_SIZES && dpfnt->req_sizes[s] >= 0; ++s)
 		{
-			if (Font_LoadSize(fb, Font_VirtualToRealSize(dpfnt->req_sizes[s]), true))
+			fb->req_sizes[s] = Font_VirtualToRealSize(dpfnt->req_sizes[s]);
+			if (fb->req_sizes[s] < 2 || fb->req_sizes[s] > 200) {
+				// Bogus size check needs to be done here already
+			} else
 				++count;
 		}
 		if (!count)
@@ -496,8 +589,25 @@ qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 	count = 0;
 	for (s = 0; s < MAX_FONT_SIZES && dpfnt->req_sizes[s] >= 0; ++s)
 	{
-		if (Font_LoadSize(ft2, Font_VirtualToRealSize(dpfnt->req_sizes[s]), false))
+		int gpad_l, gpad_r, gpad_t, gpad_b;
+		ft2_font_size_t *fsize = &ft2->font_sizes[s];
+		ft2->req_sizes[s] = Font_VirtualToRealSize(dpfnt->req_sizes[s]);
+		if (ft2->req_sizes[s] < 2 || ft2->req_sizes[s] > 200) {
+			// Bogus size check needs to be done here already
+		} else
 			++count;
+
+		// Fill fontsize here now, since we have no Font_LoadSize anymore
+		Font_Postprocess(ft2, NULL, 0, 4, fsize->size*2, fsize->size*2, &gpad_l, &gpad_r, &gpad_t, &gpad_b);
+		fsize->size = ft2->req_sizes[s];
+		fsize->sfx = (1.0/64.0)/(double)fsize->size;
+		fsize->sfy = (1.0/64.0)/(double)fsize->size;
+		fsize->glyphSize = fsize->size * 2 + max(gpad_l + gpad_r, gpad_t + gpad_b);
+		/* Not required anymore, all textures are 1024x1024 for now
+		if (!(r_font_nonpoweroftwo.integer && vid.support.arb_texture_non_power_of_two))
+			fsize->glyphSize = CeilPowerOf2(fsize->glyphSize);
+		*/
+		fsize->intSize = -1;
 	}
 	if (!count)
 	{
@@ -790,7 +900,9 @@ static void Font_Postprocess(ft2_font_t *fnt, unsigned char *imagedata, int pitc
 }
 
 static float Font_SearchSize(ft2_font_t *font, FT_Face fontface, float size);
-static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _ch, ft2_font_map_t **outmap);
+//static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _ch, ft2_font_map_t **outmap);
+#if 0
+// DEPRECATED:
 static qboolean Font_LoadSize(ft2_font_t *font, float size, qboolean check_only)
 {
 	int map_index;
@@ -877,6 +989,7 @@ static qboolean Font_LoadSize(ft2_font_t *font, float size, qboolean check_only)
 	}
 	return true;
 }
+#endif
 
 int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 {
@@ -886,7 +999,6 @@ int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 	int matchsize = -10000;
 	int m;
 	float fsize_x, fsize_y;
-	ft2_font_map_t **maps = font->font_maps;
 
 	fsize_x = fsize_y = _fsize * vid.height / vid_conheight.value;
 	if(outw && *outw)
@@ -909,15 +1021,15 @@ int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 
 	for (m = 0; m < MAX_FONT_SIZES; ++m)
 	{
-		if (!maps[m])
+		if (font->req_sizes[m] < 1)
 			continue;
 		// "round up" to the bigger size if two equally-valued matches exist
-		nval = 0.5 * (fabs(maps[m]->size - fsize_x) + fabs(maps[m]->size - fsize_y));
-		if (match == -1 || nval < value || (nval == value && matchsize < maps[m]->size))
+		nval = 0.5 * (fabs(font->font_sizes[m].size - fsize_x) + fabs(font->font_sizes[m].size - fsize_y));
+		if (match == -1 || nval < value || (nval == value && matchsize < font->font_sizes[m].size))
 		{
 			value = nval;
 			match = m;
-			matchsize = maps[m]->size;
+			matchsize = font->font_sizes[m].size;
 			if (value == 0) // there is no better match
 				break;
 		}
@@ -925,18 +1037,21 @@ int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 	if (value <= r_font_size_snapping.value)
 	{
 		// do NOT keep the aspect for perfect rendering
-		if (outh) *outh = maps[match]->size * vid_conheight.value / vid.height;
-		if (outw) *outw = maps[match]->size * vid_conwidth.value / vid.width;
+		if (outh) *outh = font->font_sizes[match].size * vid_conheight.value / vid.height;
+		if (outw) *outw = font->font_sizes[match].size * vid_conwidth.value / vid.width;
 	}
 	return match;
 }
 
+#if 0
+// DEPRECATED:
 ft2_font_map_t *Font_MapForIndex(ft2_font_t *font, int index)
 {
 	if (index < 0 || index >= MAX_FONT_SIZES)
 		return NULL;
 	return font->font_maps[index];
 }
+#endif
 
 static qboolean Font_SetSize(ft2_font_t *font, float w, float h)
 {
@@ -964,6 +1079,16 @@ static qboolean Font_SetSize(ft2_font_t *font, float w, float h)
 	return true;
 }
 
+qboolean Font_GetKerning(ft2_font_t *font, int size_index, float w, float h, Uchar left, Uchar right, float *outx, float *outy)
+{
+	// FIXME: Currently dummied because we are focusing on glyph loading
+	if (outx) *outx = 0;
+	if (outy) *outy = 0;
+	return false;
+}
+
+#if 0
+// DEPRECATED:
 qboolean Font_GetKerningForMap(ft2_font_t *font, int map_index, float w, float h, Uchar left, Uchar right, float *outx, float *outy)
 {
 	ft2_font_map_t *fmap;
@@ -1026,7 +1151,9 @@ qboolean Font_GetKerningForSize(ft2_font_t *font, float w, float h, Uchar left, 
 {
 	return Font_GetKerningForMap(font, Font_IndexForSize(font, h, NULL, NULL), w, h, left, right, outx, outy);
 }
+#endif
 
+/*
 static void UnloadMapRec(ft2_font_map_t *map)
 {
 	if (map->pic)
@@ -1038,6 +1165,7 @@ static void UnloadMapRec(ft2_font_map_t *map)
 		UnloadMapRec(map->next);
 	Mem_Free(map);
 }
+*/
 
 void Font_UnloadFont(ft2_font_t *font)
 {
@@ -1057,6 +1185,7 @@ void Font_UnloadFont(ft2_font_t *font)
 		font->attachmentcount = 0;
 		font->attachments = NULL;
 	}
+	/*
 	for (i = 0; i < MAX_FONT_SIZES; ++i)
 	{
 		if (font->font_maps[i])
@@ -1065,6 +1194,7 @@ void Font_UnloadFont(ft2_font_t *font)
 			font->font_maps[i] = NULL;
 		}
 	}
+	*/
 	if (ft2_dll)
 	{
 		if (font->face)
@@ -1100,6 +1230,465 @@ static float Font_SearchSize(ft2_font_t *font, FT_Face fontface, float size)
 	}
 }
 
+static glyph_t* Font_Glyph_Find(ft2_font_size_t *fsize, Uchar ch)
+{
+	ft2_glyph_tree_t *tree;
+	unsigned int i, idx;
+
+	if (ch < 256)
+		return fsize->main_glyphs[ch];
+
+	tree = &fsize->glyphtree;
+	for (i = 0; i < (2 * sizeof(Uchar) - 1); ++i) {
+		idx = (ch & 0x0F);
+		if (!tree->next[idx])
+			return NULL;
+		tree = tree->next[idx];
+		ch >>= 4;
+	}
+
+	idx = (ch & 0x0F);
+	return tree->next[idx]->endglyph;
+}
+
+static void Font_Glyph_Insert(ft2_font_size_t *fsize, Uchar ch, glyph_t *glyph)
+{
+	ft2_glyph_tree_t *tree;
+	unsigned int i, idx;
+	if (ch < 256)
+	{
+		fsize->main_glyphs[ch] = glyph;
+		return;
+	}
+
+	tree = &fsize->glyphtree;
+	for (i = 0; i < (2 * sizeof(Uchar)); ++i) {
+		idx = (ch & 0x0F);
+		if (!tree->next[idx]) {
+			tree->next[idx] = (ft2_glyph_tree_t*)Mem_Alloc(font_mempool, sizeof(*tree));
+			memset(tree->next[idx], 0, sizeof(*(tree->next[idx])));
+		}
+		tree = tree->next[idx];
+		ch >>= 4;
+	}
+	tree->endglyph = glyph;
+	return;
+}
+
+static void Font_Glyph_Free(glyph_t *glyph);
+static void Font_GlyphTree_Free(ft2_glyph_tree_t *tree)
+{
+	unsigned int i;
+	for (i = 0; i < sizeof(tree->next) / sizeof(tree->next[0]); ++i)
+	{
+		if (tree->next[i])
+			Font_GlyphTree_Free(tree->next[i]);
+	}
+	if (tree->endglyph)
+	{
+		Font_Glyph_Free(tree->endglyph);
+	}
+	Mem_Free(tree);
+}
+
+static void Font_Glyph_Free(glyph_t *glyph)
+{
+	// FIXME: tell the glyphtexture that this glyph is now gone...
+	Mem_Free(glyph);
+}
+
+glyph_t* Font_GetGlyph(ft2_font_t *font, int sizeindex, float _w, float _h, Uchar _ch)
+{
+	// Currently we only care about size_index rather than w, h
+	// In the future we might allow a cvar to allocat glyphs for any size directly, but
+	// this would be dangerous unless we also free glyph frequently.
+	// Also it's a bad idea when there's scaling involved.
+	// ... Unless it all performs very well ...
+
+	//assert(sizeindex >= 0 && sizeindex < MAX_FONT_SIZES && "Font_GetGlyph: Invalid size index: out of array bounds!");
+
+	ft2_font_size_t *fsize;
+	glyph_t         *glyph;
+
+	ft2_font_t      *usefont;
+
+	ft2_glyphtex_t  *glyphtex = font_glyphtex_end;
+	int              status;
+	FT_ULong         ch;
+	FT_Int32         load_flags;
+	int              gpad_l, gpad_r, gpad_t, gpad_b;
+	unsigned char   *data;
+	int              gR, gC; // glyph position: row, column - now x, y actually
+	FT_Face          fontface;
+
+	int              allocw = 0, alloch = 0;
+	int              tp;
+
+	// Freetype vars:
+	FT_ULong         ft_glyphIndex;
+	int              w, h, x, y;
+	FT_GlyphSlot     ft_glyph;
+	FT_Bitmap       *bmp;
+	unsigned char   *imagedata = NULL, *dst, *src;
+	FT_Face          ft_face;
+	int              pad_l, pad_r, pad_t, pad_b;
+
+	// info copied from glyphtex later on:
+	int bytesPerPixel;
+	int pitch;
+
+	// In case the first glyphtex texture was not yet loaded, load it.
+	if (!glyphtex) {
+		glyphtex = Font_New_GlyphTex(FONT_GLYPHTEX_WIDTH, FONT_GLYPHTEX_HEIGHT);
+	}
+
+	if (sizeindex < 0 || sizeindex > MAX_FONT_SIZES) {
+		Con_Printf("ERROR: out of bounds size-index in GetGlyph: %i\n", sizeindex);
+		return NULL;
+	}
+
+	fsize = &font->font_sizes[sizeindex];
+
+	if ( (glyph = Font_Glyph_Find(fsize, _ch)) ) {
+		return glyph;
+	}
+
+	// Glyph is new: create it
+	ch = (FT_ULong)_ch;
+
+	// NOTE: When rendering: r_font_use_alpha_textures is NOT to be used, but instead
+	// the texture's alpha-texture value.
+	// Also: We might want to actually finish alpha-textures for fonts...
+	// We'd require a shader change to make proper use of it tho: to treat that single alpha value and assume
+	// the color to be white + quakecolor(^x)
+
+	if (font->image_font)
+		fontface = (FT_Face)font->next->face;
+	else
+		fontface = (FT_Face)font->face;
+
+	switch(font->settings->antialias)
+	{
+		case 0:
+			switch(font->settings->hinting)
+			{
+				case 0:
+					load_flags = FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT | FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
+					break;
+				case 1:
+				case 2:
+					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
+					break;
+				default:
+				case 3:
+					load_flags = FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
+					break;
+			}
+			break;
+		default:
+		case 1:
+			switch(font->settings->hinting)
+			{
+				case 0:
+					load_flags = FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT | FT_LOAD_TARGET_NORMAL;
+					break;
+				case 1:
+					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT;
+					break;
+				case 2:
+					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_NORMAL;
+					break;
+				default:
+				case 3:
+					load_flags = FT_LOAD_TARGET_NORMAL;
+					break;
+			}
+			break;
+	}
+
+	if (font->image_font && fsize->intSize < 0)
+		fsize->intSize = fsize->size;
+
+	if (fsize->intSize < 0)
+	{
+		if ((fsize->intSize = Font_SearchSize(font, fontface, fsize->size)) <= 0) {
+			return NULL;
+		}
+		Con_DPrintf("Using size: %f for requested size %f\n", fsize->intSize, fsize->size);
+	}
+
+	if (!font->image_font && !Font_SetSize(font, fsize->intSize, fsize->intSize))
+	{
+		Con_Printf("ERROR: can't set sizes for font %s: %f\n", font->name, fsize->size);
+		return NULL;
+	}
+
+	glyph = (glyph_t*)Mem_Alloc(font_mempool, sizeof(glyph_t));
+	if (!glyph)
+	{
+		Con_Printf("ERROR: Out of memory when loading glyph %u for %s\n", (unsigned int)_ch, font->name);
+		return NULL;
+	}
+
+	// Freetype loading
+	ft_face = (FT_Face)font->face;
+	usefont = NULL;
+	if (font->image_font && ch <= 0xFF && img_fontmap[ch])
+	{
+		glyph->image = true;
+		return glyph;
+	}
+
+	ft_glyphIndex = qFT_Get_Char_Index(ft_face, ch);
+	if (ft_glyphIndex == 0)
+	{
+		// by convention, 0 is the "missing-glyph"-glyph
+		// try to load from a fallback font
+		for (usefont = font->next; usefont != NULL; usefont = usefont->next)
+		{
+			if (!Font_SetSize(usefont, fsize->intSize, fsize->intSize))
+				continue;
+			ft_face = (FT_Face)usefont->face;
+			ft_glyphIndex = qFT_Get_Char_Index(ft_face, ch);
+			if (ft_glyphIndex == 0)
+				continue;
+			status = qFT_Load_Glyph(ft_face, ft_glyphIndex, FT_LOAD_RENDER | load_flags);
+			if (status)
+				continue;
+			break;
+		}
+		if (!usefont)
+		{
+			// Use the missing-glyph glyph
+			ft_face = (FT_Face)font->face;
+			ft_glyphIndex = 0;
+		}
+	}
+
+	if (!usefont)
+	{
+		usefont = font;
+		ft_face = (FT_Face)font->face;
+		status = qFT_Load_Glyph(ft_face, ft_glyphIndex, FT_LOAD_RENDER | load_flags);
+		if (status)
+		{
+			Con_DPrintf("failed to load glyph for char %lx from font %s\n", (unsigned long)ch, font->name);
+			Mem_Free(glyph);
+			return NULL;
+		}
+	}
+
+	Font_Postprocess(font, NULL, 0, glyphtex->bytesPerPixel, fsize->size*2, fsize->size*2, &gpad_l, &gpad_r, &gpad_t, &gpad_b);
+
+	//pitch = glyphtex->pitch;
+	//data = glyphtex->data;
+
+	ft_glyph = ft_face->glyph;
+	bmp = &ft_glyph->bitmap;
+
+	w = bmp->width;
+	h = bmp->rows;
+
+	if (w > (fsize->glyphSize - gpad_l - gpad_r) || h > (fsize->glyphSize - gpad_t - gpad_b))
+	{
+		Con_Printf("WARNING: Glyph %lu is too big in font %s, size %g, %i x %i\n", (unsigned long)ch, font->name, fsize->size, w, h);
+		if (w > fsize->glyphSize)
+			w = fsize->glyphSize - gpad_l - gpad_r;
+		if (h > fsize->glyphSize)
+			h = fsize->glyphSize;
+	}
+
+	// Allocate a block on the glyph texture:
+	allocw = w + gpad_l + gpad_r;
+	alloch = h + gpad_t + gpad_b;
+	if (allocw < w || alloch < h) {
+		Con_Printf("ERROR: Glyph bitmap is bigger than expected: %i < %i, %i < %i\n", allocw, w, alloch, h);
+		Mem_Free(glyph);
+		return NULL;
+	}
+	if (!Mod_AllocLightmap_Block(&glyphtex->blockstate, allocw, alloch, &gC, &gR))
+	{
+		// Texture full: make new one
+		glyphtex = Font_New_GlyphTex(FONT_GLYPHTEX_WIDTH, FONT_GLYPHTEX_HEIGHT);
+		if (!Mod_AllocLightmap_Block(&glyphtex->blockstate, allocw, alloch, &gC, &gR))
+		{
+			Con_Printf("ERROR: Glyph %lu is too big to fit on a single texture, this is a bogus size. Font %s, size %g, %i x %i\n",
+				   (unsigned long)ch, font->name, fsize->size, w, h);
+			Mem_Free(glyph);
+			return NULL;
+		}
+	}
+
+	glyph->glyphtex = glyphtex;
+	glyph->tex = glyphtex->tex;
+
+	// Glyph is rendered and we have space allocated on a glyph-texture.
+	// We're good to go, ready for postprocessing and the rest.
+
+	bytesPerPixel = glyphtex->bytesPerPixel;
+	//pitch = glyphtex->pitch;
+	//imagedata = glyphtex->data + gR * pitch + gC * bytesPerPixel;
+	pitch = glyphtex->bytesPerPixel * allocw;
+	data = (unsigned char *)Mem_Alloc(font_mempool, alloch * pitch);
+	imagedata = data + gpad_t * pitch + gpad_l * bytesPerPixel;
+
+	tp = 0;
+	while (tp < pitch * alloch)
+	{
+		if (bytesPerPixel == 4) {
+			data[tp++] = 0xFF;
+			data[tp++] = 0xFF;
+			data[tp++] = 0xFF;
+		}
+		data[tp++] = 0x00;
+	}
+
+	switch (bmp->pixel_mode)
+	{
+	case FT_PIXEL_MODE_MONO:
+		if (developer_font.integer)
+			Con_DPrint("glyphinfo:   Pixel Mode: MONO\n");
+		break;
+	case FT_PIXEL_MODE_GRAY2:
+		if (developer_font.integer)
+			Con_DPrint("glyphinfo:   Pixel Mode: GRAY2\n");
+		break;
+	case FT_PIXEL_MODE_GRAY4:
+		if (developer_font.integer)
+			Con_DPrint("glyphinfo:   Pixel Mode: GRAY4\n");
+		break;
+	case FT_PIXEL_MODE_GRAY:
+		if (developer_font.integer)
+			Con_DPrint("glyphinfo:   Pixel Mode: GRAY\n");
+		break;
+	default:
+		if (developer_font.integer)
+			Con_DPrintf("glyphinfo:   Pixel Mode: Unknown: %i\n", bmp->pixel_mode);
+		Mem_Free(data);
+		Con_Printf("ERROR: Unrecognized pixel mode for font %s size %f: %i\n", font->name, fsize->size, bmp->pixel_mode);
+		Mem_Free(glyph);
+		return false;
+	}
+	for (y = 0; y < h; ++y)
+	{
+		dst = imagedata + y * pitch;
+		src = bmp->buffer + y * bmp->pitch;
+
+		switch (bmp->pixel_mode)
+		{
+		case FT_PIXEL_MODE_MONO:
+			dst += bytesPerPixel - 1; // shift to alpha byte
+			for (x = 0; x < bmp->width; x += 8)
+			{
+				unsigned char ch = *src++;
+				*dst = 255 * !!((ch & 0x80) >> 7); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x40) >> 6); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x20) >> 5); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x10) >> 4); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x08) >> 3); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x04) >> 2); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x02) >> 1); dst += bytesPerPixel;
+				*dst = 255 * !!((ch & 0x01) >> 0); dst += bytesPerPixel;
+			}
+			break;
+		case FT_PIXEL_MODE_GRAY2:
+			dst += bytesPerPixel - 1; // shift to alpha byte
+			for (x = 0; x < bmp->width; x += 4)
+			{
+				unsigned char ch = *src++;
+				*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
+				*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
+				*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
+				*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
+			}
+			break;
+		case FT_PIXEL_MODE_GRAY4:
+			dst += bytesPerPixel - 1; // shift to alpha byte
+			for (x = 0; x < bmp->width; x += 2)
+			{
+				unsigned char ch = *src++;
+				*dst = ( ((ch & 0xF0) >> 4) * 0x11); dst += bytesPerPixel;
+				*dst = ( ((ch & 0x0F) ) * 0x11); dst += bytesPerPixel;
+			}
+			break;
+		case FT_PIXEL_MODE_GRAY:
+			// in this case pitch should equal width
+			for (tp = 0; tp < bmp->pitch; ++tp)
+				dst[(bytesPerPixel - 1) + tp*bytesPerPixel] = src[tp]; // copy the grey value into the alpha bytes
+
+			//memcpy((void*)dst, (void*)src, bmp->pitch);
+			//dst += bmp->pitch;
+			break;
+		default:
+			break;
+		}
+	}
+
+	pad_l = gpad_l;
+	pad_r = gpad_r;
+	pad_t = gpad_t;
+	pad_b = gpad_b;
+	Font_Postprocess(font, imagedata, pitch, bytesPerPixel, w, h, &pad_l, &pad_r, &pad_t, &pad_b);
+
+	R_UpdateTexture(glyphtex->tex, data, gC, gR, 0, allocw, alloch, 8 * bytesPerPixel);
+	Mem_Free(data);
+
+	R_SaveTextureTGAFile(glyphtex->tex, "font-texture.tga", true);
+
+	glyph->image = false;
+	{
+		// old way
+		// double advance = (double)glyph->metrics.horiAdvance * map->sfx;
+
+		double bearingX = (ft_glyph->metrics.horiBearingX / 64.0) / fsize->size;
+		//double bearingY = (ft_glyph->metrics.horiBearingY >> 6) / fsize->size;
+		double advance = (ft_glyph->advance.x / 64.0) / fsize->size;
+		//double mWidth = (ft_glyph->metrics.width >> 6) / fsize->size;
+		//double mHeight = (ft_glyph->metrics.height >> 6) / fsize->size;
+
+		glyph->txmin = ( (double)(gC /* fsize->glyphSize*/) + (double)(gpad_l - pad_l) ) / ( (double)glyphtex->width );
+		glyph->txmax = glyph->txmin + (double)(bmp->width + pad_l + pad_r) / ( glyphtex->width );
+		glyph->tymin = ( (double)(gR /* fsize->glyphSize*/) + (double)(gpad_r - pad_r) ) / ( (double)glyphtex->height );
+		glyph->tymax = glyph->tymin + (double)(bmp->rows + pad_t + pad_b) / ( (double)glyphtex->height );
+		//Con_Printf("%f %f %f %f (%i - %i and %i - %i) %c\n", glyph->txmin, glyph->txmax, glyph->tymin, glyph->tymax, gpad_l, pad_l, gpad_r, pad_r, (char)_ch);
+		//glyph->vxmin = bearingX;
+		//glyph->vxmax = bearingX + mWidth;
+		glyph->vxmin = (ft_glyph->bitmap_left - pad_l) / fsize->size;
+		glyph->vxmax = glyph->vxmin + (bmp->width + pad_l + pad_r) / fsize->size; // don't ask
+		//glyph->vymin = -bearingY;
+		//glyph->vymax = mHeight - bearingY;
+		glyph->vymin = (-ft_glyph->bitmap_top - pad_t) / fsize->size;
+		glyph->vymax = glyph->vymin + (bmp->rows + pad_t + pad_b) / fsize->size;
+		//Con_Printf("dpi = %f %f (%f %d) %d %d\n", bmp->width / (glyph->vxmax - glyph->vxmin), bmp->rows / (glyph->vymax - glyph->vymin), map->size, map->ft_glyphSize, (int)fontface->size->metrics.x_ppem, (int)fontface->size->metrics.y_ppem);
+		//glyph->advance_x = advance * usefont->size;
+		//glyph->advance_x = advance;
+		glyph->advance_x = Font_SnapTo(advance, 1 / fsize->size);
+		glyph->advance_y = 0;
+
+		if (developer_font.integer)
+		{
+			Con_DPrintf("glyphinfo:   glyph: %lu   at (%i, %i)\n", (unsigned long)ch, gC, gR);
+			Con_DPrintf("glyphinfo:   %f, %f, %lu\n", bearingX, fsize->sfx, (unsigned long)ft_glyph->metrics.horiBearingX);
+			if (ch >= 32 && ch <= 128)
+				Con_DPrintf("glyphinfo:   Character: %c\n", (int)ch);
+			Con_DPrintf("glyphinfo:   Vertex info:\n");
+			Con_DPrintf("glyphinfo:     X: ( %f  --  %f )\n", glyph->vxmin, glyph->vxmax);
+			Con_DPrintf("glyphinfo:     Y: ( %f  --  %f )\n", glyph->vymin, glyph->vymax);
+			Con_DPrintf("glyphinfo:   Texture info:\n");
+			Con_DPrintf("glyphinfo:     S: ( %f  --  %f )\n", glyph->txmin, glyph->txmax);
+			Con_DPrintf("glyphinfo:     T: ( %f  --  %f )\n", glyph->tymin, glyph->tymax);
+			Con_DPrintf("glyphinfo:   Advance: %f, %f\n", glyph->advance_x, glyph->advance_y);
+		}
+	}
+
+	// Insert the glyph into the glyph tree
+	Font_Glyph_Insert(fsize, _ch, glyph);
+
+	return glyph;
+}
+
+#if 0
+// DEPRECATED:
 static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _ch, ft2_font_map_t **outmap)
 {
 	char map_identifier[MAX_QPATH];
@@ -1572,7 +2161,10 @@ static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _
 		*outmap = map;
 	return true;
 }
+#endif
 
+#if 0
+// DEPRECATED:
 qboolean Font_LoadMapForIndex(ft2_font_t *font, int map_index, Uchar _ch, ft2_font_map_t **outmap)
 {
 	if (map_index < 0 || map_index >= MAX_FONT_SIZES)
@@ -1591,3 +2183,4 @@ ft2_font_map_t *FontMap_FindForChar(ft2_font_map_t *start, Uchar ch)
 		return NULL;
 	return start;
 }
+#endif

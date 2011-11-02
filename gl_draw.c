@@ -765,11 +765,18 @@ void LoadFont(qboolean override, const char *name, dp_font_t *fnt, float scale, 
 	{
 		for (i = 0; i < MAX_FONT_SIZES; ++i)
 		{
+			/*
 			ft2_font_map_t *map = Font_MapForIndex(fnt->ft2, i);
 			if (!map)
 				break;
 			for(ch = 0; ch < 256; ++ch)
 				map->width_of[ch] = Font_SnapTo(fnt->width_of[ch], 1/map->size);
+			*/
+			ft2_font_size_t *ftsize = &fnt->ft2->font_sizes[i];
+			for (ch = 0; ch < 256; ++ch) {
+				if (ftsize->size > 0)
+					ftsize->width_of[ch] = Font_SnapTo(fnt->width_of[ch], 1/ftsize->size);
+			}
 		}
 	}
 
@@ -1323,16 +1330,24 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 	int colorindex = STRING_COLOR_DEFAULT;
 	size_t i;
 	float x = 0;
-	Uchar ch, mapch, nextch;
+	Uchar ch, nextch;
 	Uchar prevch = 0; // used for kerning
 	int tempcolorindex;
 	float kx;
-	int map_index = 0;
 	size_t bytes_left;
+	/* DEPRECATED:
+	int map_index = 0;
 	ft2_font_map_t *fontmap = NULL;
 	ft2_font_map_t *map = NULL;
 	//ft2_font_map_t *prevmap = NULL;
+	*/
+	int size_index = 0;
 	ft2_font_t *ft2 = fnt->ft2;
+	ft2_font_size_t *ft2size = NULL;
+	glyph_t *glyph = NULL;
+	rtexture_t *ft2tex = NULL;
+	qboolean oldstyle_char = false;
+	//qboolean oldstyle_char = false;
 	// float ftbase_x;
 	qboolean snap = true;
 	qboolean least_one = false;
@@ -1353,10 +1368,12 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 	if (ft2 != NULL)
 	{
 		if (snap)
-			map_index = Font_IndexForSize(ft2, h, &w, &h);
+			size_index = Font_IndexForSize(ft2, h, &w, &h);
 		else
-			map_index = Font_IndexForSize(ft2, h, NULL, NULL);
-		fontmap = Font_MapForIndex(ft2, map_index);
+			size_index = Font_IndexForSize(ft2, h, NULL, NULL);
+		//fontmap = Font_MapForIndex(ft2, map_index);
+		if (size_index >= 0)
+			ft2size = &ft2->font_sizes[size_index];
 	}
 
 	dw = w * sw;
@@ -1382,8 +1399,8 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 	//if (snap)
 	//	x = snap_to_pixel_x(x, 0.4); // haha, it's 0 anyway
 
-	if (fontmap)
-		width_of = fontmap->width_of;
+	if (ft2size)
+		width_of = ft2size->width_of;
 	else
 		width_of = fnt->width_of;
 
@@ -1395,7 +1412,7 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 		i = text - text_start;
 		if (!ch)
 			break;
-		if (ch == ' ' && !fontmap)
+		if (ch == ' ' && !ft2size)
 		{
 			if(!least_one || i0) // never skip the first character
 			if(x + width_of[(int) ' '] * dw > maxwidth)
@@ -1460,14 +1477,16 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 		}
 		ch = nextch;
 
-		if (!fontmap || (ch <= 0xFF && fontmap->glyphs[ch].image) || (ch >= 0xE000 && ch <= 0xE0FF))
+		if (ft2size)
+			glyph = Font_GetGlyph(ft2, size_index, w, h, ch);
+
+		if (!ft2size || (ch <= 0xFF && glyph->image) || (ch >= 0xE000 && ch <= 0xE0FF))
 		{
 			if (ch > 0xE000)
 				ch -= 0xE000;
 			if (ch > 0xFF)
 				continue;
-			if (fontmap)
-				map = ft2_oldstyle_map;
+			oldstyle_char = true;
 			prevch = 0;
 			if(!least_one || i0) // never skip the first character
 			if(x + width_of[ch] * dw > maxwidth)
@@ -1477,6 +1496,7 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 			}
 			x += width_of[ch] * dw;
 		} else {
+			/*
 			if (!map || map == ft2_oldstyle_map || ch < map->start || ch >= map->start + FONT_CHARS_PER_MAP)
 			{
 				map = FontMap_FindForChar(fontmap, ch);
@@ -1492,7 +1512,15 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 			if (prevch && Font_GetKerningForMap(ft2, map_index, w, h, prevch, ch, &kx, NULL))
 				x += kx * dw;
 			x += map->glyphs[mapch].advance_x * dw;
+			*/
+			if (oldstyle_char || glyph->tex != ft2tex) {
+				oldstyle_char = false;
+				ft2tex = glyph->tex;
+			}
 			//prevmap = map;
+			if (prevch && Font_GetKerning(ft2, size_index, w, h, prevch, ch, &kx, NULL))
+				x += kx * dw;
+			x += glyph->advance_x * dw;
 			prevch = ch;
 		}
 	}
@@ -1516,17 +1544,25 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 	static float vertex3f[QUADELEMENTS_MAXQUADS*4*3];
 	static float texcoord2f[QUADELEMENTS_MAXQUADS*4*2];
 	static float color4f[QUADELEMENTS_MAXQUADS*4*4];
-	Uchar ch, mapch, nextch;
+	Uchar ch, nextch;
 	Uchar prevch = 0; // used for kerning
 	int tempcolorindex;
+	/*
 	int map_index = 0;
 	//ft2_font_map_t *prevmap = NULL; // the previous map
 	ft2_font_map_t *map = NULL;     // the currently used map
 	ft2_font_map_t *fontmap = NULL; // the font map for the size
+	*/
+	qboolean oldstyle_char = false;
+	int size_index = 0;
 	float ftbase_y;
 	const char *text_start = text;
 	float kx, ky;
 	ft2_font_t *ft2 = fnt->ft2;
+	ft2_font_size_t *ft2size = NULL;
+	//ft2_glyphtex_t *ft2tex = NULL; // Used to reduce SetupShader calls and maximize batches
+	rtexture_t *ft2tex = NULL;
+	glyph_t *glyph = NULL;
 	qboolean snap = true;
 	float pix_x, pix_y;
 	size_t bytes_left;
@@ -1550,10 +1586,12 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 	if (ft2 != NULL)
 	{
 		if (snap)
-			map_index = Font_IndexForSize(ft2, h, &w, &h);
+			size_index = Font_IndexForSize(ft2, h, &w, &h);
 		else
-			map_index = Font_IndexForSize(ft2, h, NULL, NULL);
-		fontmap = Font_MapForIndex(ft2, map_index);
+			size_index = Font_IndexForSize(ft2, h, NULL, NULL);
+		//fontmap = Font_MapForIndex(ft2, map_index);
+		if (size_index >= 0)
+			ft2size = &ft2->font_sizes[size_index];
 	}
 
 	dw = w * sw;
@@ -1571,7 +1609,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 		return startx + DrawQ_TextWidth_UntilWidth_TrackColors_Scale(text, &maxlen, w, h, sw, sh, NULL, ignorecolorcodes, fnt, 1000000000);
 
 //	R_Mesh_ResetTextureState();
-	if (!fontmap)
+	if (!ft2size)
 		R_Mesh_TexBind(0, fnt->tex);
 	R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true, false);
 
@@ -1591,8 +1629,8 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 	pix_x = vid.width / vid_conwidth.value;
 	pix_y = vid.height / vid_conheight.value;
 
-	if (fontmap)
-		width_of = fontmap->width_of;
+	if (ft2size)
+		width_of = ft2size->width_of;
 	else
 		width_of = fnt->width_of;
 
@@ -1623,7 +1661,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 			i = text - text_start;
 			if (!ch)
 				break;
-			if (ch == ' ' && !fontmap)
+			if (ch == ' ' && !ft2size)
 			{
 				x += width_of[(int) ' '] * dw;
 				continue;
@@ -1689,15 +1727,18 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 				x += 1.0/pix_x * r_textshadow.value;
 				y += 1.0/pix_y * r_textshadow.value;
 			}
-			if (!fontmap || (ch <= 0xFF && fontmap->glyphs[ch].image) || (ch >= 0xE000 && ch <= 0xE0FF))
+
+			if (ft2size)
+				glyph = Font_GetGlyph(ft2, size_index, w, h, ch);
+			if (!ft2size || (ch <= 0xFF && glyph->image) || (ch >= 0xE000 && ch <= 0xE0FF))
 			{
 				if (ch >= 0xE000)
 					ch -= 0xE000;
 				if (ch > 0xFF)
 					goto out;
-				if (fontmap)
+				if (ft2size)
 				{
-					if (map != ft2_oldstyle_map)
+					if (!oldstyle_char)
 					{
 						if (batchcount)
 						{
@@ -1710,7 +1751,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 							av = vertex3f;
 						}
 						R_SetupShader_Generic(fnt->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true, false);
-						map = ft2_oldstyle_map;
+						oldstyle_char = true;
 					}
 				}
 				prevch = 0;
@@ -1759,6 +1800,7 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 				}
 				x += width_of[ch] * dw;
 			} else {
+				/* DEPRECATED:
 				if (!map || map == ft2_oldstyle_map || ch < map->start || ch >= map->start + FONT_CHARS_PER_MAP)
 				{
 					// new charmap - need to render
@@ -1790,13 +1832,34 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 					}
 					R_SetupShader_Generic(map->pic->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true, false);
 				}
+				*/
 
-				mapch = ch - map->start;
-				thisw = map->glyphs[mapch].advance_x;
+				// DEPRECATED: mapch = ch - map->start;
+				// DEPRECATED: thisw = map->glyphs[mapch].advance_x;
+
+				// this is done above to get the actual glyph's .image value
+				// glyph = Font_GetGlyph(ft2, size_index, w, h, ch);
+				thisw = glyph->advance_x;
+
+				if (oldstyle_char || glyph->tex != ft2tex) {
+					oldstyle_char = false;
+					ft2tex = glyph->tex;
+					if (batchcount)
+					{
+						R_Mesh_PrepareVertices_Generic_Arrays(batchcount * 4, vertex3f, color4f, texcoord2f);
+						R_Mesh_Draw(0, batchcount * 4, 0, batchcount * 2, quadelement3i, NULL, 0, quadelement3s, NULL, 0);
+						batchcount = 0;
+						ac = color4f;
+						at = texcoord2f;
+						av = vertex3f;
+					}
+					R_SetupShader_Generic(glyph->tex, NULL, GL_MODULATE, 1, (flags & DRAWFLAGS_BLEND) ? false : true, true, false);
+				}
 
 				//x += ftbase_x;
 				y += ftbase_y;
-				if (prevch && Font_GetKerningForMap(ft2, map_index, w, h, prevch, ch, &kx, &ky))
+				//if (prevch && Font_GetKerningForMap(ft2, map_index, w, h, prevch, ch, &kx, &ky))
+				if (prevch && Font_GetKerning(ft2, size_index, w, h, prevch, ch, &kx, &ky))
 				{
 					x += kx * dw;
 					y += ky * dh;
@@ -1807,14 +1870,14 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 				ac[ 4] = DrawQ_Color[0]; ac[ 5] = DrawQ_Color[1]; ac[ 6] = DrawQ_Color[2]; ac[ 7] = DrawQ_Color[3];
 				ac[ 8] = DrawQ_Color[0]; ac[ 9] = DrawQ_Color[1]; ac[10] = DrawQ_Color[2]; ac[11] = DrawQ_Color[3];
 				ac[12] = DrawQ_Color[0]; ac[13] = DrawQ_Color[1]; ac[14] = DrawQ_Color[2]; ac[15] = DrawQ_Color[3];
-				at[0] = map->glyphs[mapch].txmin; at[1] = map->glyphs[mapch].tymin;
-				at[2] = map->glyphs[mapch].txmax; at[3] = map->glyphs[mapch].tymin;
-				at[4] = map->glyphs[mapch].txmax; at[5] = map->glyphs[mapch].tymax;
-				at[6] = map->glyphs[mapch].txmin; at[7] = map->glyphs[mapch].tymax;
-				av[ 0] = x + dw * map->glyphs[mapch].vxmin; av[ 1] = y + dh * map->glyphs[mapch].vymin; av[ 2] = 10;
-				av[ 3] = x + dw * map->glyphs[mapch].vxmax; av[ 4] = y + dh * map->glyphs[mapch].vymin; av[ 5] = 10;
-				av[ 6] = x + dw * map->glyphs[mapch].vxmax; av[ 7] = y + dh * map->glyphs[mapch].vymax; av[ 8] = 10;
-				av[ 9] = x + dw * map->glyphs[mapch].vxmin; av[10] = y + dh * map->glyphs[mapch].vymax; av[11] = 10;
+				at[0] = glyph->txmin; at[1] = glyph->tymin;
+				at[2] = glyph->txmax; at[3] = glyph->tymin;
+				at[4] = glyph->txmax; at[5] = glyph->tymax;
+				at[6] = glyph->txmin; at[7] = glyph->tymax;
+				av[ 0] = x + dw * glyph->vxmin; av[ 1] = y + dh * glyph->vymin; av[ 2] = 10;
+				av[ 3] = x + dw * glyph->vxmax; av[ 4] = y + dh * glyph->vymin; av[ 5] = 10;
+				av[ 6] = x + dw * glyph->vxmax; av[ 7] = y + dh * glyph->vymax; av[ 8] = 10;
+				av[ 9] = x + dw * glyph->vxmin; av[10] = y + dh * glyph->vymax; av[11] = 10;
 				//x -= ftbase_x;
 				y -= ftbase_y;
 
