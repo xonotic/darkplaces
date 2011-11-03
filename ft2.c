@@ -589,6 +589,7 @@ qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 				// Bogus size check needs to be done here already
 			} else
 				++count;
+			// FIXME: KERNING:
 		}
 		if (!count)
 		{
@@ -633,6 +634,30 @@ qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 			fsize->glyphSize = CeilPowerOf2(fsize->glyphSize);
 		*/
 		fsize->intSize = -1;
+		if (ft2->has_kerning)
+		{
+			Uchar l, r;
+			FT_Vector kernvec;
+			for (l = 0; l < 256; ++l)
+			{
+				for (r = 0; r < 256; ++r)
+				{
+					FT_ULong ul, ur;
+					ul = qFT_Get_Char_Index((FT_Face)ft2->face, l);
+					ur = qFT_Get_Char_Index((FT_Face)ft2->face, r);
+					if (qFT_Get_Kerning((FT_Face)ft2->face, ul, ur, FT_KERNING_DEFAULT, &kernvec))
+					{
+						fsize->kerning.kerning[l][r][0] = 0;
+						fsize->kerning.kerning[l][r][1] = 0;
+					}
+					else
+					{
+						fsize->kerning.kerning[l][r][0] = Font_SnapTo((kernvec.x / 64.0) / fsize->size, 1 / fsize->size);
+						fsize->kerning.kerning[l][r][1] = Font_SnapTo((kernvec.y / 64.0) / fsize->size, 1 / fsize->size);
+					}
+				}
+			}
+		}
 	}
 	if (!count)
 	{
