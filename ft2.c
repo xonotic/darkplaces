@@ -1004,30 +1004,19 @@ static qboolean Font_SetSize(ft2_font_t *font, float w, float h)
 
 qboolean Font_GetKerning(ft2_font_t *font, int size_index, float w, float h, Uchar left, Uchar right, float *outx, float *outy)
 {
-	// FIXME: Currently dummied because we are focusing on glyph loading
-	if (outx) *outx = 0;
-	if (outy) *outy = 0;
-	return false;
-}
-
-#if 0
-// DEPRECATED:
-qboolean Font_GetKerningForMap(ft2_font_t *font, int map_index, float w, float h, Uchar left, Uchar right, float *outx, float *outy)
-{
-	ft2_font_map_t *fmap;
+	ft2_font_size_t *fsize;
 	if (!font->has_kerning || !r_font_kerning.integer)
 		return false;
-	if (map_index < 0 || map_index >= MAX_FONT_SIZES)
+	if (size_index < 0 || size_index >= MAX_FONT_SIZES)
 		return false;
-	fmap = font->font_maps[map_index];
-	if (!fmap)
+	fsize = &font->font_sizes[size_index];
+	if (fsize->size < 1)
 		return false;
 	if (left < 256 && right < 256)
 	{
-		//Con_Printf("%g : %f, %f, %f :: %f\n", (w / (float)fmap->size), w, fmap->size, fmap->intSize, Font_VirtualToRealSize(w));
 		// quick-kerning, be aware of the size: scale it
-		if (outx) *outx = fmap->kerning.kerning[left][right][0];// * (w / (float)fmap->size);
-		if (outy) *outy = fmap->kerning.kerning[left][right][1];// * (h / (float)fmap->size);
+		if (outx) *outx = fsize->kerning.kerning[left][right][0];// * (w / (float)fmap->size);
+		if (outy) *outy = fsize->kerning.kerning[left][right][1];// * (h / (float)fmap->size);
 		return true;
 	}
 	else
@@ -1035,24 +1024,7 @@ qboolean Font_GetKerningForMap(ft2_font_t *font, int map_index, float w, float h
 		FT_Vector kernvec;
 		FT_ULong ul, ur;
 
-		//if (qFT_Set_Pixel_Sizes((FT_Face)font->face, 0, fmap->size))
-#if 0
-		if (!Font_SetSize(font, w, h))
-		{
-			// this deserves an error message
-			Con_Printf("Failed to get kerning for %s\n", font->name);
-			return false;
-		}
-		ul = qFT_Get_Char_Index(font->face, left);
-		ur = qFT_Get_Char_Index(font->face, right);
-		if (qFT_Get_Kerning(font->face, ul, ur, FT_KERNING_DEFAULT, &kernvec))
-		{
-			if (outx) *outx = Font_SnapTo(kernvec.x * fmap->sfx, 1 / fmap->size);
-			if (outy) *outy = Font_SnapTo(kernvec.y * fmap->sfy, 1 / fmap->size);
-			return true;
-		}
-#endif
-		if (!Font_SetSize(font, fmap->intSize, fmap->intSize))
+		if (!Font_SetSize(font, fsize->intSize, fsize->intSize))
 		{
 			// this deserves an error message
 			Con_Printf("Failed to get kerning for %s\n", font->name);
@@ -1062,19 +1034,19 @@ qboolean Font_GetKerningForMap(ft2_font_t *font, int map_index, float w, float h
 		ur = qFT_Get_Char_Index((FT_Face)font->face, right);
 		if (qFT_Get_Kerning((FT_Face)font->face, ul, ur, FT_KERNING_DEFAULT, &kernvec))
 		{
-			if (outx) *outx = Font_SnapTo(kernvec.x * fmap->sfx, 1 / fmap->size);// * (w / (float)fmap->size);
-			if (outy) *outy = Font_SnapTo(kernvec.y * fmap->sfy, 1 / fmap->size);// * (h / (float)fmap->size);
+			if (outx) *outx = Font_SnapTo(kernvec.x * fsize->sfx, 1 / fsize->size);// * (w / (float)fmap->size);
+			if (outy) *outy = Font_SnapTo(kernvec.y * fsize->sfy, 1 / fsize->size);// * (h / (float)fmap->size);
 			return true;
 		}
 		return false;
 	}
+	return false;
 }
 
 qboolean Font_GetKerningForSize(ft2_font_t *font, float w, float h, Uchar left, Uchar right, float *outx, float *outy)
 {
-	return Font_GetKerningForMap(font, Font_IndexForSize(font, h, NULL, NULL), w, h, left, right, outx, outy);
+	return Font_GetKerning(font, Font_IndexForSize(font, h, NULL, NULL), w, h, left, right, outx, outy);
 }
-#endif
 
 static void Font_GlyphTree_Free(ft2_glyph_tree_t *tree);
 void Font_UnloadFont(ft2_font_t *font)

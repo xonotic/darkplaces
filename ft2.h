@@ -45,6 +45,9 @@ typedef struct ft2_font_size_s
 	float         intSize;
 	int           glyphSize;
 
+	// We store the kerning for the first 256 characters
+	ft2_kerning_t kerning;
+
 	// For quick access, the first 256 glyphs
 	// are stored here - but not preloaded!
 	struct glyph_s *main_glyphs[256];
