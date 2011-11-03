@@ -322,9 +322,11 @@ void font_start(void)
 	font_glyphtex_start = font_glyphtex_end = NULL;
 }
 
+void Font_Free_GlyphTex(ft2_glyphtex_t *gt);
 void font_shutdown(void)
 {
 	int i;
+	ft2_glyphtex_t *gt, *gtnext;
 	for (i = 0; i < dp_fonts.maxsize; ++i)
 	{
 		if (dp_fonts.f[i].ft2)
@@ -333,6 +335,13 @@ void font_shutdown(void)
 			dp_fonts.f[i].ft2 = NULL;
 		}
 	}
+	gt = font_glyphtex_start;
+	for (gt = font_glyphtex_start; gt; gt = gtnext)
+	{
+		gtnext = gt->next;
+		Font_Free_GlyphTex(gt);
+	}
+	font_glyphtex_start = font_glyphtex_end = NULL;
 	Font_CloseLibrary();
 }
 
@@ -379,15 +388,18 @@ ft2_glyphtex_t *Font_New_GlyphTex(int width, int height)
 	int gtpitch;
 
 	ft2_glyphtex_t *gt = (ft2_glyphtex_t *)Mem_Alloc(font_mempool, sizeof(ft2_glyphtex_t));
+	gt->next = NULL;
+	gt->prev = NULL;
+
 	if (!font_glyphtex_start)
 		font_glyphtex_start = gt;
+
 	if (font_glyphtex_end) {
 		font_glyphtex_end->next = gt;
 		gt->prev = font_glyphtex_end;
-		font_glyphtex_end = gt;
-	} else {
-		font_glyphtex_end = gt;
 	}
+
+	font_glyphtex_end = gt;
 
 	if (r_font_use_alpha_textures.integer)
 		bytesPerPixel = 1;
@@ -398,9 +410,9 @@ ft2_glyphtex_t *Font_New_GlyphTex(int width, int height)
 	gt->bytesPerPixel = bytesPerPixel;
 	gtpitch = width * bytesPerPixel;
 	gt->tex = NULL;
-	gtdata = (unsigned char*)Mem_Alloc(font_mempool, width * height * bytesPerPixel);
-	//memset(gt->data, 0, width * height * bytesPerPixel);
+
 	// Initialize as white texture with zero alpha
+	gtdata = (unsigned char*)Mem_Alloc(font_mempool, width * height * bytesPerPixel);
 	tp = 0;
 	while (tp < height*gtpitch)
 	{
@@ -424,18 +436,24 @@ ft2_glyphtex_t *Font_New_GlyphTex(int width, int height)
 	gt->glyph_count = 0;
 	//gt->lastusedframe = 0;
 
-	gt->first_glyph = gt->last_glyph = NULL;
+	gt->first_glyph = NULL;
 
 	++font_glyphtex_counter;
 	Con_Printf("Glyphtextures: %i\n", font_glyphtex_counter);
 	return gt;
 }
 
-void Font_Free_GlyphTex(ft2_glyphtex_t *gt);
+static void Font_Free_Glyph(glyph_t *glyph);
 void Font_Free_GlyphTex(ft2_glyphtex_t *gt)
 {
 	ft2_glyphtex_t *prev = gt->prev;
 	ft2_glyphtex_t *next = gt->next;
+	glyph_t *glyph, *glnext;
+
+	// IMPORTANT: If we don't set this to 0, the deletion of
+	// the contained glyphs may trigger yet another Free_GlyphTex call
+	// due to the glyphtex suddenly be recognized as unused!
+	gt->glyph_count = 0;
 
 	if (prev)
 		prev->next = next;
@@ -446,6 +464,11 @@ void Font_Free_GlyphTex(ft2_glyphtex_t *gt)
 	Mod_AllocLightmap_Free(&gt->blockstate);
 
 	// FIXME: Go through glyphs now
+	for (glyph = gt->first_glyph; glyph; glyph = glnext)
+	{
+		glnext = glyph->next; // Important: glyph gets freed, and also removes itself from the list
+		Font_Free_Glyph(glyph);
+	}
 
 	R_FreeTexture(gt->tex);
 	gt->tex = NULL;
@@ -508,6 +531,8 @@ qboolean Font_LoadFont(const char *name, dp_font_t *dpfnt)
 		dpfnt->ft2 = NULL;
 		return false;
 	}
+
+	memset(ft2, 0, sizeof(*ft2));
 
 	// check if a fallback font has been specified, if it has been, and the
 	// font fails to load, use the image font as main font
@@ -899,98 +924,6 @@ static void Font_Postprocess(ft2_font_t *fnt, unsigned char *imagedata, int pitc
 	}
 }
 
-static float Font_SearchSize(ft2_font_t *font, FT_Face fontface, float size);
-//static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _ch, ft2_font_map_t **outmap);
-#if 0
-// DEPRECATED:
-static qboolean Font_LoadSize(ft2_font_t *font, float size, qboolean check_only)
-{
-	int map_index;
-	ft2_font_map_t *fmap, temp;
-	int gpad_l, gpad_r, gpad_t, gpad_b;
-
-	if (!(size > 0.001f && size < 1000.0f))
-		size = 0;
-
-	if (!size)
-		size = 16;
-	if (size < 2) // bogus sizes are not allowed - and they screw up our allocations
-		return false;
-
-	for (map_index = 0; map_index < MAX_FONT_SIZES; ++map_index)
-	{
-		if (!font->font_maps[map_index])
-			break;
-		// if a similar size has already been loaded, ignore this one
-		//abs(font->font_maps[map_index]->size - size) < 4
-		if (font->font_maps[map_index]->size == size)
-			return true;
-	}
-
-	if (map_index >= MAX_FONT_SIZES)
-		return false;
-
-	if (check_only) {
-		FT_Face fontface;
-		if (font->image_font)
-			fontface = (FT_Face)font->next->face;
-		else
-			fontface = (FT_Face)font->face;
-		return (Font_SearchSize(font, fontface, size) > 0);
-	}
-
-	Font_Postprocess(font, NULL, 0, 4, size*2, size*2, &gpad_l, &gpad_r, &gpad_t, &gpad_b);
-
-	memset(&temp, 0, sizeof(temp));
-	temp.size = size;
-	temp.glyphSize = size*2 + max(gpad_l + gpad_r, gpad_t + gpad_b);
-	if (!(r_font_nonpoweroftwo.integer && vid.support.arb_texture_non_power_of_two))
-		temp.glyphSize = CeilPowerOf2(temp.glyphSize);
-	temp.sfx = (1.0/64.0)/(double)size;
-	temp.sfy = (1.0/64.0)/(double)size;
-	temp.intSize = -1; // negative value: LoadMap must search now :)
-	if (!Font_LoadMap(font, &temp, 0, &fmap))
-	{
-		Con_Printf("ERROR: can't load the first character map for %s\n"
-			   "This is fatal\n",
-			   font->name);
-		Font_UnloadFont(font);
-		return false;
-	}
-	font->font_maps[map_index] = temp.next;
-
-	fmap->sfx = temp.sfx;
-	fmap->sfy = temp.sfy;
-
-	// load the default kerning vector:
-	if (font->has_kerning)
-	{
-		Uchar l, r;
-		FT_Vector kernvec;
-		for (l = 0; l < 256; ++l)
-		{
-			for (r = 0; r < 256; ++r)
-			{
-				FT_ULong ul, ur;
-				ul = qFT_Get_Char_Index((FT_Face)font->face, l);
-				ur = qFT_Get_Char_Index((FT_Face)font->face, r);
-				if (qFT_Get_Kerning((FT_Face)font->face, ul, ur, FT_KERNING_DEFAULT, &kernvec))
-				{
-					fmap->kerning.kerning[l][r][0] = 0;
-					fmap->kerning.kerning[l][r][1] = 0;
-				}
-				else
-				{
-					fmap->kerning.kerning[l][r][0] = Font_SnapTo((kernvec.x / 64.0) / fmap->size, 1 / fmap->size);
-					fmap->kerning.kerning[l][r][1] = Font_SnapTo((kernvec.y / 64.0) / fmap->size, 1 / fmap->size);
-				}
-			}
-		}
-	}
-	return true;
-}
-#endif
-
 int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 {
 	int match = -1;
@@ -1042,16 +975,6 @@ int Font_IndexForSize(ft2_font_t *font, float _fsize, float *outw, float *outh)
 	}
 	return match;
 }
-
-#if 0
-// DEPRECATED:
-ft2_font_map_t *Font_MapForIndex(ft2_font_t *font, int index)
-{
-	if (index < 0 || index >= MAX_FONT_SIZES)
-		return NULL;
-	return font->font_maps[index];
-}
-#endif
 
 static qboolean Font_SetSize(ft2_font_t *font, float w, float h)
 {
@@ -1153,20 +1076,7 @@ qboolean Font_GetKerningForSize(ft2_font_t *font, float w, float h, Uchar left, 
 }
 #endif
 
-/*
-static void UnloadMapRec(ft2_font_map_t *map)
-{
-	if (map->pic)
-	{
-		//Draw_FreePic(map->pic); // FIXME: refcounting needed...
-		map->pic = NULL;
-	}
-	if (map->next)
-		UnloadMapRec(map->next);
-	Mem_Free(map);
-}
-*/
-
+static void Font_GlyphTree_Free(ft2_glyph_tree_t *tree);
 void Font_UnloadFont(ft2_font_t *font)
 {
 	int i;
@@ -1185,16 +1095,19 @@ void Font_UnloadFont(ft2_font_t *font)
 		font->attachmentcount = 0;
 		font->attachments = NULL;
 	}
-	/*
+
 	for (i = 0; i < MAX_FONT_SIZES; ++i)
 	{
-		if (font->font_maps[i])
-		{
-			UnloadMapRec(font->font_maps[i]);
-			font->font_maps[i] = NULL;
+		ft2_font_size_t *fsize = &font->font_sizes[i];
+		int ch;
+		for (ch = 0; ch < 256; ++ch) {
+			if (fsize->main_glyphs[ch]) {
+				Font_Free_Glyph(fsize->main_glyphs[ch]);
+			}
 		}
+		Font_GlyphTree_Free(&fsize->glyphtree);
 	}
-	*/
+
 	if (ft2_dll)
 	{
 		if (font->face)
@@ -1255,6 +1168,10 @@ static void Font_Glyph_Insert(ft2_font_size_t *fsize, Uchar ch, glyph_t *glyph)
 {
 	ft2_glyph_tree_t *tree;
 	unsigned int i, idx;
+
+	glyph->ftsize = fsize;
+	glyph->treech = ch;
+
 	if (ch < 256)
 	{
 		fsize->main_glyphs[ch] = glyph;
@@ -1275,25 +1192,90 @@ static void Font_Glyph_Insert(ft2_font_size_t *fsize, Uchar ch, glyph_t *glyph)
 	return;
 }
 
-static void Font_Glyph_Free(glyph_t *glyph);
-static void Font_GlyphTree_Free(ft2_glyph_tree_t *tree)
+static void Font_GlyphTree_Remove(ft2_font_size_t *fsize, Uchar ch)
+{
+	ft2_glyph_tree_t *tree;
+	unsigned int i, idx;
+
+	if (ch < 256)
+	{
+		fsize->main_glyphs[ch] = NULL;
+		return;
+	}
+
+	tree = &fsize->glyphtree;
+	for (i = 0; i < (2 * sizeof(Uchar)); ++i) {
+		idx = (ch & 0x0F);
+		if (!tree->next[idx]) {
+			Con_Print("ERROR: Glyph not in glyphtree...\n");
+			return;
+		}
+		tree = tree->next[idx];
+		ch >>= 4;
+	}
+	tree->endglyph = NULL;
+}
+
+static void Font_GlyphTree_Free_Int(ft2_glyph_tree_t *tree, qboolean memfree)
 {
 	unsigned int i;
 	for (i = 0; i < sizeof(tree->next) / sizeof(tree->next[0]); ++i)
 	{
 		if (tree->next[i])
-			Font_GlyphTree_Free(tree->next[i]);
+			Font_GlyphTree_Free_Int(tree->next[i], true);
 	}
 	if (tree->endglyph)
 	{
-		Font_Glyph_Free(tree->endglyph);
+		Font_Free_Glyph(tree->endglyph);
 	}
-	Mem_Free(tree);
+	if (memfree)
+		Mem_Free(tree);
 }
 
-static void Font_Glyph_Free(glyph_t *glyph)
+static void Font_GlyphTree_Free(ft2_glyph_tree_t *tree)
 {
-	// FIXME: tell the glyphtexture that this glyph is now gone...
+	Font_GlyphTree_Free_Int(tree, false);
+}
+
+static void Font_GlyphTex_Glyph_Freed(ft2_glyphtex_t *gtex)
+{
+	// glyph_count is zero when we're unloading the glyphtexture
+	// in this case we shouldn't free the glyphtex twice if we hit a
+	// too high glyph-freed count!
+	if (!gtex->glyph_count)
+		return;
+	gtex->glyphs_freed++;
+	// Delete the glyphtex if it has too many unused characters
+	// TODO
+}
+
+static void Font_Free_Glyph(glyph_t *glyph)
+{
+	// The glyphtex wants to know about unloaded glyphs
+	// glyph->glyphtex->glyphs_freed++;
+	Font_GlyphTex_Glyph_Freed(glyph->glyphtex);
+
+	if (!glyph->prev) {
+		if (glyph->glyphtex->first_glyph != glyph) {
+			// Consistency checking...
+			// Should never happen but in this case I'd like to check
+			// Because there are many linked lists around here...
+			Con_Print("ERROR: Glyph has no link to a previous glyph but is not the first glyph in the glyph texture either!\n");
+		} else
+			glyph->glyphtex->first_glyph = glyph->next;
+	} else
+		glyph->prev->next = glyph->next;
+
+	if (glyph->next)
+		glyph->next->prev = glyph->prev;
+
+	// Now the glyph is unlinked from the glyphtex
+	// Unlink it from the fontsize as well!
+
+	Font_GlyphTree_Remove(glyph->ftsize, glyph->treech);
+
+	// Good, now we free the glyph
+
 	Mem_Free(glyph);
 }
 
@@ -1521,6 +1503,7 @@ glyph_t* Font_GetGlyph(ft2_font_t *font, int sizeindex, float _w, float _h, Ucha
 
 	glyph->glyphtex = glyphtex;
 	glyph->tex = glyphtex->tex;
+	glyphtex->glyph_count++;
 
 	// Glyph is rendered and we have space allocated on a glyph-texture.
 	// We're good to go, ready for postprocessing and the rest.
@@ -1633,6 +1616,16 @@ glyph_t* Font_GetGlyph(ft2_font_t *font, int sizeindex, float _w, float _h, Ucha
 	R_UpdateTexture(glyphtex->tex, data, gC, gR, 0, allocw, alloch, 8 * bytesPerPixel);
 	Mem_Free(data);
 
+	if (!glyphtex->first_glyph) {
+		glyphtex->first_glyph = glyph;
+		glyph->next = glyph->prev = NULL;
+	} else {
+		glyphtex->first_glyph->prev = glyph;
+		glyph->next = glyphtex->first_glyph;
+		glyph->prev = NULL;
+		glyphtex->first_glyph = glyph;
+	}
+
 	R_SaveTextureTGAFile(glyphtex->tex, "font-texture.tga", true);
 
 	glyph->image = false;
@@ -1686,501 +1679,3 @@ glyph_t* Font_GetGlyph(ft2_font_t *font, int sizeindex, float _w, float _h, Ucha
 
 	return glyph;
 }
-
-#if 0
-// DEPRECATED:
-static qboolean Font_LoadMap(ft2_font_t *font, ft2_font_map_t *mapstart, Uchar _ch, ft2_font_map_t **outmap)
-{
-	char map_identifier[MAX_QPATH];
-	unsigned long mapidx = _ch / FONT_CHARS_PER_MAP;
-	unsigned char *data = NULL;
-	FT_ULong ch, mapch;
-	int status;
-	int tp;
-	FT_Int32 load_flags;
-	int gpad_l, gpad_r, gpad_t, gpad_b;
-	char vabuf[1024];
-
-	int pitch;
-	int gR, gC; // glyph position: row and column
-
-	ft2_font_map_t *map, *next;
-	ft2_font_t *usefont;
-
-	FT_Face fontface;
-
-	int bytesPerPixel = 4; // change the conversion loop too if you change this!
-
-	if (outmap)
-		*outmap = NULL;
-
-	if (r_font_use_alpha_textures.integer)
-		bytesPerPixel = 1;
-
-	if (font->image_font)
-		fontface = (FT_Face)font->next->face;
-	else
-		fontface = (FT_Face)font->face;
-
-	switch(font->settings->antialias)
-	{
-		case 0:
-			switch(font->settings->hinting)
-			{
-				case 0:
-					load_flags = FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT | FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
-					break;
-				case 1:
-				case 2:
-					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
-					break;
-				default:
-				case 3:
-					load_flags = FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
-					break;
-			}
-			break;
-		default:
-		case 1:
-			switch(font->settings->hinting)
-			{
-				case 0:
-					load_flags = FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT | FT_LOAD_TARGET_NORMAL;
-					break;
-				case 1:
-					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_LIGHT;
-					break;
-				case 2:
-					load_flags = FT_LOAD_FORCE_AUTOHINT | FT_LOAD_TARGET_NORMAL;
-					break;
-				default:
-				case 3:
-					load_flags = FT_LOAD_TARGET_NORMAL;
-					break;
-			}
-			break;
-	}
-
-	//status = qFT_Set_Pixel_Sizes((FT_Face)font->face, /*size*/0, mapstart->size);
-	//if (status)
-	if (font->image_font && mapstart->intSize < 0)
-		mapstart->intSize = mapstart->size;
-	if (mapstart->intSize < 0)
-	{
-		/*
-		mapstart->intSize = mapstart->size;
-		while (1)
-		{
-			if (!Font_SetSize(font, mapstart->intSize, mapstart->intSize))
-			{
-				Con_Printf("ERROR: can't set size for font %s: %f ((%f))\n", font->name, mapstart->size, mapstart->intSize);
-				return false;
-			}
-			if ((fontface->size->metrics.height>>6) <= mapstart->size)
-				break;
-			if (mapstart->intSize < 2)
-			{
-				Con_Printf("ERROR: no appropriate size found for font %s: %f\n", font->name, mapstart->size);
-				return false;
-			}
-			--mapstart->intSize;
-		}
-		*/
-		if ((mapstart->intSize = Font_SearchSize(font, fontface, mapstart->size)) <= 0)
-			return false;
-		Con_DPrintf("Using size: %f for requested size %f\n", mapstart->intSize, mapstart->size);
-	}
-
-	if (!font->image_font && !Font_SetSize(font, mapstart->intSize, mapstart->intSize))
-	{
-		Con_Printf("ERROR: can't set sizes for font %s: %f\n", font->name, mapstart->size);
-		return false;
-	}
-
-	map = (ft2_font_map_t *)Mem_Alloc(font_mempool, sizeof(ft2_font_map_t));
-	if (!map)
-	{
-		Con_Printf("ERROR: Out of memory when loading fontmap for %s\n", font->name);
-		return false;
-	}
-
-	// create a totally unique name for this map, then we will use it to make a unique cachepic_t to avoid redundant textures
-	dpsnprintf(map_identifier, sizeof(map_identifier),
-		"%s_cache_%g_%d_%g_%g_%g_%g_%g_%u",
-		font->name,
-		(double) mapstart->intSize,
-		(int) load_flags,
-		(double) font->settings->blur,
-		(double) font->settings->outline,
-		(double) font->settings->shadowx,
-		(double) font->settings->shadowy,
-		(double) font->settings->shadowz,
-		(unsigned) mapidx);
-
-	// create a cachepic_t from the data now, or reuse an existing one
-	map->pic = Draw_CachePic_Flags(map_identifier, CACHEPICFLAG_QUIET);
-	if (developer_font.integer)
-	{
-		if (map->pic->tex == r_texture_notexture)
-			Con_Printf("Generating font map %s (size: %.1f MB)\n", map_identifier, mapstart->glyphSize * (256 * 4 / 1048576.0) * mapstart->glyphSize);
-		else
-			Con_Printf("Using cached font map %s (size: %.1f MB)\n", map_identifier, mapstart->glyphSize * (256 * 4 / 1048576.0) * mapstart->glyphSize);
-	}
-
-	Font_Postprocess(font, NULL, 0, bytesPerPixel, mapstart->size*2, mapstart->size*2, &gpad_l, &gpad_r, &gpad_t, &gpad_b);
-
-	// copy over the information
-	map->size = mapstart->size;
-	map->intSize = mapstart->intSize;
-	map->glyphSize = mapstart->glyphSize;
-	map->sfx = mapstart->sfx;
-	map->sfy = mapstart->sfy;
-
-	pitch = map->glyphSize * FONT_CHARS_PER_LINE * bytesPerPixel;
-	if (map->pic->tex == r_texture_notexture)
-	{
-		data = (unsigned char *)Mem_Alloc(font_mempool, (FONT_CHAR_LINES * map->glyphSize) * pitch);
-		if (!data)
-		{
-			Con_Printf("ERROR: Failed to allocate memory for font %s size %g\n", font->name, map->size);
-			Mem_Free(map);
-			return false;
-		}
-		// initialize as white texture with zero alpha
-		tp = 0;
-		while (tp < (FONT_CHAR_LINES * map->glyphSize) * pitch)
-		{
-			if (bytesPerPixel == 4)
-			{
-				data[tp++] = 0xFF;
-				data[tp++] = 0xFF;
-				data[tp++] = 0xFF;
-			}
-			data[tp++] = 0x00;
-		}
-	}
-
-	memset(map->width_of, 0, sizeof(map->width_of));
-
-	// insert the map
-	map->start = mapidx * FONT_CHARS_PER_MAP;
-	next = mapstart;
-	while(next->next && next->next->start < map->start)
-		next = next->next;
-	map->next = next->next;
-	next->next = map;
-
-	gR = 0;
-	gC = -1;
-	for (ch = map->start;
-	     ch < (FT_ULong)map->start + FONT_CHARS_PER_MAP;
-	     ++ch)
-	{
-		FT_ULong glyphIndex;
-		int w, h, x, y;
-		FT_GlyphSlot glyph;
-		FT_Bitmap *bmp;
-		unsigned char *imagedata = NULL, *dst, *src;
-		glyph_slot_t *mapglyph;
-		FT_Face face;
-		int pad_l, pad_r, pad_t, pad_b;
-
-		mapch = ch - map->start;
-
-		if (developer_font.integer)
-			Con_DPrint("glyphinfo: ------------- GLYPH INFO -----------------\n");
-
-		++gC;
-		if (gC >= FONT_CHARS_PER_LINE)
-		{
-			gC -= FONT_CHARS_PER_LINE;
-			++gR;
-		}
-
-		if (data)
-		{
-			imagedata = data + gR * pitch * map->glyphSize + gC * map->glyphSize * bytesPerPixel;
-			imagedata += gpad_t * pitch + gpad_l * bytesPerPixel;
-		}
-		//status = qFT_Load_Char(face, ch, FT_LOAD_RENDER);
-		// we need the glyphIndex
-		face = (FT_Face)font->face;
-		usefont = NULL;
-		if (font->image_font && mapch == ch && img_fontmap[mapch])
-		{
-			map->glyphs[mapch].image = true;
-			continue;
-		}
-		glyphIndex = qFT_Get_Char_Index(face, ch);
-		if (glyphIndex == 0)
-		{
-			// by convention, 0 is the "missing-glyph"-glyph
-			// try to load from a fallback font
-			for(usefont = font->next; usefont != NULL; usefont = usefont->next)
-			{
-				if (!Font_SetSize(usefont, mapstart->intSize, mapstart->intSize))
-					continue;
-				// try that glyph
-				face = (FT_Face)usefont->face;
-				glyphIndex = qFT_Get_Char_Index(face, ch);
-				if (glyphIndex == 0)
-					continue;
-				status = qFT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER | load_flags);
-				if (status)
-					continue;
-				break;
-			}
-			if (!usefont)
-			{
-				//Con_Printf("failed to load fallback glyph for char %lx from font %s\n", (unsigned long)ch, font->name);
-				// now we let it use the "missing-glyph"-glyph
-				face = (FT_Face)font->face;
-				glyphIndex = 0;
-			}
-		}
-
-		if (!usefont)
-		{
-			usefont = font;
-			face = (FT_Face)font->face;
-			status = qFT_Load_Glyph(face, glyphIndex, FT_LOAD_RENDER | load_flags);
-			if (status)
-			{
-				//Con_Printf("failed to load glyph %lu for %s\n", glyphIndex, font->name);
-				Con_DPrintf("failed to load glyph for char %lx from font %s\n", (unsigned long)ch, font->name);
-				continue;
-			}
-		}
-
-		glyph = face->glyph;
-		bmp = &glyph->bitmap;
-
-		w = bmp->width;
-		h = bmp->rows;
-
-		if (w > (map->glyphSize - gpad_l - gpad_r) || h > (map->glyphSize - gpad_t - gpad_b)) {
-			Con_Printf("WARNING: Glyph %lu is too big in font %s, size %g: %i x %i\n", ch, font->name, map->size, w, h);
-			if (w > map->glyphSize)
-				w = map->glyphSize - gpad_l - gpad_r;
-			if (h > map->glyphSize)
-				h = map->glyphSize;
-		}
-
-		if (imagedata)
-		{
-			switch (bmp->pixel_mode)
-			{
-			case FT_PIXEL_MODE_MONO:
-				if (developer_font.integer)
-					Con_DPrint("glyphinfo:   Pixel Mode: MONO\n");
-				break;
-			case FT_PIXEL_MODE_GRAY2:
-				if (developer_font.integer)
-					Con_DPrint("glyphinfo:   Pixel Mode: GRAY2\n");
-				break;
-			case FT_PIXEL_MODE_GRAY4:
-				if (developer_font.integer)
-					Con_DPrint("glyphinfo:   Pixel Mode: GRAY4\n");
-				break;
-			case FT_PIXEL_MODE_GRAY:
-				if (developer_font.integer)
-					Con_DPrint("glyphinfo:   Pixel Mode: GRAY\n");
-				break;
-			default:
-				if (developer_font.integer)
-					Con_DPrintf("glyphinfo:   Pixel Mode: Unknown: %i\n", bmp->pixel_mode);
-				Mem_Free(data);
-				Con_Printf("ERROR: Unrecognized pixel mode for font %s size %f: %i\n", font->name, mapstart->size, bmp->pixel_mode);
-				return false;
-			}
-			for (y = 0; y < h; ++y)
-			{
-				dst = imagedata + y * pitch;
-				src = bmp->buffer + y * bmp->pitch;
-
-				switch (bmp->pixel_mode)
-				{
-				case FT_PIXEL_MODE_MONO:
-					dst += bytesPerPixel - 1; // shift to alpha byte
-					for (x = 0; x < bmp->width; x += 8)
-					{
-						unsigned char ch = *src++;
-						*dst = 255 * !!((ch & 0x80) >> 7); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x40) >> 6); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x20) >> 5); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x10) >> 4); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x08) >> 3); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x04) >> 2); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x02) >> 1); dst += bytesPerPixel;
-						*dst = 255 * !!((ch & 0x01) >> 0); dst += bytesPerPixel;
-					}
-					break;
-				case FT_PIXEL_MODE_GRAY2:
-					dst += bytesPerPixel - 1; // shift to alpha byte
-					for (x = 0; x < bmp->width; x += 4)
-					{
-						unsigned char ch = *src++;
-						*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
-						*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
-						*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
-						*dst = ( ((ch & 0xA0) >> 6) * 0x55 ); ch <<= 2; dst += bytesPerPixel;
-					}
-					break;
-				case FT_PIXEL_MODE_GRAY4:
-					dst += bytesPerPixel - 1; // shift to alpha byte
-					for (x = 0; x < bmp->width; x += 2)
-					{
-						unsigned char ch = *src++;
-						*dst = ( ((ch & 0xF0) >> 4) * 0x11); dst += bytesPerPixel;
-						*dst = ( ((ch & 0x0F) ) * 0x11); dst += bytesPerPixel;
-					}
-					break;
-				case FT_PIXEL_MODE_GRAY:
-					// in this case pitch should equal width
-					for (tp = 0; tp < bmp->pitch; ++tp)
-						dst[(bytesPerPixel - 1) + tp*bytesPerPixel] = src[tp]; // copy the grey value into the alpha bytes
-
-					//memcpy((void*)dst, (void*)src, bmp->pitch);
-					//dst += bmp->pitch;
-					break;
-				default:
-					break;
-				}
-			}
-
-			pad_l = gpad_l;
-			pad_r = gpad_r;
-			pad_t = gpad_t;
-			pad_b = gpad_b;
-			Font_Postprocess(font, imagedata, pitch, bytesPerPixel, w, h, &pad_l, &pad_r, &pad_t, &pad_b);
-		}
-		else
-		{
-			pad_l = gpad_l;
-			pad_r = gpad_r;
-			pad_t = gpad_t;
-			pad_b = gpad_b;
-			Font_Postprocess(font, NULL, pitch, bytesPerPixel, w, h, &pad_l, &pad_r, &pad_t, &pad_b);
-		}
-
-
-		// now fill map->glyphs[ch - map->start]
-		mapglyph = &map->glyphs[mapch];
-
-		{
-			// old way
-			// double advance = (double)glyph->metrics.horiAdvance * map->sfx;
-
-			double bearingX = (glyph->metrics.horiBearingX / 64.0) / map->size;
-			//double bearingY = (glyph->metrics.horiBearingY >> 6) / map->size;
-			double advance = (glyph->advance.x / 64.0) / map->size;
-			//double mWidth = (glyph->metrics.width >> 6) / map->size;
-			//double mHeight = (glyph->metrics.height >> 6) / map->size;
-
-			mapglyph->txmin = ( (double)(gC * map->glyphSize) + (double)(gpad_l - pad_l) ) / ( (double)(map->glyphSize * FONT_CHARS_PER_LINE) );
-			mapglyph->txmax = mapglyph->txmin + (double)(bmp->width + pad_l + pad_r) / ( (double)(map->glyphSize * FONT_CHARS_PER_LINE) );
-			mapglyph->tymin = ( (double)(gR * map->glyphSize) + (double)(gpad_r - pad_r) ) / ( (double)(map->glyphSize * FONT_CHAR_LINES) );
-			mapglyph->tymax = mapglyph->tymin + (double)(bmp->rows + pad_t + pad_b) / ( (double)(map->glyphSize * FONT_CHAR_LINES) );
-			//mapglyph->vxmin = bearingX;
-			//mapglyph->vxmax = bearingX + mWidth;
-			mapglyph->vxmin = (glyph->bitmap_left - pad_l) / map->size;
-			mapglyph->vxmax = mapglyph->vxmin + (bmp->width + pad_l + pad_r) / map->size; // don't ask
-			//mapglyph->vymin = -bearingY;
-			//mapglyph->vymax = mHeight - bearingY;
-			mapglyph->vymin = (-glyph->bitmap_top - pad_t) / map->size;
-			mapglyph->vymax = mapglyph->vymin + (bmp->rows + pad_t + pad_b) / map->size;
-			//Con_Printf("dpi = %f %f (%f %d) %d %d\n", bmp->width / (mapglyph->vxmax - mapglyph->vxmin), bmp->rows / (mapglyph->vymax - mapglyph->vymin), map->size, map->glyphSize, (int)fontface->size->metrics.x_ppem, (int)fontface->size->metrics.y_ppem);
-			//mapglyph->advance_x = advance * usefont->size;
-			//mapglyph->advance_x = advance;
-			mapglyph->advance_x = Font_SnapTo(advance, 1 / map->size);
-			mapglyph->advance_y = 0;
-
-			if (developer_font.integer)
-			{
-				Con_DPrintf("glyphinfo:   Glyph: %lu   at (%i, %i)\n", (unsigned long)ch, gC, gR);
-				Con_DPrintf("glyphinfo:   %f, %f, %lu\n", bearingX, map->sfx, (unsigned long)glyph->metrics.horiBearingX);
-				if (ch >= 32 && ch <= 128)
-					Con_DPrintf("glyphinfo:   Character: %c\n", (int)ch);
-				Con_DPrintf("glyphinfo:   Vertex info:\n");
-				Con_DPrintf("glyphinfo:     X: ( %f  --  %f )\n", mapglyph->vxmin, mapglyph->vxmax);
-				Con_DPrintf("glyphinfo:     Y: ( %f  --  %f )\n", mapglyph->vymin, mapglyph->vymax);
-				Con_DPrintf("glyphinfo:   Texture info:\n");
-				Con_DPrintf("glyphinfo:     S: ( %f  --  %f )\n", mapglyph->txmin, mapglyph->txmax);
-				Con_DPrintf("glyphinfo:     T: ( %f  --  %f )\n", mapglyph->tymin, mapglyph->tymax);
-				Con_DPrintf("glyphinfo:   Advance: %f, %f\n", mapglyph->advance_x, mapglyph->advance_y);
-			}
-		}
-		map->glyphs[mapch].image = false;
-	}
-
-	if (map->pic->tex == r_texture_notexture)
-	{
-		int w = map->glyphSize * FONT_CHARS_PER_LINE;
-		int h = map->glyphSize * FONT_CHAR_LINES;
-		rtexture_t *tex;
-		// abuse the Draw_CachePic system to keep track of this texture
-		tex = R_LoadTexture2D(drawtexturepool, map_identifier, w, h, data, r_font_use_alpha_textures.integer ? TEXTYPE_ALPHA : TEXTYPE_RGBA, TEXF_ALPHA | (r_font_compress.integer > 0 ? TEXF_COMPRESS : 0), -1, NULL);
-		// if tex is NULL for any reason, the pic->tex will remain set to r_texture_notexture
-		if (tex)
-			map->pic->tex = tex;
-
-		if (r_font_diskcache.integer >= 1)
-		{
-			// swap to BGRA for tga writing...
-			int s = w * h;
-			int x;
-			int b;
-			for (x = 0;x < s;x++)
-			{
-				b = data[x*4+0];
-				data[x*4+0] = data[x*4+2];
-				data[x*4+2] = b;
-			}
-			Image_WriteTGABGRA(va(vabuf, sizeof(vabuf), "%s.tga", map_identifier), w, h, data);
-#ifndef USE_GLES2
-			if (r_font_compress.integer && qglGetCompressedTexImageARB && tex)
-				R_SaveTextureDDSFile(tex, va(vabuf, sizeof(vabuf), "dds/%s.dds", map_identifier), r_texture_dds_save.integer < 2, true);
-#endif
-		}
-	}
-
-	if(data)
-		Mem_Free(data);
-
-	if (map->pic->tex == r_texture_notexture)
-	{
-		// if the first try isn't successful, keep it with a broken texture
-		// otherwise we retry to load it every single frame where ft2 rendering is used
-		// this would be bad...
-		// only `data' must be freed
-		Con_Printf("ERROR: Failed to generate texture for font %s size %f map %lu\n",
-			   font->name, mapstart->size, mapidx);
-		return false;
-	}
-	if (outmap)
-		*outmap = map;
-	return true;
-}
-#endif
-
-#if 0
-// DEPRECATED:
-qboolean Font_LoadMapForIndex(ft2_font_t *font, int map_index, Uchar _ch, ft2_font_map_t **outmap)
-{
-	if (map_index < 0 || map_index >= MAX_FONT_SIZES)
-		return false;
-	// the first map must have been loaded already
-	if (!font->font_maps[map_index])
-		return false;
-	return Font_LoadMap(font, font->font_maps[map_index], _ch, outmap);
-}
-
-ft2_font_map_t *FontMap_FindForChar(ft2_font_map_t *start, Uchar ch)
-{
-	while (start && start->start + FONT_CHARS_PER_MAP <= ch)
-		start = start->next;
-	if (start && start->start > ch)
-		return NULL;
-	return start;
-}
-#endif

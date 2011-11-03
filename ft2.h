@@ -116,6 +116,15 @@ typedef struct glyph_s
 	ft2_glyphtex_t *glyphtex;
 	// So we don't need to care about what glyphtex looks like outside the font code:
 	rtexture_t     *tex;
+
+	// We keep a linked list of glyphs of the same glyphtex
+	struct glyph_s *next;
+	struct glyph_s *prev;
+
+	// We also need to find the glyph, to be able to remove it
+	// from the glyphtree.
+	Uchar       treech;
+	ft2_font_size_t *ftsize;
 } glyph_t;
 
 

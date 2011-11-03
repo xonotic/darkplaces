@@ -35,6 +35,7 @@ qboolean Mod_AllocLightmap_Block(mod_alloclightmap_state_t *state, int blockwidt
 	// destroy this texture to have the used glyphs be
 	// moved to a more-active texture.
 	int glyph_count;
+	int glyphs_freed;
 	//int lastusedframe; // <- useful, we unload unused images
 
 	// NOTE: We also need a way to remove glyphs
@@ -42,7 +43,6 @@ qboolean Mod_AllocLightmap_Block(mod_alloclightmap_state_t *state, int blockwidt
 	// this texture, to force them to reload them.
 	// NOTE: Rather then re-rendering, we could just copy them directly.
 	struct glyph_s *first_glyph;
-	struct glyph_s *last_glyph; // <- for faster insertion
 
 	struct ft2_glyphtex_s *prev;
 	struct ft2_glyphtex_s *next;
