@@ -889,16 +889,32 @@ Key_Console (int key, int unicode)
 				while(--pos)
 				{
 					k = key_line[pos];
-					if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
-						break;
+					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+							break;
+					}
+					else
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+							break;
+					}
 				}
 
 			if(pos)
 				while(--pos)
 				{
 					k = key_line[pos];
-					if(k == '\"' || k == ';' || k == ' ' || k == '\'')
-						break;
+					if (keydown[K_SHIFT])
+					{
+						if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
+							break;
+					}
+					else
+					{
+						if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+							break;
+					}
 				}
 			key_linepos = pos + 1;
 		}
@@ -975,16 +991,32 @@ Key_Console (int key, int unicode)
 			while(++pos < len)
 			{
 				k = key_line[pos];
-				if(k == '\"' || k == ';' || k == ' ' || k == '\'')
-					break;
+				if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+				{
+					if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
+						break;
+				}
+				else
+				{
+					if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+						break;
+				}
 			}
 			
 			if (pos < len) // skip all "; ' after the word
 				while(++pos < len)
 				{
 					k = key_line[pos];
-					if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
-						break;
+					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+							break;
+					}
+					else
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+							break;
+					}
 				}
 			key_linepos = pos;
 		}
