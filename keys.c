@@ -953,6 +953,12 @@ Key_Console (int key, int unicode)
 		return;
 	}
 
+	// nyov: delete char on cursor and terminate rest of line
+	if (key == 'k' && keydown[K_CTRL])
+	{
+		key_line[key_linepos] = 0;
+		return;
+	}
 
 	// move cursor to the next character
 	if (key == K_RIGHTARROW || key == K_KP_RIGHTARROW)
