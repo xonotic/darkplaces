@@ -1439,6 +1439,7 @@ static void Con_InputLine (char *linebuffer, int linepos, qboolean insertmode, q
 		(*line_out)[i] = 0;
 
 	memcpy(*curs_out, *line_out, sizeof(*line_out));
+
 	if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
 	{
 		if (!utf8_enable.integer)
@@ -1490,7 +1491,7 @@ static void Con_DrawInput (void)
 {
 	float x, xo;
 	size_t len_out, txtlen;
-	int col_out;
+	int colorindex = -1;
 	char *line_out, *curs_out;
 
 	if (!key_consoleactive)
@@ -1499,9 +1500,8 @@ static void Con_DrawInput (void)
 	Con_InputLine(key_line, key_linepos, key_insert, r_font_disable_freetype.integer, &line_out, &curs_out);
 
 	len_out = key_linepos;
-	txtlen = strlen(key_line); // hopefully. better use a returned value?
-	col_out = -1;
-	xo = DrawQ_TextWidth_UntilWidth_TrackColors(line_out, &len_out, con_textsize.value, con_textsize.value, &col_out, false, FONT_CONSOLE, 1000000000);
+	txtlen = strlen(key_line);
+	xo = DrawQ_TextWidth_UntilWidth_TrackColors(line_out, &len_out, con_textsize.value, con_textsize.value, &colorindex, false, FONT_CONSOLE, 1000000000);
 	x = vid_conwidth.value * 0.95 - xo; // scroll
 	if(x >= 0)
 		x = 0;
@@ -1509,9 +1509,9 @@ static void Con_DrawInput (void)
 	// draw it
 	DrawQ_String(x, con_vislines - con_textsize.value*2, line_out, txtlen + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
 
-	// add a cursor on top of this when available
+	// draw cursor on top of text when available
 	if (curs_out != NULL)
-		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, curs_out, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
+		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, curs_out, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &colorindex, false, FONT_CONSOLE);
 }
 
 typedef struct
@@ -1665,10 +1665,10 @@ Draws the last few lines of output transparently over the game top
 */
 void Con_DrawNotify (void)
 {
-	float	x, v, xr;
+	float	x, v, xr, xo;
 	float chatstart, notifystart, inputsize, height;
 	float align;
-	char	temptext[MAX_INPUTLINE];
+	char temptext[MAX_INPUTLINE];
 	int numChatlines;
 	int chatpos;
 
@@ -1744,25 +1744,40 @@ void Con_DrawNotify (void)
 	}
 	if (key_dest == key_message)
 	{
-		//static char *cursor[2] = { "\xee\x80\x8a", "\xee\x80\x8b" }; // { off, on }
 		int colorindex = -1;
-		const char *cursor;
-		char charbuf16[16];
-		cursor = u8_encodech(0xE00A + ((int)(realtime * con_cursorspeed)&1), NULL, charbuf16);
+		size_t len_out, txtlen;
+		char *line_out, *curs_out;
+		char *ps1;
+		int bufposcpy;
 
-		// LordHavoc: speedup, and other improvements
-		if (chat_mode < 0)
-			dpsnprintf(temptext, sizeof(temptext), "]%s%s", chat_buffer, cursor);
+		// FIXME: implement using a different cursor than console?
+		//char charbuf16[16];
+		//cursor = u8_encodech(0xE00A + ((int)(realtime * con_cursorspeed)&1), NULL, charbuf16);
+
+		if(chat_mode < 0)
+			ps1 = "] %s";
 		else if(chat_mode)
-			dpsnprintf(temptext, sizeof(temptext), "say_team:%s%s", chat_buffer, cursor);
+			ps1 = "say_team: %s";
 		else
-			dpsnprintf(temptext, sizeof(temptext), "say:%s%s", chat_buffer, cursor);
+			ps1 = "say: %s";
+
+		dpsnprintf(temptext, sizeof(temptext), ps1, chat_buffer);
+		bufposcpy = chat_bufferpos+(int)strlen(ps1)-2;
+		Con_InputLine(temptext, bufposcpy, key_insert, r_font_disable_freetype.integer, &line_out, &curs_out);
+
+		len_out = bufposcpy;
+		txtlen  = strlen(temptext);
 
 		// FIXME word wrap
 		inputsize = (numChatlines ? con_chatsize : con_notifysize).value;
-		xr = vid_conwidth.value - DrawQ_TextWidth(temptext, 0, inputsize, inputsize, false, FONT_CHAT);
-		x = min(xr, x);
-		DrawQ_String(x, v, temptext, 0, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, &colorindex, false, FONT_CHAT);
+		xo = DrawQ_TextWidth_UntilWidth_TrackColors(line_out, &len_out, inputsize, inputsize, &colorindex, false, FONT_CHAT, 1000000000);
+		xr = vid_conwidth.value * 0.95 - xo; // scroll
+		x  = min(xr, x);
+		DrawQ_String(x, v, line_out, txtlen + 3, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CHAT);
+
+		// draw cursor on top of text when available
+		if (curs_out != NULL)
+			DrawQ_String(x + xo, v, curs_out, 0, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, &colorindex, false, FONT_CHAT);
 	}
 	if (con_mutex) Thread_UnlockMutex(con_mutex);
 }
