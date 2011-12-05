@@ -606,7 +606,7 @@ static void Con_MessageMode_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferpos = strlen(chat_buffer);
 	}
 }
 
@@ -623,7 +623,7 @@ static void Con_MessageMode2_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferpos = strlen(chat_buffer);
 	}
 }
 
@@ -638,7 +638,7 @@ static void Con_CommandMode_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferpos = strlen(chat_buffer);
 	}
 	chat_mode = -1; // command
 }

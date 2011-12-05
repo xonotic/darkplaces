@@ -1233,13 +1233,14 @@ Key_Console (int key, int unicode)
 
 int chat_mode;
 char		chat_buffer[MAX_INPUTLINE];
-unsigned int	chat_bufferlen = 0;
+unsigned int	chat_bufferpos = 0;
 
 static void
-Key_Message (int key, int ascii)
+Key_Message (int key, int unicode)
 {
+	// nyov: adopted Key_Console style here, so both functions could merge common code at some point.
 	char vabuf[1024];
-	if (key == K_ENTER || ascii == 10 || ascii == 13)
+	if (key == K_ENTER || unicode == /* LF */ 10 || unicode == /* CR */ 13)
 	{
 		if(chat_mode < 0)
 			Cmd_ExecuteString(chat_buffer, src_command, true); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
@@ -1247,47 +1248,45 @@ Key_Message (int key, int ascii)
 			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
 
 		key_dest = key_game;
-		chat_bufferlen = 0;
+		chat_bufferpos = 0;
 		chat_buffer[0] = 0;
+		return;
+	}
+
+	if (key == K_ESCAPE) {
+		key_dest = key_game;
+		chat_bufferpos = 0;
+		chat_buffer[0] = 0;
+		return;
+	}
+
+	if(key == K_TAB) {
+		chat_bufferpos = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferpos);
+		return;
+	}
+
+	if (key == K_BACKSPACE) {
+		if (chat_bufferpos) {
+			chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
+			chat_buffer[chat_bufferpos] = 0;
+		}
 		return;
 	}
 
 	// TODO add support for arrow keys and simple editing
 
-	if (key == K_ESCAPE) {
-		key_dest = key_game;
-		chat_bufferlen = 0;
-		chat_buffer[0] = 0;
-		return;
-	}
-
-	if (key == K_BACKSPACE) {
-		if (chat_bufferlen) {
-			chat_bufferlen = u8_prevbyte(chat_buffer, chat_bufferlen);
-			chat_buffer[chat_bufferlen] = 0;
-		}
-		return;
-	}
-
-	if(key == K_TAB) {
-		chat_bufferlen = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferlen);
-		return;
-	}
-
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
-	if (ascii > 0 && ascii < 32 && utf8_enable.integer)
-		ascii = 0xE000 + ascii;
+	if (unicode > 0 && unicode < 32 && utf8_enable.integer)
+		unicode = 0xE000 + unicode;
 
-	if (chat_bufferlen == sizeof (chat_buffer) - 1)
-		return;							// all full
-
-	if (!ascii)
+	if (!unicode)
 		return;							// non printable
 
-	chat_bufferlen += u8_fromchar(ascii, chat_buffer+chat_bufferlen, sizeof(chat_buffer) - chat_bufferlen - 1);
+	if (chat_bufferpos < sizeof (chat_buffer) - 1)
+		chat_bufferpos += u8_fromchar(unicode, chat_buffer+chat_bufferpos, sizeof(chat_buffer) - chat_bufferpos - 1);
 
-	//chat_buffer[chat_bufferlen++] = ascii;
-	//chat_buffer[chat_bufferlen] = 0;
+	//chat_buffer[chat_bufferpos++] = unicode;
+	//chat_buffer[chat_bufferpos] = 0;
 }
 
 //============================================================================
