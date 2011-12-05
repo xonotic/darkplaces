@@ -1265,6 +1265,84 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
+	// Advanced Console Editing by Radix radix@planetquake.com
+	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
+	// Enhanced by [515]
+	// Enhanced by terencehill
+
+	// move cursor to the previous character
+	if (key == K_LEFTARROW || key == K_KP_LEFTARROW)
+	{
+		if(chat_bufferpos < 1)
+			return;
+		if(keydown[K_CTRL]) // move cursor to the previous word
+		{
+			int	pos;
+			char	k;
+			pos = chat_bufferpos-1;
+
+			if(pos) // skip all "; ' after the word
+				while(--pos)
+				{
+					k = chat_buffer[pos];
+					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+							break;
+					}
+					else
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+							break;
+					}
+				}
+
+			if(pos)
+				while(--pos)
+				{
+					k = chat_buffer[pos];
+					if (keydown[K_SHIFT])
+					{
+						if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
+							break;
+					}
+					else
+					{
+						if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+							break;
+					}
+				}
+			chat_bufferpos = pos + 1;
+		}
+		else if(keydown[K_SHIFT]) // move cursor to the previous character ignoring colors
+		{
+			int	pos;
+			size_t	inchar = 0;
+			pos = u8_prevbyte(chat_buffer, chat_bufferpos);
+			while (pos)
+				if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && isdigit(chat_buffer[pos]))
+					pos-=2;
+				else if(pos-4 > 0 && chat_buffer[pos-4] == STRING_COLOR_TAG && chat_buffer[pos-3] == STRING_COLOR_RGB_TAG_CHAR
+						&& isxdigit(chat_buffer[pos-2]) && isxdigit(chat_buffer[pos-1]) && isxdigit(chat_buffer[pos]))
+					pos-=5;
+				else
+				{
+					if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && chat_buffer[pos] == STRING_COLOR_TAG) // consider ^^ as a character
+						pos--;
+					pos--;
+					break;
+				}
+			// we need to move to the beginning of the character when in a wide character:
+			u8_charidx(chat_buffer, pos + 1, &inchar);
+			chat_bufferpos = pos + 1 - inchar;
+		}
+		else
+		{
+			chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
+		}
+		return;
+	}
+
 	if (key == K_BACKSPACE) {
 		if (chat_bufferpos) {
 			chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
@@ -1273,7 +1351,98 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
-	// TODO add support for arrow keys and simple editing
+	// move cursor to the next character
+	if (key == K_RIGHTARROW || key == K_KP_RIGHTARROW)
+	{
+		if(chat_bufferpos >= (unsigned int)strlen(chat_buffer))
+			return;
+		if(keydown[K_CTRL]) // move cursor to the next word
+		{
+			int		pos, len;
+			char	k;
+			len = (int)strlen(chat_buffer);
+			pos = chat_bufferpos;
+
+			while(++pos < len)
+			{
+				k = chat_buffer[pos];
+				if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+				{
+					if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
+						break;
+				}
+				else
+				{
+					if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+						break;
+				}
+			}
+
+			if (pos < len) // skip all "; ' after the word
+				while(++pos < len)
+				{
+					k = chat_buffer[pos];
+					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+							break;
+					}
+					else
+					{
+						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+							break;
+					}
+				}
+			chat_bufferpos = pos;
+		}
+		else if(keydown[K_SHIFT]) // move cursor to the next character ignoring colors
+		{
+			int		pos, len;
+			len = (int)strlen(chat_buffer);
+			pos = chat_bufferpos;
+
+			// go beyond all initial consecutive color tags, if any
+			if(pos < len)
+				while (chat_buffer[pos] == STRING_COLOR_TAG)
+				{
+					if(isdigit(chat_buffer[pos+1]))
+						pos+=2;
+					else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
+						pos+=5;
+					else
+						break;
+				}
+
+			// skip the char
+			if (chat_buffer[pos] == STRING_COLOR_TAG && chat_buffer[pos+1] == STRING_COLOR_TAG) // consider ^^ as a character
+				pos++;
+			pos += u8_bytelen(chat_buffer + pos, 1);
+
+			// now go beyond all next consecutive color tags, if any
+			if(pos < len)
+				while (chat_buffer[pos] == STRING_COLOR_TAG)
+				{
+					if(isdigit(chat_buffer[pos+1]))
+						pos+=2;
+					else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
+						pos+=5;
+					else
+						break;
+				}
+			chat_bufferpos = pos;
+		}
+		else
+			chat_bufferpos += u8_bytelen(chat_buffer + chat_bufferpos, 1);
+		return;
+	}
+
+	if (key == K_INS || key == K_KP_INS) // toggle insert mode
+	{
+		key_insert ^= 1; // sharing same key_insert state with console here
+		return;
+	}
+
+	// End Advanced Console Editing
 
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
 	if (unicode > 0 && unicode < 32 && utf8_enable.integer)
@@ -1282,11 +1451,29 @@ Key_Message (int key, int unicode)
 	if (!unicode)
 		return;							// non printable
 
-	if (chat_bufferpos < sizeof (chat_buffer) - 1)
-		chat_bufferpos += u8_fromchar(unicode, chat_buffer+chat_bufferpos, sizeof(chat_buffer) - chat_bufferpos - 1);
-
-	//chat_buffer[chat_bufferpos++] = unicode;
-	//chat_buffer[chat_bufferpos] = 0;
+	if (chat_bufferpos < MAX_INPUTLINE-1)
+	{
+		char buf[16];
+		int len;
+		int blen;
+		blen = u8_fromchar(unicode, buf, sizeof(buf));
+		if (!blen)
+			return;
+		len = (int)strlen(&chat_buffer[chat_bufferpos]);
+		// check insert mode, or always insert if at end of line
+		if (key_insert || len == 0)
+		{
+			// can't use strcpy to move string to right
+			len++;
+			//memmove(&chat_buffer[chat_bufferpos + u8_bytelen(chat_buffer + chat_bufferpos, 1)], &chat_buffer[chat_bufferpos], len);
+			memmove(&chat_buffer[chat_bufferpos + blen], &chat_buffer[chat_bufferpos], len);
+		}
+		memcpy(chat_buffer + chat_bufferpos, buf, blen);
+		chat_bufferpos += blen;
+		//chat_bufferpos += u8_fromchar(unicode, chat_buffer + chat_bufferpos, sizeof(chat_buffer) - chat_bufferpos - 1);
+		//chat_buffer[chat_bufferpos] = ascii;
+		//chat_bufferpos++;
+	}
 }
 
 //============================================================================
