@@ -1415,61 +1415,83 @@ Modified by EvilTypeGuy eviltypeguy@qeradiant.com
 ================
 */
 extern cvar_t r_font_disable_freetype;
-static void Con_DrawInput (void)
+static void Con_InputLine (char *linebuffer, int linepos, qboolean insertmode, qboolean inlinecursor)
 {
-	int		y;
-	int		i;
-	char editlinecopy[MAX_INPUTLINE+1], *text;
+	// nyov: refactored for reusability
+	// (not very elegant, uses a second buffer copy for the overdrawn cursor)
+
+	char linebuf[MAX_INPUTLINE+1], linebuf2[MAX_INPUTLINE+1];
+	int txtlen, i;
+	char *text, *text2;
 	float x, xo;
 	size_t len_out;
 	int col_out;
 
-	if (!key_consoleactive)
-		return;		// don't draw anything
-
-	strlcpy(editlinecopy, key_line, sizeof(editlinecopy));
-	text = editlinecopy;
+	strlcpy(linebuf, linebuffer, sizeof(linebuf));
+	text  = linebuf;
+	text2 = linebuf2;
 
 	// Advanced Console Editing by Radix radix@planetquake.com
 	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
-	// use strlen of edit_line instead of key_linepos to allow editing
+	// use strlen of text instead of linepos to allow editing
 	// of early characters w/o erasing
 
-	y = (int)strlen(text);
+	txtlen = (int)strlen(text);
 
-	// append enoug nul-bytes to cover the utf8-versions of the cursor too
-	for (i = y; i < y + 4 && i < (int)sizeof(editlinecopy); ++i)
+	// append enough nul-bytes to cover the utf8-versions of the cursor too
+	for (i = txtlen; i < txtlen + 4 && i < (int)sizeof(linebuf); ++i)
 		text[i] = 0;
 
-	// add the cursor frame
-	if (r_font_disable_freetype.integer)
-	{
-		// this code is freetype incompatible!
-		if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
-		{
-			if (!utf8_enable.integer)
-				text[key_linepos] = 11 + 130 * key_insert;	// either solid or triangle facing right
-			else if (y + 3 < (int)sizeof(editlinecopy)-1)
-			{
-				int ofs = u8_bytelen(text + key_linepos, 1);
-				size_t len;
-				const char *curbuf;
-				char charbuf16[16];
-				curbuf = u8_encodech(0xE000 + 11 + 130 * key_insert, &len, charbuf16);
+	memcpy(text2, text, sizeof(text));
 
+	if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
+	{
+		if (!utf8_enable.integer)
+		{
+			if (inlinecursor)
+				text[linepos] = 11 + 130 * insertmode;	// either solid or triangle facing right
+			else
+			{
+				text2[0] = 11 + 130 * insertmode;	// either solid or triangle facing right
+				text2[1] = 0;
+			}
+		}
+		else if (txtlen + 3 < (int)sizeof(linebuf)-1)
+		{
+			int ofs = u8_bytelen(text + linepos, 1);
+			size_t len;
+			const char *curbuf;
+			char charbuf16[16];
+			curbuf = u8_encodech(0xE000 + 11 + 130 * insertmode, &len, charbuf16);
+
+			if (inlinecursor) // inline cursor looks better with monospaced fonts
+			{
 				if (curbuf)
 				{
-					memmove(text + key_linepos + len, text + key_linepos + ofs, sizeof(editlinecopy) - key_linepos - len);
-					memcpy(text + key_linepos, curbuf, len);
+					memmove(text + linepos + len, text + linepos + ofs, sizeof(linebuf) - linepos - len);
+					memcpy(text + linepos, curbuf, len);
 				}
-			} else
-				text[key_linepos] = '-' + ('+' - '-') * key_insert;
+			}
+			else // draw cursor over text (better with variable-width fonts)
+			{
+				memcpy(text2, curbuf, len);
+				text2[len] = 0;
+			}
 		}
+		else
+		{
+			text[linepos] = '-' + ('+' - '-') * insertmode;
+			text2[0] = 0;
+		}
+		if (inlinecursor)
+			text2[0] = 0;
+	}
+	else
+	{
+		text2[0] = 0;
 	}
 
-//	text[key_linepos + 1] = 0;
-
-	len_out = key_linepos;
+	len_out = linepos;
 	col_out = -1;
 	xo = DrawQ_TextWidth_UntilWidth_TrackColors(text, &len_out, con_textsize.value, con_textsize.value, &col_out, false, FONT_CONSOLE, 1000000000);
 	x = vid_conwidth.value * 0.95 - xo; // scroll
@@ -1477,33 +1499,18 @@ static void Con_DrawInput (void)
 		x = 0;
 
 	// draw it
-	DrawQ_String(x, con_vislines - con_textsize.value*2, text, y + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
+	DrawQ_String(x, con_vislines - con_textsize.value*2, text, txtlen + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
 
-	// add a cursor on top of this (when using freetype)
-	if (!r_font_disable_freetype.integer)
-	{
-		if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
-		{
-			if (!utf8_enable.integer)
-			{
-				text[0] = 11 + 130 * key_insert;	// either solid or triangle facing right
-				text[1] = 0;
-			}
-			else
-			{
-				size_t len;
-				const char *curbuf;
-				char charbuf16[16];
-				curbuf = u8_encodech(0xE000 + 11 + 130 * key_insert, &len, charbuf16);
-				memcpy(text, curbuf, len);
-				text[len] = 0;
-			}
-			DrawQ_String(x + xo, con_vislines - con_textsize.value*2, text, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
-		}
-	}
+	// add a cursor on top of this when available
+	if (text2 != NULL)
+		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, text2, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
+}
+static void Con_DrawInput (void)
+{
+	if (!key_consoleactive)
+		return;		// don't draw anything
 
-	// remove cursor
-//	key_line[key_linepos] = 0;
+	Con_InputLine(key_line, key_linepos, key_insert, r_font_disable_freetype.integer);
 }
 
 typedef struct
