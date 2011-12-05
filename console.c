@@ -1415,50 +1415,45 @@ Modified by EvilTypeGuy eviltypeguy@qeradiant.com
 ================
 */
 extern cvar_t r_font_disable_freetype;
-static void Con_InputLine (char *linebuffer, int linepos, qboolean insertmode, qboolean inlinecursor)
+static void Con_InputLine (char *linebuffer, int linepos, qboolean insertmode, qboolean inlinecursor, char **line_out, char **curs_out)
 {
 	// nyov: refactored for reusability
 	// (not very elegant, uses a second buffer copy for the overdrawn cursor)
 
 	char linebuf[MAX_INPUTLINE+1], linebuf2[MAX_INPUTLINE+1];
 	int txtlen, i;
-	char *text, *text2;
-	float x, xo;
-	size_t len_out;
-	int col_out;
 
 	strlcpy(linebuf, linebuffer, sizeof(linebuf));
-	text  = linebuf;
-	text2 = linebuf2;
+	*line_out = linebuf;
+	*curs_out = linebuf2;
 
 	// Advanced Console Editing by Radix radix@planetquake.com
 	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
-	// use strlen of text instead of linepos to allow editing
+	// use strlen of line_out instead of linepos to allow editing
 	// of early characters w/o erasing
 
-	txtlen = (int)strlen(text);
+	txtlen = (int)strlen(*line_out);
 
 	// append enough nul-bytes to cover the utf8-versions of the cursor too
 	for (i = txtlen; i < txtlen + 4 && i < (int)sizeof(linebuf); ++i)
-		text[i] = 0;
+		(*line_out)[i] = 0;
 
-	memcpy(text2, text, sizeof(text));
-
+	memcpy(*curs_out, *line_out, sizeof(*line_out));
 	if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
 	{
 		if (!utf8_enable.integer)
 		{
 			if (inlinecursor)
-				text[linepos] = 11 + 130 * insertmode;	// either solid or triangle facing right
+				(*line_out)[linepos] = 11 + 130 * insertmode;	// either solid or triangle facing right
 			else
 			{
-				text2[0] = 11 + 130 * insertmode;	// either solid or triangle facing right
-				text2[1] = 0;
+				(*curs_out)[0] = 11 + 130 * insertmode;	// either solid or triangle facing right
+				(*curs_out)[1] = 0;
 			}
 		}
 		else if (txtlen + 3 < (int)sizeof(linebuf)-1)
 		{
-			int ofs = u8_bytelen(text + linepos, 1);
+			int ofs = u8_bytelen(*line_out + linepos, 1);
 			size_t len;
 			const char *curbuf;
 			char charbuf16[16];
@@ -1468,49 +1463,55 @@ static void Con_InputLine (char *linebuffer, int linepos, qboolean insertmode, q
 			{
 				if (curbuf)
 				{
-					memmove(text + linepos + len, text + linepos + ofs, sizeof(linebuf) - linepos - len);
-					memcpy(text + linepos, curbuf, len);
+					memmove(*line_out + linepos + len, *line_out + linepos + ofs, sizeof(linebuf) - linepos - len);
+					memcpy (*line_out + linepos, curbuf, len);
 				}
 			}
 			else // draw cursor over text (better with variable-width fonts)
 			{
-				memcpy(text2, curbuf, len);
-				text2[len] = 0;
+				memcpy(*curs_out, curbuf, len);
+				(*curs_out)[len] = 0;
 			}
 		}
 		else
 		{
-			text[linepos] = '-' + ('+' - '-') * insertmode;
-			text2[0] = 0;
+			(*line_out)[linepos] = '-' + ('+' - '-') * insertmode;
+			(*curs_out)[0] = 0;
 		}
 		if (inlinecursor)
-			text2[0] = 0;
+			(*curs_out)[0] = 0;
 	}
 	else
 	{
-		text2[0] = 0;
+		(*curs_out)[0] = 0;
 	}
+}
+static void Con_DrawInput (void)
+{
+	float x, xo;
+	size_t len_out, txtlen;
+	int col_out;
+	char *line_out, *curs_out;
 
-	len_out = linepos;
+	if (!key_consoleactive)
+		return;		// don't draw anything
+
+	Con_InputLine(key_line, key_linepos, key_insert, r_font_disable_freetype.integer, &line_out, &curs_out);
+
+	len_out = key_linepos;
+	txtlen = strlen(key_line); // hopefully. better use a returned value?
 	col_out = -1;
-	xo = DrawQ_TextWidth_UntilWidth_TrackColors(text, &len_out, con_textsize.value, con_textsize.value, &col_out, false, FONT_CONSOLE, 1000000000);
+	xo = DrawQ_TextWidth_UntilWidth_TrackColors(line_out, &len_out, con_textsize.value, con_textsize.value, &col_out, false, FONT_CONSOLE, 1000000000);
 	x = vid_conwidth.value * 0.95 - xo; // scroll
 	if(x >= 0)
 		x = 0;
 
 	// draw it
-	DrawQ_String(x, con_vislines - con_textsize.value*2, text, txtlen + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
+	DrawQ_String(x, con_vislines - con_textsize.value*2, line_out, txtlen + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
 
 	// add a cursor on top of this when available
-	if (text2 != NULL)
-		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, text2, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
-}
-static void Con_DrawInput (void)
-{
-	if (!key_consoleactive)
-		return;		// don't draw anything
-
-	Con_InputLine(key_line, key_linepos, key_insert, r_font_disable_freetype.integer);
+	if (curs_out != NULL)
+		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, curs_out, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
 }
 
 typedef struct
