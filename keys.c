@@ -1463,6 +1463,20 @@ Key_Message (int key, int unicode)
 
 	// End Advanced Console Editing
 
+	if (key == K_HOME /*|| key == K_KP_HOME*/)
+	{
+		// TODO +CTRL for MsgKey_History_Top() or something
+		chat_bufferpos = 0;
+		return;
+	}
+
+	if (key == K_END /*|| key == K_KP_END*/)
+	{
+		// TODO +CTRL for MsgKey_History_Bottom() or something
+		chat_bufferpos = (int)strlen(chat_buffer);
+		return;
+	}
+
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
 	if (unicode > 0 && unicode < 32 && utf8_enable.integer)
 		unicode = 0xE000 + unicode;
