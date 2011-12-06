@@ -969,7 +969,7 @@ Key_Console (int key, int unicode)
 		return;
 	}
 
-	// nyov: delete char on cursor and terminate rest of line
+	// delete char on cursor and terminate rest of line
 	if (key == 'k' && keydown[K_CTRL])
 	{
 		key_line[key_linepos] = 0;
@@ -1182,7 +1182,7 @@ Key_Console (int key, int unicode)
 		}
 	}
 
-	if (key == K_HOME || key == K_KP_HOME)
+	if (key == K_HOME || key == K_KP_HOME || (key == 'a' && keydown[K_CTRL]))
 	{
 		if (keydown[K_CTRL])
 			con_backscroll = CON_TEXTSIZE;
@@ -1191,7 +1191,7 @@ Key_Console (int key, int unicode)
 		return;
 	}
 
-	if (key == K_END || key == K_KP_END)
+	if (key == K_END || key == K_KP_END || (key == 'e' && keydown[K_CTRL]))
 	{
 		if (keydown[K_CTRL])
 			con_backscroll = 0;
@@ -1239,7 +1239,18 @@ static void
 Key_Message (int key, int unicode)
 {
 	// nyov: adopted Key_Console style here, so both functions could merge common code at some point.
+	//       chat has CTRL for special chars, console functions need to use CTRL+ALT here
 	char vabuf[1024];
+
+	if (key == 'l' && keydown[K_CTRL] && keydown[K_ALT]) // no screen to clear, do same as ctrl+u (clear history?)
+	if (key == 'u' && keydown[K_CTRL] && keydown[K_ALT]) // like vi/readline ^u: delete currently edited line
+	{
+		// clear line
+		chat_bufferpos = 0;
+		chat_buffer[0] = 0;
+		return;
+	}
+
 	if (key == K_ENTER || unicode == /* LF */ 10 || unicode == /* CR */ 13)
 	{
 		if(chat_mode < 0)
@@ -1370,6 +1381,13 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
+	// delete char on cursor and terminate rest of line
+	if (key == 'k' && keydown[K_CTRL]  && keydown[K_ALT])
+	{
+		chat_buffer[chat_bufferpos] = 0;
+		return;
+	}
+
 	// move cursor to the next character
 	if (key == K_RIGHTARROW /*|| key == K_KP_RIGHTARROW*/ || key == K_MWHEELDOWN)
 	{
@@ -1463,14 +1481,14 @@ Key_Message (int key, int unicode)
 
 	// End Advanced Console Editing
 
-	if (key == K_HOME /*|| key == K_KP_HOME*/)
+	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL] && keydown[K_ALT]))
 	{
 		// TODO +CTRL for MsgKey_History_Top() or something
 		chat_bufferpos = 0;
 		return;
 	}
 
-	if (key == K_END /*|| key == K_KP_END*/)
+	if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL] && keydown[K_ALT]))
 	{
 		// TODO +CTRL for MsgKey_History_Bottom() or something
 		chat_bufferpos = (int)strlen(chat_buffer);
