@@ -1242,7 +1242,14 @@ Key_Message (int key, int unicode)
 	//       chat has CTRL for special chars, console functions need to use CTRL+ALT here
 	char vabuf[1024];
 
-	if (key == 'l' && keydown[K_CTRL] && keydown[K_ALT]) // no screen to clear, do same as ctrl+u (clear history?)
+	if (key == 'l' && keydown[K_CTRL] && keydown[K_ALT]) // no screen to clear, clear line like ctrl+u
+	{
+		// clear line
+		chat_bufferpos = 0;
+		chat_buffer[0] = 0;
+		return;
+	}
+
 	if (key == 'u' && keydown[K_CTRL] && keydown[K_ALT]) // like vi/readline ^u: delete currently edited line
 	{
 		// clear line
