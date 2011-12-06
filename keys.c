@@ -1269,9 +1269,10 @@ Key_Message (int key, int unicode)
 	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
 	// Enhanced by [515]
 	// Enhanced by terencehill
+	// Adapted for chat by nyov
 
 	// move cursor to the previous character
-	if (key == K_LEFTARROW || key == K_KP_LEFTARROW)
+	if (key == K_LEFTARROW /*|| key == K_KP_LEFTARROW*/ || key == K_MWHEELUP)
 	{
 		if(chat_bufferpos < 1)
 			return;
@@ -1312,7 +1313,11 @@ Key_Message (int key, int unicode)
 							break;
 					}
 				}
-			chat_bufferpos = pos + 1;
+
+			if(pos)
+				chat_bufferpos = pos + 1;
+			else
+				chat_bufferpos = pos;
 		}
 		else if(keydown[K_SHIFT]) // move cursor to the previous character ignoring colors
 		{
@@ -1343,16 +1348,30 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
-	if (key == K_BACKSPACE) {
-		if (chat_bufferpos) {
-			chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
-			chat_buffer[chat_bufferpos] = 0;
+	// delete char before cursor
+	if (key == K_BACKSPACE || (key == 'h' && keydown[K_CTRL] && keydown[K_ALT]))
+	{
+		if (chat_bufferpos > 0)
+		{
+			int newpos = u8_prevbyte(chat_buffer, chat_bufferpos);
+			strlcpy(chat_buffer + newpos, chat_buffer + chat_bufferpos, sizeof(chat_buffer) + 1 - chat_bufferpos);
+			chat_bufferpos = newpos;
 		}
 		return;
 	}
 
+	// delete char on cursor
+	if (key == K_DEL /*|| key == K_KP_DEL*/)
+	{
+		size_t linelen;
+		linelen = strlen(chat_buffer);
+		if (chat_bufferpos < (unsigned int)linelen)
+			memmove(chat_buffer + chat_bufferpos, chat_buffer + chat_bufferpos + u8_bytelen(chat_buffer + chat_bufferpos, 1), linelen - chat_bufferpos);
+		return;
+	}
+
 	// move cursor to the next character
-	if (key == K_RIGHTARROW || key == K_KP_RIGHTARROW)
+	if (key == K_RIGHTARROW /*|| key == K_KP_RIGHTARROW*/ || key == K_MWHEELDOWN)
 	{
 		if(chat_bufferpos >= (unsigned int)strlen(chat_buffer))
 			return;
@@ -1436,7 +1455,7 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
-	if (key == K_INS || key == K_KP_INS) // toggle insert mode
+	if (key == K_INS /*|| key == K_KP_INS*/) // toggle insert mode
 	{
 		key_insert ^= 1; // sharing same key_insert state with console here
 		return;
@@ -1451,7 +1470,7 @@ Key_Message (int key, int unicode)
 	if (!unicode)
 		return;							// non printable
 
-	if (chat_bufferpos < MAX_INPUTLINE-1)
+	if (chat_bufferpos < sizeof (chat_buffer) - 1)
 	{
 		char buf[16];
 		int len;
