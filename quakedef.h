@@ -55,6 +55,8 @@ extern char engineversion[128];
 #define	CON_MAXLINES			256
 #define	HIST_TEXTSIZE			2048
 #define	HIST_MAXLINES			16
+#define	CHATHIST_TEXTSIZE		1024
+#define	CHATHIST_MAXLINES		16
 #define	MAX_ALIAS_NAME			32
 #define	CMDBUFSIZE				131072
 #define	MAX_ARGS				80
@@ -124,6 +126,8 @@ extern char engineversion[128];
 #define	CON_MAXLINES			16384 ///< max scrollback buffer lines in console
 #define	HIST_TEXTSIZE			262144 ///< max command history buffer characters in console
 #define	HIST_MAXLINES			4096 ///< max command history buffer lines in console
+#define	CHATHIST_TEXTSIZE		16384 ///< max history buffer characters in chat typing buffer
+#define	CHATHIST_MAXLINES		256 ///< max history buffer lines in chat typing buffer
 #define	MAX_ALIAS_NAME			32
 #define	CMDBUFSIZE				655360 ///< maximum script size that can be loaded by the exec command (8192 in Quake)
 #define	MAX_ARGS				80 ///< maximum number of parameters to a console command or alias

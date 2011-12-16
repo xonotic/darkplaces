@@ -44,6 +44,12 @@ char		history_searchstring[MAX_INPUTLINE];
 qboolean	history_matchfound = false;
 conbuffer_t history;
 
+int		msghistory_line;
+char		msghistory_savedline[MAX_INPUTLINE];
+char		msghistory_searchstring[MAX_INPUTLINE];
+qboolean	msghistory_matchfound = false;
+conbuffer_t	msghistory;
+
 extern cvar_t	con_textsize;
 
 
@@ -312,6 +318,112 @@ static void Key_History_f(void)
 		Con_Printf("^3%*i^7 %s\n", (int)digits, i+1, ConBuffer_GetLine(&history, i));
 	Con_Printf("\n");
 }
+
+// nyov: chat buffer history
+// (almost copy of history buffer functions, should merge them)
+static void MsgKey_History_Init(void)
+{
+	ConBuffer_Init(&msghistory, CHATHIST_TEXTSIZE, CHATHIST_MAXLINES, zonemempool);
+	msghistory_line = -1;
+}
+
+static void MsgKey_History_Shutdown(void)
+{
+	ConBuffer_Shutdown(&msghistory);
+}
+
+static void MsgKey_History_Push(void)
+{
+	if(chat_buffer[0]) // empty?
+		ConBuffer_AddLine(&msghistory, chat_buffer, strlen(chat_buffer), 0);
+	msghistory_line = -1;
+	if (msghistory_matchfound)
+		msghistory_matchfound = false;
+}
+
+static qboolean MsgKey_History_Get_foundCommand(void)
+{
+	if (!msghistory_matchfound)
+		return false;
+	strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+	chat_bufferpos = strlen(chat_buffer);
+	msghistory_matchfound = false;
+	return true;
+}
+
+static void MsgKey_History_Up(void)
+{
+	if(msghistory_line == -1) // editing the "new" line
+		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
+
+	if (MsgKey_History_Get_foundCommand())
+		return;
+
+	if(msghistory_line == -1)
+	{
+		msghistory_line = CONBUFFER_LINES_COUNT(&msghistory) - 1;
+		if(msghistory_line != -1)
+		{
+			strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+			chat_bufferpos = strlen(chat_buffer);
+		}
+	}
+	else if(msghistory_line > 0)
+	{
+		--msghistory_line; // this also does -1 -> 0, so it is good
+		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
+	}
+}
+
+static void MsgKey_History_Down(void)
+{
+	if(msghistory_line == -1) // editing the "new" line
+		return;
+
+	if (MsgKey_History_Get_foundCommand())
+		return;
+
+	if(msghistory_line < CONBUFFER_LINES_COUNT(&msghistory) - 1)
+	{
+		++msghistory_line;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+	}
+	else
+	{
+		msghistory_line = -1;
+		strlcpy(chat_buffer, msghistory_savedline, sizeof(chat_buffer));
+	}
+
+	chat_bufferpos = strlen(chat_buffer);
+}
+
+static void MsgKey_History_First(void)
+{
+	if(msghistory_line == -1) // editing the "new" line
+		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
+
+	if (CONBUFFER_LINES_COUNT(&msghistory) > 0)
+	{
+		msghistory_line = 0;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
+	}
+}
+
+static void MsgKey_History_Last(void)
+{
+	if(msghistory_line == -1) // editing the "new" line
+		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
+
+	if (CONBUFFER_LINES_COUNT(&msghistory) > 0)
+	{
+		msghistory_line = CONBUFFER_LINES_COUNT(&msghistory) - 1;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
+	}
+}
+// end chat buffer history
 
 static int	key_bmap, key_bmap2;
 static unsigned char keydown[MAX_KEYS];	// 0 = up, 1 = down, 2 = repeating
@@ -1263,7 +1375,10 @@ Key_Message (int key, int unicode)
 		if(chat_mode < 0)
 			Cmd_ExecuteString(chat_buffer, src_command, true); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
 		else
+		{
 			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
+			MsgKey_History_Push();
+		}
 
 		key_dest = key_game;
 		chat_bufferpos = 0;
@@ -1487,6 +1602,18 @@ Key_Message (int key, int unicode)
 	}
 
 	// End Advanced Console Editing
+
+	if (key == K_UPARROW || key == K_KP_UPARROW || (key == 'p' && keydown[K_CTRL] && keydown[K_ALT]))
+	{
+		MsgKey_History_Up();
+		return;
+	}
+
+	if (key == K_DOWNARROW || key == K_KP_DOWNARROW || (key == 'n' && keydown[K_CTRL] && keydown[K_ALT]))
+	{
+		MsgKey_History_Down();
+		return;
+	}
 
 	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL] && keydown[K_ALT]))
 	{
@@ -1904,6 +2031,8 @@ Key_Init (void)
 	key_line[1] = 0;
 	key_linepos = 1;
 
+	MsgKey_History_Init();
+
 //
 // register our functions
 //
@@ -1926,6 +2055,7 @@ void
 Key_Shutdown (void)
 {
 	Key_History_Shutdown();
+	MsgKey_History_Shutdown();
 }
 
 const char *Key_GetBind (int key, int bindmap)
