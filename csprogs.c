@@ -249,6 +249,8 @@ static void CSQC_SetGlobals (void)
 		VectorCopy(cl.punchvector, PRVM_clientglobalvector(view_punchvector));
 		PRVM_clientglobalfloat(maxclients) = cl.maxclients;
 
+		PRVM_clientglobalfloat(player_localentnum) = cl.viewentity;
+
 		CSQC_R_RecalcView();
 	CSQC_END
 }
@@ -355,15 +357,6 @@ qboolean CSQC_AddRenderEdict(prvm_edict_t *ed, int edictnum)
 	if (renderflags & RF_USETRANSPARENTOFFSET)
 		entrender->transparent_offset = PRVM_clientglobalfloat(transparent_offset);
 
-	// model light
-	if (renderflags & RF_MODELLIGHT)
-	{
-		if(PRVM_clientedictvector(ed, modellight_ambient)) VectorCopy(PRVM_clientedictvector(ed, modellight_ambient), entrender->modellight_ambient);
-		if(PRVM_clientedictvector(ed, modellight_diffuse)) VectorCopy(PRVM_clientedictvector(ed, modellight_diffuse), entrender->modellight_diffuse);
-		if(PRVM_clientedictvector(ed, modellight_dir))     VectorCopy(PRVM_clientedictvector(ed, modellight_dir), entrender->modellight_lightdir);
-		entrender->flags |= RENDER_CUSTOMIZEDMODELLIGHT;
-	}
-
 	if(renderflags)
 	{
 		if(renderflags & RF_VIEWMODEL) entrender->flags |= RENDER_VIEWMODEL | RENDER_NODEPTHTEST;
@@ -371,28 +364,6 @@ qboolean CSQC_AddRenderEdict(prvm_edict_t *ed, int edictnum)
 		if(renderflags & RF_WORLDOBJECT) entrender->flags |= RENDER_WORLDOBJECT;
 		if(renderflags & RF_DEPTHHACK) entrender->flags |= RENDER_NODEPTHTEST;
 		if(renderflags & RF_ADDITIVE) entrender->flags |= RENDER_ADDITIVE;
-	}
-
-	// walk attachments to find RENDER_EXTERIORMODEL status
-	{
-		prvm_edict_t *ent = ed;
-		prvm_edict_t *v = PRVM_EDICT_NUM(CL_VM_GetViewEntity());
-		int attachloop = 0;
-		for(;;)
-		{
-			if(attachloop >= 256)
-				break;
-			if(ent == v)
-			{
-				entrender->flags |= RENDER_EXTERIORMODEL;
-				break;
-			}
-			if (PRVM_clientedictedict(ent, tag_entity))
-				ent = PRVM_EDICT_NUM(PRVM_clientedictedict(ent, tag_entity));
-			else
-				break;
-			attachloop++;
-		}
 	}
 
 	c = (int)PRVM_clientedictfloat(ed, colormap);
@@ -433,6 +404,19 @@ qboolean CSQC_AddRenderEdict(prvm_edict_t *ed, int edictnum)
 	// make the other useful stuff
 	memcpy(entrender->framegroupblend, ed->priv.server->framegroupblend, sizeof(ed->priv.server->framegroupblend));
 	CL_UpdateRenderEntity(entrender);
+
+	// model light
+	if (renderflags & RF_MODELLIGHT)
+	{
+		if(PRVM_clientedictvector(ed, modellight_ambient)) VectorCopy(PRVM_clientedictvector(ed, modellight_ambient), entrender->modellight_ambient);
+		if(PRVM_clientedictvector(ed, modellight_diffuse)) VectorCopy(PRVM_clientedictvector(ed, modellight_diffuse), entrender->modellight_diffuse);
+		if(PRVM_clientedictvector(ed, modellight_dir))     Matrix4x4_Transform3x3(&entrender->matrix, PRVM_clientedictvector(ed, modellight_dir), entrender->modellight_lightdir);
+		if (VectorLength2(entrender->modellight_lightdir) == 0)
+			VectorSet(entrender->modellight_lightdir, 0, 0, 1); // have to set SOME valid vector here
+		VectorNormalize(entrender->modellight_lightdir);
+		entrender->flags |= RENDER_CUSTOMIZEDMODELLIGHT;
+	}
+
 	// override animation data with full control
 	memcpy(entrender->frameblend, ed->priv.server->frameblend, sizeof(ed->priv.server->frameblend));
 	if (ed->priv.server->skeleton.relativetransforms)
@@ -1134,7 +1118,8 @@ void CL_VM_Init (void)
 	PRVM_clientglobaledict(self) = 0;
 
 	PRVM_clientglobalstring(mapname) = PRVM_SetEngineString(prog, cl.worldname);
-	PRVM_clientglobalfloat(player_localentnum) = cl.playerentity;
+	PRVM_clientglobalfloat(player_localnum) = cl.realplayerentity - 1;
+	PRVM_clientglobalfloat(player_localentnum) = cl.viewentity;
 
 	// set map description (use world entity 0)
 	PRVM_clientedictstring(prog->edicts, message) = PRVM_SetEngineString(prog, cl.worldmessage);
@@ -1249,6 +1234,6 @@ qboolean CL_VM_TransformView(int entnum, matrix4x4_t *viewmatrix, mplane_t *clip
 int CL_VM_GetViewEntity(void)
 {
 	if(cl.csqc_server2csqcentitynumber[cl.viewentity])
-		return cl.csqc_server2csqcentitynumber[cl.viewentity];
+		return cl.csqc_server2csqcentitynumber[cl.viewentity] + MAX_EDICTS;
 	return cl.viewentity;
 }
