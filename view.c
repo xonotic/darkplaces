@@ -487,9 +487,13 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	}
 	else
 	{
+		Con_Printf("last on ground time: %f, with z velocity of: %f\n", cl.lastongroundtime, cl.velocity[2]);
+		
 		// smooth stair stepping, but only if clonground and enabled
-		if (!clonground || cl_stairsmoothspeed.value <= 0 || teleported)
+		if (smoothtime == 0.1 || cl_stairsmoothspeed.value <= 0 || teleported)
+		{
 			cl.stairsmoothz = vieworg[2];
+		}
 		else
 		{
 			if (cl.stairsmoothz < vieworg[2])
