@@ -310,11 +310,21 @@ endif
 ifdef LINK_TO_D0_BLIND_ID
 CFLAGS_CRYPTO=-DLINK_TO_D0_BLIND_ID `pkg-config --cflags d0_blind_id`
 LIB_CRYPTO=`pkg-config --libs d0_blind_id`
+else
+ifdef DISABLE_D0_BLIND_ID
+CFLAGS_CRYPTO=-DDISABLE_D0_BLIND_ID
+LIB_CRYPTO=
+endif
 endif
 
 ifdef LINK_TO_D0_RIJNDAEL
 CFLAGS_CRYPTO_RIJNDAEL=-DLINK_TO_D0_RIJNDAEL `pkg-config --cflags d0_rijndael`
 LIB_CRYPTO_RIJNDAEL=`pkg-config --libs d0_rijndael`
+else
+ifdef DISABLE_D0_RIJNDAEL
+CFLAGS_CRYPTO_RIJNDAEL=-DDISABLE_D0_RIJNDAEL
+LIB_CRYPTO_RIJNDAEL=
+endif
 endif
 
 ifdef LINK_TO_FREETYPE2

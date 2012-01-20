@@ -209,6 +209,8 @@ static D0_EXPORT void (*qd0_blind_id_setmallocfuncs)(d0_malloc_t *m, d0_free_t *
 static D0_EXPORT void (*qd0_blind_id_setmutexfuncs)(d0_createmutex_t *c, d0_destroymutex_t *d, d0_lockmutex_t *l, d0_unlockmutex_t *u);
 static D0_EXPORT D0_WARN_UNUSED_RESULT D0_BOOL (*qd0_blind_id_verify_public_id)(const d0_blind_id_t *ctx, D0_BOOL *status);
 static D0_EXPORT D0_WARN_UNUSED_RESULT D0_BOOL (*qd0_blind_id_verify_private_id)(const d0_blind_id_t *ctx);
+
+#ifndef DISABLE_D0_BLIND_ID
 static dllfunction_t d0_blind_id_funcs[] =
 {
 	{"d0_blind_id_new", (void **) &qd0_blind_id_new},
@@ -252,11 +254,15 @@ static dllfunction_t d0_blind_id_funcs[] =
 	{"d0_blind_id_verify_private_id", (void **) &qd0_blind_id_verify_private_id},
 	{NULL, NULL}
 };
+#endif
 // end of d0_blind_id interface
 
 static dllhandle_t d0_blind_id_dll = NULL;
 static qboolean Crypto_OpenLibrary (void)
 {
+#ifdef DISABLE_D0_BLIND_ID
+	return false;
+#else
 	const char* dllnames [] =
 	{
 #if defined(WIN32)
@@ -276,11 +282,14 @@ static qboolean Crypto_OpenLibrary (void)
 
 	// Load the DLL
 	return Sys_LoadLibrary (dllnames, &d0_blind_id_dll, d0_blind_id_funcs);
+#endif
 }
 
 static void Crypto_CloseLibrary (void)
 {
+#ifndef DISABLE_D0_BLIND_ID
 	Sys_UnloadLibrary (&d0_blind_id_dll);
+#endif
 }
 
 #endif
@@ -313,6 +322,8 @@ D0_EXPORT void (*qd0_rijndael_decrypt) (const unsigned long *rk, int nrounds,
 #define D0_RIJNDAEL_KEYLENGTH(keybits) ((keybits)/8)
 #define D0_RIJNDAEL_RKLENGTH(keybits)  ((keybits)/8+28)
 #define D0_RIJNDAEL_NROUNDS(keybits)   ((keybits)/32+6)
+
+#ifndef DISABLE_D0_RIJNDAEL
 static dllfunction_t d0_rijndael_funcs[] =
 {
 	{"d0_rijndael_setup_decrypt", (void **) &qd0_rijndael_setup_decrypt},
@@ -321,11 +332,15 @@ static dllfunction_t d0_rijndael_funcs[] =
 	{"d0_rijndael_encrypt", (void **) &qd0_rijndael_encrypt},
 	{NULL, NULL}
 };
+#endif
 // end of d0_blind_id interface
 
 static dllhandle_t d0_rijndael_dll = NULL;
 static qboolean Crypto_Rijndael_OpenLibrary (void)
 {
+#ifdef DISABLE_D0_RIJNDAEL
+	return false;
+#else
 	const char* dllnames [] =
 	{
 #if defined(WIN32)
@@ -345,11 +360,14 @@ static qboolean Crypto_Rijndael_OpenLibrary (void)
 
 	// Load the DLL
 	return Sys_LoadLibrary (dllnames, &d0_rijndael_dll, d0_rijndael_funcs);
+#endif
 }
 
 static void Crypto_Rijndael_CloseLibrary (void)
 {
+#ifndef DISABLE_D0_RIJNDAEL
 	Sys_UnloadLibrary (&d0_rijndael_dll);
+#endif
 }
 
 #endif
