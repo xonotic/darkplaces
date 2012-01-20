@@ -26,10 +26,53 @@
 //
 //LordHavoc: rewrote most of this.
 
+#ifdef LINK_TO_PNG
+// This has to come before anything else that includes setjmp.h, because
+// libpng specifically wants non-BSD setjmp semantics.
+# include <png.h>
+#endif
+
 #include "quakedef.h"
 #include "image.h"
 #include "image_png.h"
 
+#ifdef LINK_TO_PNG
+
+#define qpng_set_sig_bytes png_set_sig_bytes
+#define qpng_sig_cmp png_sig_cmp
+#define qpng_create_read_struct png_create_read_struct
+#define qpng_create_write_struct png_create_write_struct
+#define qpng_create_info_struct png_create_info_struct
+#define qpng_read_info png_read_info
+#define qpng_set_compression_level png_set_compression_level
+#define qpng_set_filter png_set_filter
+#define qpng_set_expand png_set_expand
+#define qpng_set_palette_to_rgb png_set_palette_to_rgb
+#define qpng_set_tRNS_to_alpha png_set_tRNS_to_alpha
+#define qpng_set_gray_to_rgb png_set_gray_to_rgb
+#define qpng_set_filler png_set_filler
+#define qpng_set_IHDR png_set_IHDR
+#define qpng_set_packing png_set_packing
+#define qpng_set_bgr png_set_bgr
+#define qpng_set_interlace_handling png_set_interlace_handling
+#define qpng_read_update_info png_read_update_info
+#define qpng_read_image png_read_image
+#define qpng_read_end png_read_end
+#define qpng_destroy_read_struct png_destroy_read_struct
+#define qpng_destroy_write_struct png_destroy_write_struct
+#define qpng_set_read_fn png_set_read_fn
+#define qpng_set_write_fn png_set_write_fn
+#define qpng_get_valid png_get_valid
+#define qpng_get_rowbytes png_get_rowbytes
+#define qpng_get_channels png_get_channels
+#define qpng_get_bit_depth png_get_bit_depth
+#define qpng_get_IHDR png_get_IHDR
+#define qpng_access_version_number png_access_version_number
+#define qpng_write_info png_write_info
+#define qpng_write_row png_write_row
+#define qpng_write_end png_write_end
+
+#else
 
 static void				(*qpng_set_sig_bytes)		(void*, int);
 static int				(*qpng_sig_cmp)				(const unsigned char*, size_t, size_t);
@@ -124,6 +167,7 @@ static dllfunction_t png14funcs[] =
 dllhandle_t png_dll = NULL;
 dllhandle_t png14_dll = NULL;
 
+#endif
 
 /*
 =================================================================
@@ -142,6 +186,9 @@ Try to load the PNG DLL
 */
 qboolean PNG_OpenLibrary (void)
 {
+#ifdef LINK_TO_PNG
+	return TRUE;
+#else
 	const char* dllnames [] =
 	{
 #if WIN32
@@ -172,15 +219,8 @@ qboolean PNG_OpenLibrary (void)
 		return true;
 
 	// Load the DLL
-	if(!Sys_LoadLibrary (dllnames, &png_dll, pngfuncs))
-		return false;
-	if(qpng_access_version_number() / 100 >= 104)
-		if(!Sys_LoadLibrary (dllnames, &png14_dll, png14funcs))
-		{
-			Sys_UnloadLibrary (&png_dll);
-			return false;
-		}
-	return true;
+	return Sys_LoadLibrary (dllnames, &png_dll, pngfuncs);
+#endif
 }
 
 
@@ -193,8 +233,9 @@ Unload the PNG DLL
 */
 void PNG_CloseLibrary (void)
 {
-	Sys_UnloadLibrary (&png14_dll);
+#ifndef LINK_TO_PNG
 	Sys_UnloadLibrary (&png_dll);
+#endif
 }
 
 /*
@@ -301,9 +342,11 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 
 	// FIXME: register an error handler so that abort() won't be called on error
 
+#ifndef LINK_TO_PNG
 	// No DLL = no PNGs
 	if (!png_dll)
 		return NULL;
+#endif
 
 	if(qpng_sig_cmp(raw, 0, filesize))
 		return NULL;
@@ -482,12 +525,14 @@ qboolean PNG_SaveImage_preflipped (const char *filename, int width, int height, 
 	unsigned char ioBuffer[8192];
 	int passes, i, j;
 
+#ifndef LINK_TO_PNG
 	// No DLL = no JPEGs
 	if (!png_dll)
 	{
 		Con_Print("You need the libpng library to save PNG images\n");
 		return false;
 	}
+#endif
 
 	png = (void *)qpng_create_write_struct( 
 		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
