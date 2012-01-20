@@ -82,10 +82,15 @@ my_setjmp (jmp_buf env)
 
 #else
 
+typedef void *png_structp;
+typedef void **png_structpp;
+typedef void *png_infop;
+typedef void **png_infopp;
+
 static void				(*qpng_set_sig_bytes)		(void*, int);
-static int				(*qpng_sig_cmp)				(const unsigned char*, size_t, size_t);
-static void*			(*qpng_create_read_struct)	(const char*, void*, void(*)(void *png, const char *message), void(*)(void *png, const char *message));
-static void*			(*qpng_create_write_struct)	(const char*, void*, void(*)(void *png, const char *message), void(*)(void *png, const char *message));
+static int				(*qpng_sig_cmp)				(unsigned char*, size_t, size_t);
+static void*			(*qpng_create_read_struct)	(const char*, void*, void(*)(png_structp png, const char *message), void(*)(png_structp png, const char *message));
+static void*			(*qpng_create_write_struct)	(const char*, void*, void(*)(png_structp png, const char *message), void(*)(png_structp png, const char *message));
 static void*			(*qpng_create_info_struct)	(void*);
 static void				(*qpng_read_info)			(void*, void*);
 static void				(*qpng_set_compression_level)	(void*, int);
@@ -102,7 +107,7 @@ static int				(*qpng_set_interlace_handling)	(void*);
 static void				(*qpng_read_update_info)	(void*, void*);
 static void				(*qpng_read_image)			(void*, unsigned char**);
 static void				(*qpng_read_end)			(void*, void*);
-static void				(*qpng_destroy_read_struct)	(void**, void**, void**);
+static void				(*qpng_destroy_read_struct)	(png_structpp, png_infopp, void**);
 static void				(*qpng_destroy_write_struct)	(void**, void**);
 static void				(*qpng_set_read_fn)			(void*, void*, void(*)(void *png, unsigned char *data, size_t length));
 static void				(*qpng_set_write_fn)		(void*, void*, void(*)(void *png, unsigned char *data, size_t length), void(*)(void *png));
@@ -306,7 +311,7 @@ static struct
 } my_png;
 
 //LordHavoc: removed __cdecl prefix, added overrun protection, and rewrote this to be more efficient
-static void PNG_fReadData(void *png, unsigned char *data, size_t length)
+static void PNG_fReadData(png_structp png, unsigned char *data, size_t length)
 {
 	size_t l;
 	l = my_png.tmpBuflength - my_png.tmpi;
@@ -323,21 +328,21 @@ static void PNG_fReadData(void *png, unsigned char *data, size_t length)
 	//Com_HexDumpToConsole(data, (int)length);
 }
 
-static void PNG_fWriteData(void *png, unsigned char *data, size_t length)
+static void PNG_fWriteData(png_structp png, unsigned char *data, size_t length)
 {
 	FS_Write(my_png.outfile, data, length);
 }
 
-static void PNG_fFlushData(void *png)
+static void PNG_fFlushData(png_structp png)
 {
 }
 
-static void PNG_error_fn(void *png, const char *message)
+static void PNG_error_fn(png_structp png, const char *message)
 {
 	Con_Printf("PNG_LoadImage: error: %s\n", message);
 }
 
-static void PNG_warning_fn(void *png, const char *message)
+static void PNG_warning_fn(png_structp png, const char *message)
 {
 	Con_Printf("PNG_LoadImage: warning: %s\n", message);
 }
@@ -346,7 +351,8 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 {
 	unsigned int c;
 	unsigned int	y;
-	void *png, *pnginfo;
+	png_structp png;
+	png_infop pnginfo;
 	unsigned char *imagedata = NULL;
 	unsigned char ioBuffer[8192];
 
@@ -358,7 +364,8 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 		return NULL;
 #endif
 
-	if(qpng_sig_cmp(raw, 0, filesize))
+	// png_sig_cmp is not fully const-correct
+	if(qpng_sig_cmp((unsigned char *) raw, 0, filesize))
 		return NULL;
 	png = (void *)qpng_create_read_struct(
 		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
@@ -531,7 +538,8 @@ qboolean PNG_SaveImage_preflipped (const char *filename, int width, int height, 
 {
 	unsigned int offset, linesize;
 	qfile_t* file = NULL;
-	void *png, *pnginfo;
+	png_structp png;
+	png_infop pnginfo;
 	unsigned char ioBuffer[8192];
 	int passes, i, j;
 
@@ -544,16 +552,16 @@ qboolean PNG_SaveImage_preflipped (const char *filename, int width, int height, 
 	}
 #endif
 
-	png = (void *)qpng_create_write_struct( 
-		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
+	png = qpng_create_write_struct(
+		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 : 
 		(qpng_access_version_number() / 100 == 104) ? PNG_LIBPNG_VER_STRING_14 :
 		(qpng_access_version_number() / 100 == 105) ? PNG_LIBPNG_VER_STRING_15 :
-		PNG_LIBPNG_VER_STRING_16, // nasty hack... whatever
+		PNG_LIBPNG_VER_STRING_16, // nasty hack to support both libpng12 and libpng14
 		0, PNG_error_fn, PNG_warning_fn
 	);
 	if(!png)
 		return false;
-	pnginfo = (void *)qpng_create_info_struct(png);
+	pnginfo = qpng_create_info_struct(png);
 	if(!pnginfo)
 	{
 		 qpng_destroy_write_struct(&png, NULL);
