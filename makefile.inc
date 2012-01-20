@@ -192,6 +192,7 @@ CFLAGS_COMMON=\
 	$(CFLAGS_PRELOAD) \
 	$(CFLAGS_FS) \
 	$(CFLAGS_WARNINGS) \
+	$(CFLAGS_CURL) \
 	$(CFLAGS_LIBJPEG) \
 	$(CFLAGS_LIBVORBIS) \
 	$(CFLAGS_PNG) \
@@ -232,6 +233,7 @@ OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_S
 
 LDFLAGS_UNIXCOMMON=\
 	-lm \
+	$(LIB_CURL) \
 	$(LIB_ODE) \
 	$(LIB_JPEG) \
 	$(LIB_PNG) \

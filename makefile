@@ -302,6 +302,11 @@ else
 	CFLAGS_FS=
 endif
 
+ifdef LINK_TO_CURL
+CFLAGS_CURL=-DLINK_TO_CURL `pkg-config --cflags libcurl`
+LIB_CURL=`pkg-config --libs libcurl`
+endif
+
 ifdef LINK_TO_LIBJPEG
 CFLAGS_LIBJPEG=-DLINK_TO_LIBJPEG
 LIB_JPEG=-ljpeg

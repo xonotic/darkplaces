@@ -12,6 +12,31 @@ static cvar_t cl_curl_enabled = {CVAR_SAVE, "cl_curl_enabled","1", "whether clie
 static cvar_t cl_curl_useragent = {0, "cl_curl_useragent","1", "send the User-Agent string (note: turning this off may break stuff)"};
 static cvar_t cl_curl_useragent_append = {0, "cl_curl_useragent_append","", "a string to append to the User-Agent string (useful for name and version number of your mod)"};
 
+#ifdef LINK_TO_CURL
+
+#include <curl/curl.h>
+
+#define qcurl_global_init curl_global_init
+#define qcurl_global_cleanup curl_global_cleanup
+#define qcurl_easy_init curl_easy_init
+#define qcurl_easy_cleanup curl_easy_cleanup
+#define qcurl_easy_setopt curl_easy_setopt
+#define qcurl_easy_strerror curl_easy_strerror
+#define qcurl_easy_getinfo curl_easy_getinfo
+#define qcurl_multi_init curl_multi_init
+#define qcurl_multi_perform curl_multi_perform
+#define qcurl_multi_add_handle curl_multi_add_handle
+#define qcurl_multi_remove_handle curl_multi_remove_handle
+#define qcurl_multi_info_read curl_multi_info_read
+#define qcurl_multi_cleanup curl_multi_cleanup
+#define qcurl_multi_strerror curl_multi_strerror
+#define qcurl_slist_append curl_slist_append
+#define qcurl_slist_free_all curl_slist_free_all
+
+typedef struct curl_slist curl_slist;
+
+#else
+
 /*
 =================================================================
 
@@ -185,6 +210,8 @@ static dllfunction_t curlfuncs[] =
 static dllhandle_t curl_dll = NULL;
 // will be checked at many places to find out if qcurl calls are allowed
 
+#endif
+
 void *curl_mutex = NULL;
 
 typedef struct downloadinfo_s
@@ -238,8 +265,11 @@ Setting the command to NULL clears it.
 */
 static void Curl_CommandWhenDone(const char *cmd)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
+
 	if(cmd)
 		strlcpy(command_when_done, cmd, sizeof(command_when_done));
 	else
@@ -254,8 +284,11 @@ Problem: what counts as an error?
 
 static void Curl_CommandWhenError(const char *cmd)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
+
 	if(cmd)
 		strlcpy(command_when_error, cmd, sizeof(command_when_error));
 	else
@@ -315,8 +348,11 @@ All downloads finished, at least one success since connect, no single failure
 */
 static void Curl_CheckCommandWhenDone(void)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
+
 	if(numdownloads_added && ((numdownloads_success + numdownloads_fail) == numdownloads_added))
 	{
 		if(numdownloads_fail == 0)
@@ -337,6 +373,7 @@ static void Curl_CheckCommandWhenDone(void)
 	}
 }
 
+#ifndef LINK_TO_CURL
 /*
 ====================
 CURL_CloseLibrary
@@ -383,6 +420,7 @@ static void CURL_CloseLibrary (void)
 {
 	Sys_UnloadLibrary (&curl_dll);
 }
+#endif
 
 
 static CURLM *curlm = NULL;
@@ -472,8 +510,12 @@ static qboolean Curl_Begin(const char *URL, const char *extraheaders, double max
 static void Curl_EndDownload(downloadinfo *di, CurlStatus status, CURLcode error)
 {
 	qboolean ok = false;
+
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
+
 	switch(status)
 	{
 		case CURL_DOWNLOAD_SUCCESS:
@@ -603,8 +645,12 @@ static void CheckPendingDownloads(void)
 	const char *h;
 	char urlbuf[1024];
 	char vabuf[1024];
+
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
+
 	if(numdownloads < cl_curl_maxdownloads.integer)
 	{
 		downloadinfo *di;
@@ -725,9 +771,12 @@ On Win32, this must be called AFTER WSAStartup has been done!
 */
 void Curl_Init(void)
 {
+#ifndef LINK_TO_CURL
 	CURL_OpenLibrary();
 	if(!curl_dll)
 		return;
+#endif
+
 	if (Thread_HasThreads()) curl_mutex = Thread_CreateMutex();
 	qcurl_global_init(CURL_GLOBAL_NOTHING);
 	curlm = qcurl_multi_init();
@@ -743,13 +792,17 @@ Surprise... closes all the stuff. Please do this BEFORE shutting down LHNET.
 void Curl_ClearRequirements(void);
 void Curl_Shutdown(void)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
 	Curl_ClearRequirements();
 	Curl_CancelAll();
 	if (curl_mutex) Thread_DestroyMutex(curl_mutex);
+#ifndef LINK_TO_CURL
 	CURL_CloseLibrary();
 	curl_dll = NULL;
+#endif
 }
 
 /*
@@ -762,8 +815,10 @@ Finds the internal information block for a download given by file name.
 static downloadinfo *Curl_Find(const char *filename)
 {
 	downloadinfo *di;
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return NULL;
+#endif
 	for(di = downloads; di; di = di->next)
 		if(!strcasecmp(di->filename, filename))
 			return di;
@@ -780,11 +835,13 @@ if given) in the "dlcache/" folder.
 */
 static qboolean Curl_Begin(const char *URL, const char *extraheaders, double maxspeed, const char *name, qboolean ispak, qboolean forthismap, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 	{
 		return false;
 	}
 	else
+#endif
 	{
 		char fn[MAX_OSPATH];
 		char urlbuf[1024];
@@ -1012,8 +1069,10 @@ void Curl_Run(void)
 	if(!cl_curl_enabled.integer)
 		return;
 
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
 
 	if (curl_mutex) Thread_LockMutex(curl_mutex);
 
@@ -1125,8 +1184,10 @@ Stops ALL downloads.
 */
 void Curl_CancelAll(void)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
 
 	if (curl_mutex) Thread_LockMutex(curl_mutex);
 
@@ -1148,8 +1209,10 @@ returns true iff there is a download running.
 */
 qboolean Curl_Running(void)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return false;
+#endif
 
 	return downloads != NULL;
 }
@@ -1164,8 +1227,10 @@ for the given download.
 */
 static double Curl_GetDownloadAmount(downloadinfo *di)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return -2;
+#endif
 	if(di->curle)
 	{
 		double length;
@@ -1188,8 +1253,10 @@ returns the speed of the given download in bytes per second
 */
 static double Curl_GetDownloadSpeed(downloadinfo *di)
 {
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return -2;
+#endif
 	if(di->curle)
 	{
 		double speed;
@@ -1212,8 +1279,11 @@ static void Curl_Info_f(void)
 {
 	downloadinfo *di;
 	char urlbuf[1024];
+
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 		return;
+#endif
 	if(Curl_Running())
 	{
 		if (curl_mutex) Thread_LockMutex(curl_mutex);
@@ -1273,11 +1343,13 @@ static void Curl_Curl_f(void)
 	const char *url;
 	const char *name = 0;
 
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 	{
 		Con_Print("libcurl DLL not found, this command is inactive.\n");
 		return;
 	}
+#endif
 
 	if(!cl_curl_enabled.integer)
 	{
@@ -1440,6 +1512,7 @@ Curl_downloadinfo_t *Curl_GetDownloadInfo(int *nDownloads, const char **addition
 	downloadinfo *di;
 	Curl_downloadinfo_t *downinfo;
 
+#ifndef LINK_TO_CURL
 	if(!curl_dll)
 	{
 		*nDownloads = 0;
@@ -1447,6 +1520,7 @@ Curl_downloadinfo_t *Curl_GetDownloadInfo(int *nDownloads, const char **addition
 			*additional_info = NULL;
 		return NULL;
 	}
+#endif
 
 	if (curl_mutex) Thread_LockMutex(curl_mutex);
 
