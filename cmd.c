@@ -1615,7 +1615,7 @@ static void Cmd_TokenizeString (const char *text)
 			l = (int)strlen(com_token) + 1;
 			if (cmd_tokenizebufferpos + l > CMD_TOKENIZELENGTH)
 			{
-				Con_Printf("Cmd_TokenizeString: ran out of %i character buffer space for command arguements\n", CMD_TOKENIZELENGTH);
+				Con_Printf("Cmd_TokenizeString: ran out of %i character buffer space for command arguments\n", CMD_TOKENIZELENGTH);
 				break;
 			}
 			memcpy (cmd_tokenizebuffer + cmd_tokenizebufferpos, com_token, l);

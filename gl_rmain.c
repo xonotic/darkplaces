@@ -3261,7 +3261,7 @@ skinframe_t *R_SkinFrame_Find(const char *name, int textureflags, int comparewid
 	{
 		rtexture_t *dyntexture;
 		// check whether its a dynamic texture
-		// this only needs to be done because Purge doesnt delete skinframes - only sets the texture pointers to NULL and we need to restore it before returing.. [11/29/2007 Black]
+		// this only needs to be done because Purge doesn't delete skinframes - only sets the texture pointers to NULL and we need to restore it before returing.. [11/29/2007 Black]
 		dyntexture = CL_GetDynTexture( basename );
 		item->base = dyntexture; // either NULL or dyntexture handle
 	}

@@ -65,7 +65,7 @@ typedef struct prvm_required_field_s
 } prvm_required_field_t;
 
 
-// AK: I dont call it engine private cause it doesnt really belongs to the engine
+// AK: I don't call it engine private because it doesn't really belong to the engine,
 //     it belongs to prvm.
 typedef struct prvm_edict_private_s
 {

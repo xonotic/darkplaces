@@ -1506,7 +1506,7 @@ void Sbar_Draw (void)
 				else
 					Sbar_DrawXNum((154-3*24),12,cl.stats[STAT_HEALTH],3,24,0.6,0.7,0.8,1,0);
 
-				// AK dont draw ammo for the laser
+				// AK don't draw ammo for the laser
 				if(cl.stats[STAT_ACTIVEWEAPON] != 12)
 				{
 					if (cl.stats[STAT_ITEMS] & NEX_IT_SHELLS)

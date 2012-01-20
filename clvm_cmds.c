@@ -472,7 +472,7 @@ static void VM_CL_findradius (prvm_prog_t *prog)
 	else
 		chainfield = prog->fieldoffsets.chain;
 	if(chainfield < 0)
-		prog->error_cmd("VM_findchain: %s doesnt have the specified chain field !", prog->name);
+		prog->error_cmd("VM_findchain: %s doesn't have the specified chain field !", prog->name);
 
 	chain = (prvm_edict_t *)prog->edicts;
 

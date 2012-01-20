@@ -1712,7 +1712,7 @@ void VID_EnableJoystick(qboolean enable)
 }
 
 #if SDL_MAJOR_VERSION == 1
-// set the icon (we dont use SDL here since it would be too much a PITA)
+// set the icon (we don't use SDL here since it would be too much a PITA)
 #ifdef WIN32
 #include "resource.h"
 #include <SDL_syswm.h>

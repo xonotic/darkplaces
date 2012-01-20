@@ -307,7 +307,7 @@ void R_MarkDirtyTexture(rtexture_t *rt) {
 		return;
 	}
 
-	// dont do anything if the texture is already dirty (and make sure this *is* a dynamic texture after all!)
+	// don't do anything if the texture is already dirty (and make sure this *is* a dynamic texture after all!)
 	if (glt->flags & GLTEXF_DYNAMIC)
 	{
 		// mark it as dirty, so R_RealGetTexture gets called

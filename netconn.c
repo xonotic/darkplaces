@@ -1494,7 +1494,7 @@ static int NetConn_ClientParsePacket_ServerList_ProcessReply(const char *address
 
 	if (n == serverlist_cachecount)
 	{
-		// LAN search doesnt require an answer from the master server so we wont
+		// LAN search doesn't require an answer from the master server so we wont
 		// know the ping nor will it be initialized already...
 
 		// find a slot
@@ -1526,7 +1526,7 @@ static int NetConn_ClientParsePacket_ServerList_ProcessReply(const char *address
 		entry->query = SQS_QUERIED;
 	} else {
 		// convert to unsigned to catch the -1
-		// I still dont like this but its better than the old 10000 magic ping number - as in easier to type and read :( [11/8/2007 Black]
+		// I still don't like this but its better than the old 10000 magic ping number - as in easier to type and read :( [11/8/2007 Black]
 		entry->info.ping = min((unsigned) entry->info.ping, (unsigned) pingtime);
 		serverreplycount++;
 	}

@@ -797,8 +797,8 @@ float(float entitynum, float fldnum) getentity = #504;
 vector(float entitynum, float fldnum) getentityvec = #504;
 // description: allows to query parms from render entities, especially useful with attaching CSQC ents to
 // server entities networked and interpolated by engine (monsters, players), number of entity is it's SVQC number
-// you can send it via tempentity/CSQC entity message. Note that this builtin doesnt know about entity removing/reallocating
-// so it's meaning to work for short period of time, dont use it on missiles/grenades whatever will be removed next five seconds
+// you can send it via tempentity/CSQC entity message. Note that this builtin doesn't know about entity removing/reallocating
+// so it's meaning to work for short period of time, don't use it on missiles/grenades whatever will be removed next five seconds
 
 //DP_GFX_FONTS
 //idea: Blub\0, divVerent

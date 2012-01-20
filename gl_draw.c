@@ -872,7 +872,7 @@ static void LoadFont_f(void)
 			   "loadfont console gfx/conchars,gfx/fallback 8 12 16 24 32\n"
 			   "In many cases, 8 12 16 24 32 should be a good choice.\n"
 			   "custom switches:\n"
-			   " scale x : scale all characters by this amount when rendering (doesnt change line height)\n"
+			   " scale x : scale all characters by this amount when rendering (doesn't change line height)\n"
 			   " voffset x : offset all chars vertical when rendering, this is multiplied to character height\n"
 			);
 		return;

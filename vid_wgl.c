@@ -496,7 +496,7 @@ void AppActivate(BOOL fActive, BOOL minimize)
 	}
 }
 
-//TODO: move it around in vid_wgl.c since I dont think this is the right position
+//TODO: move it around in vid_wgl.c since I don't think this is the right position
 void Sys_SendKeyEvents (void)
 {
 	MSG msg;

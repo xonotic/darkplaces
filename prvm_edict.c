@@ -248,8 +248,8 @@ prvm_edict_t *PRVM_ED_Alloc(prvm_prog_t *prog)
 	int i;
 	prvm_edict_t *e;
 
-	// the client qc dont need maxclients
-	// thus it doesnt need to use svs.maxclients
+	// the client qc doesn't need maxclients
+	// thus it doesn't need to use svs.maxclients
 	// AK:	changed i=svs.maxclients+1
 	// AK:	changed so the edict 0 wont spawn -> used as reserved/world entity
 	//		although the menu/client has no world
@@ -289,7 +289,7 @@ FIXME: walk all entities and NULL out references to this entity
 */
 void PRVM_ED_Free(prvm_prog_t *prog, prvm_edict_t *ed)
 {
-	// dont delete the null entity (world) or reserved edicts
+	// don't delete the null entity (world) or reserved edicts
 	if (ed - prog->edicts <= prog->reserved_edicts)
 		return;
 

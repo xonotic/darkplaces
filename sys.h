@@ -74,7 +74,7 @@ void Sys_Error (const char *error, ...) DP_FUNC_PRINTF(1) DP_FUNC_NORETURN;
 void Sys_PrintToTerminal(const char *text);
 void Sys_PrintfToTerminal(const char *fmt, ...);
 
-/// INFO: This is only called by Host_Shutdown so we dont need testing for recursion
+/// INFO: This is only called by Host_Shutdown so we don't need testing for recursion
 void Sys_Shutdown (void);
 void Sys_Quit (int returnvalue);
 
