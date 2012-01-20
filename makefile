@@ -322,6 +322,11 @@ CFLAGS_ODE=-DLINK_TO_ODE `pkg-config --cflags ode`
 LIB_ODE=`pkg-config --libs ode`
 endif
 
+ifdef LINK_TO_THEORA
+CFLAGS_THEORA=-DLINK_TO_THEORA `pkg-config --cflags theora vorbisfile vorbisenc vorbis ogg`
+LIB_THEORA=`pkg-config --libs theora vorbisfile vorbisenc vorbis ogg`
+endif
+
 ifdef LINK_TO_ZLIB
 CFLAGS_ZLIB=-DLINK_TO_ZLIB
 LIB_ZLIB=-lz

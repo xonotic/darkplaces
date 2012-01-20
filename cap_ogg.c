@@ -19,6 +19,55 @@ static cvar_t cl_capturevideo_ogg_theora_noise_sensitivity = {CVAR_SAVE, "cl_cap
 static cvar_t cl_capturevideo_ogg_theora_sharpness = {CVAR_SAVE, "cl_capturevideo_ogg_theora_sharpness", "0", "sharpness (0 to 2); lower is sharper"};
 static cvar_t cl_capturevideo_ogg_vorbis_quality = {CVAR_SAVE, "cl_capturevideo_ogg_vorbis_quality", "3", "audio quality (-1 to 10); higher is better"};
 
+#ifdef LINK_TO_THEORA
+
+#include <ogg/ogg.h>
+#include <vorbis/codec.h>
+#include <vorbis/vorbisenc.h>
+#include <theora/theora.h>
+
+#define qogg_stream_packetin ogg_stream_packetin
+#define qogg_stream_pageout ogg_stream_pageout
+#define qogg_stream_flush ogg_stream_flush
+#define qogg_stream_init ogg_stream_init
+#define qogg_stream_clear ogg_stream_clear
+#define qogg_page_granulepos ogg_page_granulepos
+
+#define qvorbis_info_init vorbis_info_init
+#define qvorbis_info_clear vorbis_info_clear
+#define qvorbis_comment_init vorbis_comment_init
+#define qvorbis_comment_clear vorbis_comment_clear
+#define qvorbis_block_init vorbis_block_init
+#define qvorbis_block_clear vorbis_block_clear
+#define qvorbis_dsp_clear vorbis_dsp_clear
+#define qvorbis_granule_time vorbis_granule_time
+#define qvorbis_analysis_init vorbis_analysis_init
+#define qvorbis_commentheader_out vorbis_commentheader_out
+#define qvorbis_analysis_headerout vorbis_analysis_headerout
+#define qvorbis_analysis_buffer vorbis_analysis_buffer
+#define qvorbis_analysis_wrote vorbis_analysis_wrote
+#define qvorbis_analysis_blockout vorbis_analysis_blockout
+#define qvorbis_analysis vorbis_analysis
+#define qvorbis_bitrate_addblock vorbis_bitrate_addblock
+#define qvorbis_bitrate_flushpacket vorbis_bitrate_flushpacket
+#define qvorbis_encode_init_vbr vorbis_encode_init_vbr
+
+#define qtheora_encode_init theora_encode_init
+#define qtheora_encode_YUVin theora_encode_YUVin
+#define qtheora_encode_packetout theora_encode_packetout
+#define qtheora_encode_header theora_encode_header
+#define qtheora_encode_comment theora_encode_comment
+#define qtheora_encode_tables theora_encode_tables
+#define qtheora_info_init theora_info_init
+#define qtheora_info_clear theora_info_clear
+#define qtheora_clear theora_clear
+#define qtheora_comment_init theora_comment_init
+#define qtheora_comment_clear theora_comment_clear
+#define qtheora_granule_time theora_granule_time
+#define qtheora_control theora_control
+
+#else
+
 // ogg.h stuff
 #ifdef _MSC_VER
 typedef __int16 ogg_int16_t;
@@ -591,10 +640,13 @@ static qboolean SCR_CaptureVideo_Ogg_OpenLibrary(void)
 		&&
 		Sys_LoadLibrary (dllnames_ve, &ve_dll, vorbisencfuncs);
 }
+#endif
 
 void SCR_CaptureVideo_Ogg_Init(void)
 {
+#ifndef LINK_TO_THEORA
 	SCR_CaptureVideo_Ogg_OpenLibrary();
+#endif
 
 	Cvar_RegisterVariable(&cl_capturevideo_ogg_theora_vp3compat);
 	Cvar_RegisterVariable(&cl_capturevideo_ogg_theora_quality);
@@ -609,15 +661,21 @@ void SCR_CaptureVideo_Ogg_Init(void)
 
 qboolean SCR_CaptureVideo_Ogg_Available(void)
 {
+#ifdef LINK_TO_THEORA
+	return TRUE;
+#else
 	return og_dll && th_dll && vo_dll && ve_dll;
+#endif
 }
 
 void SCR_CaptureVideo_Ogg_CloseDLL(void)
 {
+#ifndef LINK_TO_THEORA
 	Sys_UnloadLibrary (&ve_dll);
 	Sys_UnloadLibrary (&vo_dll);
 	Sys_UnloadLibrary (&th_dll);
 	Sys_UnloadLibrary (&og_dll);
+#endif
 }
 
 // this struct should not be needed
