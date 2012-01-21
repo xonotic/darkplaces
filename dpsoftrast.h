@@ -33,6 +33,7 @@ typedef enum DPSOFTRAST_TEXTURE_FILTER_e
 }
 DPSOFTRAST_TEXTURE_FILTER;
 
+#ifdef HAVE_DPSOFTRAST
 int DPSOFTRAST_Init(int width, int height, int numthreads, int interlace, unsigned int *colorpixels, unsigned int *depthpixels);
 void DPSOFTRAST_Shutdown(void);
 void DPSOFTRAST_Flush(void);
@@ -74,6 +75,7 @@ void DPSOFTRAST_SetVertexPointer(const float *vertex3f, size_t stride);
 void DPSOFTRAST_SetColorPointer(const float *color4f, size_t stride);
 void DPSOFTRAST_SetColorPointer4ub(const unsigned char *color4ub, size_t stride);
 void DPSOFTRAST_SetTexCoordPointer(int unitnum, int numcomponents, size_t stride, const float *texcoordf);
+#endif
 
 typedef enum gl20_texunit_e
 {
@@ -313,6 +315,7 @@ typedef enum DPSOFTRAST_UNIFORM_e
 }
 DPSOFTRAST_UNIFORM;
 
+#ifdef HAVE_DPSOFTRAST
 void DPSOFTRAST_SetShader(int mode, int permutation, int exactspecularmath);
 #define DPSOFTRAST_Uniform1f(index, v0) DPSOFTRAST_Uniform4f(index, v0, 0, 0, 0)
 #define DPSOFTRAST_Uniform2f(index, v0, v1) DPSOFTRAST_Uniform4f(index, v0, v1, 0, 0)
@@ -323,5 +326,6 @@ void DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM index, int arraysize, int tr
 void DPSOFTRAST_Uniform1i(DPSOFTRAST_UNIFORM index, int i0);
 
 void DPSOFTRAST_DrawTriangles(int firstvertex, int numvertices, int numtriangles, const int *element3i, const unsigned short *element3s);
+#endif
 
 #endif // DPSOFTRAST_H

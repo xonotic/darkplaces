@@ -2197,6 +2197,7 @@ extern cvar_t gl_info_version;
 extern cvar_t gl_info_platform;
 extern cvar_t gl_info_driver;
 
+#ifdef HAVE_DPSOFTRAST
 static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 {
 #if SDL_MAJOR_VERSION == 1
@@ -2293,12 +2294,13 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 #endif
 	return true;
 }
+#endif
 
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
 	if (!SDL_WasInit(SDL_INIT_VIDEO) && SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 		Sys_Error ("Failed to init SDL video subsystem: %s", SDL_GetError());
-#ifdef SSE_POSSIBLE
+#ifdef HAVE_DPSOFTRAST
 	if (vid_soft.integer)
 		return VID_InitModeSoft(mode);
 	else
@@ -2408,6 +2410,7 @@ void VID_Finish (void)
 #endif
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_Finish();
 #if SDL_MAJOR_VERSION == 1
 //		if (!r_test.integer)
@@ -2421,6 +2424,7 @@ void VID_Finish (void)
 				SDL_BlitSurface(vid_softsurface, NULL, screen, NULL);
 				SDL_UpdateWindowSurface(window);
 			}
+#endif
 #endif
 			break;
 		case RENDERPATH_D3D9:

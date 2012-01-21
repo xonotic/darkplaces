@@ -116,7 +116,6 @@ OBJ_COMMON= \
 	csprogs.o \
 	curves.o \
 	cvar.o \
-	dpsoftrast.o \
 	dpvsimpledecode.o \
 	filematch.o \
 	fractalnoise.o \
@@ -142,7 +141,6 @@ OBJ_COMMON= \
 	mdfour.o \
 	menu.o \
 	meshqueue.o \
-	mod_skeletal_animatevertices_sse.o \
 	mod_skeletal_animatevertices_generic.o \
 	model_alias.o \
 	model_brush.o \
@@ -179,11 +177,15 @@ OBJ_COMMON= \
 	world.o \
 	zone.o
 
+OBJ_X86 = \
+	dpsoftrast.o \
+	mod_skeletal_animatevertices_sse.o
+
 # note that builddate.c is very intentionally not compiled to a .o before
 # being linked, because it should be recompiled every time an executable is
 # built to give the executable a proper date string
-OBJ_SV= builddate.c sys_linux.o vid_null.o thread_null.o $(OBJ_SND_NULL) $(OBJ_NOCD) $(OBJ_COMMON)
-OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_SND_COMMON) snd_sdl.o cd_sdl.o $(OBJ_COMMON)
+OBJ_SV= builddate.c sys_linux.o vid_null.o thread_null.o $(OBJ_SND_NULL) $(OBJ_NOCD) $(OBJ_COMMON) $(OBJ_CPU)
+OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_SND_COMMON) snd_sdl.o cd_sdl.o $(OBJ_COMMON) $(OBJ_CPU)
 
 
 # Compilation
@@ -230,7 +232,7 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 ##### UNIX specific variables #####
 
-OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
+OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON) $(OBJ_CPU)
 
 LDFLAGS_UNIXCOMMON=\
 	-lm \
@@ -320,7 +322,7 @@ LDFLAGS_MACOSXCL=$(LDFLAGS_UNIXCOMMON) -ldl -framework IOKit -framework Carbon $
 LDFLAGS_MACOSXSV=$(LDFLAGS_UNIXCOMMON) -ldl
 LDFLAGS_MACOSXSDL=$(LDFLAGS_UNIXCOMMON) -ldl -framework IOKit $(SDLCONFIG_STATICLIBS) SDLMain.m
 
-OBJ_AGL= builddate.c sys_linux.o vid_agl.o thread_null.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON)
+OBJ_AGL= builddate.c sys_linux.o vid_agl.o thread_null.o $(OBJ_SOUND) $(OBJ_CD) $(OBJ_COMMON) $(OBJ_CPU)
 
 EXE_MACOSXCL=darkplaces-agl
 EXE_MACOSXCLNEXUIZ=nexuiz-agl
@@ -360,7 +362,7 @@ OBJ_WINCD=cd_win.o
 #if you want no CD audio
 #OBJ_WINCD=$(OBJ_NOCD)
 
-OBJ_WGL= builddate.c sys_win.o vid_wgl.o thread_null.o $(OBJ_SND_WIN) $(OBJ_WINCD) $(OBJ_COMMON)
+OBJ_WGL= builddate.c sys_win.o vid_wgl.o thread_null.o $(OBJ_SND_WIN) $(OBJ_WINCD) $(OBJ_COMMON) $(OBJ_CPU)
 
 # Link
 # see LDFLAGS_WINCOMMON in makefile

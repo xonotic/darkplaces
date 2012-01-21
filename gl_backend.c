@@ -660,7 +660,9 @@ void GL_Finish(void)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_Finish();
+#endif
 		break;
 	}
 }
@@ -1209,7 +1211,9 @@ void R_SetViewport(const r_viewport_t *v)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_Viewport(v->x, v->y, v->width, v->height);
+#endif
 		break;
 	case RENDERPATH_GL20:
 	case RENDERPATH_GLES2:
@@ -1508,6 +1512,7 @@ void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colo
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (fbo)
 		{
 			int width, height;
@@ -1521,6 +1526,7 @@ void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colo
 		}
 		else
 			DPSOFTRAST_SetRenderTargets(vid.width, vid.height, vid.softdepthpixels, vid.softpixels, NULL, NULL, NULL);
+#endif
 		break;
 	}
 }
@@ -1669,6 +1675,7 @@ static void GL_Backend_ResetState(void)
 #endif
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_ColorMask(1,1,1,1);
 		DPSOFTRAST_BlendFunc(gl_state.blendfunc1, gl_state.blendfunc2);
 		DPSOFTRAST_CullFace(gl_state.cullface);
@@ -1677,6 +1684,7 @@ static void GL_Backend_ResetState(void)
 		DPSOFTRAST_PolygonOffset(gl_state.polygonoffset[0], gl_state.polygonoffset[1]);
 		DPSOFTRAST_SetRenderTargets(vid.width, vid.height, vid.softdepthpixels, vid.softpixels, NULL, NULL, NULL);
 		DPSOFTRAST_Viewport(0, 0, vid.width, vid.height);
+#endif
 		break;
 	case RENDERPATH_GL20:
 	case RENDERPATH_GLES2:
@@ -1858,7 +1866,9 @@ void GL_BlendFunc(int blendfunc1, int blendfunc2)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_BlendFunc(gl_state.blendfunc1, gl_state.blendfunc2);
+#endif
 			break;
 		}
 	}
@@ -1891,7 +1901,9 @@ void GL_DepthMask(int state)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_DepthMask(gl_state.depthmask);
+#endif
 			break;
 		}
 	}
@@ -1931,7 +1943,9 @@ void GL_DepthTest(int state)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_DepthTest(gl_state.depthtest);
+#endif
 			break;
 		}
 	}
@@ -1964,7 +1978,9 @@ void GL_DepthFunc(int state)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_DepthFunc(gl_state.depthfunc);
+#endif
 			break;
 		}
 	}
@@ -2010,7 +2026,9 @@ void GL_DepthRange(float nearfrac, float farfrac)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_DepthRange(gl_state.depthrange[0], gl_state.depthrange[1]);
+#endif
 			break;
 		}
 	}
@@ -2169,7 +2187,9 @@ void GL_PolygonOffset(float planeoffset, float depthoffset)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_PolygonOffset(gl_state.polygonoffset[0], gl_state.polygonoffset[1]);
+#endif
 			break;
 		}
 	}
@@ -2207,7 +2227,9 @@ void GL_SetMirrorState(qboolean state)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_CullFace(gl_state.cullface);
+#endif
 			break;
 		}
 	}
@@ -2284,12 +2306,14 @@ void GL_CullFace(int state)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (gl_state.cullface != state)
 		{
 			gl_state.cullface = state;
 			gl_state.cullfaceenable = state != GL_NONE ? true : false;
 			DPSOFTRAST_CullFace(gl_state.cullface);
 		}
+#endif
 		break;
 	}
 }
@@ -2393,7 +2417,9 @@ void GL_ColorMask(int r, int g, int b, int a)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_ColorMask(r, g, b, a);
+#endif
 			break;
 		}
 	}
@@ -2422,7 +2448,9 @@ void GL_Color(float cr, float cg, float cb, float ca)
 			// no equivalent in D3D
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_Color4f(cr, cg, cb, ca);
+#endif
 			break;
 		case RENDERPATH_GL20:
 		case RENDERPATH_GLES2:
@@ -2464,7 +2492,9 @@ void GL_Scissor (int x, int y, int width, int height)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_Scissor(x, y, width, height);
+#endif
 		break;
 	}
 }
@@ -2500,7 +2530,9 @@ void GL_ScissorTest(int state)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_ScissorTest(gl_state.scissortest);
+#endif
 			break;
 		}
 	}
@@ -2555,10 +2587,12 @@ void GL_Clear(int mask, const float *colorvalue, float depthvalue, int stencilva
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (mask & GL_COLOR_BUFFER_BIT)
 			DPSOFTRAST_ClearColor(colorvalue[0], colorvalue[1], colorvalue[2], colorvalue[3]);
 		if (mask & GL_DEPTH_BUFFER_BIT)
 			DPSOFTRAST_ClearDepth(depthvalue);
+#endif
 		break;
 	}
 }
@@ -2618,7 +2652,9 @@ void GL_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpi
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_GetPixelsBGRA(x, y, width, height, outpixels);
+#endif
 		break;
 	}
 }
@@ -3227,7 +3263,9 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_DrawTriangles(firstvertex, numvertices, numtriangles, element3i, element3s);
+#endif
 			break;
 		case RENDERPATH_GLES1:
 		case RENDERPATH_GLES2:
@@ -3771,7 +3809,9 @@ void R_Mesh_CopyToTexture(rtexture_t *tex, int tx, int ty, int sx, int sy, int w
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_CopyRectangleToTexture(tex->texnum, 0, tx, ty, sx, sy, width, height);
+#endif
 		break;
 	}
 }
@@ -3950,6 +3990,7 @@ void R_Mesh_TexBind(unsigned int unitnum, rtexture_t *tex)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (!tex)
 		{
 			tex = r_texture_white;
@@ -3962,6 +4003,7 @@ void R_Mesh_TexBind(unsigned int unitnum, rtexture_t *tex)
 			return;
 		unit->texture = tex;
 		DPSOFTRAST_SetTexture(unitnum, texnum);
+#endif
 		break;
 	}
 }
@@ -4320,6 +4362,7 @@ void R_Mesh_PrepareVertices_Vertex3f(int numvertices, const float *vertex3f, con
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_SetVertexPointer(vertex3f, sizeof(float[3]));
 		DPSOFTRAST_SetColorPointer(NULL, 0);
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(float[2]), NULL);
@@ -4327,6 +4370,7 @@ void R_Mesh_PrepareVertices_Vertex3f(int numvertices, const float *vertex3f, con
 		DPSOFTRAST_SetTexCoordPointer(2, 2, sizeof(float[2]), NULL);
 		DPSOFTRAST_SetTexCoordPointer(3, 2, sizeof(float[2]), NULL);
 		DPSOFTRAST_SetTexCoordPointer(4, 2, sizeof(float[2]), NULL);
+#endif
 		break;
 	}
 }
@@ -4398,6 +4442,7 @@ void R_Mesh_PrepareVertices_Generic_Arrays(int numvertices, const float *vertex3
 	case RENDERPATH_D3D11:
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_SetVertexPointer(vertex3f, sizeof(float[3]));
 		DPSOFTRAST_SetColorPointer(color4f, sizeof(float[4]));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(float[2]), texcoord2f);
@@ -4405,6 +4450,7 @@ void R_Mesh_PrepareVertices_Generic_Arrays(int numvertices, const float *vertex3
 		DPSOFTRAST_SetTexCoordPointer(2, 2, sizeof(float[2]), NULL);
 		DPSOFTRAST_SetTexCoordPointer(3, 2, sizeof(float[2]), NULL);
 		DPSOFTRAST_SetTexCoordPointer(4, 2, sizeof(float[2]), NULL);
+#endif
 		return;
 	}
 
@@ -4523,6 +4569,7 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_SetVertexPointer(vertex->vertex3f, sizeof(*vertex));
 		DPSOFTRAST_SetColorPointer(vertex->color4f, sizeof(*vertex));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(*vertex), vertex->texcoord2f);
@@ -4530,6 +4577,7 @@ void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *ve
 		DPSOFTRAST_SetTexCoordPointer(2, 2, sizeof(*vertex), NULL);
 		DPSOFTRAST_SetTexCoordPointer(3, 2, sizeof(*vertex), NULL);
 		DPSOFTRAST_SetTexCoordPointer(4, 2, sizeof(*vertex), NULL);
+#endif
 		break;
 	}
 }
@@ -4601,6 +4649,7 @@ void R_Mesh_PrepareVertices_Mesh_Arrays(int numvertices, const float *vertex3f, 
 	case RENDERPATH_D3D11:
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_SetVertexPointer(vertex3f, sizeof(float[3]));
 		DPSOFTRAST_SetColorPointer(color4f, sizeof(float[4]));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(float[2]), texcoordtexture2f);
@@ -4608,6 +4657,7 @@ void R_Mesh_PrepareVertices_Mesh_Arrays(int numvertices, const float *vertex3f, 
 		DPSOFTRAST_SetTexCoordPointer(2, 3, sizeof(float[3]), tvector3f);
 		DPSOFTRAST_SetTexCoordPointer(3, 3, sizeof(float[3]), normal3f);
 		DPSOFTRAST_SetTexCoordPointer(4, 2, sizeof(float[2]), texcoordlightmap2f);
+#endif
 		return;
 	}
 
@@ -4737,6 +4787,7 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_SetVertexPointer(vertex->vertex3f, sizeof(*vertex));
 		DPSOFTRAST_SetColorPointer(vertex->color4f, sizeof(*vertex));
 		DPSOFTRAST_SetTexCoordPointer(0, 2, sizeof(*vertex), vertex->texcoordtexture2f);
@@ -4744,6 +4795,7 @@ void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, 
 		DPSOFTRAST_SetTexCoordPointer(2, 3, sizeof(*vertex), vertex->tvector3f);
 		DPSOFTRAST_SetTexCoordPointer(3, 3, sizeof(*vertex), vertex->normal3f);
 		DPSOFTRAST_SetTexCoordPointer(4, 2, sizeof(*vertex), vertex->texcoordlightmap2f);
+#endif
 		break;
 	}
 }
@@ -4773,7 +4825,9 @@ void GL_BlendEquationSubtract(qboolean negated)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_BlendSubtract(true);
+#endif
 			break;
 		}
 	}
@@ -4800,7 +4854,9 @@ void GL_BlendEquationSubtract(qboolean negated)
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_BlendSubtract(false);
+#endif
 			break;
 		}
 	}

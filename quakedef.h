@@ -499,6 +499,11 @@ qboolean Sys_HaveSSE2(void);
 
 #include "palette.h"
 
+#ifdef SSE_POSSIBLE
+/* The software rasterizer requires SSE */
+# define HAVE_DPSOFTRAST
+#endif
+
 /// incremented every frame, never reset
 extern int host_framecount;
 /// not bounded in any way, changed at start of every frame, never reset

@@ -395,8 +395,10 @@ void R_FreeTexture(rtexture_t *rt)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (glt->texnum)
 			DPSOFTRAST_Texture_Free(glt->texnum);
+#endif
 		break;
 	}
 
@@ -594,11 +596,13 @@ static void GL_TextureMode_f (void)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		// change all the existing texture objects
 		for (pool = gltexturepoolchain;pool;pool = pool->next)
 			for (glt = pool->gltchain;glt;glt = glt->chain)
 				if (glt->texnum && (gl_filter_force || !(glt->flags & (TEXF_FORCENEAREST | TEXF_FORCELINEAR))))
 					DPSOFTRAST_Texture_Filter(glt->texnum, (glt->flags & TEXF_MIPMAP) ? dpsoftrast_filter_mipmap : dpsoftrast_filter_nomipmap);
+#endif
 		break;
 	}
 }
@@ -1196,7 +1200,9 @@ static void R_UploadPartialTexture(gltexture_t *glt, const unsigned char *data, 
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		DPSOFTRAST_Texture_UpdatePartial(glt->texnum, 0, data, fragx, fragy, fragwidth, fragheight);
+#endif
 		break;
 	}
 }
@@ -1508,6 +1514,7 @@ static void R_UploadFullTexture(gltexture_t *glt, const unsigned char *data)
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		switch(glt->texturetype)
 		{
 		case GLTEXTURETYPE_2D:
@@ -1556,6 +1563,7 @@ static void R_UploadFullTexture(gltexture_t *glt, const unsigned char *data)
 			DPSOFTRAST_Texture_Filter(glt->texnum, dpsoftrast_filter_mipmap);
 		else
 			DPSOFTRAST_Texture_Filter(glt->texnum, dpsoftrast_filter_nomipmap);
+#endif
 		break;
 	}
 }
@@ -1834,6 +1842,7 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		{
 			int tflags = 0;
 			switch(textype)
@@ -1860,6 +1869,7 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 			if (glt->flags & TEXF_CLAMP) tflags |= DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE;
 			glt->texnum = DPSOFTRAST_Texture_New(tflags, glt->tilewidth, glt->tileheight, glt->tiledepth);
 		}
+#endif
 		break;
 	}
 
@@ -1995,6 +2005,7 @@ rtexture_t *R_LoadTextureRenderBuffer(rtexturepool_t *rtexturepool, const char *
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		{
 			int tflags = 0;
 			switch(textype)
@@ -2009,6 +2020,7 @@ rtexture_t *R_LoadTextureRenderBuffer(rtexturepool_t *rtexturepool, const char *
 			}
 			glt->texnum = DPSOFTRAST_Texture_New(tflags, glt->tilewidth, glt->tileheight, glt->tiledepth);
 		}
+#endif
 		break;
 	}
 
@@ -2682,7 +2694,9 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		glt->texnum = DPSOFTRAST_Texture_New(((glt->flags & TEXF_CLAMP) ? DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE : 0) | (dds_miplevels > 1 ? DPSOFTRAST_TEXTURE_FLAG_MIPMAP : 0), glt->tilewidth, glt->tileheight, glt->tiledepth);
+#endif
 		break;
 	}
 
@@ -2747,12 +2761,14 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			if (bytesperblock)
 				Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			else
 				DPSOFTRAST_Texture_UpdateFull(glt->texnum, upload_mippixels);
 			// DPSOFTRAST calculates its own mipmaps
 			mip = dds_miplevels;
+#endif
 			break;
 		}
 		if(upload_mippixels != mippixels)
@@ -2828,6 +2844,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		if (glt->flags & TEXF_FORCELINEAR)
 			DPSOFTRAST_Texture_Filter(glt->texnum, DPSOFTRAST_TEXTURE_FILTER_LINEAR);
 		else if (glt->flags & TEXF_FORCENEAREST)
@@ -2836,6 +2853,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 			DPSOFTRAST_Texture_Filter(glt->texnum, dpsoftrast_filter_mipmap);
 		else
 			DPSOFTRAST_Texture_Filter(glt->texnum, dpsoftrast_filter_nomipmap);
+#endif
 		break;
 	}
 

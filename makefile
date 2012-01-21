@@ -45,6 +45,18 @@ else
 	CMD_RM=$(CMD_UNIXRM)
 endif
 
+# CPU-specifics
+OBJ_CPU =
+
+ifeq ($(DP_MAKE_TARGET),mingw)
+	# MinGW is always x86
+	OBJ_CPU += $(OBJ_X86)
+else
+ifneq (,$(filter i%86 x86_64,$(DP_MACHINE)))
+	OBJ_CPU += $(OBJ_X86)
+endif
+endif
+
 # 64bits AMD CPUs use another lib directory
 ifeq ($(DP_MACHINE),x86_64)
 	UNIX_X11LIBPATH:=/usr/X11R6/lib64

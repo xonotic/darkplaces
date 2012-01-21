@@ -1844,6 +1844,7 @@ void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutatio
 }
 #endif
 
+#ifdef HAVE_DPSOFTRAST
 static void R_SetupShader_SetPermutationSoft(unsigned int mode, unsigned int permutation)
 {
 	DPSOFTRAST_SetShader(mode, permutation, r_shadow_glossexact.integer);
@@ -1851,6 +1852,7 @@ static void R_SetupShader_SetPermutationSoft(unsigned int mode, unsigned int per
 	DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewMatrixM1, 1, false, gl_modelview16f);
 	DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_ClientTime, cl.time);
 }
+#endif
 
 void R_GLSL_Restart_f(void)
 {
@@ -2027,9 +2029,11 @@ void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemod
 		R_Mesh_TexMatrix(0, NULL);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		R_SetupShader_SetPermutationSoft(SHADERMODE_GENERIC, permutation);
 		R_Mesh_TexBind(GL20TU_FIRST , first );
 		R_Mesh_TexBind(GL20TU_SECOND, second);
+#endif
 		break;
 	}
 }
@@ -2078,7 +2082,9 @@ void R_SetupShader_DepthOrShadow(qboolean notrippy, qboolean depthrgb, qboolean 
 		R_Mesh_TexBind(0, 0);
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		R_SetupShader_SetPermutationSoft(SHADERMODE_DEPTH_OR_SHADOW, permutation);
+#endif
 		break;
 	}
 }
@@ -2873,6 +2879,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_ARRAY_NORMAL | BATCHNEED_ARRAY_VECTOR | (rsurface.modellightmapcolor4f ? BATCHNEED_ARRAY_VERTEXCOLOR : 0) | BATCHNEED_ARRAY_TEXCOORD | (rsurface.uselightmaptexture ? BATCHNEED_ARRAY_LIGHTMAP : 0) | BATCHNEED_ALLOWMULTIDRAW, texturenumsurfaces, texturesurfacelist);
 		R_Mesh_PrepareVertices_Mesh_Arrays(rsurface.batchnumvertices, rsurface.batchvertex3f, rsurface.batchsvector3f, rsurface.batchtvector3f, rsurface.batchnormal3f, rsurface.batchlightmapcolor4f, rsurface.batchtexcoordtexture2f, rsurface.batchtexcoordlightmap2f);
 		R_SetupShader_SetPermutationSoft(mode, permutation);
@@ -3006,6 +3013,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 				if (permutation & SHADERPERMUTATION_SHADOWMAPVSDCT    ) R_Mesh_TexBind(GL20TU_CUBEPROJECTION    , r_shadow_shadowmapvsdcttexture                      );
 			}
 		}
+#endif
 		break;
 	}
 }
@@ -3105,6 +3113,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 	case RENDERPATH_GLES1:
 		break;
 	case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 		R_SetupShader_SetPermutationGLSL(mode, permutation);
 		DPSOFTRAST_Uniform3f(       DPSOFTRAST_UNIFORM_LightPosition            , viewlightorigin[0], viewlightorigin[1], viewlightorigin[2]);
 		DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ViewToLightM1            , 1, false, viewtolight16f);
@@ -3122,6 +3131,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 		R_Mesh_TexBind(GL20TU_CUBE               , rsurface.rtlight->currentcubemap                    );
 		R_Mesh_TexBind(GL20TU_SHADOWMAP2D        , r_shadow_shadowmap2ddepthtexture                    );
 		R_Mesh_TexBind(GL20TU_CUBEPROJECTION     , r_shadow_shadowmapvsdcttexture                      );
+#endif
 		break;
 	}
 }
@@ -5582,6 +5592,8 @@ void R_SetupView(qboolean allowwaterclippingplane, int fbo, rtexture_t *depthtex
 		R_Viewport_InitPerspective(&r_refdef.view.viewport, &r_refdef.view.matrix, r_refdef.view.x, rtheight - scaledheight - r_refdef.view.y, scaledwidth, scaledheight, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, r_refdef.farclip, customclipplane);
 	R_Mesh_SetRenderTargets(fbo, depthtexture, colortexture, NULL, NULL, NULL);
 	R_SetViewport(&r_refdef.view.viewport);
+
+#ifdef HAVE_DPSOFTRAST
 	if (r_refdef.view.useclipplane && allowwaterclippingplane && vid.renderpath == RENDERPATH_SOFT)
 	{
 		matrix4x4_t mvpmatrix, invmvpmatrix, invtransmvpmatrix;
@@ -5592,6 +5604,7 @@ void R_SetupView(qboolean allowwaterclippingplane, int fbo, rtexture_t *depthtex
 		Matrix4x4_Transform4(&invtransmvpmatrix, plane, screenplane);
 		DPSOFTRAST_ClipPlane(screenplane[0], screenplane[1], screenplane[2], screenplane[3]);
 	}
+#endif
 }
 
 void R_EntityMatrix(const matrix4x4_t *matrix)
@@ -5625,8 +5638,10 @@ void R_EntityMatrix(const matrix4x4_t *matrix)
 			qglLoadMatrixf(gl_modelview16f);CHECKGLERROR
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewProjectionMatrixM1, 1, false, gl_modelviewprojection16f);
 			DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewMatrixM1, 1, false, gl_modelview16f);
+#endif
 			break;
 		case RENDERPATH_GL20:
 		case RENDERPATH_GLES2:
@@ -6195,7 +6210,9 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 		}
 
 	}
+#ifdef HAVE_DPSOFTRAST
 	if(vid.renderpath==RENDERPATH_SOFT) DPSOFTRAST_ClipPlane(0, 0, 0, 1);
+#endif
 	r_fb.water.renderingscene = false;
 	r_refdef.view = originalview;
 	R_ResetViewRendering3D(fbo, depthtexture, colortexture);
@@ -6800,6 +6817,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			R_Mesh_PrepareVertices_Mesh_Arrays(4, r_screenvertex3f, NULL, NULL, NULL, NULL, r_fb.screentexcoord2f, r_fb.bloomtexcoord2f);
 			R_SetupShader_SetPermutationSoft(SHADERMODE_POSTPROCESS, permutation);
 			R_Mesh_TexBind(GL20TU_FIRST     , r_fb.colortexture);
@@ -6814,6 +6832,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 			DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_Saturation        , r_glsl_saturation.value);
 			DPSOFTRAST_Uniform2f(DPSOFTRAST_UNIFORM_PixelToScreenTexCoord, 1.0f/vid.width, 1.0f/vid.height);
 			DPSOFTRAST_Uniform4f(DPSOFTRAST_UNIFORM_BloomColorSubtract   , r_bloom_colorsubtract.value, r_bloom_colorsubtract.value, r_bloom_colorsubtract.value, 0.0f);
+#endif
 			break;
 		default:
 			break;

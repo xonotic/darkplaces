@@ -305,11 +305,13 @@ void VID_Finish (void)
 		case RENDERPATH_D3D11:
 			break;
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			DPSOFTRAST_Finish();
 //			baseDC = GetDC(mainwindow);
 			BitBlt(baseDC, 0, 0, vid.width, vid.height, vid_softhdc, 0, 0, SRCCOPY);
 //			ReleaseDC(mainwindow, baseDC);
 //			baseDC = NULL;
+#endif
 			break;
 		}
 	}
@@ -1565,6 +1567,7 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 }
 #endif
 
+#ifdef HAVE_DPSOFTRAST
 qboolean VID_InitModeSOFT(viddef_mode_t *mode)
 {
 	int i;
@@ -1844,10 +1847,11 @@ qboolean VID_InitModeSOFT(viddef_mode_t *mode)
 
 	return true;
 }
+#endif
 
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
-#ifdef SSE_POSSIBLE
+#ifdef HAVE_DPSOFTRAST
 	if (vid_soft.integer)
 		return VID_InitModeSOFT(mode);
 #endif

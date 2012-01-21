@@ -663,7 +663,9 @@ static void HandleEvents(void)
 				else
 					Con_DPrintf("Updating to ConfigureNotify resolution %dx%d\n", vid.width, vid.height);
 
+#ifdef HAVE_DPSOFTRAST
 				DPSOFTRAST_Flush();
+#endif
 
 				if(vid.softdepthpixels)
 					free(vid.softdepthpixels);
@@ -904,6 +906,7 @@ void VID_Finish (void)
 	switch(vid.renderpath)
 	{
 		case RENDERPATH_SOFT:
+#ifdef HAVE_DPSOFTRAST
 			if(vidx11_shmevent >= 0) {
 				vidx11_ximage_pos = !vidx11_ximage_pos;
 				vid.softpixels = (unsigned int *) vidx11_ximage[vidx11_ximage_pos]->data;
@@ -926,6 +929,7 @@ void VID_Finish (void)
 				DPSOFTRAST_Finish();
 				XPutImage(vidx11_display, win, vidx11_gc, vidx11_ximage[vidx11_ximage_pos], 0, 0, 0, 0, vid.width, vid.height);
 			}
+#endif
 			break;
 
 		case RENDERPATH_GL11:
@@ -1009,6 +1013,7 @@ static void VID_BuildGLXAttrib(int *attrib, qboolean stencil, qboolean stereobuf
 	*attrib++ = None;
 }
 
+#ifdef HAVE_DPSOFTRAST
 static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 {
 	int i, j;
@@ -1307,6 +1312,7 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 
 	return true;
 }
+#endif
 
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
@@ -1649,7 +1655,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
-#ifdef SSE_POSSIBLE
+#ifdef HAVE_DPSOFTRAST
 	if (vid_soft.integer)
 		return VID_InitModeSoft(mode);
 	else

@@ -1688,7 +1688,7 @@ static dllhandle_t xinputdll_dll = NULL;
 
 void VID_Shared_Init(void)
 {
-#ifdef SSE_POSSIBLE
+#ifdef HAVE_DPSOFTRAST
 	if (Sys_HaveSSE2())
 	{
 		Con_Printf("DPSOFTRAST available (SSE2 instructions detected)\n");
@@ -2057,6 +2057,7 @@ size_t VID_SortModes(vid_mode_t *modes, size_t count, qboolean usebpp, qboolean 
 	return count;
 }
 
+#ifdef HAVE_DPSOFTRAST
 void VID_Soft_SharedSetup(void)
 {
 	gl_platform = "DPSOFTRAST";
@@ -2123,3 +2124,4 @@ void VID_Soft_SharedSetup(void)
 	// clear to black (loading plaque will be seen over this)
 	GL_Clear(GL_COLOR_BUFFER_BIT, NULL, 1.0f, 128);
 }
+#endif
