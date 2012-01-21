@@ -44,7 +44,7 @@ my_setjmp (jmp_buf env)
 
 #ifdef LINK_TO_PNG
 
-#define qpng_setjmp(png) my_setjmp (png->jmpbuf)
+#define qpng_setjmp(png) my_setjmp (png_jmpbuf (png))
 
 #define qpng_set_sig_bytes png_set_sig_bytes
 #define qpng_sig_cmp png_sig_cmp
