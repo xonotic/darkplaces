@@ -82,6 +82,16 @@ my_setjmp (jmp_buf env)
 
 #else
 
+/*
+ * Without LINK_TO_PNG, DarkPlaces assumes libpng 1.2 (in which png_uint_32
+ * is always unsigned long even if that's 64-bit), and then attempts
+ * to correct for it if it's actually 1.4 or 1.5 (where png_uint_32 is
+ * unsigned int if that's at least 32 bits, or unsigned long otherwise).
+ *
+ * With LINK_TO_PNG we use the library API/ABI as intended.
+ */
+typedef unsigned long png_uint_32;
+
 typedef void *png_structp;
 typedef void **png_structpp;
 typedef void *png_infop;
@@ -100,7 +110,7 @@ static void				(*qpng_set_palette_to_rgb)	(void*);
 static void				(*qpng_set_tRNS_to_alpha)	(void*);
 static void				(*qpng_set_gray_to_rgb)		(void*);
 static void				(*qpng_set_filler)			(void*, unsigned int, int);
-static void				(*qpng_set_IHDR)			(void*, void*, unsigned long, unsigned long, int, int, int, int, int);
+static void				(*qpng_set_IHDR)			(void*, void*, png_uint_32, png_uint_32, int, int, int, int, int);
 static void				(*qpng_set_packing)			(void*);
 static void				(*qpng_set_bgr)				(void*);
 static int				(*qpng_set_interlace_handling)	(void*);
@@ -115,7 +125,7 @@ static unsigned int		(*qpng_get_valid)			(void*, void*, unsigned int);
 static unsigned int		(*qpng_get_rowbytes)		(void*, void*);
 static unsigned char	(*qpng_get_channels)		(void*, void*);
 static unsigned char	(*qpng_get_bit_depth)		(void*, void*);
-static unsigned int		(*qpng_get_IHDR)			(void*, void*, unsigned long*, unsigned long*, int *, int *, int *, int *, int *);
+static png_uint_32		(*qpng_get_IHDR)			(void*, void*, png_uint_32 *, png_uint_32 *, int *, int *, int *, int *, int *);
 static unsigned int			(*qpng_access_version_number)		(void); // FIXME is this return type right? It is a png_uint_32 in libpng
 static void				(*qpng_write_info)			(void*, void*);
 static void				(*qpng_write_row)			(void*, unsigned char*);
@@ -300,8 +310,8 @@ static struct
 	int		BitDepth;
 	int		BytesPerPixel;
 	int		ColorType;
-	unsigned long	Height; // retarded libpng 1.2 pngconf.h uses long (64bit/32bit depending on arch)
-	unsigned long	Width; // retarded libpng 1.2 pngconf.h uses long (64bit/32bit depending on arch)
+	png_uint_32	Height;
+	png_uint_32	Width;
 	int		Interlace;
 	int		Compression;
 	int		Filter;
@@ -419,17 +429,23 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 	qpng_read_info(png, pnginfo);
 	qpng_get_IHDR(png, pnginfo, &my_png.Width, &my_png.Height,&my_png.BitDepth, &my_png.ColorType, &my_png.Interlace, &my_png.Compression, &my_png.Filter);
 
+#ifndef LINK_TO_PNG
 	// this check guards against pngconf.h with unsigned int *width/height parameters on big endian systems by detecting the strange values and shifting them down 32bits
 	// (if it's little endian the unwritten bytes are the most significant
 	//  ones and we don't worry about that)
 	//
 	// this is only necessary because of retarded 64bit png_uint_32 types in libpng 1.2, which can (conceivably) vary by platform
+	//
+	// If LINK_TO_PNG is defined, we should never need this,
+	// because we get the correct definition of png_uint_32 from the
+	// system libpng header.
 #if LONG_MAX > 4000000000
 	if (my_png.Width > LONG_MAX || my_png.Height > LONG_MAX)
 	{
 		my_png.Width >>= 32;
 		my_png.Height >>= 32;
 	}
+#endif
 #endif
 
 	if (my_png.ColorType == PNG_COLOR_TYPE_PALETTE)
