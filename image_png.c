@@ -271,6 +271,8 @@ void PNG_CloseLibrary (void)
 =================================================================
 */
 
+#ifndef LINK_TO_PNG
+
 #define PNG_LIBPNG_VER_STRING_12 "1.2.4"
 #define PNG_LIBPNG_VER_STRING_14 "1.4.0"
 #define PNG_LIBPNG_VER_STRING_15 "1.5.0"
@@ -290,6 +292,8 @@ void PNG_CloseLibrary (void)
 #define PNG_COLOR_TYPE_GA  PNG_COLOR_TYPE_GRAY_ALPHA
 
 #define PNG_INFO_tRNS 0x0010
+
+#endif
 
 // this struct is only used for status information during loading
 static struct
@@ -377,11 +381,16 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 	// png_sig_cmp is not fully const-correct
 	if(qpng_sig_cmp((unsigned char *) raw, 0, filesize))
 		return NULL;
+
 	png = (void *)qpng_create_read_struct(
+#ifdef LINK_TO_PNG
+		PNG_LIBPNG_VER_STRING,
+#else
 		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
 		(qpng_access_version_number() / 100 == 104) ? PNG_LIBPNG_VER_STRING_14 :
 		(qpng_access_version_number() / 100 == 105) ? PNG_LIBPNG_VER_STRING_15 :
-		PNG_LIBPNG_VER_STRING_16, // nasty hack... whatever
+		PNG_LIBPNG_VER_STRING_16, // nasty hack to support both libpng12 and libpng14
+#endif
 		0, PNG_error_fn, PNG_warning_fn
 	);
 	if(!png)
@@ -569,10 +578,14 @@ qboolean PNG_SaveImage_preflipped (const char *filename, int width, int height, 
 #endif
 
 	png = qpng_create_write_struct(
+#ifdef LINK_TO_PNG
+		PNG_LIBPNG_VER_STRING,
+#else
 		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 : 
 		(qpng_access_version_number() / 100 == 104) ? PNG_LIBPNG_VER_STRING_14 :
 		(qpng_access_version_number() / 100 == 105) ? PNG_LIBPNG_VER_STRING_15 :
 		PNG_LIBPNG_VER_STRING_16, // nasty hack to support both libpng12 and libpng14
+#endif
 		0, PNG_error_fn, PNG_warning_fn
 	);
 	if(!png)
