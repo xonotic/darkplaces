@@ -1490,7 +1490,7 @@ static void VM_CL_runplayerphysics (prvm_prog_t *prog)
 	s.cmd.jump = (s.cmd.buttons & 2) != 0;
 	s.cmd.crouch = (s.cmd.buttons & 16) != 0;
 
-	CL_ClientMovement_PlayerMove(&s);
+	CL_ClientMovement_PlayerMove_Frame(&s);
 
 	if(ent == prog->edicts)
 	{
@@ -2500,7 +2500,8 @@ static void VM_CL_gettagindex (prvm_prog_t *prog)
 	{
 		tag_index = CL_GetTagIndex(prog, ent, tag_name);
 		if (tag_index == 0)
-			Con_DPrintf("VM_CL_gettagindex(entity #%i): tag \"%s\" not found\n", PRVM_NUM_FOR_EDICT(ent), tag_name);
+			if(developer_extra.integer)
+				Con_DPrintf("VM_CL_gettagindex(entity #%i): tag \"%s\" not found\n", PRVM_NUM_FOR_EDICT(ent), tag_name);
 	}
 	PRVM_G_FLOAT(OFS_RETURN) = tag_index;
 }
@@ -3851,7 +3852,7 @@ static void VM_CL_skel_build(prvm_prog_t *prog)
 		Matrix4x4_Accumulate(&blendedmatrix, &skeleton->relativetransforms[bonenum], retainfrac);
 		for (blendindex = 0;blendindex < numblends;blendindex++)
 		{
-			Matrix4x4_FromBonePose6s(&matrix, model->num_posescale, model->data_poses6s + 6 * (frameblend[blendindex].subframe * model->num_bones + bonenum));
+			Matrix4x4_FromBonePose7s(&matrix, model->num_posescale, model->data_poses7s + 7 * (frameblend[blendindex].subframe * model->num_bones + bonenum));
 			Matrix4x4_Accumulate(&blendedmatrix, &matrix, frameblend[blendindex].lerp);
 		}
 		skeleton->relativetransforms[bonenum] = blendedmatrix;
@@ -4149,13 +4150,18 @@ static void VM_CL_loadcubemap(prvm_prog_t *prog)
 
 #define REFDEFFLAG_TELEPORTED 1
 #define REFDEFFLAG_JUMPING 2
+#define REFDEFFLAG_DEAD 4
+#define REFDEFFLAG_INTERMISSION 8
 static void VM_CL_V_CalcRefdef(prvm_prog_t *prog)
 {
 	matrix4x4_t entrendermatrix;
 	vec3_t clviewangles;
+	vec3_t clvelocity;
 	qboolean teleported;
 	qboolean clonground;
 	qboolean clcmdjump;
+	qboolean cldead;
+	qboolean clintermission;
 	float clstatsviewheight;
 	prvm_edict_t *ent;
 	int flags;
@@ -4172,8 +4178,11 @@ static void VM_CL_V_CalcRefdef(prvm_prog_t *prog)
 	clonground = ((int)PRVM_clientedictfloat(ent, pmove_flags) & PMF_ONGROUND) != 0;
 	clcmdjump = (flags & REFDEFFLAG_JUMPING) != 0;
 	clstatsviewheight = PRVM_clientedictvector(ent, view_ofs)[2];
+	cldead = (flags & REFDEFFLAG_DEAD) != 0;
+	clintermission = (flags & REFDEFFLAG_INTERMISSION) != 0;
+	VectorCopy(PRVM_clientedictvector(ent, velocity), clvelocity);
 
-	V_CalcRefdefUsing(&entrendermatrix, clviewangles, teleported, clonground, clcmdjump, clstatsviewheight);
+	V_CalcRefdefUsing(&entrendermatrix, clviewangles, teleported, clonground, clcmdjump, clstatsviewheight, cldead, clintermission, clvelocity);
 
 	VectorCopy(cl.csqc_vieworiginfromengine, cl.csqc_vieworigin);
 	VectorCopy(cl.csqc_viewanglesfromengine, cl.csqc_viewangles);

@@ -302,6 +302,10 @@ typedef struct client_s
 	// number of skipped entity frames
 	// if it exceeds a limit, an empty entity frame is sent
 	int num_skippedentityframes;
+
+	// last sent move sequence
+	// if the move sequence changed, an empty entity frame is sent
+	int lastmovesequence;
 } client_t;
 
 
@@ -334,6 +338,7 @@ typedef struct client_s
 // LordHavoc: corpse code
 #define	SOLID_CORPSE			5		///< same as SOLID_BBOX, except it behaves as SOLID_NOT against SOLID_SLIDEBOX objects (players/monsters)
 // LordHavoc: physics
+// VorteX: now these fields are deprecated, as geomtype is more flexible
 #define	SOLID_PHYSICS_BOX		32		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
 #define	SOLID_PHYSICS_SPHERE	33		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)
 #define	SOLID_PHYSICS_CAPSULE	34		///< physics object (mins, maxs, mass, origin, axis_forward, axis_left, axis_up, velocity, spinvelocity)

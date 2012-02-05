@@ -996,6 +996,7 @@ typedef struct client_state_s
 	float bob2_smooth;
 	float bobfall_speed;
 	float bobfall_swing;
+	double calcrefdef_prevtime;
 
 	// don't change view angle, full screen, etc
 	int intermission;
@@ -1448,7 +1449,7 @@ void V_StartPitchDrift (void);
 void V_StopPitchDrift (void);
 
 void V_Init (void);
-float V_CalcRoll (vec3_t angles, vec3_t velocity);
+float V_CalcRoll (const vec3_t angles, const vec3_t velocity);
 void V_UpdateBlends (void);
 void V_ParseDamage (void);
 
@@ -1871,7 +1872,7 @@ typedef struct cl_clientmovement_state_s
 	usercmd_t cmd;
 }
 cl_clientmovement_state_t;
-void CL_ClientMovement_PlayerMove(cl_clientmovement_state_t *s);
+void CL_ClientMovement_PlayerMove_Frame(cl_clientmovement_state_t *s);
 
 // warpzone prediction hack (CSQC builtin)
 void CL_RotateMoves(const matrix4x4_t *m);
@@ -1889,7 +1890,7 @@ void SCR_CaptureVideo_SoundFrame(const portable_sampleframe_t *paintbuffer, size
 void V_DriftPitch(void);
 void V_FadeViewFlashs(void);
 void V_CalcViewBlend(void);
-void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight);
+void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight, qboolean cldead, qboolean clintermission, const vec3_t clvelocity);
 void V_CalcRefdef(void);
 void CL_Locs_Reload_f(void);
 

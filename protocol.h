@@ -58,7 +58,7 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define EF_SELECTABLE			16384		// LordHavoc: highlights when PRYDON_CLIENTCURSOR mouse is over it
 #define EF_DOUBLESIDED			32768		//[515]: disable cull face for this entity
 #define EF_NOSELFSHADOW			65536		// LordHavoc: does not cast a shadow on itself (or any other EF_NOSELFSHADOW entities)
-#define EF_UNUSED17				131072
+#define EF_DYNAMICMODELLIGHT			131072
 #define EF_UNUSED18				262144
 #define EF_UNUSED19				524288
 #define EF_RESTARTANIM_BIT		1048576     // div0: restart animation bit (like teleport bit, but lerps between end and start of the anim, and doesn't stop player lerping)
@@ -345,6 +345,7 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define RENDER_ADDITIVE 2097152
 #define RENDER_DOUBLESIDED 4194304
 #define RENDER_CUSTOMIZEDMODELLIGHT 4096
+#define RENDER_DYNAMICMODELLIGHT 8388608 // origin dependent model light
 
 #define MAX_FRAMEGROUPBLENDS 4
 typedef struct framegroupblend_s
@@ -746,7 +747,7 @@ void EntityFrame4_CL_ReadFrame(void);
 // byte type=1 short frames[2] short times[2] byte lerps[2]
 // byte type=2 short frames[3] short times[3] byte lerps[3]
 // byte type=3 short frames[4] short times[4] byte lerps[4]
-// byte type=4 short modelindex byte numbones {short pose6s[6]}
+// byte type=4 short modelindex byte numbones {short pose7s[7]}
 // see also RENDER_COMPLEXANIMATION
 #define E5_COMPLEXANIMATION (1<<25)
 // ushort traileffectnum

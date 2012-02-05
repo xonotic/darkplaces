@@ -1665,8 +1665,8 @@ void Mod_LoadQ3Shaders(void)
 	int numparameters;
 	char parameter[TEXTURE_MAXFRAMES + 4][Q3PATHLENGTH];
 	char *custsurfaceparmnames[256]; // VorteX: q3map2 has 64 but well, someone will need more
-	unsigned long custsurfaceparms[256]; 
-	int numcustsurfaceparms;
+	unsigned long custsurfaceflags[256]; 
+	int numcustsurfaceflags;
 	qboolean dpshaderkill;
 
 	Mod_FreeQ3Shaders();
@@ -1680,7 +1680,7 @@ void Mod_LoadQ3Shaders(void)
 		q3shaders_mem, sizeof (char**), 256);
 
 	// parse custinfoparms.txt
-	numcustsurfaceparms = 0;
+	numcustsurfaceflags = 0;
 	if ((text = f = (char *)FS_LoadFile("scripts/custinfoparms.txt", tempmempool, false, NULL)) != NULL)
 	{
 		if (!COM_ParseToken_QuakeC(&text, false) || strcasecmp(com_token, "{"))
@@ -1700,21 +1700,21 @@ void Mod_LoadQ3Shaders(void)
 					if (!strcasecmp(com_token, "}"))
 						break;	
 					// register surfaceflag
-					if (numcustsurfaceparms >= 256)
+					if (numcustsurfaceflags >= 256)
 					{
 						Con_Printf("scripts/custinfoparms.txt: surfaceflags section parsing error - max 256 surfaceflags exceeded\n");
 						break;
 					}
 					// name
 					j = strlen(com_token)+1;
-					custsurfaceparmnames[numcustsurfaceparms] = (char *)Mem_Alloc(tempmempool, j);
-					strlcpy(custsurfaceparmnames[numcustsurfaceparms], com_token, j+1);
+					custsurfaceparmnames[numcustsurfaceflags] = (char *)Mem_Alloc(tempmempool, j);
+					strlcpy(custsurfaceparmnames[numcustsurfaceflags], com_token, j+1);
 					// value
 					if (COM_ParseToken_QuakeC(&text, false))
-						custsurfaceparms[numcustsurfaceparms] = strtol(com_token, NULL, 0);
+						custsurfaceflags[numcustsurfaceflags] = strtol(com_token, NULL, 0);
 					else
-						custsurfaceparms[numcustsurfaceparms] = 0;
-					numcustsurfaceparms++;
+						custsurfaceflags[numcustsurfaceflags] = 0;
+					numcustsurfaceflags++;
 				}
 			}
 		}
@@ -2129,19 +2129,21 @@ void Mod_LoadQ3Shaders(void)
 						shader.surfaceparms |= Q3SURFACEPARM_POINTLIGHT;
 					else if (!strcasecmp(parameter[1], "antiportal"))
 						shader.surfaceparms |= Q3SURFACEPARM_ANTIPORTAL;
+					else if (!strcasecmp(parameter[1], "skip"))
+						; // shader.surfaceparms |= Q3SURFACEPARM_SKIP; FIXME we don't have enough #defines for this any more, and the engine doesn't need this one anyway
 					else
 					{
 						// try custom surfaceparms
-						for (j = 0; j < numcustsurfaceparms; j++)
+						for (j = 0; j < numcustsurfaceflags; j++)
 						{
 							if (!strcasecmp(custsurfaceparmnames[j], parameter[1]))
 							{
-								shader.surfaceparms |= custsurfaceparms[j];
+								shader.surfaceflags |= custsurfaceflags[j];
 								break;
 							}
 						}
 						// failed all
-						if (j == numcustsurfaceparms)
+						if (j == numcustsurfaceflags)
 							Con_DPrintf("%s parsing warning: unknown surfaceparm \"%s\"\n", search->filenames[fileindex], parameter[1]);
 					}
 				}
@@ -2388,7 +2390,7 @@ void Mod_LoadQ3Shaders(void)
 	}
 	FS_FreeSearch(search);
 	// free custinfoparm values
-	for (j = 0; j < numcustsurfaceparms; j++)
+	for (j = 0; j < numcustsurfaceflags; j++)
 		Mem_Free(custsurfaceparmnames[j]);
 }
 
@@ -2635,7 +2637,7 @@ nothing                GL_ZERO GL_ONE
 	//	if (shader->surfaceparms & Q3SURFACEPARM_LIGHTGRID    ) texture->supercontents |= SUPERCONTENTS_LIGHTGRID    ;
 	//	if (shader->surfaceparms & Q3SURFACEPARM_ANTIPORTAL   ) texture->supercontents |= SUPERCONTENTS_ANTIPORTAL   ;
 
-		texture->surfaceflags = 0;
+		texture->surfaceflags = shader->surfaceflags;
 		if (shader->surfaceparms & Q3SURFACEPARM_ALPHASHADOW  ) texture->surfaceflags |= Q3SURFACEFLAG_ALPHASHADOW  ;
 	//	if (shader->surfaceparms & Q3SURFACEPARM_AREAPORTAL   ) texture->surfaceflags |= Q3SURFACEFLAG_AREAPORTAL   ;
 	//	if (shader->surfaceparms & Q3SURFACEPARM_CLUSTERPORTAL) texture->surfaceflags |= Q3SURFACEFLAG_CLUSTERPORTAL;
@@ -3043,6 +3045,7 @@ void Mod_BuildVBOs(void)
 	}
 }
 
+extern cvar_t mod_obj_orientation;
 static void Mod_Decompile_OBJ(dp_model_t *model, const char *filename, const char *mtlfilename, const char *originalfilename)
 {
 	int submodelindex, vertexindex, surfaceindex, triangleindex, textureindex, countvertices = 0, countsurfaces = 0, countfaces = 0, counttextures = 0;
@@ -3110,7 +3113,10 @@ static void Mod_Decompile_OBJ(dp_model_t *model, const char *filename, const cha
 			memcpy(outbuffer, oldbuffer, outbufferpos);
 			Z_Free(oldbuffer);
 		}
-		l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "v %f %f %f\nvn %f %f %f\nvt %f %f\n", v[0], v[2], v[1], vn[0], vn[2], vn[1], vt[0], 1-vt[1]);
+		if(mod_obj_orientation.integer)
+			l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "v %f %f %f\nvn %f %f %f\nvt %f %f\n", v[0], v[2], v[1], vn[0], vn[2], vn[1], vt[0], 1-vt[1]);
+		else
+			l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "v %f %f %f\nvn %f %f %f\nvt %f %f\n", v[0], v[1], v[2], vn[0], vn[1], vn[2], vt[0], 1-vt[1]);
 		if (l > 0)
 			outbufferpos += l;
 	}
@@ -3140,7 +3146,10 @@ static void Mod_Decompile_OBJ(dp_model_t *model, const char *filename, const cha
 				a = e[0]+1;
 				b = e[1]+1;
 				c = e[2]+1;
-				l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "f %i/%i/%i %i/%i/%i %i/%i/%i\n", a,a,a,b,b,b,c,c,c);
+				if(mod_obj_orientation.integer)
+					l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "f %i/%i/%i %i/%i/%i %i/%i/%i\n", a,a,a,b,b,b,c,c,c);
+				else
+					l = dpsnprintf(outbuffer + outbufferpos, outbuffermax - outbufferpos, "f %i/%i/%i %i/%i/%i %i/%i/%i\n", a,a,a,c,c,c,b,b,b);
 				if (l > 0)
 					outbufferpos += l;
 			}
@@ -3215,7 +3224,7 @@ static void Mod_Decompile_SMD(dp_model_t *model, const char *filename, int first
 
 			// strangely the smd angles are for a transposed matrix, so we
 			// have to generate a transposed matrix, then convert that...
-			Matrix4x4_FromBonePose6s(&posematrix, model->num_posescale, model->data_poses6s + 6*(model->num_bones * poseindex + transformindex));
+			Matrix4x4_FromBonePose7s(&posematrix, model->num_posescale, model->data_poses7s + 7*(model->num_bones * poseindex + transformindex));
 			Matrix4x4_ToArray12FloatGL(&posematrix, mtest[0]);
 			AnglesFromVectors(angles, mtest[0], mtest[2], false);
 			if (angles[0] >= 180) angles[0] -= 360;

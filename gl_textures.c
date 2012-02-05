@@ -2167,7 +2167,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	unsigned char *dds;
 	fs_offset_t ddsfilesize;
 	unsigned int ddssize;
-	qboolean force_swdecode = (r_texture_dds_swdecode.integer > 1);
+	qboolean force_swdecode, npothack;
 
 	if (cls.state == ca_dedicated)
 		return NULL;
@@ -2344,9 +2344,17 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	}
 
 	force_swdecode = false;
+	npothack = 
+		(!vid.support.arb_texture_non_power_of_two &&
+			(
+				(dds_width & (dds_width - 1))
+				||
+				(dds_height & (dds_height - 1))
+			)
+		);
 	if(bytesperblock)
 	{
-		if(vid.support.arb_texture_compression && vid.support.ext_texture_compression_s3tc)
+		if(vid.support.arb_texture_compression && vid.support.ext_texture_compression_s3tc && !npothack)
 		{
 			if(r_texture_dds_swdecode.integer > 1)
 				force_swdecode = true;
@@ -2457,7 +2465,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 				avgcolor[1] += ((c >>  5) & 0x3F) + ((c >> 21) & 0x3F);
 				avgcolor[2] += ((c      ) & 0x1F) + ((c >> 16) & 0x1F);
 				if(textype == TEXTYPE_DXT5)
-					avgcolor[3] += (0.5 * mippixels[i-8] + 0.5 * mippixels[i-7]);
+					avgcolor[3] += (mippixels[i-8] + (int) mippixels[i-7]) * (0.5f / 255.0f);
 				else if(textype == TEXTYPE_DXT3)
 					avgcolor[3] += (
 						  (mippixels_start[i-8] & 0x0F)
@@ -2468,11 +2476,11 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 						+ (mippixels_start[i-6] >> 4)
 						+ (mippixels_start[i-5] & 0x0F)
 						+ (mippixels_start[i-5] >> 4)
-					       ) * (0.125f / 15.0f * 255.0f);
+					       ) * (0.125f / 15.0f);
 				else
-					avgcolor[3] += 255;
+					avgcolor[3] += 1.0f;
 			}
-			f = (float)bytesperblock / size;
+			f = (float)bytesperblock / mipsize;
 			avgcolor[0] *= (0.5f / 31.0f) * f;
 			avgcolor[1] *= (0.5f / 63.0f) * f;
 			avgcolor[2] *= (0.5f / 31.0f) * f;
@@ -2487,7 +2495,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 				avgcolor[2] += mippixels[i];
 				avgcolor[3] += mippixels[i+3];
 			}
-			f = (1.0f / 255.0f) * bytesperpixel / size;
+			f = (1.0f / 255.0f) * bytesperpixel / mipsize;
 			avgcolor[0] *= f;
 			avgcolor[1] *= f;
 			avgcolor[2] *= f;
@@ -2624,6 +2632,12 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	glt->tiledepth = 1;
 	glt->miplevels = dds_miplevels;
 
+	if(npothack)
+	{
+		for (glt->tilewidth = 1;glt->tilewidth < mipwidth;glt->tilewidth <<= 1);
+		for (glt->tileheight = 1;glt->tileheight < mipheight;glt->tileheight <<= 1);
+	}
+
 	// texture uploading can take a while, so make sure we're sending keepalives
 	CL_KeepaliveMessage(false);
 
@@ -2678,9 +2692,25 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 
 	for (mip = 0;mip <= dds_miplevels;mip++) // <= to include the not-counted "largest" miplevel
 	{
+		unsigned char *upload_mippixels = mippixels;
+		int upload_mipwidth = mipwidth;
+		int upload_mipheight = mipheight;
 		mipsize = bytesperblock ? ((mipwidth+3)/4)*((mipheight+3)/4)*bytesperblock : mipwidth*mipheight*bytesperpixel;
 		if (mippixels + mipsize > mippixels_start + mipsize_total)
 			break;
+		if(npothack)
+		{
+			upload_mipwidth = (glt->tilewidth >> mip);
+			upload_mipheight = (glt->tileheight >> mip);
+			if(upload_mipwidth != mipwidth || upload_mipheight != mipheight)
+			// I _think_ they always mismatch, but I was too lazy
+			// to properly check, and this test here is really
+			// harmless
+			{
+				upload_mippixels = (unsigned char *) Mem_Alloc(tempmempool, 4 * upload_mipwidth * upload_mipheight);
+				Image_Resample32(mippixels, mipwidth, mipheight, 1, upload_mippixels, upload_mipwidth, upload_mipheight, 1, r_lerpimages.integer);
+			}
+		}
 		switch(vid.renderpath)
 		{
 		case RENDERPATH_GL11:
@@ -2690,11 +2720,11 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 		case RENDERPATH_GLES2:
 			if (bytesperblock)
 			{
-				qglCompressedTexImage2DARB(GL_TEXTURE_2D, mip, glt->glinternalformat, mipwidth, mipheight, 0, mipsize, mippixels);CHECKGLERROR
+				qglCompressedTexImage2DARB(GL_TEXTURE_2D, mip, glt->glinternalformat, upload_mipwidth, upload_mipheight, 0, mipsize, upload_mippixels);CHECKGLERROR
 			}
 			else
 			{
-				qglTexImage2D(GL_TEXTURE_2D, mip, glt->glinternalformat, mipwidth, mipheight, 0, glt->glformat, glt->gltype, mippixels);CHECKGLERROR
+				qglTexImage2D(GL_TEXTURE_2D, mip, glt->glinternalformat, upload_mipwidth, upload_mipheight, 0, glt->glformat, glt->gltype, upload_mippixels);CHECKGLERROR
 			}
 			break;
 		case RENDERPATH_D3D9:
@@ -2703,7 +2733,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 				D3DLOCKED_RECT d3dlockedrect;
 				if (IDirect3DTexture9_LockRect((IDirect3DTexture9*)glt->d3dtexture, mip, &d3dlockedrect, NULL, 0) == D3D_OK && d3dlockedrect.pBits)
 				{
-					memcpy(d3dlockedrect.pBits, mippixels, mipsize);
+					memcpy(d3dlockedrect.pBits, upload_mippixels, mipsize);
 					IDirect3DTexture9_UnlockRect((IDirect3DTexture9*)glt->d3dtexture, mip);
 				}
 				break;
@@ -2720,11 +2750,13 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 			if (bytesperblock)
 				Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
 			else
-				DPSOFTRAST_Texture_UpdateFull(glt->texnum, mippixels);
+				DPSOFTRAST_Texture_UpdateFull(glt->texnum, upload_mippixels);
 			// DPSOFTRAST calculates its own mipmaps
 			mip = dds_miplevels;
 			break;
 		}
+		if(upload_mippixels != mippixels)
+			Mem_Free(upload_mippixels);
 		mippixels += mipsize;
 		if (mipwidth <= 1 && mipheight <= 1)
 		{

@@ -2263,7 +2263,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		// unshaded geometry (fullbright or ambient model lighting)
 		mode = SHADERMODE_FLATCOLOR;
 		ambientscale = diffusescale = specularscale = 0;
-		if (rsurface.texture->glowtexture && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
+		if ((rsurface.texture->glowtexture || rsurface.texture->backgroundglowtexture) && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
 			permutation |= SHADERPERMUTATION_GLOW;
 		if (r_refdef.fogenabled)
 			permutation |= r_texture_fogheighttexture ? SHADERPERMUTATION_FOGHEIGHTTEXTURE : (r_refdef.fogplaneviewabove ? SHADERPERMUTATION_FOGOUTSIDE : SHADERPERMUTATION_FOGINSIDE);
@@ -2313,7 +2313,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_ALPHAGEN_VERTEX;
 		// directional model lighting
 		mode = SHADERMODE_LIGHTDIRECTION;
-		if (rsurface.texture->glowtexture && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
+		if ((rsurface.texture->glowtexture || rsurface.texture->backgroundglowtexture) && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
 			permutation |= SHADERPERMUTATION_GLOW;
 		permutation |= SHADERPERMUTATION_DIFFUSE;
 		if (specularscale > 0)
@@ -2374,7 +2374,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_ALPHAGEN_VERTEX;
 		// ambient model lighting
 		mode = SHADERMODE_LIGHTDIRECTION;
-		if (rsurface.texture->glowtexture && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
+		if ((rsurface.texture->glowtexture || rsurface.texture->backgroundglowtexture) && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
 			permutation |= SHADERPERMUTATION_GLOW;
 		if (r_refdef.fogenabled)
 			permutation |= r_texture_fogheighttexture ? SHADERPERMUTATION_FOGHEIGHTTEXTURE : (r_refdef.fogplaneviewabove ? SHADERPERMUTATION_FOGOUTSIDE : SHADERPERMUTATION_FOGINSIDE);
@@ -2431,7 +2431,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHAGEN_VERTEX)
 			permutation |= SHADERPERMUTATION_ALPHAGEN_VERTEX;
 		// lightmapped wall
-		if (rsurface.texture->glowtexture && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
+		if ((rsurface.texture->glowtexture || rsurface.texture->backgroundglowtexture) && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
 			permutation |= SHADERPERMUTATION_GLOW;
 		if (r_refdef.fogenabled)
 			permutation |= r_texture_fogheighttexture ? SHADERPERMUTATION_FOGHEIGHTTEXTURE : (r_refdef.fogplaneviewabove ? SHADERPERMUTATION_FOGOUTSIDE : SHADERPERMUTATION_FOGINSIDE);
@@ -4731,12 +4731,12 @@ static void R_View_UpdateEntityLighting (void)
 	{
 		ent = r_refdef.scene.entities[i];
 
-		// skip unseen models and models that updated by CSQC
-		if ((!r_refdef.viewcache.entityvisible[i] && skipunseen) || ent->flags & RENDER_CUSTOMIZEDMODELLIGHT)
+		// skip unseen models
+		if ((!r_refdef.viewcache.entityvisible[i] && skipunseen))
 			continue;
 
 		// skip bsp models
-		if (ent->model && (ent->model == cl.worldmodel || ent->model->brush.parentmodel == cl.worldmodel))
+		if (ent->model && ent->model == cl.worldmodel)
 		{
 			// TODO: use modellight for r_ambient settings on world?
 			VectorSet(ent->modellight_ambient, 0, 0, 0);
@@ -4744,74 +4744,83 @@ static void R_View_UpdateEntityLighting (void)
 			VectorSet(ent->modellight_lightdir, 0, 0, 1);
 			continue;
 		}
-
-		// fetch the lighting from the worldmodel data
-		VectorClear(ent->modellight_ambient);
-		VectorClear(ent->modellight_diffuse);
-		VectorClear(tempdiffusenormal);
-		if (ent->flags & RENDER_LIGHT)
+		
+		if (ent->flags & RENDER_CUSTOMIZEDMODELLIGHT)
 		{
-			vec3_t org;
-			Matrix4x4_OriginFromMatrix(&ent->matrix, org);
-
-			// complete lightning for lit sprites
-			// todo: make a EF_ field so small ents could be lit purely by modellight and skipping real rtlight pass (like EF_NORTLIGHT)?
-			if (ent->model->type == mod_sprite && !(ent->model->data_textures[0].basematerialflags & MATERIALFLAG_FULLBRIGHT))
+			// aleady updated by CSQC
+			// TODO: force modellight on BSP models in this case?
+			VectorCopy(ent->modellight_lightdir, tempdiffusenormal); 
+		}
+		else
+		{
+			// fetch the lighting from the worldmodel data
+			VectorClear(ent->modellight_ambient);
+			VectorClear(ent->modellight_diffuse);
+			VectorClear(tempdiffusenormal);
+			if (ent->flags & RENDER_LIGHT)
 			{
-				if (ent->model->sprite.sprnum_type == SPR_OVERHEAD) // apply offset for overhead sprites
-					org[2] = org[2] + r_overheadsprites_pushback.value;
-				R_LightPoint(ent->modellight_ambient, org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
-			}
-			else
-				R_CompleteLightPoint(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal, org, LP_LIGHTMAP);
+				vec3_t org;
+				Matrix4x4_OriginFromMatrix(&ent->matrix, org);
 
-			if(ent->flags & RENDER_EQUALIZE)
-			{
-				// first fix up ambient lighting...
-				if(r_equalize_entities_minambient.value > 0)
+				// complete lightning for lit sprites
+				// todo: make a EF_ field so small ents could be lit purely by modellight and skipping real rtlight pass (like EF_NORTLIGHT)?
+				if (ent->model->type == mod_sprite && !(ent->model->data_textures[0].basematerialflags & MATERIALFLAG_FULLBRIGHT))
 				{
-					fd = 0.299f * ent->modellight_diffuse[0] + 0.587f * ent->modellight_diffuse[1] + 0.114f * ent->modellight_diffuse[2];
-					if(fd > 0)
+					if (ent->model->sprite.sprnum_type == SPR_OVERHEAD) // apply offset for overhead sprites
+						org[2] = org[2] + r_overheadsprites_pushback.value;
+					R_LightPoint(ent->modellight_ambient, org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
+				}
+				else
+					R_CompleteLightPoint(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal, org, LP_LIGHTMAP);
+
+				if(ent->flags & RENDER_EQUALIZE)
+				{
+					// first fix up ambient lighting...
+					if(r_equalize_entities_minambient.value > 0)
 					{
-						fa = (0.299f * ent->modellight_ambient[0] + 0.587f * ent->modellight_ambient[1] + 0.114f * ent->modellight_ambient[2]);
-						if(fa < r_equalize_entities_minambient.value * fd)
+						fd = 0.299f * ent->modellight_diffuse[0] + 0.587f * ent->modellight_diffuse[1] + 0.114f * ent->modellight_diffuse[2];
+						if(fd > 0)
 						{
-							// solve:
-							//   fa'/fd' = minambient
-							//   fa'+0.25*fd' = fa+0.25*fd
-							//   ...
-							//   fa' = fd' * minambient
-							//   fd'*(0.25+minambient) = fa+0.25*fd
-							//   ...
-							//   fd' = (fa+0.25*fd) * 1 / (0.25+minambient)
-							//   fa' = (fa+0.25*fd) * minambient / (0.25+minambient)
-							//   ...
-							fdd = (fa + 0.25f * fd) / (0.25f + r_equalize_entities_minambient.value);
-							f = fdd / fd; // f>0 because all this is additive; f<1 because fdd<fd because this follows from fa < r_equalize_entities_minambient.value * fd
-							VectorMA(ent->modellight_ambient, (1-f)*0.25f, ent->modellight_diffuse, ent->modellight_ambient);
-							VectorScale(ent->modellight_diffuse, f, ent->modellight_diffuse);
+							fa = (0.299f * ent->modellight_ambient[0] + 0.587f * ent->modellight_ambient[1] + 0.114f * ent->modellight_ambient[2]);
+							if(fa < r_equalize_entities_minambient.value * fd)
+							{
+								// solve:
+								//   fa'/fd' = minambient
+								//   fa'+0.25*fd' = fa+0.25*fd
+								//   ...
+								//   fa' = fd' * minambient
+								//   fd'*(0.25+minambient) = fa+0.25*fd
+								//   ...
+								//   fd' = (fa+0.25*fd) * 1 / (0.25+minambient)
+								//   fa' = (fa+0.25*fd) * minambient / (0.25+minambient)
+								//   ...
+								fdd = (fa + 0.25f * fd) / (0.25f + r_equalize_entities_minambient.value);
+								f = fdd / fd; // f>0 because all this is additive; f<1 because fdd<fd because this follows from fa < r_equalize_entities_minambient.value * fd
+								VectorMA(ent->modellight_ambient, (1-f)*0.25f, ent->modellight_diffuse, ent->modellight_ambient);
+								VectorScale(ent->modellight_diffuse, f, ent->modellight_diffuse);
+							}
+						}
+					}
+
+					if(r_equalize_entities_to.value > 0 && r_equalize_entities_by.value != 0)
+					{
+						fa = 0.299f * ent->modellight_ambient[0] + 0.587f * ent->modellight_ambient[1] + 0.114f * ent->modellight_ambient[2];
+						fd = 0.299f * ent->modellight_diffuse[0] + 0.587f * ent->modellight_diffuse[1] + 0.114f * ent->modellight_diffuse[2];
+						f = fa + 0.25 * fd;
+						if(f > 0)
+						{
+							// adjust brightness and saturation to target
+							avg[0] = avg[1] = avg[2] = fa / f;
+							VectorLerp(ent->modellight_ambient, r_equalize_entities_by.value, avg, ent->modellight_ambient);
+							avg[0] = avg[1] = avg[2] = fd / f;
+							VectorLerp(ent->modellight_diffuse, r_equalize_entities_by.value, avg, ent->modellight_diffuse);
 						}
 					}
 				}
-
-				if(r_equalize_entities_to.value > 0 && r_equalize_entities_by.value != 0)
-				{
-					fa = 0.299f * ent->modellight_ambient[0] + 0.587f * ent->modellight_ambient[1] + 0.114f * ent->modellight_ambient[2];
-					fd = 0.299f * ent->modellight_diffuse[0] + 0.587f * ent->modellight_diffuse[1] + 0.114f * ent->modellight_diffuse[2];
-					f = fa + 0.25 * fd;
-					if(f > 0)
-					{
-						// adjust brightness and saturation to target
-						avg[0] = avg[1] = avg[2] = fa / f;
-						VectorLerp(ent->modellight_ambient, r_equalize_entities_by.value, avg, ent->modellight_ambient);
-						avg[0] = avg[1] = avg[2] = fd / f;
-						VectorLerp(ent->modellight_diffuse, r_equalize_entities_by.value, avg, ent->modellight_diffuse);
-					}
-				}
 			}
+			else // highly rare
+				VectorSet(ent->modellight_ambient, 1, 1, 1);
 		}
-		else // highly rare
-			VectorSet(ent->modellight_ambient, 1, 1, 1);
 
 		// move the light direction into modelspace coordinates for lighting code
 		Matrix4x4_Transform3x3(&ent->inversematrix, tempdiffusenormal, ent->modellight_lightdir);
@@ -6159,6 +6168,14 @@ static void R_Bloom_StartFrame(void)
 	r_fb.screentexcoord2f[6] = 0;
 	r_fb.screentexcoord2f[7] = 0;
 
+	if(r_fb.fbo) 
+	{
+		for (i = 1;i < 8;i += 2)
+		{
+			r_fb.screentexcoord2f[i] += 1 - (float)(viewheight + r_refdef.view.y) / (float)r_fb.screentextureheight;
+		}
+	}
+
 	// set up a texcoord array for the reduced resolution bloom image
 	// (which will be additive blended over the screen image)
 	r_fb.bloomtexcoord2f[0] = 0;
@@ -6182,20 +6199,17 @@ static void R_Bloom_StartFrame(void)
 	case RENDERPATH_D3D9:
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
+		for (i = 0;i < 4;i++)
 		{
-			int i;
-			for (i = 0;i < 4;i++)
-			{
-				r_fb.screentexcoord2f[i*2+0] += 0.5f / (float)r_fb.screentexturewidth;
-				r_fb.screentexcoord2f[i*2+1] += 0.5f / (float)r_fb.screentextureheight;
-				r_fb.bloomtexcoord2f[i*2+0] += 0.5f / (float)r_fb.bloomtexturewidth;
-				r_fb.bloomtexcoord2f[i*2+1] += 0.5f / (float)r_fb.bloomtextureheight;
-			}
+			r_fb.screentexcoord2f[i*2+0] += 0.5f / (float)r_fb.screentexturewidth;
+			r_fb.screentexcoord2f[i*2+1] += 0.5f / (float)r_fb.screentextureheight;
+			r_fb.bloomtexcoord2f[i*2+0] += 0.5f / (float)r_fb.bloomtexturewidth;
+			r_fb.bloomtexcoord2f[i*2+1] += 0.5f / (float)r_fb.bloomtextureheight;
 		}
 		break;
 	}
 
-	R_Viewport_InitOrtho(&r_fb.bloomviewport, &identitymatrix, r_refdef.view.x, (r_fb.bloomfbo[0] ? r_fb.bloomtextureheight : vid.height) - r_fb.bloomheight - r_refdef.view.y, r_fb.bloomwidth, r_fb.bloomheight, 0, 0, 1, 1, -10, 100, NULL);
+	R_Viewport_InitOrtho(&r_fb.bloomviewport, &identitymatrix, 0, 0, r_fb.bloomwidth, r_fb.bloomheight, 0, 0, 1, 1, -10, 100, NULL);
 
 	if (r_fb.fbo)
 		r_refdef.view.clear = true;
@@ -6309,14 +6323,14 @@ static void R_Bloom_MakeTexture(void)
 			xoffset /= (float)r_fb.bloomtexturewidth;
 			yoffset /= (float)r_fb.bloomtextureheight;
 			// compute a texcoord array with the specified x and y offset
-			r_fb.offsettexcoord2f[0] = xoffset+0;
-			r_fb.offsettexcoord2f[1] = yoffset+(float)r_fb.bloomheight / (float)r_fb.bloomtextureheight;
-			r_fb.offsettexcoord2f[2] = xoffset+(float)r_fb.bloomwidth / (float)r_fb.bloomtexturewidth;
-			r_fb.offsettexcoord2f[3] = yoffset+(float)r_fb.bloomheight / (float)r_fb.bloomtextureheight;
-			r_fb.offsettexcoord2f[4] = xoffset+(float)r_fb.bloomwidth / (float)r_fb.bloomtexturewidth;
-			r_fb.offsettexcoord2f[5] = yoffset+0;
-			r_fb.offsettexcoord2f[6] = xoffset+0;
-			r_fb.offsettexcoord2f[7] = yoffset+0;
+			r_fb.offsettexcoord2f[0] = xoffset+r_fb.bloomtexcoord2f[0];
+			r_fb.offsettexcoord2f[1] = yoffset+r_fb.bloomtexcoord2f[1];
+			r_fb.offsettexcoord2f[2] = xoffset+r_fb.bloomtexcoord2f[2];
+			r_fb.offsettexcoord2f[3] = yoffset+r_fb.bloomtexcoord2f[3];
+			r_fb.offsettexcoord2f[4] = xoffset+r_fb.bloomtexcoord2f[4];
+			r_fb.offsettexcoord2f[5] = yoffset+r_fb.bloomtexcoord2f[5];
+			r_fb.offsettexcoord2f[6] = xoffset+r_fb.bloomtexcoord2f[6];
+			r_fb.offsettexcoord2f[7] = yoffset+r_fb.bloomtexcoord2f[7];
 			// this r value looks like a 'dot' particle, fading sharply to
 			// black at the edges
 			// (probably not realistic but looks good enough)
@@ -7806,7 +7820,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	{
 		// no modellight if using fakelight for the map
 	}
-	else if (rsurface.modeltexcoordlightmap2f == NULL && !(t->currentmaterialflags & MATERIALFLAG_FULLBRIGHT))
+	else if ((rsurface.modeltexcoordlightmap2f == NULL || (rsurface.ent_flags & (RENDER_DYNAMICMODELLIGHT | RENDER_CUSTOMIZEDMODELLIGHT))) && !(t->currentmaterialflags & MATERIALFLAG_FULLBRIGHT))
 	{
 		// pick a model lighting mode
 		if (VectorLength2(rsurface.modellight_diffuse) >= (1.0f / 256.0f))
@@ -7882,6 +7896,11 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		t->backgroundglowtexture = t->backgroundcurrentskinframe->glow;
 		if (!t->backgroundnmaptexture)
 			t->backgroundnmaptexture = r_texture_blanknormalmap;
+		// make sure that if glow is going to be used, both textures are not NULL
+		if (!t->backgroundglowtexture && t->glowtexture)
+			t->backgroundglowtexture = r_texture_black;
+		if (!t->glowtexture && t->backgroundglowtexture)
+			t->glowtexture = r_texture_black;
 	}
 	else
 	{

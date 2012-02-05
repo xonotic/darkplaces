@@ -972,8 +972,12 @@ static void CL_ClientMovement_Move(cl_clientmovement_state_t *s)
 		if (trace.fraction == 1)
 			break;
 
-		//if (trace.plane.normal[2] > 0.7)
-		//	s->onground = true;
+		// this is only really needed for nogravityonground combined with gravityunaffectedbyticrate
+		// <LordHavoc> I'm pretty sure I commented it out solely because it seemed redundant
+		// this got commented out in a change that supposedly makes the code match QW better
+		// so if this is broken, maybe put it in an if(cls.protocol != PROTOCOL_QUAKEWORLD) block
+		if (trace.plane.normal[2] > 0.7)
+			s->onground = true;
 
 		t -= t * trace.fraction;
 
@@ -1366,20 +1370,23 @@ static void CL_ClientMovement_Physics_Walk(cl_clientmovement_state_t *s)
 			accelspeed = min(cl.movevars_accelerate * s->cmd.frametime * wishspeed, addspeed);
 			VectorMA(s->velocity, accelspeed, wishdir, s->velocity);
 		}
-		if(cl.moveflags & MOVEFLAG_NOGRAVITYONGROUND)
-			gravity = 0;
-		else
-			gravity = cl.movevars_gravity * cl.movevars_entgravity * s->cmd.frametime;
-		if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
-			s->velocity[2] -= gravity * 0.5f;
-		else
-			s->velocity[2] -= gravity;
+		gravity = cl.movevars_gravity * cl.movevars_entgravity * s->cmd.frametime;
+		if(!(cl.moveflags & MOVEFLAG_NOGRAVITYONGROUND))
+		{
+			if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
+				s->velocity[2] -= gravity * 0.5f;
+			else
+				s->velocity[2] -= gravity;
+		}
 		if (cls.protocol == PROTOCOL_QUAKEWORLD)
 			s->velocity[2] = 0;
 		if (VectorLength2(s->velocity))
 			CL_ClientMovement_Move(s);
-		if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
-			s->velocity[2] -= gravity * 0.5f;
+		if(!(cl.moveflags & MOVEFLAG_NOGRAVITYONGROUND) || !s->onground)
+		{
+			if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
+				s->velocity[2] -= gravity * 0.5f;
+		}
 	}
 	else
 	{
@@ -1435,12 +1442,15 @@ static void CL_ClientMovement_Physics_Walk(cl_clientmovement_state_t *s)
 		else
 			s->velocity[2] -= gravity;
 		CL_ClientMovement_Move(s);
-		if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
-			s->velocity[2] -= gravity * 0.5f;
+		if(!(cl.moveflags & MOVEFLAG_NOGRAVITYONGROUND) || !s->onground)
+		{
+			if(cl.moveflags & MOVEFLAG_GRAVITYUNAFFECTEDBYTICRATE)
+				s->velocity[2] -= gravity * 0.5f;
+		}
 	}
 }
 
-void CL_ClientMovement_PlayerMove(cl_clientmovement_state_t *s)
+static void CL_ClientMovement_PlayerMove(cl_clientmovement_state_t *s)
 {
 	//Con_Printf(" %f", frametime);
 	if (!s->cmd.jump)
@@ -1545,6 +1555,27 @@ void CL_UpdateMoveVars(void)
 		cl.movevars_aircontrol_power = 2; // CPMA default
 }
 
+void CL_ClientMovement_PlayerMove_Frame(cl_clientmovement_state_t *s)
+{
+	// if a move is more than 50ms, do it as two moves (matching qwsv)
+	//Con_Printf("%i ", s.cmd.msec);
+	if(s->cmd.frametime > 0.0005)
+	{
+		if (s->cmd.frametime > 0.05)
+		{
+			s->cmd.frametime /= 2;
+			CL_ClientMovement_PlayerMove(s);
+		}
+		CL_ClientMovement_PlayerMove(s);
+	}
+	else
+	{
+		// we REALLY need this handling to happen, even if the move is not executed
+		if (!s->cmd.jump)
+			s->cmd.canjump = true;
+	}
+}
+
 void CL_ClientMovement_Replay(void)
 {
 	int i;
@@ -1590,23 +1621,8 @@ void CL_ClientMovement_Replay(void)
 			if (i < CL_MAX_USERCMDS - 1)
 				s.cmd.canjump = cl.movecmd[i+1].canjump;
 
-			// if a move is more than 50ms, do it as two moves (matching qwsv)
-			//Con_Printf("%i ", s.cmd.msec);
-			if(s.cmd.frametime > 0.0005)
-			{
-				if (s.cmd.frametime > 0.05)
-				{
-					s.cmd.frametime /= 2;
-					CL_ClientMovement_PlayerMove(&s);
-				}
-				CL_ClientMovement_PlayerMove(&s);
-			}
-			else
-			{
-				// we REALLY need this handling to happen, even if the move is not executed
-				if (!s.cmd.jump)
-					s.cmd.canjump = true;
-			}
+			CL_ClientMovement_PlayerMove_Frame(&s);
+
 			cl.movecmd[i].canjump = s.cmd.canjump;
 		}
 		//Con_Printf("\n");

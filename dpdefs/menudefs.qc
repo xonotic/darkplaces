@@ -202,7 +202,7 @@ float	stof(string val,...)  = #21;
 entity	spawn(void) 		= #22;
 void	remove(entity e) 	= #23;
 
-entity	findstring(entity start, .string field, string match)  	= #24;
+entity	find(entity start, .string field, string match)  	= #24;
 entity	findfloat(entity start, .float field, float match) 	= #25;
 entity	findentity(entity start, .entity field, entity match) 	= #25;
 
@@ -293,7 +293,7 @@ void	WriteEntity(entity data, float dest, float desto) = #408;
 //////////////////////////////////////////////////
 
 float	iscachedpic(string name)	= #451;
-string	precache_pic(string name)	= #452;
+string	precache_pic(string name, ...)	= #452;
 void	freepic(string name)		= #453;
 
 float	drawcharacter(vector position, float character, vector scale, vector rgb, float alpha, float flag) = #454;
@@ -404,6 +404,15 @@ float(string s1, string s2, float len) strncmp = #228;
 float(string s1, string s2) strcasecmp = #229;
 float(string s1, string s2, float len) strncasecmp = #230;
 
+//DP_PRECACHE_PIC_FLAGS
+//idea: divVerent
+//darkplaces implementation: divVerent
+//constant definitions:
+float PRECACHE_PIC_FROMWAD = 1; // this one actually is part of EXT_CSQC
+float PRECACHE_PIC_NOTPERSISTENT = 2; // picture may get deallocated when unused
+float PRECACHE_PIC_MIPMAP = 8; // mipmap the texture for possibly better downscaling at memory expense
+//notes: these constants are given as optional second argument to precache_pic()
+
 //DP_QC_CRC16
 //idea: div0
 //darkplaces implementation: div0
@@ -435,6 +444,15 @@ void(float bufhandle, float string_index, string str) bufstr_set = #447;
 float(float bufhandle, string str, float order) bufstr_add = #448;
 void(float bufhandle, float string_index) bufstr_free = #449;
 void(float bufhandle, string pattern, string antipattern) buf_cvarlist = #517;
+
+//DP_QC_STRING_CASE_FUNCTIONS
+//idea: Dresk
+//darkplaces implementation: LordHavoc / Dresk
+//builtin definitions:
+string(string s) strtolower = #480; // returns the passed in string in pure lowercase form
+string(string s) strtoupper = #481; // returns the passed in string in pure uppercase form
+//description:
+//provides simple string uppercase and lowercase functions
 
 //DP_QC_CVAR_DESCRIPTION
 //idea: divVerent

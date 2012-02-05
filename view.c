@@ -120,7 +120,7 @@ V_CalcRoll
 Used by view and sv_user
 ===============
 */
-float V_CalcRoll (vec3_t angles, vec3_t velocity)
+float V_CalcRoll (const vec3_t angles, const vec3_t velocity)
 {
 	vec3_t	right;
 	float	sign;
@@ -428,7 +428,46 @@ static void highpass3_limited(vec3_t value, vec_t fracx, vec_t limitx, vec_t fra
 	out[2] = highpass_limited(value[2], fracz, limitz, &store[2]);
 }
 
-void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight)
+/*
+ * State:
+ *   cl.bob2_smooth
+ *   cl.bobfall_speed
+ *   cl.bobfall_swing
+ *   cl.gunangles_adjustment_highpass
+ *   cl.gunangles_adjustment_lowpass
+ *   cl.gunangles_highpass
+ *   cl.gunangles_prev
+ *   cl.gunorg_adjustment_highpass
+ *   cl.gunorg_adjustment_lowpass
+ *   cl.gunorg_highpass
+ *   cl.gunorg_prev
+ *   cl.hitgroundtime
+ *   cl.lastongroundtime
+ *   cl.oldongrounbd
+ *   cl.stairsmoothtime
+ *   cl.stairsmoothz
+ *   cl.calcrefdef_prevtime
+ * Extra input:
+ *   cl.movecmd[0].time
+ *   cl.movevars_stepheight
+ *   cl.movevars_timescale
+ *   cl.oldtime
+ *   cl.punchangle
+ *   cl.punchvector
+ *   cl.qw_intermission_angles
+ *   cl.qw_intermission_origin
+ *   cl.qw_weaponkick
+ *   cls.protocol
+ *   cl.time
+ * Output:
+ *   cl.csqc_viewanglesfromengine
+ *   cl.csqc_viewmodelmatrixfromengine
+ *   cl.csqc_vieworiginfromengine
+ *   r_refdef.view.matrix
+ *   viewmodelmatrix_nobob
+ *   viewmodelmatrix_withbob
+ */
+void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight, qboolean cldead, qboolean clintermission, const vec3_t clvelocity)
 {
 	float vieworg[3], viewangles[3], smoothtime;
 	float gunorg[3], gunangles[3];
@@ -452,6 +491,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 		cl.lastongroundtime = cl.movecmd[0].time;
 	}
 	cl.oldonground = clonground;
+	cl.calcrefdef_prevtime = max(cl.calcrefdef_prevtime, cl.oldtime);
 
 	VectorClear(gunorg);
 	viewmodelmatrix_nobob = identitymatrix;
@@ -471,7 +511,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	if (v_dmg_time > 0)
 		v_dmg_time -= bound(0, smoothtime, 0.1);
 
-	if (cl.intermission)
+	if (clintermission)
 	{
 		// entity is a fixed camera, just copy the matrix
 		if (cls.protocol == PROTOCOL_QUAKEWORLD)
@@ -479,11 +519,17 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 		else
 		{
 			r_refdef.view.matrix = *entrendermatrix;
-			Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, cl.stats[STAT_VIEWHEIGHT]);
+			Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, clstatsviewheight);
 		}
 		Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
 		Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
 		Matrix4x4_Copy(&viewmodelmatrix_withbob, &viewmodelmatrix_nobob);
+
+		VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
+		VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
+
+		Matrix4x4_Invert_Simple(&tmpmatrix, &r_refdef.view.matrix);
+		Matrix4x4_CreateScale(&cl.csqc_viewmodelmatrixfromengine, cl_viewmodel_scale.value);
 	}
 	else
 	{
@@ -504,7 +550,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 
 		// apply the viewofs (even if chasecam is used)
 		// Samual: Lets add smoothing for this too so that things like crouching are done with a transition.
-		viewheight = bound(0, (cl.time - cl.oldtime) / max(0.0001, cl_smoothviewheight.value), 1);
+		viewheight = bound(0, (cl.time - cl.calcrefdef_prevtime) / max(0.0001, cl_smoothviewheight.value), 1);
 		viewheightavg = viewheightavg * (1 - viewheight) + clstatsviewheight * viewheight;
 		vieworg[2] += viewheightavg;
 
@@ -596,10 +642,10 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 		{
 			// first person view from entity
 			// angles
-			if (cl.stats[STAT_HEALTH] <= 0 && v_deathtilt.integer)
+			if (cldead && v_deathtilt.integer)
 				viewangles[ROLL] = v_deathtiltangle.value;
 			VectorAdd(viewangles, cl.punchangle, viewangles);
-			viewangles[ROLL] += V_CalcRoll(cl.viewangles, cl.velocity);
+			viewangles[ROLL] += V_CalcRoll(clviewangles, clvelocity);
 			if (v_dmg_time > 0)
 			{
 				viewangles[ROLL] += v_dmg_time/v_kicktime.value*v_dmg_roll;
@@ -607,14 +653,13 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 			}
 			// origin
 			VectorAdd(vieworg, cl.punchvector, vieworg);
-			if (cl.stats[STAT_HEALTH] > 0)
+			if (!cldead)
 			{
 				double xyspeed, bob, bobfall;
 				float cycle;
 				vec_t frametime;
 
-				//frametime = cl.realframetime * cl.movevars_timescale;
-				frametime = (cl.time - cl.oldtime) * cl.movevars_timescale;
+				frametime = (cl.time - cl.calcrefdef_prevtime) * cl.movevars_timescale;
 
 				// 1. if we teleported, clear the frametime... the lowpass will recover the previous value then
 				if(teleported)
@@ -662,7 +707,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				VectorAdd(viewangles, gunangles, gunangles);
 
 				// bounded XY speed, used by several effects below
-				xyspeed = bound (0, sqrt(cl.velocity[0]*cl.velocity[0] + cl.velocity[1]*cl.velocity[1]), 400);
+				xyspeed = bound (0, sqrt(clvelocity[0]*clvelocity[0] + clvelocity[1]*clvelocity[1]), 400);
 
 				// vertical view bobbing code
 				if (cl_bob.value && cl_bobcycle.value)
@@ -719,8 +764,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 					// calculate the front and side of the player between the X and Y axes
 					AngleVectors(viewangles, forward, right, up);
 					// now get the speed based on those angles. The bounds should match the same value as xyspeed's
-					side = bound(-400, DotProduct (cl.velocity, right) * cl.bob2_smooth, 400);
-					front = bound(-400, DotProduct (cl.velocity, forward) * cl.bob2_smooth, 400);
+					side = bound(-400, DotProduct (clvelocity, right) * cl.bob2_smooth, 400);
+					front = bound(-400, DotProduct (clvelocity, forward) * cl.bob2_smooth, 400);
 					VectorScale(forward, bob, forward);
 					VectorScale(right, bob, right);
 					// we use side with forward and front with right, so the bobbing goes
@@ -742,8 +787,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				{
 					if (!clonground)
 					{
-						cl.bobfall_speed = bound(-400, cl.velocity[2], 0) * bound(0, cl_bobfall.value, 0.1);
-						if (cl.velocity[2] < -cl_bobfallminspeed.value)
+						cl.bobfall_speed = bound(-400, clvelocity[2], 0) * bound(0, cl_bobfall.value, 0.1);
+						if (clvelocity[2] < -cl_bobfallminspeed.value)
 							cl.bobfall_swing = 1;
 						else
 							cl.bobfall_swing = 0; // TODO really?
@@ -821,18 +866,22 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 		Matrix4x4_Invert_Simple(&tmpmatrix, &r_refdef.view.matrix);
 		Matrix4x4_Concat(&cl.csqc_viewmodelmatrixfromengine, &tmpmatrix, &viewmodelmatrix_withbob);
 	}
+
+	cl.calcrefdef_prevtime = cl.time;
 }
 
 void V_CalcRefdef (void)
 {
 	entity_t *ent;
+	qboolean cldead;
 
-	if (cls.state == ca_connected && cls.signon == SIGNONS && !cl.csqc_server2csqcentitynumber[cl.playerentity])
+	if (cls.state == ca_connected && cls.signon == SIGNONS && !cl.csqc_server2csqcentitynumber[cl.viewentity])
 	{
 		// ent is the view entity (visible when out of body)
 		ent = &cl.entities[cl.viewentity];
 
-		V_CalcRefdefUsing(&ent->render.matrix, cl.viewangles, !ent->persistent.trail_allowed, cl.onground, cl.cmd.jump, cl.stats[STAT_VIEWHEIGHT]); // FIXME use a better way to detect teleport/warp than trail_allowed
+		cldead = (cl.stats[STAT_HEALTH] <= 0 && cl.stats[STAT_HEALTH] != -666 && cl.stats[STAT_HEALTH] != -2342);
+		V_CalcRefdefUsing(&ent->render.matrix, cl.viewangles, !ent->persistent.trail_allowed, cl.onground, cl.cmd.jump, cl.stats[STAT_VIEWHEIGHT], cldead, cl.intermission, cl.velocity); // FIXME use a better way to detect teleport/warp than trail_allowed
 	}
 	else
 	{

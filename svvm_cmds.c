@@ -33,9 +33,11 @@ const char *vm_sv_extensions =
 "DP_CSQC_ROTATEMOVES "
 "DP_CSQC_SETPAUSE "
 "DP_CSQC_V_CALCREFDEF_WIP1 "
+"DP_CSQC_V_CALCREFDEF_WIP2 "
 "DP_EF_ADDITIVE "
 "DP_EF_BLUE "
 "DP_EF_DOUBLESIDED "
+"DP_EF_DYNAMICMODELLIGHT "
 "DP_EF_FLAME "
 "DP_EF_FULLBRIGHT "
 "DP_EF_NODEPTHTEST "
@@ -2910,7 +2912,7 @@ static void VM_SV_skel_build(prvm_prog_t *prog)
 		Matrix4x4_Accumulate(&blendedmatrix, &skeleton->relativetransforms[bonenum], retainfrac);
 		for (blendindex = 0;blendindex < numblends;blendindex++)
 		{
-			Matrix4x4_FromBonePose6s(&matrix, model->num_posescale, model->data_poses6s + 6 * (frameblend[blendindex].subframe * model->num_bones + bonenum));
+			Matrix4x4_FromBonePose7s(&matrix, model->num_posescale, model->data_poses7s + 7 * (frameblend[blendindex].subframe * model->num_bones + bonenum));
 			Matrix4x4_Accumulate(&blendedmatrix, &matrix, frameblend[blendindex].lerp);
 		}
 		skeleton->relativetransforms[bonenum] = blendedmatrix;
