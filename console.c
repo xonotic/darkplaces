@@ -590,7 +590,8 @@ void Con_ClearNotify (void)
 {
 	int i;
 	for(i = 0; i < CON_LINES_COUNT; ++i)
-		CON_LINES(i).mask |= CON_MASK_HIDENOTIFY;
+		if(!(CON_LINES(i).mask & CON_MASK_CHAT))
+			CON_LINES(i).mask |= CON_MASK_HIDENOTIFY;
 }
 
 
@@ -2079,11 +2080,10 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 					lumplen = LittleLong(header->lumps[Q2LUMP_ENTITIES].filelen);
 				}
 			}
-			else if((p = BuffLittleLong(buf)) == BSPVERSION || p == 30)
+			else if((p = BuffLittleLong(buf)) == BSPVERSION || p == 30 || !memcmp(buf, "BSP2", 4))
 			{
-				dheader_t *header = (dheader_t *)buf;
-				lumpofs = LittleLong(header->lumps[LUMP_ENTITIES].fileofs);
-				lumplen = LittleLong(header->lumps[LUMP_ENTITIES].filelen);
+				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
+				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
 			}
 			else
 				p = 0;
@@ -2508,7 +2508,7 @@ static void Nicks_CutMatchesAlphaNumeric(int count)
 	if(Nicks_strcleanlen(Nicks_sanlist[0]) < strlen(tempstr))
 	{
 		// if the clean sanitized one is longer than the current one, use it, it has crap chars which definitely are in there
-		strlcpy(Nicks_sanlist[0], tempstr, sizeof(tempstr));
+		strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
 	}
 }
 
@@ -2564,7 +2564,7 @@ static void Nicks_CutMatchesNoSpaces(int count)
 	if(Nicks_strcleanlen(Nicks_sanlist[0]) < strlen(tempstr))
 	{
 		// if the clean sanitized one is longer than the current one, use it, it has crap chars which definitely are in there
-		strlcpy(Nicks_sanlist[0], tempstr, sizeof(tempstr));
+		strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
 	}
 }
 

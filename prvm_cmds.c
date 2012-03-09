@@ -17,6 +17,7 @@
 #include "mdfour.h"
 
 extern cvar_t prvm_backtraceforwarnings;
+extern dllhandle_t ode_dll;
 
 // LordHavoc: changed this to NOT use a return statement, so that it can be used in functions that must return a value
 void VM_Warning(prvm_prog_t *prog, const char *fmt, ...)
@@ -277,10 +278,14 @@ static qboolean checkextension(prvm_prog_t *prog, const char *name)
 			// special sheck for ODE
 			if (!strncasecmp("DP_PHYSICS_ODE", name, 14))
 			{
-#ifdef USEODE
+#ifdef ODE_DYNAMIC
 				return ode_dll ? true : false;
 #else
+#ifdef ODE_STATIC
+				return true;
+#else
 				return false;
+#endif
 #endif
 			}
 
@@ -5896,7 +5901,7 @@ out1:
 out2:
 		handle->postdata = NULL;
 		handle->postlen = 0;
-		ret = Curl_Begin_ToMemory(url, 0, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
+		ret = Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, NULL, NULL, 0, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
 	}
 	if(ret)
 	{

@@ -30,6 +30,7 @@
 #include "image.h"
 #include "image_png.h"
 
+
 static void				(*qpng_set_sig_bytes)		(void*, int);
 static int				(*qpng_sig_cmp)				(const unsigned char*, size_t, size_t);
 static void*			(*qpng_create_read_struct)	(const char*, void*, void(*)(void *png, const char *message), void(*)(void *png, const char *message));
@@ -63,6 +64,18 @@ static unsigned int			(*qpng_access_version_number)		(void); // FIXME is this re
 static void				(*qpng_write_info)			(void*, void*);
 static void				(*qpng_write_row)			(void*, unsigned char*);
 static void				(*qpng_write_end)			(void*, void*);
+
+// libpng 1.4+ longjmp hack
+typedef void (*qpng_longjmp_ptr) (jmp_buf, int);
+static jmp_buf* (*qpng_set_longjmp_fn) (void *, qpng_longjmp_ptr, size_t);
+#define qpng_jmpbuf_14(png_ptr) (*qpng_set_longjmp_fn((png_ptr), longjmp, sizeof (jmp_buf)))
+
+// libpng 1.2 longjmp hack
+#define qpng_jmpbuf_12(png_ptr) (*((jmp_buf *) png_ptr))
+
+// all version support
+#define qpng_jmpbuf(png_ptr) \
+	(qpng_set_longjmp_fn ? qpng_jmpbuf_14(png_ptr) : qpng_jmpbuf_12(png_ptr))
 
 static dllfunction_t pngfuncs[] =
 {
@@ -101,9 +114,15 @@ static dllfunction_t pngfuncs[] =
 	{"png_write_end",			(void **) &qpng_write_end},
 	{NULL, NULL}
 };
+static dllfunction_t png14funcs[] =
+{
+	{"png_set_longjmp_fn",		(void **) &qpng_set_longjmp_fn},
+	{NULL, NULL}
+};
 
 // Handle for PNG DLL
 dllhandle_t png_dll = NULL;
+dllhandle_t png14_dll = NULL;
 
 
 /*
@@ -126,13 +145,17 @@ qboolean PNG_OpenLibrary (void)
 	const char* dllnames [] =
 	{
 #if WIN32
+		"libpng15-15.dll",
+		"libpng15.dll",
 		"libpng14-14.dll",
 		"libpng14.dll",
 		"libpng12.dll",
 #elif defined(MACOSX)
+		"libpng15.15.dylib",
 		"libpng14.14.dylib",
 		"libpng12.0.dylib",
 #else
+		"libpng15.so.15", // WTF libtool guidelines anyone?
 		"libpng14.so.14", // WTF libtool guidelines anyone?
 		"libpng12.so.0",
 		"libpng.so", // FreeBSD
@@ -145,7 +168,15 @@ qboolean PNG_OpenLibrary (void)
 		return true;
 
 	// Load the DLL
-	return Sys_LoadLibrary (dllnames, &png_dll, pngfuncs);
+	if(!Sys_LoadLibrary (dllnames, &png_dll, pngfuncs))
+		return false;
+	if(qpng_access_version_number() / 100 >= 104)
+		if(!Sys_LoadLibrary (dllnames, &png14_dll, png14funcs))
+		{
+			Sys_UnloadLibrary (&png_dll);
+			return false;
+		}
+	return true;
 }
 
 
@@ -158,6 +189,7 @@ Unload the PNG DLL
 */
 void PNG_CloseLibrary (void)
 {
+	Sys_UnloadLibrary (&png14_dll);
 	Sys_UnloadLibrary (&png_dll);
 }
 
@@ -171,6 +203,7 @@ void PNG_CloseLibrary (void)
 
 #define PNG_LIBPNG_VER_STRING_12 "1.2.4"
 #define PNG_LIBPNG_VER_STRING_14 "1.4.0"
+#define PNG_LIBPNG_VER_STRING_15 "1.5.0"
 
 #define PNG_COLOR_MASK_PALETTE    1
 #define PNG_COLOR_MASK_COLOR      2
@@ -273,7 +306,9 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 	if(qpng_sig_cmp(raw, 0, filesize))
 		return NULL;
 	png = (void *)qpng_create_read_struct(
-		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 : PNG_LIBPNG_VER_STRING_14, // nasty hack to support both libpng12 and libpng14
+		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
+		(qpng_access_version_number() / 100 == 104) ? PNG_LIBPNG_VER_STRING_14 :
+		PNG_LIBPNG_VER_STRING_15, // nasty hack... whatever
 		0, PNG_error_fn, PNG_warning_fn
 	);
 	if(!png)
@@ -285,17 +320,7 @@ unsigned char *PNG_LoadImage_BGRA (const unsigned char *raw, int filesize, int *
 
 	// NOTE: this relies on jmp_buf being the first thing in the png structure
 	// created by libpng! (this is correct for libpng 1.2.x)
-#ifdef __cplusplus
-#ifdef WIN64
-	if (setjmp((_JBTYPE *)png))
-#elif defined(MACOSX) || defined(WIN32)
-	if (setjmp((int *)png))
-#else
-	if (setjmp((__jmp_buf_tag *)png))
-#endif
-#else
-	if (setjmp(png))
-#endif
+	if (setjmp(qpng_jmpbuf(png)))
 	{
 		if (my_png.Data)
 			Mem_Free(my_png.Data);

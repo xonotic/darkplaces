@@ -2008,15 +2008,10 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		host_client->fixangle_angles_set = FALSE;
 	}
 
-	// stuff the sigil bits into the high bits of items for sbar, or else
-	// mix in items2
-	// LordHavoc: detecting items2 turned out to be tricky, check if the field
-	// was forcefully declared, we want to override serverflags if it was
-	// declared by the qc intentionally, but not if we added it in the engine.
-	if (prog->fieldoffsets.items2 < (int)(prog->numfielddefs - SV_REQGLOBALS))
-		items = (int)PRVM_serveredictfloat(ent, items) | ((int)PRVM_serveredictfloat(ent, items2) << 23);
-	else
-		items = (int)PRVM_serveredictfloat(ent, items) | ((int)PRVM_serverglobalfloat(serverflags) << 28);
+	// the runes are in serverflags, pack them into the items value, also pack
+	// in the items2 value for mission pack huds
+	// (used only in the mission packs, which do not use serverflags)
+	items = (int)PRVM_serveredictfloat(ent, items) | ((int)PRVM_serveredictfloat(ent, items2) << 23) | ((int)PRVM_serverglobalfloat(serverflags) << 28);
 
 	VectorCopy(PRVM_serveredictvector(ent, punchvector), punchvector);
 
@@ -3904,10 +3899,10 @@ static int SV_ThreadFunc(void *voiddata)
 				if(host_client->spawned)
 					if(host_client->netconnection)
 						playing = true;
-		if(!playing)
+		if(sv.time < 10)
 		{
-			// Nobody is looking? Then we won't do timing...
-			// Instead, reset it to zero
+			// don't accumulate time for the first 10 seconds of a match
+			// so things can settle
 			svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = 0;
 		}
 		else if(svs.perf_acc_realtime > 5)
@@ -3921,7 +3916,8 @@ static int SV_ThreadFunc(void *voiddata)
 				svs.perf_offset_sdev = sqrt(svs.perf_acc_offset_squared / svs.perf_acc_offset_samples - svs.perf_offset_avg * svs.perf_offset_avg);
 			}
 			if(svs.perf_lost > 0 && developer_extra.integer)
-				Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
+				if(playing)
+					Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
 			svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = 0;
 		}
 

@@ -203,11 +203,16 @@ void VectorVectors(const vec3_t forward, vec3_t right, vec3_t up)
 	right[0] = forward[2];
 	right[1] = -forward[0];
 	right[2] = forward[1];
+	// BUG!
+	//   assume forward = {sqrt(1/3), sqrt(1/3), -sqrt(1/3)}
+	//   then right will be {-sqrt(1/3), -sqrt(1/3), sqrt(1/3)}
+	//   PROBLEM?
 
 	d = DotProduct(forward, right);
 	VectorMA(right, -d, forward, right);
 	VectorNormalize(right);
 	CrossProduct(right, forward, up);
+	VectorNormalize(up); // CrossProduct in this case returns 'up thats length is not 1
 }
 
 void VectorVectorsDouble(const double *forward, double *right, double *up)

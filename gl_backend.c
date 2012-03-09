@@ -2630,7 +2630,7 @@ static qboolean GL_Backend_CompileShader(int programobject, GLenum shadertypeenu
 	qglCompileShader(shaderobject);CHECKGLERROR
 	qglGetShaderiv(shaderobject, GL_COMPILE_STATUS, &shadercompiled);CHECKGLERROR
 	qglGetShaderInfoLog(shaderobject, sizeof(compilelog), NULL, compilelog);CHECKGLERROR
-	if (compilelog[0] && (strstr(compilelog, "error") || strstr(compilelog, "ERROR") || strstr(compilelog, "Error") || strstr(compilelog, "WARNING") || strstr(compilelog, "warning") || strstr(compilelog, "Warning") || developer_extra.integer))
+	if (compilelog[0] && ((strstr(compilelog, "error") || strstr(compilelog, "ERROR") || strstr(compilelog, "Error")) || ((strstr(compilelog, "WARNING") || strstr(compilelog, "warning") || strstr(compilelog, "Warning")) && developer.integer) || developer_extra.integer))
 	{
 		int i, j, pretextlines = 0;
 		for (i = 0;i < numstrings - 1;i++)

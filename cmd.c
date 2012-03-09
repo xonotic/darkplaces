@@ -177,8 +177,8 @@ static sizebuf_t	cmd_text;
 static unsigned char		cmd_text_buf[CMDBUFSIZE];
 void *cmd_text_mutex = NULL;
 
-#define Cbuf_LockThreadMutex() (cmd_text_mutex ? Thread_LockMutex(cmd_text_mutex),1 : 0)
-#define Cbuf_UnlockThreadMutex() (cmd_text_mutex ? Thread_UnlockMutex(cmd_text_mutex),1 : 0)
+#define Cbuf_LockThreadMutex() (void)(cmd_text_mutex ? Thread_LockMutex(cmd_text_mutex) : 0)
+#define Cbuf_UnlockThreadMutex() (void)(cmd_text_mutex ? Thread_UnlockMutex(cmd_text_mutex) : 0)
 
 /*
 ============
@@ -463,7 +463,8 @@ static void Cmd_StuffCmds_f (void)
 static void Cmd_Exec(const char *filename)
 {
 	char *f;
-	qboolean isdefaultcfg = strlen(filename) >= 11 && !strcmp(filename + strlen(filename) - 11, "default.cfg");
+	size_t filenameLen = strlen(filename);
+	qboolean isdefaultcfg = filenameLen >= 11 && !strcmp(filename + filenameLen - 11, "default.cfg");
 
 	if (!strcmp(filename, "config.cfg"))
 	{

@@ -667,6 +667,7 @@ void Host_Main(void)
 	double wait;
 	int pass1, pass2, pass3, i;
 	char vabuf[1024];
+	qboolean playing;
 
 	Host_Init();
 
@@ -706,14 +707,15 @@ void Host_Main(void)
 			svs.perf_acc_realtime += deltacleantime;
 
 			// Look for clients who have spawned
+			playing = false;
 			for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
 				if(host_client->spawned)
 					if(host_client->netconnection)
-						break;
-			if(i == svs.maxclients)
+						playing = true;
+			if(sv.time < 10)
 			{
-				// Nobody is looking? Then we won't do timing...
-				// Instead, reset it to zero
+				// don't accumulate time for the first 10 seconds of a match
+				// so things can settle
 				svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = 0;
 			}
 			else if(svs.perf_acc_realtime > 5)
@@ -727,7 +729,8 @@ void Host_Main(void)
 					svs.perf_offset_sdev = sqrt(svs.perf_acc_offset_squared / svs.perf_acc_offset_samples - svs.perf_offset_avg * svs.perf_offset_avg);
 				}
 				if(svs.perf_lost > 0 && developer_extra.integer)
-					Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
+					if(playing) // only complain if anyone is looking
+						Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
 				svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = 0;
 			}
 		}
@@ -1342,7 +1345,7 @@ static void Host_Init (void)
 
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText("togglemenu\n");
+		Cbuf_AddText("togglemenu 1\n");
 		Cbuf_Execute();
 	}
 
