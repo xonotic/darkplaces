@@ -1463,6 +1463,16 @@ Key_Message (int key, int unicode)
 			return;
 		}
 
+		if (key == 'q' && keydown[K_CTRL]) // like zsh ^q: push line to history, don't execute, and clear
+		{
+			// clear line
+			MsgKey_History_Push();
+			// key_dest = key_game; //but don't close input, ESC does that
+			chat_bufferpos = 0;
+			chat_buffer[0] = 0;
+			return;
+		}
+
 		if (key == K_ENTER || unicode == /* LF */ 10 || unicode == /* CR */ 13)
 		{
 			if(chat_mode < 0)
@@ -1480,6 +1490,7 @@ Key_Message (int key, int unicode)
 		}
 
 		if (key == K_ESCAPE) {
+			MsgKey_History_Push();
 			key_dest = key_game;
 			chat_bufferpos = 0;
 			chat_buffer[0] = 0;
