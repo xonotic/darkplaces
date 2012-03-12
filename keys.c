@@ -1442,10 +1442,13 @@ static void
 Key_Message (int key, int unicode)
 {
 	// nyov: adopted Key_Console style here, so both functions could merge common code at some point.
-	//       chat has CTRL for special chars, console functions need to use CTRL+ALT here
+	//       modifed chat to use CTRL+ALT for special characters (so we can use CTRL modifier like in console)
 	char vabuf[1024];
 
-	if (key == 'l' && keydown[K_CTRL] && keydown[K_ALT]) // no screen to clear, clear line like ctrl+u
+	if (!keydown[K_ALT])
+	{
+
+	if (key == 'l' && keydown[K_CTRL]) // no screen to clear, clear line like ctrl+u
 	{
 		// clear line
 		chat_bufferpos = 0;
@@ -1453,7 +1456,7 @@ Key_Message (int key, int unicode)
 		return;
 	}
 
-	if (key == 'u' && keydown[K_CTRL] && keydown[K_ALT]) // like vi/readline ^u: delete currently edited line
+	if (key == 'u' && keydown[K_CTRL]) // like vi/readline ^u: delete currently edited line
 	{
 		// clear line
 		chat_bufferpos = 0;
@@ -1573,7 +1576,7 @@ Key_Message (int key, int unicode)
 	}
 
 	// delete char before cursor
-	if (key == K_BACKSPACE || (key == 'h' && keydown[K_CTRL] && keydown[K_ALT]))
+	if (key == K_BACKSPACE || (key == 'h' && keydown[K_CTRL]))
 	{
 		if (chat_bufferpos > 0)
 		{
@@ -1595,7 +1598,7 @@ Key_Message (int key, int unicode)
 	}
 
 	// delete char on cursor and terminate rest of line
-	if (key == 'k' && keydown[K_CTRL]  && keydown[K_ALT])
+	if (key == 'k' && keydown[K_CTRL])
 	{
 		chat_buffer[chat_bufferpos] = 0;
 		return;
@@ -1694,19 +1697,19 @@ Key_Message (int key, int unicode)
 
 	// End Advanced Console Editing
 
-	if (key == K_UPARROW || key == K_KP_UPARROW || (key == 'p' && keydown[K_CTRL] && keydown[K_ALT]))
+	if (key == K_UPARROW || key == K_KP_UPARROW || (key == 'p' && keydown[K_CTRL]))
 	{
 		MsgKey_History_Up();
 		return;
 	}
 
-	if (key == K_DOWNARROW || key == K_KP_DOWNARROW || (key == 'n' && keydown[K_CTRL] && keydown[K_ALT]))
+	if (key == K_DOWNARROW || key == K_KP_DOWNARROW || (key == 'n' && keydown[K_CTRL]))
 	{
 		MsgKey_History_Down();
 		return;
 	}
 
-	if (keydown[K_CTRL]  && keydown[K_ALT])
+	if (keydown[K_CTRL])
 	{
 		// prints all the matching commands
 		if (key == 'f')
@@ -1738,22 +1741,25 @@ Key_Message (int key, int unicode)
 		}
 	}
 
-	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL] && keydown[K_ALT]))
+	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL]))
 	{
 		// TODO +CTRL for MsgKey_History_Top() or something
 		chat_bufferpos = 0;
 		return;
 	}
 
-	if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL] && keydown[K_ALT]))
+	if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL]))
 	{
 		// TODO +CTRL for MsgKey_History_Bottom() or something
 		chat_bufferpos = (int)strlen(chat_buffer);
 		return;
 	}
 
+	}
+
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
-	if (unicode > 0 && unicode < 32 && utf8_enable.integer)
+	// nyov: modified to only work as ctrl+alt+key
+	if (unicode > 0 && unicode < 32 && utf8_enable.integer && keydown[K_ALT])
 		unicode = 0xE000 + unicode;
 
 	if (!unicode || unicode < 32)
