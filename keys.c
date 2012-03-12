@@ -1742,15 +1742,19 @@ Key_Message (int key, int unicode)
 
 		if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL]))
 		{
-			// TODO +CTRL for MsgKey_History_Top() or something
-			chat_bufferpos = 0;
+			if (keydown[K_CTRL])
+				MsgKey_History_First();
+			else
+				chat_bufferpos = 0;
 			return;
 		}
 
 		if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL]))
 		{
-			// TODO +CTRL for MsgKey_History_Bottom() or something
-			chat_bufferpos = (int)strlen(chat_buffer);
+			if (keydown[K_CTRL])
+				MsgKey_History_Last();
+			else
+				chat_bufferpos = (int)strlen(chat_buffer);
 			return;
 		}
 	}
