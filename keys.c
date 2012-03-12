@@ -44,20 +44,20 @@ char		history_searchstring[MAX_INPUTLINE];
 qboolean	history_matchfound = false;
 conbuffer_t history;
 
-int		msghistory_line;
-char		msghistory_savedline[MAX_INPUTLINE];
-char		msghistory_searchstring[MAX_INPUTLINE];
-qboolean	msghistory_matchfound = false;
-conbuffer_t	msghistory;
+int		chathistory_line;
+char		chathistory_savedline[MAX_INPUTLINE];
+char		chathistory_searchstring[MAX_INPUTLINE];
+qboolean	chathistory_matchfound = false;
+conbuffer_t	chathistory;
 
 extern cvar_t	con_textsize;
 
 
 static void Key_History_Init(void)
 {
-	qfile_t *historyfile;
 	ConBuffer_Init(&history, HIST_TEXTSIZE, HIST_MAXLINES, zonemempool);
 
+	qfile_t *historyfile;
 	historyfile = FS_OpenRealFile("darkplaces_history.txt", "rb", false); // rb to handle unix line endings on windows too
 	if(historyfile)
 	{
@@ -93,6 +93,12 @@ static void Key_History_Init(void)
 	history_line = -1;
 }
 
+static void MsgKey_History_Init(void)
+{
+	ConBuffer_Init(&chathistory, CHATHIST_TEXTSIZE, CHATHIST_MAXLINES, zonemempool);
+	chathistory_line = -1;
+}
+
 static void Key_History_Shutdown(void)
 {
 	// TODO write history to a file
@@ -109,6 +115,11 @@ static void Key_History_Shutdown(void)
 	ConBuffer_Shutdown(&history);
 }
 
+static void MsgKey_History_Shutdown(void)
+{
+	ConBuffer_Shutdown(&chathistory);
+}
+
 static void Key_History_Push(void)
 {
 	if(key_line[1]) // empty?
@@ -121,6 +132,15 @@ static void Key_History_Push(void)
 		history_matchfound = false;
 }
 
+static void MsgKey_History_Push(void)
+{
+	if(chat_buffer[0]) // empty?
+		ConBuffer_AddLine(&chathistory, chat_buffer, strlen(chat_buffer), 0);
+	chathistory_line = -1;
+	if (chathistory_matchfound)
+		chathistory_matchfound = false;
+}
+
 static qboolean Key_History_Get_foundCommand(void)
 {
 	if (!history_matchfound)
@@ -128,6 +148,16 @@ static qboolean Key_History_Get_foundCommand(void)
 	strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 	key_linepos = strlen(key_line);
 	history_matchfound = false;
+	return true;
+}
+
+static qboolean MsgKey_History_Get_foundCommand(void)
+{
+	if (!chathistory_matchfound)
+		return false;
+	strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+	chat_bufferpos = strlen(chat_buffer);
+	chathistory_matchfound = false;
 	return true;
 }
 
@@ -156,6 +186,31 @@ static void Key_History_Up(void)
 	}
 }
 
+static void MsgKey_History_Up(void)
+{
+	if(chathistory_line == -1) // editing the "new" line
+		strlcpy(chathistory_savedline, chat_buffer, sizeof(chathistory_savedline));
+
+	if (MsgKey_History_Get_foundCommand())
+		return;
+
+	if(chathistory_line == -1)
+	{
+		chathistory_line = CONBUFFER_LINES_COUNT(&chathistory) - 1;
+		if(chathistory_line != -1)
+		{
+			strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+			chat_bufferpos = strlen(chat_buffer);
+		}
+	}
+	else if(chathistory_line > 0)
+	{
+		--chathistory_line; // this also does -1 -> 0, so it is good
+		strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
+	}
+}
+
 static void Key_History_Down(void)
 {
 	if(history_line == -1) // editing the "new" line
@@ -178,6 +233,28 @@ static void Key_History_Down(void)
 	key_linepos = strlen(key_line);
 }
 
+static void MsgKey_History_Down(void)
+{
+	if(chathistory_line == -1) // editing the "new" line
+		return;
+
+	if (MsgKey_History_Get_foundCommand())
+		return;
+
+	if(chathistory_line < CONBUFFER_LINES_COUNT(&chathistory) - 1)
+	{
+		++chathistory_line;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+	}
+	else
+	{
+		chathistory_line = -1;
+		strlcpy(chat_buffer, chathistory_savedline, sizeof(chat_buffer));
+	}
+
+	chat_bufferpos = strlen(chat_buffer);
+}
+
 static void Key_History_First(void)
 {
 	if(history_line == -1) // editing the "new" line
@@ -188,6 +265,19 @@ static void Key_History_First(void)
 		history_line = 0;
 		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 		key_linepos = strlen(key_line);
+	}
+}
+
+static void MsgKey_History_First(void)
+{
+	if(chathistory_line == -1) // editing the "new" line
+		strlcpy(chathistory_savedline, chat_buffer, sizeof(chathistory_savedline));
+
+	if (CONBUFFER_LINES_COUNT(&chathistory) > 0)
+	{
+		chathistory_line = 0;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
 	}
 }
 
@@ -204,6 +294,18 @@ static void Key_History_Last(void)
 	}
 }
 
+static void MsgKey_History_Last(void)
+{
+	if(chathistory_line == -1) // editing the "new" line
+		strlcpy(chathistory_savedline, chat_buffer, sizeof(chathistory_savedline));
+
+	if (CONBUFFER_LINES_COUNT(&chathistory) > 0)
+	{
+		chathistory_line = CONBUFFER_LINES_COUNT(&chathistory) - 1;
+		strlcpy(chat_buffer, ConBuffer_GetLine(&chathistory, chathistory_line), sizeof(chat_buffer));
+		chat_bufferpos = strlen(chat_buffer);
+	}
+}
 static void Key_History_Find_Backwards(void)
 {
 	int i;
@@ -319,111 +421,6 @@ static void Key_History_f(void)
 	Con_Printf("\n");
 }
 
-// nyov: chat buffer history
-// (almost copy of history buffer functions, should merge them)
-static void MsgKey_History_Init(void)
-{
-	ConBuffer_Init(&msghistory, CHATHIST_TEXTSIZE, CHATHIST_MAXLINES, zonemempool);
-	msghistory_line = -1;
-}
-
-static void MsgKey_History_Shutdown(void)
-{
-	ConBuffer_Shutdown(&msghistory);
-}
-
-static void MsgKey_History_Push(void)
-{
-	if(chat_buffer[0]) // empty?
-		ConBuffer_AddLine(&msghistory, chat_buffer, strlen(chat_buffer), 0);
-	msghistory_line = -1;
-	if (msghistory_matchfound)
-		msghistory_matchfound = false;
-}
-
-static qboolean MsgKey_History_Get_foundCommand(void)
-{
-	if (!msghistory_matchfound)
-		return false;
-	strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-	chat_bufferpos = strlen(chat_buffer);
-	msghistory_matchfound = false;
-	return true;
-}
-
-static void MsgKey_History_Up(void)
-{
-	if(msghistory_line == -1) // editing the "new" line
-		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
-
-	if (MsgKey_History_Get_foundCommand())
-		return;
-
-	if(msghistory_line == -1)
-	{
-		msghistory_line = CONBUFFER_LINES_COUNT(&msghistory) - 1;
-		if(msghistory_line != -1)
-		{
-			strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-			chat_bufferpos = strlen(chat_buffer);
-		}
-	}
-	else if(msghistory_line > 0)
-	{
-		--msghistory_line; // this also does -1 -> 0, so it is good
-		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-		chat_bufferpos = strlen(chat_buffer);
-	}
-}
-
-static void MsgKey_History_Down(void)
-{
-	if(msghistory_line == -1) // editing the "new" line
-		return;
-
-	if (MsgKey_History_Get_foundCommand())
-		return;
-
-	if(msghistory_line < CONBUFFER_LINES_COUNT(&msghistory) - 1)
-	{
-		++msghistory_line;
-		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-	}
-	else
-	{
-		msghistory_line = -1;
-		strlcpy(chat_buffer, msghistory_savedline, sizeof(chat_buffer));
-	}
-
-	chat_bufferpos = strlen(chat_buffer);
-}
-
-static void MsgKey_History_First(void)
-{
-	if(msghistory_line == -1) // editing the "new" line
-		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
-
-	if (CONBUFFER_LINES_COUNT(&msghistory) > 0)
-	{
-		msghistory_line = 0;
-		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-		chat_bufferpos = strlen(chat_buffer);
-	}
-}
-
-static void MsgKey_History_Last(void)
-{
-	if(msghistory_line == -1) // editing the "new" line
-		strlcpy(msghistory_savedline, chat_buffer, sizeof(msghistory_savedline));
-
-	if (CONBUFFER_LINES_COUNT(&msghistory) > 0)
-	{
-		msghistory_line = CONBUFFER_LINES_COUNT(&msghistory) - 1;
-		strlcpy(chat_buffer, ConBuffer_GetLine(&msghistory, msghistory_line), sizeof(chat_buffer));
-		chat_bufferpos = strlen(chat_buffer);
-	}
-}
-// end chat buffer history
 
 static int	key_bmap, key_bmap2;
 static unsigned char keydown[MAX_KEYS];	// 0 = up, 1 = down, 2 = repeating
@@ -1341,7 +1338,11 @@ Key_Console (int key, int unicode)
 	}
 }
 
-//============================================================================
+/*
+====================
+Interactive chat line editing and scrollback history
+====================
+*/
 
 int chat_mode;
 char		chat_buffer[MAX_INPUTLINE];
@@ -1633,7 +1634,7 @@ Key_Message (int key, int unicode)
 	if (unicode > 0 && unicode < 32 && utf8_enable.integer)
 		unicode = 0xE000 + unicode;
 
-	if (!unicode)
+	if (!unicode || unicode < 32)
 		return;							// non printable
 
 	if (chat_bufferpos < sizeof (chat_buffer) - 1)
