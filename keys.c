@@ -1447,89 +1447,178 @@ Key_Message (int key, int unicode)
 
 	if (!keydown[K_ALT])
 	{
-
-	if (key == 'l' && keydown[K_CTRL]) // no screen to clear, clear line like ctrl+u
-	{
-		// clear line
-		chat_bufferpos = 0;
-		chat_buffer[0] = 0;
-		return;
-	}
-
-	if (key == 'u' && keydown[K_CTRL]) // like vi/readline ^u: delete currently edited line
-	{
-		// clear line
-		chat_bufferpos = 0;
-		chat_buffer[0] = 0;
-		return;
-	}
-
-	if (key == K_ENTER || unicode == /* LF */ 10 || unicode == /* CR */ 13)
-	{
-		if(chat_mode < 0)
-			Cmd_ExecuteString(chat_buffer, src_command, true); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
-		else
+		if (key == 'l' && keydown[K_CTRL]) // no screen to clear, clear line like ctrl+u
 		{
-			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
-			MsgKey_History_Push();
+			// clear line
+			chat_bufferpos = 0;
+			chat_buffer[0] = 0;
+			return;
 		}
 
-		key_dest = key_game;
-		chat_bufferpos = 0;
-		chat_buffer[0] = 0;
-		return;
-	}
-
-	if (key == K_ESCAPE) {
-		key_dest = key_game;
-		chat_bufferpos = 0;
-		chat_buffer[0] = 0;
-		return;
-	}
-
-	if(key == K_TAB) {
-		chat_bufferpos = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferpos);
-		return;
-	}
-
-	// Advanced Console Editing by Radix radix@planetquake.com
-	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
-	// Enhanced by [515]
-	// Enhanced by terencehill
-	// Adapted for chat by nyov
-
-	// move cursor to the previous character
-	if (key == K_LEFTARROW /*|| key == K_KP_LEFTARROW*/ || key == K_MWHEELUP)
-	{
-		if(chat_bufferpos < 1)
-			return;
-		if(keydown[K_CTRL]) // move cursor to the previous word
+		if (key == 'u' && keydown[K_CTRL]) // like vi/readline ^u: delete currently edited line
 		{
-			int	pos;
-			char	k;
-			pos = chat_bufferpos-1;
+			// clear line
+			chat_bufferpos = 0;
+			chat_buffer[0] = 0;
+			return;
+		}
 
-			if(pos) // skip all "; ' after the word
-				while(--pos)
+		if (key == K_ENTER || unicode == /* LF */ 10 || unicode == /* CR */ 13)
+		{
+			if(chat_mode < 0)
+				Cmd_ExecuteString(chat_buffer, src_command, true); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
+			else
+			{
+				Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
+				MsgKey_History_Push();
+			}
+
+			key_dest = key_game;
+			chat_bufferpos = 0;
+			chat_buffer[0] = 0;
+			return;
+		}
+
+		if (key == K_ESCAPE) {
+			key_dest = key_game;
+			chat_bufferpos = 0;
+			chat_buffer[0] = 0;
+			return;
+		}
+
+		if(key == K_TAB) {
+			chat_bufferpos = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferpos);
+			return;
+		}
+
+		// Advanced Console Editing by Radix radix@planetquake.com
+		// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
+		// Enhanced by [515]
+		// Enhanced by terencehill
+		// Adapted for chat by nyov
+
+		// move cursor to the previous character
+		if (key == K_LEFTARROW /*|| key == K_KP_LEFTARROW*/ || key == K_MWHEELUP)
+		{
+			if(chat_bufferpos < 1)
+				return;
+			if(keydown[K_CTRL]) // move cursor to the previous word
+			{
+				int	pos;
+				char	k;
+				pos = chat_bufferpos-1;
+
+				if(pos) // skip all "; ' after the word
+					while(--pos)
+					{
+						k = chat_buffer[pos];
+						if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+						{
+							if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+								break;
+						}
+						else
+						{
+							if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+								break;
+						}
+					}
+
+				if(pos)
+					while(--pos)
+					{
+						k = chat_buffer[pos];
+						if (keydown[K_SHIFT])
+						{
+							if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
+								break;
+						}
+						else
+						{
+							if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+								break;
+						}
+					}
+
+				if(pos)
+					chat_bufferpos = pos + 1;
+				else
+					chat_bufferpos = pos;
+			}
+			else if(keydown[K_SHIFT]) // move cursor to the previous character ignoring colors
+			{
+				int	pos;
+				size_t	inchar = 0;
+				pos = u8_prevbyte(chat_buffer, chat_bufferpos);
+				while (pos)
+					if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && isdigit(chat_buffer[pos]))
+						pos-=2;
+					else if(pos-4 > 0 && chat_buffer[pos-4] == STRING_COLOR_TAG && chat_buffer[pos-3] == STRING_COLOR_RGB_TAG_CHAR
+							&& isxdigit(chat_buffer[pos-2]) && isxdigit(chat_buffer[pos-1]) && isxdigit(chat_buffer[pos]))
+						pos-=5;
+					else
+					{
+						if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && chat_buffer[pos] == STRING_COLOR_TAG) // consider ^^ as a character
+							pos--;
+						pos--;
+						break;
+					}
+				// we need to move to the beginning of the character when in a wide character:
+				u8_charidx(chat_buffer, pos + 1, &inchar);
+				chat_bufferpos = pos + 1 - inchar;
+			}
+			else
+			{
+				chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
+			}
+			return;
+		}
+
+		// delete char before cursor
+		if (key == K_BACKSPACE || (key == 'h' && keydown[K_CTRL]))
+		{
+			if (chat_bufferpos > 0)
+			{
+				int newpos = u8_prevbyte(chat_buffer, chat_bufferpos);
+				strlcpy(chat_buffer + newpos, chat_buffer + chat_bufferpos, sizeof(chat_buffer) + 1 - chat_bufferpos);
+				chat_bufferpos = newpos;
+			}
+			return;
+		}
+
+		// delete char on cursor
+		if (key == K_DEL /*|| key == K_KP_DEL*/)
+		{
+			size_t linelen;
+			linelen = strlen(chat_buffer);
+			if (chat_bufferpos < (unsigned int)linelen)
+				memmove(chat_buffer + chat_bufferpos, chat_buffer + chat_bufferpos + u8_bytelen(chat_buffer + chat_bufferpos, 1), linelen - chat_bufferpos);
+			return;
+		}
+
+		// delete char on cursor and terminate rest of line
+		if (key == 'k' && keydown[K_CTRL])
+		{
+			chat_buffer[chat_bufferpos] = 0;
+			return;
+		}
+
+		// move cursor to the next character
+		if (key == K_RIGHTARROW /*|| key == K_KP_RIGHTARROW*/ || key == K_MWHEELDOWN)
+		{
+			if(chat_bufferpos >= (unsigned int)strlen(chat_buffer))
+				return;
+			if(keydown[K_CTRL]) // move cursor to the next word
+			{
+				int		pos, len;
+				char	k;
+				len = (int)strlen(chat_buffer);
+				pos = chat_bufferpos;
+
+				while(++pos < len)
 				{
 					k = chat_buffer[pos];
 					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
-					{
-						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
-							break;
-					}
-					else
-					{
-						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
-							break;
-					}
-				}
-
-			if(pos)
-				while(--pos)
-				{
-					k = chat_buffer[pos];
-					if (keydown[K_SHIFT])
 					{
 						if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
 							break;
@@ -1541,220 +1630,129 @@ Key_Message (int key, int unicode)
 					}
 				}
 
-			if(pos)
-				chat_bufferpos = pos + 1;
-			else
+				if (pos < len) // skip all "; ' after the word
+					while(++pos < len)
+					{
+						k = chat_buffer[pos];
+						if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+						{
+							if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+								break;
+						}
+						else
+						{
+							if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+								break;
+						}
+					}
 				chat_bufferpos = pos;
-		}
-		else if(keydown[K_SHIFT]) // move cursor to the previous character ignoring colors
-		{
-			int	pos;
-			size_t	inchar = 0;
-			pos = u8_prevbyte(chat_buffer, chat_bufferpos);
-			while (pos)
-				if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && isdigit(chat_buffer[pos]))
-					pos-=2;
-				else if(pos-4 > 0 && chat_buffer[pos-4] == STRING_COLOR_TAG && chat_buffer[pos-3] == STRING_COLOR_RGB_TAG_CHAR
-						&& isxdigit(chat_buffer[pos-2]) && isxdigit(chat_buffer[pos-1]) && isxdigit(chat_buffer[pos]))
-					pos-=5;
-				else
-				{
-					if(pos-1 > 0 && chat_buffer[pos-1] == STRING_COLOR_TAG && chat_buffer[pos] == STRING_COLOR_TAG) // consider ^^ as a character
-						pos--;
-					pos--;
-					break;
-				}
-			// we need to move to the beginning of the character when in a wide character:
-			u8_charidx(chat_buffer, pos + 1, &inchar);
-			chat_bufferpos = pos + 1 - inchar;
-		}
-		else
-		{
-			chat_bufferpos = u8_prevbyte(chat_buffer, chat_bufferpos);
-		}
-		return;
-	}
-
-	// delete char before cursor
-	if (key == K_BACKSPACE || (key == 'h' && keydown[K_CTRL]))
-	{
-		if (chat_bufferpos > 0)
-		{
-			int newpos = u8_prevbyte(chat_buffer, chat_bufferpos);
-			strlcpy(chat_buffer + newpos, chat_buffer + chat_bufferpos, sizeof(chat_buffer) + 1 - chat_bufferpos);
-			chat_bufferpos = newpos;
-		}
-		return;
-	}
-
-	// delete char on cursor
-	if (key == K_DEL /*|| key == K_KP_DEL*/)
-	{
-		size_t linelen;
-		linelen = strlen(chat_buffer);
-		if (chat_bufferpos < (unsigned int)linelen)
-			memmove(chat_buffer + chat_bufferpos, chat_buffer + chat_bufferpos + u8_bytelen(chat_buffer + chat_bufferpos, 1), linelen - chat_bufferpos);
-		return;
-	}
-
-	// delete char on cursor and terminate rest of line
-	if (key == 'k' && keydown[K_CTRL])
-	{
-		chat_buffer[chat_bufferpos] = 0;
-		return;
-	}
-
-	// move cursor to the next character
-	if (key == K_RIGHTARROW /*|| key == K_KP_RIGHTARROW*/ || key == K_MWHEELDOWN)
-	{
-		if(chat_bufferpos >= (unsigned int)strlen(chat_buffer))
-			return;
-		if(keydown[K_CTRL]) // move cursor to the next word
-		{
-			int		pos, len;
-			char	k;
-			len = (int)strlen(chat_buffer);
-			pos = chat_bufferpos;
-
-			while(++pos < len)
-			{
-				k = chat_buffer[pos];
-				if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
-				{
-					if(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_')
-						break;
-				}
-				else
-				{
-					if(k == '\"' || k == ';' || k == ' ' || k == '\'')
-						break;
-				}
 			}
+			else if(keydown[K_SHIFT]) // move cursor to the next character ignoring colors
+			{
+				int		pos, len;
+				len = (int)strlen(chat_buffer);
+				pos = chat_bufferpos;
 
-			if (pos < len) // skip all "; ' after the word
-				while(++pos < len)
-				{
-					k = chat_buffer[pos];
-					if (keydown[K_SHIFT]) // nyov: backtracking in very_long_grouped_cvar_strangeness (ctrl+k helps)
+				// go beyond all initial consecutive color tags, if any
+				if(pos < len)
+					while (chat_buffer[pos] == STRING_COLOR_TAG)
 					{
-						if (!(k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '_'))
+						if(isdigit(chat_buffer[pos+1]))
+							pos+=2;
+						else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
+							pos+=5;
+						else
 							break;
 					}
-					else
+
+				// skip the char
+				if (chat_buffer[pos] == STRING_COLOR_TAG && chat_buffer[pos+1] == STRING_COLOR_TAG) // consider ^^ as a character
+					pos++;
+				pos += u8_bytelen(chat_buffer + pos, 1);
+
+				// now go beyond all next consecutive color tags, if any
+				if(pos < len)
+					while (chat_buffer[pos] == STRING_COLOR_TAG)
 					{
-						if (!(k == '\"' || k == ';' || k == ' ' || k == '\''))
+						if(isdigit(chat_buffer[pos+1]))
+							pos+=2;
+						else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
+							pos+=5;
+						else
 							break;
 					}
-				}
-			chat_bufferpos = pos;
-		}
-		else if(keydown[K_SHIFT]) // move cursor to the next character ignoring colors
-		{
-			int		pos, len;
-			len = (int)strlen(chat_buffer);
-			pos = chat_bufferpos;
-
-			// go beyond all initial consecutive color tags, if any
-			if(pos < len)
-				while (chat_buffer[pos] == STRING_COLOR_TAG)
-				{
-					if(isdigit(chat_buffer[pos+1]))
-						pos+=2;
-					else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
-						pos+=5;
-					else
-						break;
-				}
-
-			// skip the char
-			if (chat_buffer[pos] == STRING_COLOR_TAG && chat_buffer[pos+1] == STRING_COLOR_TAG) // consider ^^ as a character
-				pos++;
-			pos += u8_bytelen(chat_buffer + pos, 1);
-
-			// now go beyond all next consecutive color tags, if any
-			if(pos < len)
-				while (chat_buffer[pos] == STRING_COLOR_TAG)
-				{
-					if(isdigit(chat_buffer[pos+1]))
-						pos+=2;
-					else if(chat_buffer[pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(chat_buffer[pos+2]) && isxdigit(chat_buffer[pos+3]) && isxdigit(chat_buffer[pos+4]))
-						pos+=5;
-					else
-						break;
-				}
-			chat_bufferpos = pos;
-		}
-		else
-			chat_bufferpos += u8_bytelen(chat_buffer + chat_bufferpos, 1);
-		return;
-	}
-
-	if (key == K_INS /*|| key == K_KP_INS*/) // toggle insert mode
-	{
-		key_insert ^= 1; // sharing same key_insert state with console here
-		return;
-	}
-
-	// End Advanced Console Editing
-
-	if (key == K_UPARROW || key == K_KP_UPARROW || (key == 'p' && keydown[K_CTRL]))
-	{
-		MsgKey_History_Up();
-		return;
-	}
-
-	if (key == K_DOWNARROW || key == K_KP_DOWNARROW || (key == 'n' && keydown[K_CTRL]))
-	{
-		MsgKey_History_Down();
-		return;
-	}
-
-	if (keydown[K_CTRL])
-	{
-		// prints all the matching commands
-		if (key == 'f')
-		{
-			MsgKey_History_Find_All();
-			return;
-		}
-		// Search forwards/backwards, pointing the history's index to the
-		// matching command but without fetching it to let one continue the search.
-		// To fetch it, it suffices to just press UP or DOWN.
-		if (key == 'r')
-		{
-			if (keydown[K_SHIFT])
-				MsgKey_History_Find_Forwards();
+				chat_bufferpos = pos;
+			}
 			else
-				MsgKey_History_Find_Backwards();
+				chat_bufferpos += u8_bytelen(chat_buffer + chat_bufferpos, 1);
 			return;
 		}
-		// go to the last/first command of the history
-		if (key == ',')
+
+		if (key == K_INS /*|| key == K_KP_INS*/) // toggle insert mode
 		{
-			MsgKey_History_First();
+			key_insert ^= 1; // sharing same key_insert state with console here
 			return;
 		}
-		if (key == '.')
+
+		// End Advanced Console Editing
+
+		if (key == K_UPARROW || key == K_KP_UPARROW || (key == 'p' && keydown[K_CTRL]))
 		{
-			MsgKey_History_Last();
+			MsgKey_History_Up();
 			return;
 		}
-	}
 
-	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL]))
-	{
-		// TODO +CTRL for MsgKey_History_Top() or something
-		chat_bufferpos = 0;
-		return;
-	}
+		if (key == K_DOWNARROW || key == K_KP_DOWNARROW || (key == 'n' && keydown[K_CTRL]))
+		{
+			MsgKey_History_Down();
+			return;
+		}
 
-	if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL]))
-	{
-		// TODO +CTRL for MsgKey_History_Bottom() or something
-		chat_bufferpos = (int)strlen(chat_buffer);
-		return;
-	}
+		if (keydown[K_CTRL])
+		{
+			// prints all the matching commands
+			if (key == 'f')
+			{
+				MsgKey_History_Find_All();
+				return;
+			}
+			// Search forwards/backwards, pointing the history's index to the
+			// matching command but without fetching it to let one continue the search.
+			// To fetch it, it suffices to just press UP or DOWN.
+			if (key == 'r')
+			{
+				if (keydown[K_SHIFT])
+					MsgKey_History_Find_Forwards();
+				else
+					MsgKey_History_Find_Backwards();
+				return;
+			}
+			// go to the last/first command of the history
+			if (key == ',')
+			{
+				MsgKey_History_First();
+				return;
+			}
+			if (key == '.')
+			{
+				MsgKey_History_Last();
+				return;
+			}
+		}
 
+		if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL]))
+		{
+			// TODO +CTRL for MsgKey_History_Top() or something
+			chat_bufferpos = 0;
+			return;
+		}
+
+		if (key == K_END /*|| key == K_KP_END*/ || (key == 'e' && keydown[K_CTRL]))
+		{
+			// TODO +CTRL for MsgKey_History_Bottom() or something
+			chat_bufferpos = (int)strlen(chat_buffer);
+			return;
+		}
 	}
 
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
