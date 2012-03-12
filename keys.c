@@ -306,6 +306,7 @@ static void MsgKey_History_Last(void)
 		chat_bufferpos = strlen(chat_buffer);
 	}
 }
+
 static void Key_History_Find_Backwards(void)
 {
 	int i;
@@ -337,6 +338,41 @@ static void Key_History_Find_Backwards(void)
 			Con_Printf("^2%*i^7 %s\n", (int)digits, i+1, ConBuffer_GetLine(&history, i));
 			history_line = i;
 			history_matchfound = true;
+			return;
+		}
+}
+
+static void MsgKey_History_Find_Backwards(void)
+{
+	int i;
+	const char *partial = chat_buffer;
+	char vabuf[1024];
+	size_t digits = strlen(va(vabuf, sizeof(vabuf), "%i", HIST_MAXLINES));
+
+	if (chathistory_line == -1) // editing the "new" line
+		strlcpy(chathistory_savedline, chat_buffer, sizeof(chathistory_savedline));
+
+	if (strcmp(chat_buffer, chathistory_searchstring)) // different string? Start a new search
+	{
+		strlcpy(chathistory_searchstring, chat_buffer, sizeof(chathistory_searchstring));
+		i = CONBUFFER_LINES_COUNT(&chathistory) - 1;
+	}
+	else if (chathistory_line == -1)
+		i = CONBUFFER_LINES_COUNT(&chathistory) - 1;
+	else
+		i = chathistory_line - 1;
+
+	if (!*partial)
+		partial = "*";
+	else if (!( strchr(partial, '*') || strchr(partial, '?') )) // no pattern?
+		partial = va(vabuf, sizeof(vabuf), "*%s*", partial);
+
+	for ( ; i >= 0; i--)
+		if (matchpattern_with_separator(ConBuffer_GetLine(&chathistory, i), partial, true, "", false))
+		{
+			Con_Printf("^2%*i^7 %s\n", (int)digits, i+1, ConBuffer_GetLine(&chathistory, i));
+			chathistory_line = i;
+			chathistory_matchfound = true;
 			return;
 		}
 }
@@ -373,6 +409,38 @@ static void Key_History_Find_Forwards(void)
 		}
 }
 
+static void MsgKey_History_Find_Forwards(void)
+{
+	int i;
+	const char *partial = chat_buffer;
+	char vabuf[1024];
+	size_t digits = strlen(va(vabuf, sizeof(vabuf), "%i", HIST_MAXLINES));
+
+	if (chathistory_line == -1) // editing the "new" line
+		return;
+
+	if (strcmp(chat_buffer, chathistory_searchstring)) // different string? Start a new search
+	{
+		strlcpy(chathistory_searchstring, chat_buffer, sizeof(chathistory_searchstring));
+		i = 0;
+	}
+	else i = chathistory_line + 1;
+
+	if (!*partial)
+		partial = "*";
+	else if (!( strchr(partial, '*') || strchr(partial, '?') )) // no pattern?
+		partial = va(vabuf, sizeof(vabuf), "*%s*", partial);
+
+	for ( ; i < CONBUFFER_LINES_COUNT(&chathistory); i++)
+		if (matchpattern_with_separator(ConBuffer_GetLine(&chathistory, i), partial, true, "", false))
+		{
+			Con_Printf("^2%*i^7 %s\n", (int)digits, i+1, ConBuffer_GetLine(&chathistory, i));
+			chathistory_line = i;
+			chathistory_matchfound = true;
+			return;
+		}
+}
+
 static void Key_History_Find_All(void)
 {
 	const char *partial = key_line + 1;
@@ -390,6 +458,28 @@ static void Key_History_Find_All(void)
 		if (matchpattern_with_separator(ConBuffer_GetLine(&history, i), partial, true, "", false))
 		{
 			Con_Printf("%s%*i^7 %s\n", (i == history_line) ? "^2" : "^3", (int)digits, i+1, ConBuffer_GetLine(&history, i));
+			count++;
+		}
+	Con_Printf("%i result%s\n\n", count, (count != 1) ? "s" : "");
+}
+
+static void MsgKey_History_Find_All(void)
+{
+	const char *partial = chat_buffer;
+	int i, count = 0;
+	char vabuf[1024];
+	size_t digits = strlen(va(vabuf, sizeof(vabuf), "%i", HIST_MAXLINES));
+	Con_Printf("Chathistory containing \"%s\":\n", chat_buffer);
+
+	if (!*partial)
+		partial = "*";
+	else if (!( strchr(partial, '*') || strchr(partial, '?') )) // no pattern?
+		partial = va(vabuf, sizeof(vabuf), "*%s*", partial);
+
+	for (i=0; i<CONBUFFER_LINES_COUNT(&chathistory); i++)
+		if (matchpattern_with_separator(ConBuffer_GetLine(&chathistory, i), partial, true, "", false))
+		{
+			Con_Printf("%s%*i^7 %s\n", (i == chathistory_line) ? "^2" : "^3", (int)digits, i+1, ConBuffer_GetLine(&chathistory, i));
 			count++;
 		}
 	Con_Printf("%i result%s\n\n", count, (count != 1) ? "s" : "");
@@ -1614,6 +1704,38 @@ Key_Message (int key, int unicode)
 	{
 		MsgKey_History_Down();
 		return;
+	}
+
+	if (keydown[K_CTRL]  && keydown[K_ALT])
+	{
+		// prints all the matching commands
+		if (key == 'f')
+		{
+			MsgKey_History_Find_All();
+			return;
+		}
+		// Search forwards/backwards, pointing the history's index to the
+		// matching command but without fetching it to let one continue the search.
+		// To fetch it, it suffices to just press UP or DOWN.
+		if (key == 'r')
+		{
+			if (keydown[K_SHIFT])
+				MsgKey_History_Find_Forwards();
+			else
+				MsgKey_History_Find_Backwards();
+			return;
+		}
+		// go to the last/first command of the history
+		if (key == ',')
+		{
+			MsgKey_History_First();
+			return;
+		}
+		if (key == '.')
+		{
+			MsgKey_History_Last();
+			return;
+		}
 	}
 
 	if (key == K_HOME /*|| key == K_KP_HOME*/ || (key == 'a' && keydown[K_CTRL] && keydown[K_ALT]))
