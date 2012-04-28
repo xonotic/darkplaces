@@ -1772,6 +1772,7 @@ Key_Message (int key, int unicode)
 
 	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
 	// nyov: modified to only work as ctrl+alt+key
+	// (note: doesn't work in windows WGL, ctrl+alt+key is always 0, thanks to terencehill for noticing)
 	if (unicode > 0 && unicode < 32 && utf8_enable.integer && keydown[K_ALT])
 		unicode = 0xE000 + unicode;
 
