@@ -356,6 +356,22 @@ cvar_t r_editlights_cursorpushback = {0, "r_editlights_cursorpushback", "0", "ho
 cvar_t r_editlights_cursorpushoff = {0, "r_editlights_cursorpushoff", "4", "how far to push the cursor off the impacted surface"};
 cvar_t r_editlights_cursorgrid = {0, "r_editlights_cursorgrid", "4", "snaps cursor to this grid size"};
 cvar_t r_editlights_quakelightsizescale = {CVAR_SAVE, "r_editlights_quakelightsizescale", "1", "changes size of light entities loaded from a map"};
+cvar_t r_editlights_drawproperties = {0, "r_editlights_drawproperties", "1", "draw properties of currently selected light"};
+cvar_t r_editlights_current_origin = {0, "r_editlights_current_origin", "0 0 0", "origin of selected light"};
+cvar_t r_editlights_current_angles = {0, "r_editlights_current_angles", "0 0 0", "angles of selected light"};
+cvar_t r_editlights_current_color = {0, "r_editlights_current_color", "1 1 1", "color of selected light"};
+cvar_t r_editlights_current_radius = {0, "r_editlights_current_radius", "0", "radius of selected light"};
+cvar_t r_editlights_current_corona = {0, "r_editlights_current_corona", "0", "corona intensity of selected light"};
+cvar_t r_editlights_current_coronasize = {0, "r_editlights_current_coronasize", "0", "corona size of selected light"};
+cvar_t r_editlights_current_style = {0, "r_editlights_current_style", "0", "style of selected light"};
+cvar_t r_editlights_current_shadows = {0, "r_editlights_current_shadows", "0", "shadows flag of selected light"};
+cvar_t r_editlights_current_cubemap = {0, "r_editlights_current_cubemap", "0", "cubemap of selected light"};
+cvar_t r_editlights_current_ambient = {0, "r_editlights_current_ambient", "0", "ambient intensity of selected light"};
+cvar_t r_editlights_current_diffuse = {0, "r_editlights_current_diffuse", "1", "diffuse intensity of selected light"};
+cvar_t r_editlights_current_specular = {0, "r_editlights_current_specular", "1", "specular intensity of selected light"};
+cvar_t r_editlights_current_normalmode = {0, "r_editlights_current_normalmode", "0", "normalmode flag of selected light"};
+cvar_t r_editlights_current_realtimemode = {0, "r_editlights_current_realtimemode", "0", "realtimemode flag of selected light"};
+
 
 typedef struct r_shadow_bouncegrid_settings_s
 {
@@ -1530,15 +1546,16 @@ int R_Shadow_CalcSphereSideMask(const vec3_t p, float radius, float bias)
 static int R_Shadow_CullFrustumSides(rtlight_t *rtlight, float size, float border)
 {
 	int i;
-	vec3_t p, n;
+	vec3_t o, p, n;
 	int sides = 0x3F, masks[6] = { 3<<4, 3<<4, 3<<0, 3<<0, 3<<2, 3<<2 };
 	float scale = (size - 2*border)/size, len;
 	float bias = border / (float)(size - border), dp, dn, ap, an;
 	// check if cone enclosing side would cross frustum plane 
 	scale = 2 / (scale*scale + 2);
+	Matrix4x4_OriginFromMatrix(&rtlight->matrix_lighttoworld, o);
 	for (i = 0;i < 5;i++)
 	{
-		if (PlaneDiff(rtlight->shadoworigin, &r_refdef.view.frustum[i]) > -0.03125)
+		if (PlaneDiff(o, &r_refdef.view.frustum[i]) > -0.03125)
 			continue;
 		Matrix4x4_Transform3x3(&rtlight->matrix_worldtolight, r_refdef.view.frustum[i].normal, n);
 		len = scale*VectorLength2(n);
@@ -1546,10 +1563,10 @@ static int R_Shadow_CullFrustumSides(rtlight_t *rtlight, float size, float borde
 		if(n[1]*n[1] > len) sides &= n[1] < 0 ? ~(1<<2) : ~(2 << 2);
 		if(n[2]*n[2] > len) sides &= n[2] < 0 ? ~(1<<4) : ~(2 << 4);
 	}
-	if (PlaneDiff(rtlight->shadoworigin, &r_refdef.view.frustum[4]) >= r_refdef.farclip - r_refdef.nearclip + 0.03125)
+	if (PlaneDiff(o, &r_refdef.view.frustum[4]) >= r_refdef.farclip - r_refdef.nearclip + 0.03125)
 	{
         Matrix4x4_Transform3x3(&rtlight->matrix_worldtolight, r_refdef.view.frustum[4].normal, n);
-        len = scale*VectorLength(n);
+        len = scale*VectorLength2(n);
 		if(n[0]*n[0] > len) sides &= n[0] >= 0 ? ~(1<<0) : ~(2 << 0);
 		if(n[1]*n[1] > len) sides &= n[1] >= 0 ? ~(1<<2) : ~(2 << 2);
 		if(n[2]*n[2] > len) sides &= n[2] >= 0 ? ~(1<<4) : ~(2 << 4);
@@ -2104,7 +2121,7 @@ static void R_Shadow_MakeShadowMap(int side, int size)
 		if (r_shadow_shadowmap2ddepthtexture) return;
 		if (r_fb.usedepthtextures)
 		{
-			r_shadow_shadowmap2ddepthtexture = R_LoadTextureShadowMap2D(r_shadow_texturepool, "shadowmap", size*2, size*(vid.support.arb_texture_non_power_of_two ? 3 : 4), r_shadow_shadowmapdepthbits >= 24 ? (r_shadow_shadowmapsampler ? TEXTYPE_SHADOWMAP24_COMP : TEXTYPE_SHADOWMAP24_RAW) : (r_shadow_shadowmapsampler ? TEXTYPE_SHADOWMAP16_COMP : TEXTYPE_SHADOWMAP16_RAW), false);
+			r_shadow_shadowmap2ddepthtexture = R_LoadTextureShadowMap2D(r_shadow_texturepool, "shadowmap", size*2, size*(vid.support.arb_texture_non_power_of_two ? 3 : 4), r_shadow_shadowmapdepthbits >= 24 ? (r_shadow_shadowmapsampler ? TEXTYPE_SHADOWMAP24_COMP : TEXTYPE_SHADOWMAP24_RAW) : (r_shadow_shadowmapsampler ? TEXTYPE_SHADOWMAP16_COMP : TEXTYPE_SHADOWMAP16_RAW), r_shadow_shadowmapsampler);
 			r_shadow_shadowmap2ddepthbuffer = NULL;
 			r_shadow_fbo2d = R_Mesh_CreateFramebufferObject(r_shadow_shadowmap2ddepthtexture, NULL, NULL, NULL, NULL);
 		}
@@ -4661,6 +4678,7 @@ void R_Shadow_PrepareModelShadows(void)
 {
 	int i;
 	float scale, size, radius, dot1, dot2;
+	prvm_vec3_t prvmshadowdir, prvmshadowfocus;
 	vec3_t shadowdir, shadowforward, shadowright, shadoworigin, shadowfocus, shadowmins, shadowmaxs;
 	entity_render_t *ent;
 
@@ -4689,7 +4707,8 @@ void R_Shadow_PrepareModelShadows(void)
 	scale = r_shadow_shadowmapping_precision.value * r_shadows_shadowmapscale.value;
 	radius = 0.5f * size / scale;
 
-	Math_atov(r_shadows_throwdirection.string, shadowdir);
+	Math_atov(r_shadows_throwdirection.string, prvmshadowdir);
+	VectorCopy(prvmshadowdir, shadowdir);
 	VectorNormalize(shadowdir);
 	dot1 = DotProduct(r_refdef.view.forward, shadowdir);
 	dot2 = DotProduct(r_refdef.view.up, shadowdir);
@@ -4699,7 +4718,8 @@ void R_Shadow_PrepareModelShadows(void)
 		VectorMA(r_refdef.view.up, -dot2, shadowdir, shadowforward);
 	VectorNormalize(shadowforward);
 	CrossProduct(shadowdir, shadowforward, shadowright);
-	Math_atov(r_shadows_focus.string, shadowfocus);
+	Math_atov(r_shadows_focus.string, prvmshadowfocus);
+	VectorCopy(prvmshadowfocus, shadowfocus);
 	VectorM(shadowfocus[0], r_refdef.view.right, shadoworigin);
 	VectorMA(shadoworigin, shadowfocus[1], r_refdef.view.up, shadoworigin);
 	VectorMA(shadoworigin, -shadowfocus[2], r_refdef.view.forward, shadoworigin);
@@ -4735,6 +4755,7 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	vec3_t relativelightdirection, relativeforward, relativeright;
 	vec3_t relativeshadowmins, relativeshadowmaxs;
 	vec3_t shadowdir, shadowforward, shadowright, shadoworigin, shadowfocus;
+	prvm_vec3_t prvmshadowdir, prvmshadowfocus;
 	float m[12];
 	matrix4x4_t shadowmatrix, cameramatrix, mvpmatrix, invmvpmatrix, scalematrix, texmatrix;
 	r_viewport_t viewport;
@@ -4786,9 +4807,11 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	r_shadow_shadowmap_parameters[2] = 1.0;
 	r_shadow_shadowmap_parameters[3] = bound(0.0f, 1.0f - r_shadows_darken.value, 1.0f);
 
-	Math_atov(r_shadows_throwdirection.string, shadowdir);
+	Math_atov(r_shadows_throwdirection.string, prvmshadowdir);
+	VectorCopy(prvmshadowdir, shadowdir);
 	VectorNormalize(shadowdir);
-	Math_atov(r_shadows_focus.string, shadowfocus);
+	Math_atov(r_shadows_focus.string, prvmshadowfocus);
+	VectorCopy(prvmshadowfocus, shadowfocus);
 	VectorM(shadowfocus[0], r_refdef.view.right, shadoworigin);
 	VectorMA(shadoworigin, shadowfocus[1], r_refdef.view.up, shadoworigin);
 	VectorMA(shadoworigin, -shadowfocus[2], r_refdef.view.forward, shadoworigin);
@@ -4937,6 +4960,7 @@ void R_DrawModelShadows(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 	vec3_t relativelightdirection;
 	vec3_t relativeshadowmins, relativeshadowmaxs;
 	vec3_t tmp, shadowdir;
+	prvm_vec3_t prvmshadowdir;
 
 	if (!r_refdef.scene.numentities || !vid.stencil || (r_shadow_shadowmode != R_SHADOW_SHADOWMODE_STENCIL && r_shadows.integer != 1))
 		return;
@@ -4959,7 +4983,8 @@ void R_DrawModelShadows(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 	// get shadow dir
 	if (r_shadows.integer == 2)
 	{
-		Math_atov(r_shadows_throwdirection.string, shadowdir);
+		Math_atov(r_shadows_throwdirection.string, prvmshadowdir);
+		VectorCopy(prvmshadowdir, shadowdir);
 		VectorNormalize(shadowdir);
 	}
 
@@ -5523,8 +5548,8 @@ void R_Shadow_LoadWorldLights(void)
 		n = 0;
 		while (*s)
 		{
-			t = s;
 			/*
+			t = s;
 			shadow = true;
 			for (;COM_Parse(t, true) && strcmp(
 			if (COM_Parse(t, true))
@@ -6390,9 +6415,36 @@ void R_Shadow_EditLights_DrawSelectedLightProperties(void)
 	int lightnumber, lightcount;
 	size_t lightindex, range;
 	dlight_t *light;
-	float x, y;
 	char temp[256];
+	float x, y;
+
 	if (!r_editlights.integer)
+		return;
+
+	// update cvars so QC can query them
+	if (r_shadow_selectedlight)
+	{
+		dpsnprintf(temp, sizeof(temp), "%f %f %f", r_shadow_selectedlight->origin[0], r_shadow_selectedlight->origin[1], r_shadow_selectedlight->origin[2]);
+		Cvar_SetQuick(&r_editlights_current_origin, temp);
+		dpsnprintf(temp, sizeof(temp), "%f %f %f", r_shadow_selectedlight->angles[0], r_shadow_selectedlight->angles[1], r_shadow_selectedlight->angles[2]);
+		Cvar_SetQuick(&r_editlights_current_angles, temp);
+		dpsnprintf(temp, sizeof(temp), "%f %f %f", r_shadow_selectedlight->color[0], r_shadow_selectedlight->color[1], r_shadow_selectedlight->color[2]);
+		Cvar_SetQuick(&r_editlights_current_color, temp);
+		Cvar_SetValueQuick(&r_editlights_current_radius, r_shadow_selectedlight->radius);
+		Cvar_SetValueQuick(&r_editlights_current_corona, r_shadow_selectedlight->corona);
+		Cvar_SetValueQuick(&r_editlights_current_coronasize, r_shadow_selectedlight->coronasizescale);
+		Cvar_SetValueQuick(&r_editlights_current_style, r_shadow_selectedlight->style);
+		Cvar_SetValueQuick(&r_editlights_current_shadows, r_shadow_selectedlight->shadow);
+		Cvar_SetQuick(&r_editlights_current_cubemap, r_shadow_selectedlight->cubemapname);
+		Cvar_SetValueQuick(&r_editlights_current_ambient, r_shadow_selectedlight->ambientscale);
+		Cvar_SetValueQuick(&r_editlights_current_diffuse, r_shadow_selectedlight->diffusescale);
+		Cvar_SetValueQuick(&r_editlights_current_specular, r_shadow_selectedlight->specularscale);
+		Cvar_SetValueQuick(&r_editlights_current_normalmode, (r_shadow_selectedlight->flags & LIGHTFLAG_NORMALMODE) ? 1 : 0);
+		Cvar_SetValueQuick(&r_editlights_current_realtimemode, (r_shadow_selectedlight->flags & LIGHTFLAG_REALTIMEMODE) ? 1 : 0);
+	}
+
+	// draw properties on screen
+	if (!r_editlights_drawproperties.integer)
 		return;
 	x = vid_conwidth.value - 240;
 	y = 5;
@@ -6521,7 +6573,7 @@ static void R_Shadow_EditLights_Help_f(void)
 "sizescale scale : multiply radius (size) of light (1 does nothing)\n"
 "originscale x y z : multiply origin of light (1 1 1 does nothing)\n"
 "style style : set lightstyle of light (flickering patterns, switches, etc)\n"
-"cubemap basename : set filter cubemap of light (not yet supported)\n"
+"cubemap basename : set filter cubemap of light\n"
 "shadows 1/0 : turn on/off shadows\n"
 "corona n : set corona intensity\n"
 "coronasize n : set corona size (0-1)\n"
@@ -6606,6 +6658,21 @@ static void R_Shadow_EditLights_Init(void)
 	Cvar_RegisterVariable(&r_editlights_cursorpushoff);
 	Cvar_RegisterVariable(&r_editlights_cursorgrid);
 	Cvar_RegisterVariable(&r_editlights_quakelightsizescale);
+	Cvar_RegisterVariable(&r_editlights_drawproperties);
+	Cvar_RegisterVariable(&r_editlights_current_origin);
+	Cvar_RegisterVariable(&r_editlights_current_angles);
+	Cvar_RegisterVariable(&r_editlights_current_color);
+	Cvar_RegisterVariable(&r_editlights_current_radius);
+	Cvar_RegisterVariable(&r_editlights_current_corona);
+	Cvar_RegisterVariable(&r_editlights_current_coronasize);
+	Cvar_RegisterVariable(&r_editlights_current_style);
+	Cvar_RegisterVariable(&r_editlights_current_shadows);
+	Cvar_RegisterVariable(&r_editlights_current_cubemap);
+	Cvar_RegisterVariable(&r_editlights_current_ambient);
+	Cvar_RegisterVariable(&r_editlights_current_diffuse);
+	Cvar_RegisterVariable(&r_editlights_current_specular);
+	Cvar_RegisterVariable(&r_editlights_current_normalmode);
+	Cvar_RegisterVariable(&r_editlights_current_realtimemode);
 	Cmd_AddCommand("r_editlights_help", R_Shadow_EditLights_Help_f, "prints documentation on console commands and variables in rtlight editing system");
 	Cmd_AddCommand("r_editlights_clear", R_Shadow_EditLights_Clear_f, "removes all world lights (let there be darkness!)");
 	Cmd_AddCommand("r_editlights_reload", R_Shadow_EditLights_Reload_f, "reloads rtlights file (or imports from .lights file or .ent file or the map itself)");
@@ -6633,7 +6700,7 @@ LIGHT SAMPLING
 =============================================================================
 */
 
-void R_LightPoint(vec3_t color, const vec3_t p, const int flags)
+void R_LightPoint(float *color, const vec3_t p, const int flags)
 {
 	int i, numlights, flag;
 	float f, relativepoint[3], dist, dist2, lightradius2;

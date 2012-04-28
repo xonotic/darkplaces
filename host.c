@@ -97,6 +97,7 @@ Host_AbortCurrentFrame
 aborts the current host frame and goes on with the next one
 ================
 */
+void Host_AbortCurrentFrame(void) DP_FUNC_NORETURN;
 void Host_AbortCurrentFrame(void)
 {
 	// in case we were previously nice, make us mean again
@@ -672,7 +673,6 @@ void Host_Main(void)
 	Host_Init();
 
 	realtime = 0;
-	dirtytime = Sys_DirtyTime();
 	for (;;)
 	{
 		if (setjmp(host_abortframe))
@@ -899,7 +899,7 @@ void Host_Main(void)
 			SV_SendClientMessages();
 
 			if (sv.paused == 1 && realtime > sv.pausedstart && sv.pausedstart > 0) {
-				prog->globals.generic[OFS_PARM0] = realtime - sv.pausedstart;
+				prog->globals.fp[OFS_PARM0] = realtime - sv.pausedstart;
 				PRVM_serverglobalfloat(time) = sv.time;
 				prog->ExecuteProgram(prog, PRVM_serverfunction(SV_PausedTic), "QC function SV_PausedTic is missing");
 			}

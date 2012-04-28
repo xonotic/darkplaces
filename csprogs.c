@@ -11,7 +11,7 @@
 // Client prog handling
 //[515]: omg !!! optimize it ! a lot of hacks here and there also :P
 
-#define CSQC_RETURNVAL	prog->globals.generic[OFS_RETURN]
+#define CSQC_RETURNVAL	prog->globals.fp[OFS_RETURN]
 #define CSQC_BEGIN
 #define CSQC_END
 
@@ -223,6 +223,7 @@ void CSQC_UpdateNetworkTimes(double newtime, double oldtime)
 //[515]: set globals before calling R_UpdateView, WEIRD CRAP
 static void CSQC_SetGlobals (void)
 {
+	vec3_t pmove_org;
 	prvm_prog_t *prog = CLVM_prog;
 	CSQC_BEGIN
 		PRVM_clientglobalfloat(time) = cl.time;
@@ -239,7 +240,8 @@ static void CSQC_SetGlobals (void)
 		// LordHavoc: Spike says not to do this, but without pmove_org the
 		// CSQC is useless as it can't alter the view origin without
 		// completely replacing it
-		Matrix4x4_OriginFromMatrix(&cl.entities[cl.viewentity].render.matrix, PRVM_clientglobalvector(pmove_org));
+		Matrix4x4_OriginFromMatrix(&cl.entities[cl.viewentity].render.matrix, pmove_org);
+		VectorCopy(pmove_org, PRVM_clientglobalvector(pmove_org));
 		VectorCopy(cl.movement_velocity, PRVM_clientglobalvector(pmove_vel));
 		PRVM_clientglobalfloat(pmove_onground) = cl.onground;
 		PRVM_clientglobalfloat(pmove_inwater) = cl.inwater;
@@ -348,7 +350,7 @@ qboolean CSQC_AddRenderEdict(prvm_edict_t *ed, int edictnum)
 
 	// set up the animation data
 	VM_GenerateFrameGroupBlend(prog, ed->priv.server->framegroupblend, ed);
-	VM_FrameBlendFromFrameGroupBlend(ed->priv.server->frameblend, ed->priv.server->framegroupblend, model);
+	VM_FrameBlendFromFrameGroupBlend(ed->priv.server->frameblend, ed->priv.server->framegroupblend, model, cl.time);
 	VM_UpdateEdictSkeleton(prog, ed, model, ed->priv.server->frameblend);
 	if (PRVM_clientedictfloat(ed, shadertime)) // hack for csprogs.dat files that do not set shadertime, leaves the value at entity spawn time
 		entrender->shadertime = PRVM_clientedictfloat(ed, shadertime);
@@ -899,7 +901,7 @@ static void CLVM_free_edict(prvm_prog_t *prog, prvm_edict_t *ed)
 	R_DecalSystem_Reset(&entrender->decalsystem);
 	memset(entrender, 0, sizeof(*entrender));
 	World_UnlinkEdict(ed);
-	memset(ed->fields.vp, 0, prog->entityfields * 4);
+	memset(ed->fields.fp, 0, prog->entityfields * sizeof(prvm_vec_t));
 	VM_RemoveEdictSkeleton(prog, ed);
 	World_Physics_RemoveFromEntity(&cl.world, ed);
 	World_Physics_RemoveJointFromEntity(&cl.world, ed);
@@ -998,7 +1000,6 @@ void CL_VM_Init (void)
 		return;
 
 	// see if the requested csprogs.dat file matches the requested crc
-	csprogsdatacrc = -1;
 	if (!cls.demoplayback || csqc_usedemoprogs.integer)
 	{
 		csprogsfn = va(vabuf, sizeof(vabuf), "dlcache/%s.%i.%i", csqc_progname.string, requiredsize, requiredcrc);

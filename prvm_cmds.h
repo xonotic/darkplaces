@@ -210,7 +210,7 @@ float	getserverlistindexforkey(string key)
 #define VM_SAFEPARMCOUNT(p,f)
 #endif
 
-#define	VM_RETURN_EDICT(e)		(((int *)prog->globals.generic)[OFS_RETURN] = PRVM_EDICT_TO_PROG(e))
+#define	VM_RETURN_EDICT(e)		(prog->globals.ip[OFS_RETURN] = PRVM_EDICT_TO_PROG(e))
 
 #define VM_STRINGTEMP_LENGTH MAX_INPUTLINE
 
@@ -409,6 +409,11 @@ void VM_bufstr_get (prvm_prog_t *prog);
 void VM_bufstr_set (prvm_prog_t *prog);
 void VM_bufstr_add (prvm_prog_t *prog);
 void VM_bufstr_free (prvm_prog_t *prog);
+
+void VM_buf_loadfile(prvm_prog_t *prog);
+void VM_buf_writefile(prvm_prog_t *prog);
+void VM_bufstr_find(prvm_prog_t *prog);
+void VM_matchpattern(prvm_prog_t *prog);
 
 void VM_changeyaw (prvm_prog_t *prog);
 void VM_changepitch (prvm_prog_t *prog);

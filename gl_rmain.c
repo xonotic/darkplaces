@@ -132,8 +132,8 @@ cvar_t r_transparentdepthmasking = {CVAR_SAVE, "r_transparentdepthmasking", "0",
 cvar_t r_transparent_sortmindist = {CVAR_SAVE, "r_transparent_sortmindist", "0", "lower distance limit for transparent sorting"};
 cvar_t r_transparent_sortmaxdist = {CVAR_SAVE, "r_transparent_sortmaxdist", "32768", "upper distance limit for transparent sorting"};
 cvar_t r_transparent_sortarraysize = {CVAR_SAVE, "r_transparent_sortarraysize", "4096", "number of distance-sorting layers"};
-cvar_t r_celshading = {CVAR_SAVE, "r_celshading", "0", "cartoon-style light shading"};
-cvar_t r_celoutlines = {CVAR_SAVE, "r_celoutlines", "0", "cartoon-style outlines (requires r_shadow_deferred)"};
+cvar_t r_celshading = {CVAR_SAVE, "r_celshading", "0", "cartoon-style light shading (OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
+cvar_t r_celoutlines = {CVAR_SAVE, "r_celoutlines", "0", "cartoon-style outlines (requires r_shadow_deferred; OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
 
 cvar_t gl_fogenable = {0, "gl_fogenable", "0", "nehahra fog enable (for Nehahra compatibility only)"};
 cvar_t gl_fogdensity = {0, "gl_fogdensity", "0.25", "nehahra fog density (recommend values below 0.1) (for Nehahra compatibility only)"};
@@ -203,6 +203,7 @@ cvar_t r_bloom_blur = {CVAR_SAVE, "r_bloom_blur", "4", "how large the glow is"};
 cvar_t r_bloom_resolution = {CVAR_SAVE, "r_bloom_resolution", "320", "what resolution to perform the bloom effect at (independent of screen resolution)"};
 cvar_t r_bloom_colorexponent = {CVAR_SAVE, "r_bloom_colorexponent", "1", "how exaggerated the glow is"};
 cvar_t r_bloom_colorsubtract = {CVAR_SAVE, "r_bloom_colorsubtract", "0.125", "reduces bloom colors by a certain amount"};
+cvar_t r_bloom_scenebrightness = {CVAR_SAVE, "r_bloom_scenebrightness", "1", "global rendering brightness when bloom is enabled"};
 
 cvar_t r_hdr_scenebrightness = {CVAR_SAVE, "r_hdr_scenebrightness", "1", "global rendering brightness"};
 cvar_t r_hdr_glowintensity = {CVAR_SAVE, "r_hdr_glowintensity", "1", "how bright light emitting textures should appear"};
@@ -3511,7 +3512,7 @@ skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, co
 
 	// if already loaded just return it, otherwise make a new skinframe
 	skinframe = R_SkinFrame_Find(name, textureflags, width, height, (textureflags & TEXF_FORCE_RELOAD) ? -1 : skindata ? CRC_Block(skindata, width*height*4) : 0, true);
-	if (skinframe && skinframe->base)
+	if (skinframe->base)
 		return skinframe;
 	textureflags &= ~TEXF_FORCE_RELOAD;
 
@@ -3581,9 +3582,9 @@ skinframe_t *R_SkinFrame_LoadInternalQuake(const char *name, int textureflags, i
 
 	// if already loaded just return it, otherwise make a new skinframe
 	skinframe = R_SkinFrame_Find(name, textureflags, width, height, skindata ? CRC_Block(skindata, width*height) : 0, true);
-	if (skinframe && skinframe->base)
+	if (skinframe->base)
 		return skinframe;
-	textureflags &= ~TEXF_FORCE_RELOAD;
+	//textureflags &= ~TEXF_FORCE_RELOAD;
 
 	skinframe->stain = NULL;
 	skinframe->merged = NULL;
@@ -3705,7 +3706,7 @@ skinframe_t *R_SkinFrame_LoadInternal8bit(const char *name, int textureflags, co
 
 	// if already loaded just return it, otherwise make a new skinframe
 	skinframe = R_SkinFrame_Find(name, textureflags, width, height, skindata ? CRC_Block(skindata, width*height) : 0, true);
-	if (skinframe && skinframe->base)
+	if (skinframe->base)
 		return skinframe;
 	textureflags &= ~TEXF_FORCE_RELOAD;
 
@@ -4297,6 +4298,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_bloom_resolution);
 	Cvar_RegisterVariable(&r_bloom_colorexponent);
 	Cvar_RegisterVariable(&r_bloom_colorsubtract);
+	Cvar_RegisterVariable(&r_bloom_scenebrightness);
 	Cvar_RegisterVariable(&r_hdr_scenebrightness);
 	Cvar_RegisterVariable(&r_hdr_glowintensity);
 	Cvar_RegisterVariable(&r_hdr_irisadaptation);
@@ -6918,6 +6920,11 @@ void R_RenderView(void)
 	R_Shadow_UpdateWorldLightSelection();
 
 	R_Bloom_StartFrame();
+
+	// apply bloom brightness offset
+	if(r_fb.bloomtexture[0])
+		r_refdef.view.colorscale *= r_bloom_scenebrightness.value;
+
 	R_Water_StartFrame();
 
 	// now we probably have an fbo to render into
@@ -7463,7 +7470,7 @@ void R_DrawNoModel(entity_render_t *ent)
 		R_DrawNoModel_TransparentCallback(ent, rsurface.rtlight, 0, NULL);
 }
 
-void R_CalcBeam_Vertex3f (float *vert, const vec3_t org1, const vec3_t org2, float width)
+void R_CalcBeam_Vertex3f (float *vert, const float *org1, const float *org2, float width)
 {
 	vec3_t right1, right2, diff, normal;
 
@@ -7766,7 +7773,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 {
 	int i;
 	const entity_render_t *ent = rsurface.entity;
-	dp_model_t *model = ent->model;
+	dp_model_t *model = ent->model; // when calling this, ent must not be NULL
 	q3shaderinfo_layer_tcmod_t *tcmod;
 
 	if (t->update_lastrenderframe == r_textureframe && t->update_lastrenderentity == (void *)ent && !rsurface.forcecurrenttextureupdate)
@@ -7774,7 +7781,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	t->update_lastrenderframe = r_textureframe;
 	t->update_lastrenderentity = (void *)ent;
 
-	if(ent && ent->entitynumber >= MAX_EDICTS && ent->entitynumber < 2 * MAX_EDICTS)
+	if(ent->entitynumber >= MAX_EDICTS && ent->entitynumber < 2 * MAX_EDICTS)
 		t->camera_entity = ent->entitynumber;
 	else
 		t->camera_entity = 0;
@@ -9489,7 +9496,6 @@ static void RSurf_DrawBatch_GL11_ApplyFog(void)
 	if (rsurface.passcolor4f)
 	{
 		// generate color arrays
-		c = rsurface.passcolor4f + rsurface.batchfirstvertex * 4;
 		rsurface.passcolor4f = (float *)R_FrameData_Alloc(rsurface.batchnumvertices * sizeof(float[4]));
 		rsurface.passcolor4f_vertexbuffer = 0;
 		rsurface.passcolor4f_bufferoffset = 0;
@@ -11184,7 +11190,6 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 	else
 		frametime = 0;
 	decalsystem->lastupdatetime = r_refdef.scene.time;
-	decal = decalsystem->decals;
 	numdecals = decalsystem->numdecals;
 
 	for (i = 0, decal = decalsystem->decals;i < numdecals;i++, decal++)
@@ -11261,7 +11266,6 @@ static void R_DrawModelDecals_Entity(entity_render_t *ent)
 		RSurf_ActiveModelEntity(ent, false, false, false);
 
 	decalsystem->lastupdatetime = r_refdef.scene.time;
-	decal = decalsystem->decals;
 
 	faderate = 1.0f / max(0.001f, cl_decals_fadetime.value);
 
@@ -11450,13 +11454,12 @@ static void R_DrawDebugModel(void)
 	{
 		int triangleindex;
 		int bihleafindex;
-		qboolean cullbox = ent == r_refdef.scene.worldentity;
+		qboolean cullbox = false;
 		const q3mbrush_t *brush;
 		const bih_t *bih = &model->collision_bih;
 		const bih_leaf_t *bihleaf;
 		float vertex3f[3][3];
 		GL_PolygonOffset(r_refdef.polygonfactor + r_showcollisionbrushes_polygonfactor.value, r_refdef.polygonoffset + r_showcollisionbrushes_polygonoffset.value);
-		cullbox = false;
 		for (bihleafindex = 0, bihleaf = bih->leafs;bihleafindex < bih->numleafs;bihleafindex++, bihleaf++)
 		{
 			if (cullbox && R_CullBox(bihleaf->mins, bihleaf->maxs))

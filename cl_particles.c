@@ -518,7 +518,7 @@ static const char *standardeffectnames[EFFECT_TOTAL] =
 	"SVC_PARTICLE"
 };
 
-static void CL_Particles_LoadEffectInfo(void)
+static void CL_Particles_LoadEffectInfo(const char *customfile)
 {
 	int i;
 	int filepass;
@@ -533,10 +533,15 @@ static void CL_Particles_LoadEffectInfo(void)
 	for (filepass = 0;;filepass++)
 	{
 		if (filepass == 0)
-			dpsnprintf(filename, sizeof(filename), "effectinfo.txt");
+		{
+			if (customfile)
+				strlcpy(filename, customfile, sizeof(filename));
+			else
+				strlcpy(filename, "effectinfo.txt", sizeof(filename));
+		}
 		else if (filepass == 1)
 		{
-			if (!cl.worldbasename[0])
+			if (!cl.worldbasename[0] || customfile)
 				continue;
 			dpsnprintf(filename, sizeof(filename), "%s_effectinfo.txt", cl.worldnamenoextension);
 		}
@@ -550,6 +555,11 @@ static void CL_Particles_LoadEffectInfo(void)
 	}
 }
 
+static void CL_Particles_LoadEffectInfo_f(void)
+{
+	CL_Particles_LoadEffectInfo(Cmd_Argc() > 1 ? Cmd_Argv(1) : NULL);
+}
+
 /*
 ===============
 CL_InitParticles
@@ -559,7 +569,7 @@ void CL_ReadPointFile_f (void);
 void CL_Particles_Init (void)
 {
 	Cmd_AddCommand ("pointfile", CL_ReadPointFile_f, "display point file produced by qbsp when a leak was detected in the map (a line leading through the leak hole, to an entity inside the level)");
-	Cmd_AddCommand ("cl_particles_reloadeffects", CL_Particles_LoadEffectInfo, "reloads effectinfo.txt and maps/levelname_effectinfo.txt (where levelname is the current map)");
+	Cmd_AddCommand ("cl_particles_reloadeffects", CL_Particles_LoadEffectInfo_f, "reloads effectinfo.txt and maps/levelname_effectinfo.txt (where levelname is the current map) if parameter is given, loads from custom file (no levelname_effectinfo are loaded in this case)");
 
 	Cvar_RegisterVariable (&cl_particles);
 	Cvar_RegisterVariable (&cl_particles_quality);
@@ -874,8 +884,10 @@ void CL_SpawnDecalParticleForSurface(int hitent, const vec3_t org, const vec3_t 
 void CL_SpawnDecalParticleForPoint(const vec3_t org, float maxdist, float size, float alpha, int texnum, int color1, int color2)
 {
 	int i;
-	float bestfrac, bestorg[3], bestnormal[3];
-	float org2[3];
+	vec_t bestfrac;
+	vec3_t bestorg;
+	vec3_t bestnormal;
+	vec3_t org2;
 	int besthitent = 0, hitent;
 	trace_t trace;
 	bestfrac = 10;
@@ -1630,7 +1642,8 @@ CL_EntityParticles
 void CL_EntityParticles (const entity_t *ent)
 {
 	int i;
-	float pitch, yaw, dist = 64, beamlength = 16, org[3], v[3];
+	vec_t pitch, yaw, dist = 64, beamlength = 16;
+	vec3_t org, v;
 	static vec3_t avelocities[NUMVERTEXNORMALS];
 	if (!cl_particles.integer) return;
 	if (cl.time <= cl.oldtime) return; // don't spawn new entity particles while paused
@@ -1655,7 +1668,8 @@ void CL_EntityParticles (const entity_t *ent)
 
 void CL_ReadPointFile_f (void)
 {
-	vec3_t org, leakorg;
+	double org[3], leakorg[3];
+	vec3_t vecorg;
 	int r, c, s;
 	char *pointfile = NULL, *pointfilepos, *t, tchar;
 	char name[MAX_QPATH];
@@ -1690,7 +1704,8 @@ void CL_ReadPointFile_f (void)
 #if _MSC_VER >= 1400
 #define sscanf sscanf_s
 #endif
-		r = sscanf (pointfilepos,"%f %f %f", &org[0], &org[1], &org[2]);
+		r = sscanf (pointfilepos,"%lf %lf %lf", &org[0], &org[1], &org[2]);
+		VectorCopy(org, vecorg);
 		*t = tchar;
 		pointfilepos = t;
 		if (r != 3)
@@ -1702,16 +1717,16 @@ void CL_ReadPointFile_f (void)
 		if (cl.num_particles < cl.max_particles - 3)
 		{
 			s++;
-			CL_NewParticle(org, pt_alphastatic, particlepalette[(-c)&15], particlepalette[(-c)&15], tex_particle, 2, 0, 255, 0, 0, 0, org[0], org[1], org[2], 0, 0, 0, 0, 0, 0, 0, true, 1<<30, 1, PBLEND_ALPHA, PARTICLE_BILLBOARD, -1, -1, -1, 1, 1, 0, 0, NULL);
+			CL_NewParticle(vecorg, pt_alphastatic, particlepalette[(-c)&15], particlepalette[(-c)&15], tex_particle, 2, 0, 255, 0, 0, 0, org[0], org[1], org[2], 0, 0, 0, 0, 0, 0, 0, true, 1<<30, 1, PBLEND_ALPHA, PARTICLE_BILLBOARD, -1, -1, -1, 1, 1, 0, 0, NULL);
 		}
 	}
 	Mem_Free(pointfile);
-	VectorCopy(leakorg, org);
-	Con_Printf("%i points read (%i particles spawned)\nLeak at %f %f %f\n", c, s, org[0], org[1], org[2]);
+	VectorCopy(leakorg, vecorg);
+	Con_Printf("%i points read (%i particles spawned)\nLeak at %f %f %f\n", c, s, leakorg[0], leakorg[1], leakorg[2]);
 
-	CL_NewParticle(org, pt_beam, 0xFF0000, 0xFF0000, tex_beam, 64, 0, 255, 0, 0, 0, org[0] - 4096, org[1], org[2], org[0] + 4096, org[1], org[2], 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
-	CL_NewParticle(org, pt_beam, 0x00FF00, 0x00FF00, tex_beam, 64, 0, 255, 0, 0, 0, org[0], org[1] - 4096, org[2], org[0], org[1] + 4096, org[2], 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
-	CL_NewParticle(org, pt_beam, 0x0000FF, 0x0000FF, tex_beam, 64, 0, 255, 0, 0, 0, org[0], org[1], org[2] - 4096, org[0], org[1], org[2] + 4096, 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
+	CL_NewParticle(vecorg, pt_beam, 0xFF0000, 0xFF0000, tex_beam, 64, 0, 255, 0, 0, 0, org[0] - 4096, org[1], org[2], org[0] + 4096, org[1], org[2], 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
+	CL_NewParticle(vecorg, pt_beam, 0x00FF00, 0x00FF00, tex_beam, 64, 0, 255, 0, 0, 0, org[0], org[1] - 4096, org[2], org[0], org[1] + 4096, org[2], 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
+	CL_NewParticle(vecorg, pt_beam, 0x0000FF, 0x0000FF, tex_beam, 64, 0, 255, 0, 0, 0, org[0], org[1], org[2] - 4096, org[0], org[1], org[2] + 4096, 0, 0, 0, 0, false, 1<<30, 1, PBLEND_ADD, PARTICLE_HBEAM, -1, -1, -1, 1, 1, 0, 0, NULL);
 }
 
 /*
@@ -2369,7 +2384,7 @@ static void r_part_start(void)
 		particlepalette[i] = palette_rgb[i][0] * 65536 + palette_rgb[i][1] * 256 + palette_rgb[i][2];
 	particletexturepool = R_AllocTexturePool();
 	R_InitParticleTexture ();
-	CL_Particles_LoadEffectInfo();
+	CL_Particles_LoadEffectInfo(NULL);
 }
 
 static void r_part_shutdown(void)
@@ -2381,7 +2396,7 @@ static void r_part_newmap(void)
 {
 	if (decalskinframe)
 		R_SkinFrame_MarkUsed(decalskinframe);
-	CL_Particles_LoadEffectInfo();
+	CL_Particles_LoadEffectInfo(NULL);
 }
 
 unsigned short particle_elements[MESHQUEUE_TRANSPARENT_BATCHSIZE*6];
@@ -2415,7 +2430,7 @@ static void R_DrawDecal_TransparentCallback(const entity_render_t *ent, const rt
 	const decal_t *d;
 	float *v3f, *t2f, *c4f;
 	particletexture_t *tex;
-	float right[3], up[3], size, ca;
+	vec_t right[3], up[3], size, ca;
 	float alphascale = (1.0f / 65536.0f) * cl_particles_alpha.value;
 
 	RSurf_ActiveWorldEntity();
@@ -2562,6 +2577,7 @@ killdecal:
 
 static void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtlight_t *rtlight, int numsurfaces, int *surfacelist)
 {
+	vec3_t vecorg, vecvel, baseright, baseup;
 	int surfacelistindex;
 	int batchstart, batchcount;
 	const particle_t *p;
@@ -2571,7 +2587,7 @@ static void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const
 	particletexture_t *tex;
 	float up2[3], v[3], right[3], up[3], fog, ifog, size, len, lenfactor, alpha;
 //	float ambient[3], diffuse[3], diffusenormal[3];
-	float palpha, spintime, spinrad, spincos, spinsin, spinm1, spinm2, spinm3, spinm4, baseright[3], baseup[3];
+	float palpha, spintime, spinrad, spincos, spinsin, spinm1, spinm2, spinm3, spinm4;
 	vec4_t colormultiplier;
 	float minparticledist_start, minparticledist_end;
 	qboolean dofade;
@@ -2639,7 +2655,12 @@ static void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const
 			c4f[3] = alpha;
 			// note: lighting is not cheap!
 			if (particletype[p->typeindex].lighting)
-				R_LightPoint(c4f, p->org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
+			{
+				vecorg[0] = p->org[0];
+				vecorg[1] = p->org[1];
+				vecorg[2] = p->org[2];
+				R_LightPoint(c4f, vecorg, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
+			}
 			// mix in the fog color
 			if (r_refdef.fogenabled)
 			{
@@ -2700,7 +2721,10 @@ static void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const
 			t2f[6] = tex->s2;t2f[7] = tex->t2;
 			break;
 		case PARTICLE_ORIENTED_DOUBLESIDED:
-			VectorVectors(p->vel, baseright, baseup);
+			vecvel[0] = p->vel[0];
+			vecvel[1] = p->vel[1];
+			vecvel[2] = p->vel[2];
+			VectorVectors(vecvel, baseright, baseup);
 			if (p->angle + p->spin)
 			{
 				spinrad = (p->angle + p->spin * (spintime - p->delayedspawn)) * (float)(M_PI / 180.0f);

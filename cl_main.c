@@ -552,7 +552,7 @@ void CL_UpdateRenderEntity(entity_render_t *ent)
 	// update the inverse matrix for the renderer
 	Matrix4x4_Invert_Simple(&ent->inversematrix, &ent->matrix);
 	// update the animation blend state
-	VM_FrameBlendFromFrameGroupBlend(ent->frameblend, ent->framegroupblend, ent->model);
+	VM_FrameBlendFromFrameGroupBlend(ent->frameblend, ent->framegroupblend, ent->model, cl.time);
 	// we need the matrix origin to center the box
 	Matrix4x4_OriginFromMatrix(&ent->matrix, org);
 	// update entity->render.scale because the renderer needs it
@@ -927,7 +927,7 @@ static void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qboolean int
 	const matrix4x4_t *matrix;
 	matrix4x4_t blendmatrix, tempmatrix, matrix2;
 	int frame;
-	float origin[3], angles[3], lerp;
+	vec_t origin[3], angles[3], lerp;
 	entity_t *t;
 	entity_render_t *r;
 	//entity_persistent_t *p = &e->persistent;
@@ -1520,7 +1520,7 @@ static void CL_LinkNetworkEntity(entity_t *e)
 	if ((e->state_current.lightpflags & PFLAGS_FULLDYNAMIC) && r_refdef.scene.numlights < MAX_DLIGHTS)
 	{
 		matrix4x4_t dlightmatrix;
-		float light[4];
+		vec4_t light;
 		VectorScale(e->state_current.light, (1.0f / 256.0f), light);
 		light[3] = e->state_current.light[3];
 		if (light[0] == 0 && light[1] == 0 && light[2] == 0)
@@ -1600,7 +1600,7 @@ static void CL_RelinkStaticEntities(void)
 			e->render.flags |= RENDER_SHADOW;
 		VectorSet(e->render.colormod, 1, 1, 1);
 		VectorSet(e->render.glowmod, 1, 1, 1);
-		VM_FrameBlendFromFrameGroupBlend(e->render.frameblend, e->render.framegroupblend, e->render.model);
+		VM_FrameBlendFromFrameGroupBlend(e->render.frameblend, e->render.framegroupblend, e->render.model, cl.time);
 		e->render.allowdecals = true;
 		CL_UpdateRenderEntity(&e->render);
 		r_refdef.scene.entities[r_refdef.scene.numentities++] = &e->render;

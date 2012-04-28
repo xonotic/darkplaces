@@ -364,7 +364,7 @@ void MSG_WriteCoord (sizebuf_t *sb, float f, protocolversion_t protocol)
 		MSG_WriteCoord32f (sb, f);
 }
 
-void MSG_WriteVector (sizebuf_t *sb, float *v, protocolversion_t protocol)
+void MSG_WriteVector (sizebuf_t *sb, const vec3_t v, protocolversion_t protocol)
 {
 	MSG_WriteCoord (sb, v[0], protocol);
 	MSG_WriteCoord (sb, v[1], protocol);
@@ -544,7 +544,7 @@ float MSG_ReadCoord (sizebuf_t *sb, protocolversion_t protocol)
 		return MSG_ReadCoord32f(sb);
 }
 
-void MSG_ReadVector (sizebuf_t *sb, float *v, protocolversion_t protocol)
+void MSG_ReadVector (sizebuf_t *sb, vec3_t v, protocolversion_t protocol)
 {
 	v[0] = MSG_ReadCoord(sb, protocol);
 	v[1] = MSG_ReadCoord(sb, protocol);
@@ -742,7 +742,6 @@ int COM_Wordwrap(const char *string, size_t length, float continuationWidth, flo
 		{
 			case 0: // end of string
 				result += processLine(passthroughPL, startOfLine, cursor - startOfLine, spaceUsedInLine, isContinuation);
-				isContinuation = false;
 				goto out;
 			case '\n': // end of line
 				result += processLine(passthroughPL, startOfLine, cursor - startOfLine, spaceUsedInLine, isContinuation);

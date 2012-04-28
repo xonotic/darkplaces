@@ -109,6 +109,8 @@ trace_t SV_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int
 	float pitchsign = 1;
 	prvm_edict_t *traceowner, *touch;
 	trace_t trace;
+	// temporary storage because prvm_vec_t may differ from vec_t
+	vec3_t touchmins, touchmaxs;
 	// bounding box of entire move area
 	vec3_t clipboxmins, clipboxmaxs;
 	// size when clipping against monsters
@@ -224,12 +226,14 @@ trace_t SV_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int
 			Matrix4x4_CreateTranslate(&matrix, PRVM_serveredictvector(touch, origin)[0], PRVM_serveredictvector(touch, origin)[1], PRVM_serveredictvector(touch, origin)[2]);
 		Matrix4x4_Invert_Simple(&imatrix, &matrix);
 		VM_GenerateFrameGroupBlend(prog, touch->priv.server->framegroupblend, touch);
-		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model);
+		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model, sv.time);
 		VM_UpdateEdictSkeleton(prog, touch, model, touch->priv.server->frameblend);
+		VectorCopy(PRVM_serveredictvector(touch, mins), touchmins);
+		VectorCopy(PRVM_serveredictvector(touch, maxs), touchmaxs);
 		if (type == MOVE_MISSILE && (int)PRVM_serveredictfloat(touch, flags) & FL_MONSTER)
-			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipstart, hitsupercontentsmask);
+			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipstart, hitsupercontentsmask);
 		else
-			Collision_ClipPointToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, hitsupercontentsmask);
+			Collision_ClipPointToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, hitsupercontentsmask);
 
 		Collision_CombineTraces(&cliptrace, &trace, (void *)touch, PRVM_serveredictfloat(touch, solid) == SOLID_BSP);
 	}
@@ -255,6 +259,8 @@ trace_t SV_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 	float pitchsign = 1;
 	prvm_edict_t *traceowner, *touch;
 	trace_t trace;
+	// temporary storage because prvm_vec_t may differ from vec_t
+	vec3_t touchmins, touchmaxs;
 	// bounding box of entire move area
 	vec3_t clipboxmins, clipboxmaxs;
 	// size when clipping against monsters
@@ -391,12 +397,14 @@ trace_t SV_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 			Matrix4x4_CreateTranslate(&matrix, PRVM_serveredictvector(touch, origin)[0], PRVM_serveredictvector(touch, origin)[1], PRVM_serveredictvector(touch, origin)[2]);
 		Matrix4x4_Invert_Simple(&imatrix, &matrix);
 		VM_GenerateFrameGroupBlend(prog, touch->priv.server->framegroupblend, touch);
-		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model);
+		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model, sv.time);
 		VM_UpdateEdictSkeleton(prog, touch, model, touch->priv.server->frameblend);
+		VectorCopy(PRVM_serveredictvector(touch, mins), touchmins);
+		VectorCopy(PRVM_serveredictvector(touch, maxs), touchmaxs);
 		if (type == MOVE_MISSILE && (int)PRVM_serveredictfloat(touch, flags) & FL_MONSTER)
-			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipend, hitsupercontentsmask);
+			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipend, hitsupercontentsmask);
 		else
-			Collision_ClipLineToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, clipend, hitsupercontentsmask, false);
+			Collision_ClipLineToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, clipend, hitsupercontentsmask, false);
 
 		Collision_CombineTraces(&cliptrace, &trace, (void *)touch, PRVM_serveredictfloat(touch, solid) == SOLID_BSP);
 	}
@@ -436,6 +444,8 @@ trace_t SV_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, co
 	qboolean pointtrace;
 	prvm_edict_t *traceowner, *touch;
 	trace_t trace;
+	// temporary storage because prvm_vec_t may differ from vec_t
+	vec3_t touchmins, touchmaxs;
 	// bounding box of entire move area
 	vec3_t clipboxmins, clipboxmaxs;
 	// size of the moving object
@@ -605,12 +615,14 @@ trace_t SV_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, co
 			Matrix4x4_CreateTranslate(&matrix, PRVM_serveredictvector(touch, origin)[0], PRVM_serveredictvector(touch, origin)[1], PRVM_serveredictvector(touch, origin)[2]);
 		Matrix4x4_Invert_Simple(&imatrix, &matrix);
 		VM_GenerateFrameGroupBlend(prog, touch->priv.server->framegroupblend, touch);
-		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model);
+		VM_FrameBlendFromFrameGroupBlend(touch->priv.server->frameblend, touch->priv.server->framegroupblend, model, sv.time);
 		VM_UpdateEdictSkeleton(prog, touch, model, touch->priv.server->frameblend);
+		VectorCopy(PRVM_serveredictvector(touch, mins), touchmins);
+		VectorCopy(PRVM_serveredictvector(touch, maxs), touchmaxs);
 		if (type == MOVE_MISSILE && (int)PRVM_serveredictfloat(touch, flags) & FL_MONSTER)
-			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipend, hitsupercontentsmask);
+			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, clipmins2, clipmaxs2, clipend, hitsupercontentsmask);
 		else
-			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, PRVM_serveredictvector(touch, mins), PRVM_serveredictvector(touch, maxs), bodysupercontents, &matrix, &imatrix, clipstart, clipmins, clipmaxs, clipend, hitsupercontentsmask);
+			Collision_ClipToGenericEntity(&trace, model, touch->priv.server->frameblend, &touch->priv.server->skeleton, touchmins, touchmaxs, bodysupercontents, &matrix, &imatrix, clipstart, clipmins, clipmaxs, clipend, hitsupercontentsmask);
 
 		Collision_CombineTraces(&cliptrace, &trace, (void *)touch, PRVM_serveredictfloat(touch, solid) == SOLID_BSP);
 	}
@@ -711,8 +723,11 @@ int SV_EntitiesInBox(const vec3_t mins, const vec3_t maxs, int maxedicts, prvm_e
 	vec3_t paddedmins, paddedmaxs;
 	if (maxedicts < 1 || resultedicts == NULL)
 		return 0;
-	VectorSet(paddedmins, mins[0] - 10, mins[1] - 10, mins[2] - 1);
-	VectorSet(paddedmaxs, maxs[0] + 10, maxs[1] + 10, maxs[2] + 1);
+	// LordHavoc: discovered this actually causes its own bugs (dm6 teleporters being too close to info_teleport_destination)
+	//VectorSet(paddedmins, mins[0] - 10, mins[1] - 10, mins[2] - 1);
+	//VectorSet(paddedmaxs, maxs[0] + 10, maxs[1] + 10, maxs[2] + 1);
+	VectorCopy(mins, paddedmins);
+	VectorCopy(maxs, paddedmaxs);
 	if (sv_areadebug.integer)
 	{
 		int numresultedicts = 0;
@@ -837,7 +852,7 @@ void SV_LinkEdict (prvm_edict_t *ent)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	dp_model_t *model;
-	vec3_t mins, maxs;
+	vec3_t mins, maxs, entmins, entmaxs, entangles;
 	int modelindex;
 
 	if (ent == prog->edicts)
@@ -855,7 +870,7 @@ void SV_LinkEdict (prvm_edict_t *ent)
 	model = SV_GetModelByIndex(modelindex);
 
 	VM_GenerateFrameGroupBlend(prog, ent->priv.server->framegroupblend, ent);
-	VM_FrameBlendFromFrameGroupBlend(ent->priv.server->frameblend, ent->priv.server->framegroupblend, model);
+	VM_FrameBlendFromFrameGroupBlend(ent->priv.server->frameblend, ent->priv.server->framegroupblend, model, sv.time);
 	VM_UpdateEdictSkeleton(prog, ent, model, ent->priv.server->frameblend);
 
 // set the abs box
@@ -864,7 +879,10 @@ void SV_LinkEdict (prvm_edict_t *ent)
 	{
 		// TODO maybe should do this for rotating SOLID_BSP too? Would behave better with rotating doors
 		// TODO special handling for spheres?
-		RotateBBox(PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), PRVM_serveredictvector(ent, angles), mins, maxs);
+		VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
+		VectorCopy(PRVM_serveredictvector(ent, maxs), entmaxs);
+		VectorCopy(PRVM_serveredictvector(ent, angles), entangles);
+		RotateBBox(entmins, entmaxs, entangles, mins, maxs);
 		VectorAdd(PRVM_serveredictvector(ent, origin), mins, mins);
 		VectorAdd(PRVM_serveredictvector(ent, origin), maxs, maxs);
 	}
@@ -954,11 +972,14 @@ static int SV_TestEntityPosition (prvm_edict_t *ent, vec3_t offset)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	int contents;
-	vec3_t org;
+	vec3_t org, entorigin, entmins, entmaxs;
 	trace_t trace;
 	contents = SV_GenericHitSuperContentsMask(ent);
 	VectorAdd(PRVM_serveredictvector(ent, origin), offset, org);
-	trace = SV_TraceBox(org, PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), PRVM_serveredictvector(ent, origin), ((PRVM_serveredictfloat(ent, movetype) == MOVETYPE_FLY_WORLDONLY) ? MOVE_WORLDONLY : MOVE_NOMONSTERS), ent, contents);
+	VectorCopy(PRVM_serveredictvector(ent, origin), entorigin);
+	VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
+	VectorCopy(PRVM_serveredictvector(ent, maxs), entmaxs);
+	trace = SV_TraceBox(org, entmins, entmaxs, entorigin, ((PRVM_serveredictfloat(ent, movetype) == MOVETYPE_FLY_WORLDONLY) ? MOVE_WORLDONLY : MOVE_NOMONSTERS), ent, contents);
 	if (trace.startsupercontents & contents)
 		return true;
 	else
@@ -971,8 +992,8 @@ static int SV_TestEntityPosition (prvm_edict_t *ent, vec3_t offset)
 			// FIXME: this breaks entities larger than the hull size
 			int i;
 			vec3_t v, m1, m2, s;
-			VectorAdd(org, PRVM_serveredictvector(ent, mins), m1);
-			VectorAdd(org, PRVM_serveredictvector(ent, maxs), m2);
+			VectorAdd(org, entmins, m1);
+			VectorAdd(org, entmaxs, m2);
 			VectorSubtract(m2, m1, s);
 #define EPSILON (1.0f / 32.0f)
 			if (s[0] >= EPSILON*2) {m1[0] += EPSILON;m2[0] -= EPSILON;}
@@ -997,7 +1018,7 @@ static int SV_TestEntityPosition (prvm_edict_t *ent, vec3_t offset)
 #else
 		// verify if the endpos is REALLY outside solid
 		VectorCopy(trace.endpos, org);
-		trace = SV_TraceBox(org, PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), org, MOVE_NOMONSTERS, ent, contents);
+		trace = SV_TraceBox(org, entmins, entmaxs, org, MOVE_NOMONSTERS, ent, contents);
 		if(trace.startsolid)
 			Con_Printf("SV_TestEntityPosition: trace.endpos detected to be in solid. NOT using it.\n");
 		else
@@ -1065,12 +1086,12 @@ void SV_CheckVelocity (prvm_edict_t *ent)
 //
 	for (i=0 ; i<3 ; i++)
 	{
-		if (IS_NAN(PRVM_serveredictvector(ent, velocity)[i]))
+		if (PRVM_IS_NAN(PRVM_serveredictvector(ent, velocity)[i]))
 		{
 			Con_Printf("Got a NaN velocity on entity #%i (%s)\n", PRVM_NUM_FOR_EDICT(ent), PRVM_GetString(prog, PRVM_serveredictstring(ent, classname)));
 			PRVM_serveredictvector(ent, velocity)[i] = 0;
 		}
-		if (IS_NAN(PRVM_serveredictvector(ent, origin)[i]))
+		if (PRVM_IS_NAN(PRVM_serveredictvector(ent, origin)[i]))
 		{
 			Con_Printf("Got a NaN origin on entity #%i (%s)\n", PRVM_NUM_FOR_EDICT(ent), PRVM_GetString(prog, PRVM_serveredictstring(ent, classname)));
 			PRVM_serveredictvector(ent, origin)[i] = 0;
@@ -1190,7 +1211,7 @@ returns the blocked flags (1 = floor, 2 = step / wall)
 ==================
 */
 #define STOP_EPSILON 0.1
-static void ClipVelocity (vec3_t in, vec3_t normal, vec3_t out, float overbounce)
+static void ClipVelocity (prvm_vec3_t in, vec3_t normal, prvm_vec3_t out, prvm_vec_t overbounce)
 {
 	int i;
 	float backoff;
@@ -1226,7 +1247,8 @@ static int SV_FlyMove (prvm_edict_t *ent, float time, qboolean applygravity, flo
 	int blocked, bumpcount;
 	int i, j, numplanes;
 	float d, time_left, gravity;
-	vec3_t dir, push, planes[MAX_CLIP_PLANES], primal_velocity, original_velocity, new_velocity;
+	vec3_t dir, push, planes[MAX_CLIP_PLANES];
+	prvm_vec3_t primal_velocity, original_velocity, new_velocity;
 #if 0
 	vec3_t end;
 #endif
@@ -1686,7 +1708,7 @@ static void SV_PushMove (prvm_edict_t *pusher, float movetime)
 	int checkcontents;
 	qboolean rotated;
 	float savesolid, movetime2, pushltime;
-	vec3_t mins, maxs, move, move1, moveangle, pushorig, pushang, a, forward, left, up, org;
+	vec3_t mins, maxs, move, move1, moveangle, pushorig, pushang, a, forward, left, up, org, pushermins, pushermaxs, checkorigin, checkmins, checkmaxs;
 	int num_moved;
 	int numcheckentities;
 	static prvm_edict_t *checkentities[MAX_EDICTS];
@@ -1850,7 +1872,12 @@ static void SV_PushMove (prvm_edict_t *pusher, float movetime)
 		// final position, move it
 		if (!((int)PRVM_serveredictfloat(check, flags) & FL_ONGROUND) || PRVM_PROG_TO_EDICT(PRVM_serveredictedict(check, groundentity)) != pusher)
 		{
-			Collision_ClipToGenericEntity(&trace, pushermodel, pusher->priv.server->frameblend, &pusher->priv.server->skeleton, PRVM_serveredictvector(pusher, mins), PRVM_serveredictvector(pusher, maxs), SUPERCONTENTS_BODY, &pusherfinalmatrix, &pusherfinalimatrix, PRVM_serveredictvector(check, origin), PRVM_serveredictvector(check, mins), PRVM_serveredictvector(check, maxs), PRVM_serveredictvector(check, origin), checkcontents);
+			VectorCopy(PRVM_serveredictvector(pusher, mins), pushermins);
+			VectorCopy(PRVM_serveredictvector(pusher, maxs), pushermaxs);
+			VectorCopy(PRVM_serveredictvector(check, origin), checkorigin);
+			VectorCopy(PRVM_serveredictvector(check, mins), checkmins);
+			VectorCopy(PRVM_serveredictvector(check, maxs), checkmaxs);
+			Collision_ClipToGenericEntity(&trace, pushermodel, pusher->priv.server->frameblend, &pusher->priv.server->skeleton, pushermins, pushermaxs, SUPERCONTENTS_BODY, &pusherfinalmatrix, &pusherfinalimatrix, checkorigin, checkmins, checkmaxs, checkorigin, checkcontents);
 			//trace = SV_TraceBox(PRVM_serveredictvector(check, origin), PRVM_serveredictvector(check, mins), PRVM_serveredictvector(check, maxs), PRVM_serveredictvector(check, origin), MOVE_NOMONSTERS, check, checkcontents);
 			if (!trace.startsolid)
 			{
@@ -1912,7 +1939,12 @@ static void SV_PushMove (prvm_edict_t *pusher, float movetime)
 			PRVM_serveredictfloat(check, flags) = (int)PRVM_serveredictfloat(check, flags) & ~FL_ONGROUND;
 
 		// if it is still inside the pusher, block
-		Collision_ClipToGenericEntity(&trace, pushermodel, pusher->priv.server->frameblend, &pusher->priv.server->skeleton, PRVM_serveredictvector(pusher, mins), PRVM_serveredictvector(pusher, maxs), SUPERCONTENTS_BODY, &pusherfinalmatrix, &pusherfinalimatrix, PRVM_serveredictvector(check, origin), PRVM_serveredictvector(check, mins), PRVM_serveredictvector(check, maxs), PRVM_serveredictvector(check, origin), checkcontents);
+		VectorCopy(PRVM_serveredictvector(pusher, mins), pushermins);
+		VectorCopy(PRVM_serveredictvector(pusher, maxs), pushermaxs);
+		VectorCopy(PRVM_serveredictvector(check, origin), checkorigin);
+		VectorCopy(PRVM_serveredictvector(check, mins), checkmins);
+		VectorCopy(PRVM_serveredictvector(check, maxs), checkmaxs);
+		Collision_ClipToGenericEntity(&trace, pushermodel, pusher->priv.server->frameblend, &pusher->priv.server->skeleton, pushermins, pushermaxs, SUPERCONTENTS_BODY, &pusherfinalmatrix, &pusherfinalimatrix, checkorigin, checkmins, checkmaxs, checkorigin, checkcontents);
 		if (trace.startsolid)
 		{
 			vec3_t move2;
@@ -2208,9 +2240,10 @@ static void SV_WallFriction (prvm_edict_t *ent, float *stepnormal)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	float d, i;
-	vec3_t forward, into, side;
+	vec3_t forward, into, side, v_angle;
 
-	AngleVectors (PRVM_serveredictvector(ent, v_angle), forward, NULL, NULL);
+	VectorCopy(PRVM_serveredictvector(ent, v_angle), v_angle);
+	AngleVectors (v_angle, forward, NULL, NULL);
 	if ((d = DotProduct (stepnormal, forward) + 0.5) < 0)
 	{
 		// cut the tangential velocity
@@ -2301,7 +2334,7 @@ static void SV_WalkMove (prvm_edict_t *ent)
 	int originalmove_groundentity;
 	int hitsupercontentsmask;
 	int type;
-	vec3_t upmove, downmove, start_origin, start_velocity, stepnormal, originalmove_origin, originalmove_velocity;
+	vec3_t upmove, downmove, start_origin, start_velocity, stepnormal, originalmove_origin, originalmove_velocity, entmins, entmaxs;
 	trace_t downtrace, trace;
 	qboolean applygravity;
 
@@ -2343,7 +2376,9 @@ static void SV_WalkMove (prvm_edict_t *ent)
 			type = MOVE_NOMONSTERS; // only clip against bmodels
 		else
 			type = MOVE_NORMAL;
-		trace = SV_TraceBox(upmove, PRVM_serveredictvector(ent, mins), PRVM_serveredictvector(ent, maxs), downmove, type, ent, SV_GenericHitSuperContentsMask(ent));
+		VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
+		VectorCopy(PRVM_serveredictvector(ent, maxs), entmaxs);
+		trace = SV_TraceBox(upmove, entmins, entmaxs, downmove, type, ent, SV_GenericHitSuperContentsMask(ent));
 		if(trace.fraction < 1 && trace.plane.normal[2] > 0.7)
 			clip |= 1; // but we HAVE found a floor
 	}
@@ -2552,10 +2587,12 @@ SV_CheckWaterTransition
 */
 static void SV_CheckWaterTransition (prvm_edict_t *ent)
 {
+	vec3_t entorigin;
 	prvm_prog_t *prog = SVVM_prog;
 	// LordHavoc: bugfixes in this function are keyed to the sv_gameplayfix_bugfixedcheckwatertransition cvar - if this cvar is 0 then all the original bugs should be reenabled for compatibility
 	int cont;
-	cont = Mod_Q1BSP_NativeContentsFromSuperContents(NULL, SV_PointSuperContents(PRVM_serveredictvector(ent, origin)));
+	VectorCopy(PRVM_serveredictvector(ent, origin), entorigin);
+	cont = Mod_Q1BSP_NativeContentsFromSuperContents(NULL, SV_PointSuperContents(entorigin));
 	if (!PRVM_serveredictfloat(ent, watertype))
 	{
 		// just spawned here
@@ -2935,7 +2972,7 @@ void SV_Physics_ClientMove(void)
 	{
 		// angle fixing was requested by physics code...
 		// so store the current angles for later use
-		memcpy(host_client->fixangle_angles, PRVM_serveredictvector(ent, angles), sizeof(host_client->fixangle_angles));
+		VectorCopy(PRVM_serveredictvector(ent, angles), host_client->fixangle_angles);
 		host_client->fixangle_angles_set = TRUE;
 
 		// and clear fixangle for the next frame
@@ -2994,7 +3031,7 @@ static void SV_Physics_ClientEntity_PostThink(prvm_edict_t *ent)
 	{
 		// angle fixing was requested by physics code...
 		// so store the current angles for later use
-		memcpy(host_client->fixangle_angles, PRVM_serveredictvector(ent, angles), sizeof(host_client->fixangle_angles));
+		VectorCopy(PRVM_serveredictvector(ent, angles), host_client->fixangle_angles);
 		host_client->fixangle_angles_set = TRUE;
 
 		// and clear fixangle for the next frame

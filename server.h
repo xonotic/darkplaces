@@ -66,12 +66,13 @@ typedef struct server_static_s
 typedef enum server_state_e {ss_loading, ss_active} server_state_t;
 
 #define MAX_CONNECTFLOODADDRESSES 16
-typedef struct server_connectfloodaddress_s
+#define MAX_GETSTATUSFLOODADDRESSES 128
+typedef struct server_floodaddress_s
 {
 	double lasttime;
 	lhnetaddress_t address;
 }
-server_connectfloodaddress_t;
+server_floodaddress_t;
 
 typedef struct server_s
 {
@@ -137,7 +138,8 @@ typedef struct server_s
 	/// connection flood blocking
 	/// note this is in server_t rather than server_static_t so that it is
 	/// reset on each map command (such as New Game in singleplayer)
-	server_connectfloodaddress_t connectfloodaddresses[MAX_CONNECTFLOODADDRESSES];
+	server_floodaddress_t connectfloodaddresses[MAX_CONNECTFLOODADDRESSES];
+	server_floodaddress_t getstatusfloodaddresses[MAX_GETSTATUSFLOODADDRESSES];
 
 #define SV_MAX_PARTICLEEFFECTNAME 256
 	qboolean particleeffectnamesloaded;
@@ -231,7 +233,7 @@ typedef struct client_s
 	float clmovement_inputtimeout;
 
 /// spawn parms are carried from level to level
-	float spawn_parms[NUM_SPAWN_PARMS];
+	prvm_vec_t spawn_parms[NUM_SPAWN_PARMS];
 
 	// properties that are sent across the network only when changed
 	char name[MAX_SCOREBOARDNAME], old_name[MAX_SCOREBOARDNAME];

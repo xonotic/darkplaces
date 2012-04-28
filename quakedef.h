@@ -25,9 +25,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #if defined(__GNUC__) && (__GNUC__ > 2)
 #define DP_FUNC_PRINTF(n) __attribute__ ((format (printf, n, n+1)))
 #define DP_FUNC_PURE      __attribute__ ((pure))
+#define DP_FUNC_NORETURN  __attribute__ ((noreturn))
 #else
 #define DP_FUNC_PRINTF(n)
 #define DP_FUNC_PURE
+#define DP_FUNC_NORETURN
 #endif
 
 #include <sys/types.h>
@@ -512,7 +514,7 @@ void Host_InitCommands(void);
 void Host_Main(void);
 void Host_Shutdown(void);
 void Host_StartVideo(void);
-void Host_Error(const char *error, ...) DP_FUNC_PRINTF(1);
+void Host_Error(const char *error, ...) DP_FUNC_PRINTF(1) DP_FUNC_NORETURN;
 void Host_Quit_f(void);
 void Host_ClientCommands(const char *fmt, ...) DP_FUNC_PRINTF(1);
 void Host_ShutdownServer(void);
@@ -555,7 +557,25 @@ void Sys_Shared_Init(void);
 #define ISWHITESPACEORCONTROL(ch) ((signed char) (ch) <= (signed char) ' ')
 
 
+#ifdef PRVM_64
+#define FLOAT_IS_TRUE_FOR_INT(x) ((x) & 0x7FFFFFFFFFFFFFFF) // also match "negative zero" doubles of value 0x8000000000000000
+#define FLOAT_LOSSLESS_FORMAT "%.17g"
+#define VECTOR_LOSSLESS_FORMAT "%.17g %.17g %.17g"
+#else
 #define FLOAT_IS_TRUE_FOR_INT(x) ((x) & 0x7FFFFFFF) // also match "negative zero" floats of value 0x80000000
+#define FLOAT_LOSSLESS_FORMAT "%.9g"
+#define VECTOR_LOSSLESS_FORMAT "%.9g %.9g %.9g"
+#endif
+
+#ifdef _MSC_VER
+#define INT_LOSSLESS_FORMAT_SIZE "I64"
+#define INT_LOSSLESS_FORMAT_CONVERT_S(x) ((__int64)(x))
+#define INT_LOSSLESS_FORMAT_CONVERT_U(x) ((unsigned __int64)(x))
+#else
+#define INT_LOSSLESS_FORMAT_SIZE "j"
+#define INT_LOSSLESS_FORMAT_CONVERT_S(x) ((intmax_t)(x))
+#define INT_LOSSLESS_FORMAT_CONVERT_U(x) ((uintmax_t)(x))
+#endif
 
 #endif
 

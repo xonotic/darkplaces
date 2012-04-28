@@ -3359,17 +3359,17 @@ static void Mod_Decompile_f(void)
 	FS_StripExtension(inname, basename, sizeof(basename));
 
 	mod = Mod_ForName(inname, false, true, inname[0] == '*' ? cl.model_name[1] : NULL);
+	if (!mod)
+	{
+		Con_Print("No such model\n");
+		return;
+	}
 	if (mod->brush.submodel)
 	{
 		// if we're decompiling a submodel, be sure to give it a proper name based on its parent
 		FS_StripExtension(cl.model_name[1], outname, sizeof(outname));
 		dpsnprintf(basename, sizeof(basename), "%s/%s", outname, mod->name);
 		outname[0] = 0;
-	}
-	if (!mod)
-	{
-		Con_Print("No such model\n");
-		return;
 	}
 	if (!mod->surfmesh.num_triangles)
 	{
@@ -4367,7 +4367,6 @@ static void Mod_GenerateLightmaps_CreateLightmaps(dp_model_t *model)
 	for (surfaceindex = 0;surfaceindex < model->num_surfaces;surfaceindex++)
 	{
 		surface = model->data_surfaces + surfaceindex;
-		e = model->surfmesh.data_element3i + surface->num_firsttriangle*3;
 		if (!surface->num_triangles)
 			continue;
 		lightmapindex = mod_generatelightmaps_lightmaptriangles[surface->num_firsttriangle].lightmapindex;
