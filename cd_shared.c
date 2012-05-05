@@ -638,14 +638,12 @@ void CDAudio_StartPlaylist(qboolean resume)
 		}
 		if (count > 0)
 		{
-			// position < 0 means never resume track
-			if (position < 0)
-				position = 0;
 			// advance to next track in playlist if the last one ended
-			if (!resume)
+			if (!resume || position < 0) // position < 0 means never resume track
 			{
 				position = 0;
-				current++;
+				if (!resume)
+					current++;
 				if (randomplay)
 					current = (int)lhrandom(0, count);
 			}
