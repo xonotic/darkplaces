@@ -146,8 +146,67 @@ void Sys_InitConsole (void)
 {
 }
 
+#ifdef ANTICHEAT
+# ifndef WIN32
+#  include <sys/ptrace.h>
+#  include <sys/wait.h>
+#  include <errno.h>
+# endif
+#endif
+static void anticheat_init(void)
+{
+#ifdef ANTICHEAT
+#define FAIL exit(42)
+
+	// anti ptrace; also, make a forked process copy to detach from debuggers
+# ifndef WIN32
+	pid_t pid = fork();
+	if(pid < 0)
+		FAIL;
+	if(pid == 0)
+	{
+		// nothing to do here
+	}
+	else
+	{
+		// parent
+		int status;
+		if(ptrace(PTRACE_ATTACH, pid, NULL, NULL) < 0)
+		{
+			kill(pid, SIGKILL);
+			FAIL;
+		}
+		for(;;)
+		{
+			if(waitpid(pid, &status, 0) == (pid_t) -1)
+			{
+				if(errno == ECHILD) // process no longer exists
+					FAIL;
+			}
+			if(WIFEXITED(status))
+			{
+				exit(WEXITSTATUS(status));
+			}
+			if(WIFSTOPPED(status))
+			{
+				printf("ptrace: continue... (signal: %d)\n", (int) WSTOPSIG(status));
+				if(ptrace(PTRACE_CONT, pid, (void *) WSTOPSIG(status), NULL) < 0)
+				{
+					perror("okay.png");
+				}
+			}
+		}
+		// never gonna get to here
+	}
+# endif
+
+#endif
+}
+
 int main (int argc, char **argv)
 {
+	anticheat_init();
+
 	signal(SIGFPE, SIG_IGN);
 
 	com_argc = argc;
