@@ -993,10 +993,14 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	*af = 0;
 
 	gldrivername = "opengl32.dll";
+
+#ifndef ANTICHEAT
 // COMMANDLINEOPTION: Windows WGL: -gl_driver <drivername> selects a GL driver library, default is opengl32.dll, useful only for 3dfxogl.dll or 3dfxvgl.dll, if you don't know what this is for, you don't need it
 	i = COM_CheckParm("-gl_driver");
 	if (i && i < com_argc - 1)
 		gldrivername = com_argv[i + 1];
+#endif
+
 	if (!GL_OpenLibrary(gldrivername))
 	{
 		Con_Printf("Unable to load GL driver %s\n", gldrivername);

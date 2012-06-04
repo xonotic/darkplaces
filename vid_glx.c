@@ -1335,12 +1335,15 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 #else
 	drivername = "libGL.so.1";
 #endif
+
+#ifndef ANTICHEAT
 // COMMANDLINEOPTION: Linux GLX: -gl_driver <drivername> selects a GL driver library, default is libGL.so.1, useful only for using fxmesa or similar, if you don't know what this is for, you don't need it
 // COMMANDLINEOPTION: BSD GLX: -gl_driver <drivername> selects a GL driver library, default is libGL.so.1, useful only for using fxmesa or similar, if you don't know what this is for, you don't need it
 // LordHavoc: although this works on MacOSX, it's useless there (as there is only one system libGL)
 	i = COM_CheckParm("-gl_driver");
 	if (i && i < com_argc - 1)
 		drivername = com_argv[i + 1];
+#endif
 	if (!GL_OpenLibrary(drivername))
 	{
 		Con_Printf("Unable to load GL driver \"%s\"\n", drivername);
