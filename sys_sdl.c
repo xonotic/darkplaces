@@ -83,7 +83,9 @@ void Sys_PrintToTerminal(const char *text)
 
 char *Sys_ConsoleInput(void)
 {
-//	if (cls.state == ca_dedicated)
+#ifdef ANTICHEAT
+	if (cls.state == ca_dedicated)
+#endif
 	{
 		static char text[MAX_INPUTLINE];
 		int len = 0;
