@@ -93,7 +93,11 @@ static void Cmd_Defer_f (void)
 			Mem_Free(cmd->value);
 			Mem_Free(cmd);
 		}
-	} else if(Cmd_Argc() == 3)
+	} else if(Cmd_Argc() == 3
+#ifdef ANTICHEAT
+		&& (cls.state != ca_connected || cls.demoplayback)
+#endif
+	)
 	{
 		const char *value = Cmd_Argv(2);
 		cmddeferred_t *defcmd = (cmddeferred_t*)Mem_Alloc(tempmempool, sizeof(*defcmd));
@@ -117,6 +121,9 @@ static void Cmd_Defer_f (void)
 		  cmd_deferred_list = defcmd;*/
 	} else {
 		Con_Printf("usage: defer <seconds> <command>\n"
+#ifdef ANTICHEAT
+			   "         (only works while not connected)\n"
+#endif
 			   "       defer clear\n");
 		return;
 	}
@@ -379,6 +386,9 @@ void Cbuf_Execute (void)
 
 void Cbuf_Frame(void)
 {
+#ifdef ANTICHEAT
+	if(cls.state != ca_connected || cls.demoplayback)
+#endif
 	Cbuf_Execute_Deferred();
 	if (cmd_text.cursize)
 	{
