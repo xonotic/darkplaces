@@ -2623,6 +2623,11 @@ static const char *RCon_Authenticate(lhnetaddress_t *peeraddress, const char *pa
 	qboolean have_usernames = false;
 	char vabuf[1024];
 
+#ifdef ANTICHEAT
+	if(cls.state != ca_dedicated)
+		return NULL;
+#endif
+
 	userpass_start = rcon_password.string;
 	while((userpass_end = strchr(userpass_start, ' ')))
 	{
