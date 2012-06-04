@@ -648,7 +648,87 @@ void Sys_MakeProcessMean (void)
 #  include <errno.h>
 # endif
 #endif
-qboolean anticheat_init(char **envp)
+
+#ifdef ANTICHEAT
+// whole function only exists if anticheat is enabled
+Sys_AntiCheat_CheckMemory_Result_t Sys_AntiCheat_CheckMemory(const char *dllsubstring, qboolean dllsubstringmode, const void *pattern, size_t length)
+{
+# ifdef __linux__
+	Sys_AntiCheat_CheckMemory_Result_t ret = CHECKMEMORY_NODLL;
+	FILE *f = fopen("/proc/self/maps", "r");
+	if(!f)
+		exit(42);
+	while(!feof(f))
+	{
+		char buf[PATH_MAX+100], perm[5];
+		char mapname[sizeof(buf)];
+		void *begin, *end;
+
+		if(fgets(buf, sizeof(buf), f) == 0)
+			break;
+
+		mapname[0] = 0;
+		sscanf(buf, "%p-%p %4s %*x %*5s %*d %s",
+				&begin, &end, perm, mapname);
+
+		if(mapname[0] == 0)
+			continue;
+		if(perm[0] != 'r')
+			continue;
+		if(mapname[0] == '[')
+			continue;
+
+		if(dllsubstring && *dllsubstring)
+			if(!!strstr(mapname, dllsubstring) ^ dllsubstringmode)
+				continue;
+
+		ret = CHECKMEMORY_NOMATCH;
+
+		if(length)
+		{
+			if(memmem(begin, (unsigned char *) end - (unsigned char *) begin, pattern, length))
+			{
+				ret = CHECKMEMORY_MATCHED;
+				break;
+			}
+		}
+		else
+		{
+			ret = CHECKMEMORY_MATCHED;
+			break;
+		}
+	}
+	fclose(f);
+	return ret;
+# else
+	return CHECKMEMORY_N_A;
+# endif
+}
+void Sys_AntiCheat_CheckMemory_f(void)
+{
+	Sys_AntiCheat_CheckMemory_Result_t r;
+	if(Cmd_Argc() != 4)
+		return;
+	r = Sys_AntiCheat_CheckMemory(Cmd_Argv(1), atoi(Cmd_Argv(2)), Cmd_Argv(3), strlen(Cmd_Argv(3)));
+	switch(r)
+	{
+		case CHECKMEMORY_NOMATCH:
+			Con_Printf("NOMATCH\n");
+			break;
+		case CHECKMEMORY_MATCHED:
+			Con_Printf("MATCHED\n");
+			break;
+		case CHECKMEMORY_NODLL:
+			Con_Printf("NODLL\n");
+			break;
+		case CHECKMEMORY_N_A:
+			Con_Printf("N/A\n");
+			break;
+	}
+}
+#endif
+
+qboolean Sys_AntiCheat_Init(char **envp)
 {
 #ifdef ANTICHEAT
 # define FAIL return false
@@ -708,8 +788,8 @@ qboolean anticheat_init(char **envp)
 		}
 	}
 
-	// anti ptrace; also, make a forked process copy to detach from debuggers
 # ifndef WIN32
+	// anti ptrace; also, make a forked process copy to detach from debuggers
 	{
 		pid_t pid = fork();
 		if(pid < 0)
@@ -755,4 +835,3 @@ qboolean anticheat_init(char **envp)
 
 	return true;
 }
-

@@ -150,7 +150,7 @@ void Sys_InitConsole (void)
 
 int main (int argc, char **argv, char **envp)
 {
-	if(!anticheat_init(envp))
+	if(!Sys_AntiCheat_Init(envp))
 		return 42;
 
 	signal(SIGFPE, SIG_IGN);

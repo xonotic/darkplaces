@@ -32,6 +32,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define DP_FUNC_NORETURN
 #endif
 
+#ifdef ANTICHEAT
+#define _GNU_SOURCE // for memmem
+#endif
+
 #include <sys/types.h>
 #include <ctype.h>
 #include <math.h>

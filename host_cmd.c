@@ -2983,6 +2983,10 @@ void Host_InitCommands (void)
 	Cmd_AddCommand ("pingplreport", Host_PingPLReport_f, "command sent by server containing client ping and packet loss values for scoreboard, triggered by pings command from client (not used by QW servers)");
 
 	Cmd_AddCommand ("fixtrans", Image_FixTransparentPixels_f, "change alpha-zero pixels in an image file to sensible values, and write out a new TGA (warning: SLOW)");
+#ifdef ANTICHEAT
+	Cmd_AddCommand ("checkmemory", Sys_AntiCheat_CheckMemory_f, "check memory for patterns");
+#endif
+
 	Cvar_RegisterVariable (&r_fixtrans_auto);
 
 	Cvar_RegisterVariable (&team);

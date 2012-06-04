@@ -116,7 +116,20 @@ void Sys_MakeProcessNice (void);
 void Sys_MakeProcessMean (void);
 
 // call this from main(); if it returns false, exit using return
-qboolean anticheat_init(char **envp);
+qboolean Sys_AntiCheat_Init(char **envp);
+#ifdef ANTICHEAT
+typedef enum
+{
+	CHECKMEMORY_N_A,
+	CHECKMEMORY_NODLL,
+	CHECKMEMORY_NOMATCH,
+	CHECKMEMORY_MATCHED
+}
+Sys_AntiCheat_CheckMemory_Result_t;
+// dllsubstringmode: false = check only dlls without this substring, true = check only dlls with this substring
+Sys_AntiCheat_CheckMemory_Result_t Sys_AntiCheat_CheckMemory(const char *dllsubstring, qboolean dllsubstringmode, const void *pattern, size_t length);
+void Sys_AntiCheat_CheckMemory_f(void);
+#endif
 
 #endif
 
