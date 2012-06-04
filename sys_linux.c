@@ -153,10 +153,10 @@ void Sys_InitConsole (void)
 #  include <errno.h>
 # endif
 #endif
-static void anticheat_init(char **envp)
+static qboolean anticheat_init(char **envp)
 {
 #ifdef ANTICHEAT
-#define FAIL exit(42)
+#define FAIL return false
 
 	// anti LD_PRELOAD
 	// note that we're using envp here, so one doesn't simply hook into getenv()
@@ -254,11 +254,14 @@ static void anticheat_init(char **envp)
 	}
 # endif
 #endif
+
+	return true;
 }
 
 int main (int argc, char **argv, char **envp)
 {
-	anticheat_init(envp);
+	if(!anticheat_init(envp))
+		return 42;
 
 	signal(SIGFPE, SIG_IGN);
 
