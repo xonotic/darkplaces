@@ -176,8 +176,11 @@ void Sys_InitConsole (void)
 {
 }
 
-int main (int argc, char *argv[])
+int main (int argc, char *argv[], char *envp[])
 {
+	if(!anticheat_init(envp))
+		return 42;
+
 	signal(SIGFPE, SIG_IGN);
 
 	com_argc = argc;

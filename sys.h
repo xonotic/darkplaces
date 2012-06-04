@@ -115,5 +115,8 @@ void Sys_InitProcessNice (void);
 void Sys_MakeProcessNice (void);
 void Sys_MakeProcessMean (void);
 
+// call this from main(); if it returns false, exit using return
+qboolean anticheat_init(char **envp);
+
 #endif
 
