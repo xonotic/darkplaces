@@ -587,6 +587,11 @@ static void HandleEvents(void)
 	{
 		XNextEvent(vidx11_display, &event);
 
+#ifdef ANTICHEAT
+		if(event.xany.send_event)
+			continue;
+#endif
+
 		switch (event.type)
 		{
 		case KeyPress:
