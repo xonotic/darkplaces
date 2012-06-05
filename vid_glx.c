@@ -588,7 +588,7 @@ static void HandleEvents(void)
 		XNextEvent(vidx11_display, &event);
 
 #ifdef ANTICHEAT
-		if(event.xany.send_event)
+		if(event.xany.send_event && event.type != MotionNotify)
 			continue;
 #endif
 
