@@ -590,6 +590,9 @@ static void HandleEvents(void)
 #ifdef ANTICHEAT
 		if(event.xany.send_event && event.type != MotionNotify)
 			continue;
+		// note: synthetic MotionNotify already only change
+		// in_windowmouse_x/y, which are not gameplay but just GUI
+		// relevant
 #endif
 
 		switch (event.type)
