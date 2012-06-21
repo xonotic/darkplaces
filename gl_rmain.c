@@ -4481,105 +4481,42 @@ void GL_Init (void)
 }
 #endif
 
-int R_CullBox(const vec3_t mins, const vec3_t maxs)
+static void R_GetCornerOfBox(const vec3_t mins, const vec3_t maxs, int signbits, vec3_t out)
 {
-	int i;
-	mplane_t *p;
-	if (r_trippy.integer)
-		return false;
-	for (i = 0;i < r_refdef.view.numfrustumplanes;i++)
-	{
-		// skip nearclip plane, it often culls portals when you are very close, and is almost never useful
-		if (i == 4)
-			continue;
-		p = r_refdef.view.frustum + i;
-		switch(p->signbits)
-		{
-		default:
-		case 0:
-			if (p->normal[0]*maxs[0] + p->normal[1]*maxs[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 1:
-			if (p->normal[0]*mins[0] + p->normal[1]*maxs[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 2:
-			if (p->normal[0]*maxs[0] + p->normal[1]*mins[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 3:
-			if (p->normal[0]*mins[0] + p->normal[1]*mins[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 4:
-			if (p->normal[0]*maxs[0] + p->normal[1]*maxs[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 5:
-			if (p->normal[0]*mins[0] + p->normal[1]*maxs[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 6:
-			if (p->normal[0]*maxs[0] + p->normal[1]*mins[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 7:
-			if (p->normal[0]*mins[0] + p->normal[1]*mins[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		}
-	}
-	return false;
+	out[0] = ((signbits & 1) ? mins : maxs)[0];
+	out[1] = ((signbits & 2) ? mins : maxs)[1];
+	out[2] = ((signbits & 4) ? mins : maxs)[2];
 }
 
-int R_CullBoxCustomPlanes(const vec3_t mins, const vec3_t maxs, int numplanes, const mplane_t *planes)
+static int R_CullBoxCustomPlanesIgnoreIndex(const vec3_t mins, const vec3_t maxs, int numplanes, const mplane_t *planes, int ignore)
 {
 	int i;
 	const mplane_t *p;
+	vec3_t corner;
 	if (r_trippy.integer)
 		return false;
 	for (i = 0;i < numplanes;i++)
 	{
+		if (i == ignore)
+			continue;
 		p = planes + i;
-		switch(p->signbits)
-		{
-		default:
-		case 0:
-			if (p->normal[0]*maxs[0] + p->normal[1]*maxs[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 1:
-			if (p->normal[0]*mins[0] + p->normal[1]*maxs[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 2:
-			if (p->normal[0]*maxs[0] + p->normal[1]*mins[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 3:
-			if (p->normal[0]*mins[0] + p->normal[1]*mins[1] + p->normal[2]*maxs[2] < p->dist)
-				return true;
-			break;
-		case 4:
-			if (p->normal[0]*maxs[0] + p->normal[1]*maxs[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 5:
-			if (p->normal[0]*mins[0] + p->normal[1]*maxs[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 6:
-			if (p->normal[0]*maxs[0] + p->normal[1]*mins[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		case 7:
-			if (p->normal[0]*mins[0] + p->normal[1]*mins[1] + p->normal[2]*mins[2] < p->dist)
-				return true;
-			break;
-		}
+		R_GetCornerOfBox(mins, maxs, p->signbits, corner);
+		if (DotProduct(p->normal, corner) < p->dist)
+			return true;
 	}
 	return false;
+}
+
+int R_CullBox(const vec3_t mins, const vec3_t maxs)
+{
+	// skip nearclip plane, it often culls portals when you are very close, and is almost never useful
+	return R_CullBoxCustomPlanesIgnoreIndex(mins, maxs, r_refdef.view.numfrustumplanes, r_refdef.view.frustum, 4);
+}
+
+int R_CullBoxCustomPlanes(const vec3_t mins, const vec3_t maxs, int numplanes, const mplane_t *planes)
+{
+	// nothing to ignore
+	return R_CullBoxCustomPlanesIgnoreIndex(mins, maxs, numplanes, planes, -1);
 }
 
 //==================================================================================
