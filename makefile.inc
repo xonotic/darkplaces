@@ -124,6 +124,7 @@ OBJ_COMMON= \
 	ft2.o \
 	utf8lib.o \
 	gl_backend.o \
+	gl_cache.o \
 	gl_draw.o \
 	gl_rmain.o \
 	gl_rsurf.o \

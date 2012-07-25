@@ -2,6 +2,8 @@
 #ifndef GL_BACKEND_H
 #define GL_BACKEND_H
 
+typedef struct shadermodeinfo_s shadermodeinfo_t;
+
 extern r_viewport_t gl_viewport;
 extern matrix4x4_t gl_modelmatrix;
 extern matrix4x4_t gl_viewmatrix;
@@ -54,7 +56,7 @@ int R_Mesh_CreateFramebufferObject(rtexture_t *depthtexture, rtexture_t *colorte
 void R_Mesh_DestroyFramebufferObject(int fbo);
 void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture, rtexture_t *colortexture2, rtexture_t *colortexture3, rtexture_t *colortexture4);
 
-unsigned int GL_Backend_CompileProgram(int vertexstrings_count, const char **vertexstrings_list, int geometrystrings_count, const char **geometrystrings_list, int fragmentstrings_count, const char **fragmentstrings_list);
+unsigned int GL_Backend_CompileProgram(shadermodeinfo_t *modeinfo, int vertexstrings_count, const char **vertexstrings_list, int geometrystrings_count, const char **geometrystrings_list, int fragmentstrings_count, const char **fragmentstrings_list);
 void GL_Backend_FreeProgram(unsigned int prog);
 
 extern cvar_t gl_paranoid;

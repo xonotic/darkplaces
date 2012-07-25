@@ -1,4 +1,4 @@
-
+#include "shadermodeinfo.h"
 #include "quakedef.h"
 #include "cl_collision.h"
 #include "dpsoftrast.h"
@@ -2616,11 +2616,12 @@ void R_Mesh_Start(void)
 	}
 }
 
-static qboolean GL_Backend_CompileShader(int programobject, GLenum shadertypeenum, const char *shadertype, int numstrings, const char **strings)
+static qboolean GL_Backend_CompileShader(shadermodeinfo_t *modeinfo, int programobject, GLenum shadertypeenum, const char *shadertype, int numstrings, const char **strings)
 {
 	int shaderobject;
 	int shadercompiled;
 	char compilelog[MAX_INPUTLINE];
+
 	shaderobject = qglCreateShader(shadertypeenum);CHECKGLERROR
 	if (!shaderobject)
 		return false;
@@ -2647,7 +2648,7 @@ static qboolean GL_Backend_CompileShader(int programobject, GLenum shadertypeenu
 	return true;
 }
 
-unsigned int GL_Backend_CompileProgram(int vertexstrings_count, const char **vertexstrings_list, int geometrystrings_count, const char **geometrystrings_list, int fragmentstrings_count, const char **fragmentstrings_list)
+unsigned int GL_Backend_CompileProgram(shadermodeinfo_t *modeinfo, int vertexstrings_count, const char **vertexstrings_list, int geometrystrings_count, const char **geometrystrings_list, int fragmentstrings_count, const char **fragmentstrings_list)
 {
 	GLint programlinked;
 	GLuint programobject = 0;
@@ -2673,15 +2674,15 @@ unsigned int GL_Backend_CompileProgram(int vertexstrings_count, const char **ver
 		qglBindFragDataLocation(programobject, 0, "dp_FragColor");
 #endif
 
-	if (vertexstrings_count && !GL_Backend_CompileShader(programobject, GL_VERTEX_SHADER, "vertex", vertexstrings_count, vertexstrings_list))
+	if (vertexstrings_count && !GL_Backend_CompileShader(modeinfo, programobject, GL_VERTEX_SHADER, "vertex", vertexstrings_count, vertexstrings_list))
 		goto cleanup;
 
 #ifdef GL_GEOMETRY_SHADER
-	if (geometrystrings_count && !GL_Backend_CompileShader(programobject, GL_GEOMETRY_SHADER, "geometry", geometrystrings_count, geometrystrings_list))
+	if (geometrystrings_count && !GL_Backend_CompileShader(modeinfo, programobject, GL_GEOMETRY_SHADER, "geometry", geometrystrings_count, geometrystrings_list))
 		goto cleanup;
 #endif
 
-	if (fragmentstrings_count && !GL_Backend_CompileShader(programobject, GL_FRAGMENT_SHADER, "fragment", fragmentstrings_count, fragmentstrings_list))
+	if (fragmentstrings_count && !GL_Backend_CompileShader(modeinfo, programobject, GL_FRAGMENT_SHADER, "fragment", fragmentstrings_count, fragmentstrings_list))
 		goto cleanup;
 
 	qglLinkProgram(programobject);CHECKGLERROR

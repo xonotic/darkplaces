@@ -1,6 +1,6 @@
 #define GL_CACHE_VERSION        1
 
-typedefstruct gl_cache_header_s
+typedef struct gl_cache_header_s
 {
   int version;
   int crc;

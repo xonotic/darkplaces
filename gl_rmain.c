@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 // r_main.c
 
+#include "shadermodeinfo.h"
 #include "quakedef.h"
 #include "cl_dyntexture.h"
 #include "r_shadow.h"
@@ -616,6 +617,8 @@ typedef struct shaderpermutationinfo_s
 }
 shaderpermutationinfo_t;
 
+// ~exidl: moved to shadermodeinfo.h
+/*
 typedef struct shadermodeinfo_s
 {
 	const char *vertexfilename;
@@ -625,6 +628,7 @@ typedef struct shadermodeinfo_s
 	const char *name;
 }
 shadermodeinfo_t;
+*/
 
 // NOTE: MUST MATCH ORDER OF SHADERPERMUTATION_* DEFINES!
 shaderpermutationinfo_t shaderpermutationinfo[SHADERPERMUTATION_COUNT] =
@@ -1088,7 +1092,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 
 	// compile the shader program
 	if (vertstrings_count + geomstrings_count + fragstrings_count)
-		p->program = GL_Backend_CompileProgram(vertstrings_count, vertstrings_list, geomstrings_count, geomstrings_list, fragstrings_count, fragstrings_list);
+	  p->program = GL_Backend_CompileProgram(modeinfo, vertstrings_count, vertstrings_list, geomstrings_count, geomstrings_list, fragstrings_count, fragstrings_list);
 	if (p->program)
 	{
 		CHECKGLERROR
