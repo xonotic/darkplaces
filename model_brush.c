@@ -62,6 +62,8 @@ cvar_t mod_q1bsp_polygoncollisions = {0, "mod_q1bsp_polygoncollisions", "0", "di
 cvar_t mod_collision_bih = {0, "mod_collision_bih", "1", "enables use of generated Bounding Interval Hierarchy tree instead of compiled bsp tree in collision code"};
 cvar_t mod_recalculatenodeboxes = {0, "mod_recalculatenodeboxes", "1", "enables use of generated node bounding boxes based on BSP tree portal reconstruction, rather than the node boxes supplied by the map compiler"};
 
+cvar_t mod_jkbsp_nolightmaps = {CVAR_SAVE, "mod_jkbsp_nolightmaps", "0", "do not load lightmaps in JKBSP maps (to save video RAM, but be warned: it looks ugly)"};
+
 static texture_t mod_q1bsp_texture_solid;
 static texture_t mod_q1bsp_texture_sky;
 static texture_t mod_q1bsp_texture_lava;
@@ -104,6 +106,8 @@ void Mod_BrushInit(void)
 	Cvar_RegisterVariable(&mod_q1bsp_polygoncollisions);
 	Cvar_RegisterVariable(&mod_collision_bih);
 	Cvar_RegisterVariable(&mod_recalculatenodeboxes);
+
+	Cvar_RegisterVariable(&mod_jkbsp_nolightmaps);
 
 	// these games were made for older DP engines and are no longer
 	// maintained; use this hack to show their textures properly
@@ -7404,6 +7408,2304 @@ void Mod_IBSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		Mod_Q2BSP_Load(mod,buffer, bufferend);
 	else
 		Host_Error("Mod_IBSP_Load: unknown/unsupported version %i", i);
+}
+
+//
+// ~exidl: RBSP support
+//
+static void Mod_JKBSP_LoadEntities(lump_t *l)
+{
+	const char *data;
+	char key[128], value[MAX_INPUTLINE];
+	float v[3];
+	loadmodel->brushjk.num_lightgrid_cellsize[0] = 64;
+	loadmodel->brushjk.num_lightgrid_cellsize[1] = 64;
+	loadmodel->brushjk.num_lightgrid_cellsize[2] = 128;
+	if (!l->filelen)
+		return;
+	loadmodel->brush.entities = (char *)Mem_Alloc(loadmodel->mempool, l->filelen + 1);
+	memcpy(loadmodel->brush.entities, mod_base + l->fileofs, l->filelen);
+	loadmodel->brush.entities[l->filelen] = 0;
+	data = loadmodel->brush.entities;
+	// some Q3 maps override the lightgrid_cellsize with a worldspawn key
+	// VorteX: q3map2 FS-R generates tangentspace deluxemaps for q3bsp and sets 'deluxeMaps' key
+	loadmodel->brushjk.deluxemapping = false;
+	if (data && COM_ParseToken_Simple(&data, false, false, true) && com_token[0] == '{')
+	{
+		while (1)
+		{
+			if (!COM_ParseToken_Simple(&data, false, false, true))
+				break; // error
+			if (com_token[0] == '}')
+				break; // end of worldspawn
+			if (com_token[0] == '_')
+				strlcpy(key, com_token + 1, sizeof(key));
+			else
+				strlcpy(key, com_token, sizeof(key));
+			while (key[strlen(key)-1] == ' ') // remove trailing spaces
+				key[strlen(key)-1] = 0;
+			if (!COM_ParseToken_Simple(&data, false, false, true))
+				break; // error
+			strlcpy(value, com_token, sizeof(value));
+			if (!strcasecmp("gridsize", key)) // this one is case insensitive to 100% match q3map2
+			{
+#if _MSC_VER >= 1400
+#define sscanf sscanf_s
+#endif
+#if 0
+				if (sscanf(value, "%f %f %f", &v[0], &v[1], &v[2]) == 3 && v[0] != 0 && v[1] != 0 && v[2] != 0)
+					VectorCopy(v, loadmodel->brushjk.num_lightgrid_cellsize);
+#else
+				VectorSet(v, 64, 64, 128);
+				if(sscanf(value, "%f %f %f", &v[0], &v[1], &v[2]) != 3)
+					Con_Printf("Mod_JKBSP_LoadEntities: funny gridsize \"%s\" in %s, interpreting as \"%f %f %f\" to match q3map2's parsing\n", value, loadmodel->name, v[0], v[1], v[2]);
+				if (v[0] != 0 && v[1] != 0 && v[2] != 0)
+					VectorCopy(v, loadmodel->brushjk.num_lightgrid_cellsize);
+#endif
+			}
+			else if (!strcmp("deluxeMaps", key))
+			{
+				if (!strcmp(com_token, "1"))
+				{
+					loadmodel->brushjk.deluxemapping = true;
+					loadmodel->brushjk.deluxemapping_modelspace = true;
+				}
+				else if (!strcmp(com_token, "2"))
+				{
+					loadmodel->brushjk.deluxemapping = true;
+					loadmodel->brushjk.deluxemapping_modelspace = false;
+				}
+			}
+		}
+	}
+}
+
+static void Mod_JKBSP_LoadTextures(lump_t *l)
+{
+	jkdtexture_t *in;
+	texture_t *out;
+	int i, count;
+
+	in = (jkdtexture_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadTextures: funny lump size in %s", loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (texture_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->data_textures = out;
+	loadmodel->num_textures = count;
+	loadmodel->num_texturesperskin = loadmodel->num_textures;
+
+	for (i = 0;i < count;i++)
+	{
+		strlcpy (out[i].name, in[i].name, sizeof (out[i].name));
+		out[i].surfaceflags = LittleLong(in[i].surfaceflags);
+		out[i].supercontents = Mod_Q3BSP_SuperContentsFromNativeContents(loadmodel, LittleLong(in[i].contents));
+		Mod_LoadTextureFromQ3Shader(out + i, out[i].name, true, true, TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS);
+		// restore the surfaceflags and supercontents
+		out[i].surfaceflags = LittleLong(in[i].surfaceflags);
+		out[i].supercontents = Mod_Q3BSP_SuperContentsFromNativeContents(loadmodel, LittleLong(in[i].contents));
+	}
+}
+
+static void Mod_JKBSP_LoadPlanes(lump_t *l)
+{
+	jkdplane_t *in;
+	mplane_t *out;
+	int i, count;
+
+	in = (jkdplane_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadPlanes: funny lump size in %s", loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (mplane_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_planes = out;
+	loadmodel->brush.num_planes = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		out->normal[0] = LittleFloat(in->normal[0]);
+		out->normal[1] = LittleFloat(in->normal[1]);
+		out->normal[2] = LittleFloat(in->normal[2]);
+		out->dist = LittleFloat(in->dist);
+		PlaneClassify(out);
+	}
+}
+
+static void Mod_JKBSP_LoadBrushSides(lump_t *l)
+{
+	jkdbrushside_t *in;
+	q3mbrushside_t *out;
+	int i, n, count;
+
+	in = (jkdbrushside_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadBrushSides: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (q3mbrushside_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_brushsides = out;
+	loadmodel->brush.num_brushsides = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		n = LittleLong(in->planeindex);
+		if (n < 0 || n >= loadmodel->brush.num_planes)
+			Host_Error("Mod_JKBSP_LoadBrushSides: invalid planeindex %i (%i planes)", n, loadmodel->brush.num_planes);
+		out->plane = loadmodel->brush.data_planes + n;
+		n = LittleLong(in->textureindex);
+		if (n < 0 || n >= loadmodel->num_textures)
+			Host_Error("Mod_JKBSP_LoadBrushSides: invalid textureindex %i (%i textures)", n, loadmodel->num_textures);
+		out->texture = loadmodel->data_textures + n;
+	}
+}
+
+static void Mod_JKBSP_LoadBrushes(lump_t *l)
+{
+	jkdbrush_t *in;
+	q3mbrush_t *out;
+	int i, j, n, c, count, maxplanes, q3surfaceflags;
+	colplanef_t *planes;
+
+	in = (jkdbrush_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadBrushes: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (q3mbrush_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_brushes = out;
+	loadmodel->brush.num_brushes = count;
+
+	maxplanes = 0;
+	planes = NULL;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		n = LittleLong(in->firstbrushside);
+		c = LittleLong(in->numbrushsides);
+		if (n < 0 || n + c > loadmodel->brush.num_brushsides)
+			Host_Error("Mod_JKBSP_LoadBrushes: invalid brushside range %i : %i (%i brushsides)", n, n + c, loadmodel->brush.num_brushsides);
+		out->firstbrushside = loadmodel->brush.data_brushsides + n;
+		out->numbrushsides = c;
+		n = LittleLong(in->textureindex);
+		if (n < 0 || n >= loadmodel->num_textures)
+			Host_Error("Mod_JKBSP_LoadBrushes: invalid textureindex %i (%i textures)", n, loadmodel->num_textures);
+		out->texture = loadmodel->data_textures + n;
+
+		// make a list of mplane_t structs to construct a colbrush from
+		if (maxplanes < out->numbrushsides)
+		{
+			maxplanes = out->numbrushsides;
+			if (planes)
+				Mem_Free(planes);
+			planes = (colplanef_t *)Mem_Alloc(tempmempool, sizeof(colplanef_t) * maxplanes);
+		}
+		q3surfaceflags = 0;
+		for (j = 0;j < out->numbrushsides;j++)
+		{
+			VectorCopy(out->firstbrushside[j].plane->normal, planes[j].normal);
+			planes[j].dist = out->firstbrushside[j].plane->dist;
+			planes[j].q3surfaceflags = out->firstbrushside[j].texture->surfaceflags;
+			planes[j].texture = out->firstbrushside[j].texture;
+			q3surfaceflags |= planes[j].q3surfaceflags;
+		}
+		// make the colbrush from the planes
+		out->colbrushf = Collision_NewBrushFromPlanes(loadmodel->mempool, out->numbrushsides, planes, out->texture->supercontents, q3surfaceflags, out->texture, true);
+
+		// this whole loop can take a while (e.g. on redstarrepublic4)
+		CL_KeepaliveMessage(false);
+	}
+	if (planes)
+		Mem_Free(planes);
+}
+
+static void Mod_JKBSP_LoadEffects(lump_t *l)
+{
+	jkdeffect_t *in;
+	q3deffect_t *out;
+	int i, n, count;
+
+	in = (jkdeffect_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadEffects: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (q3deffect_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brushjk.data_effects = out;
+	loadmodel->brushjk.num_effects = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		strlcpy (out->shadername, in->shadername, sizeof (out->shadername));
+		n = LittleLong(in->brushindex);
+		if (n >= loadmodel->brush.num_brushes)
+		{
+			Con_Printf("Mod_JKBSP_LoadEffects: invalid brushindex %i (%i brushes), setting to -1\n", n, loadmodel->brush.num_brushes);
+			n = -1;
+		}
+		out->brushindex = n;
+		out->unknown = LittleLong(in->unknown);
+	}
+}
+
+static void Mod_JKBSP_LoadVertices(lump_t *l)
+{
+	jkdvertex_t *in;
+	int i, j, count;
+
+	in = (jkdvertex_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadVertices: funny lump size in %s", loadmodel->name);
+	loadmodel->brushjk.num_vertices = count = l->filelen / sizeof(*in);
+	loadmodel->brushjk.data_vertex3f = (float *)Mem_Alloc(loadmodel->mempool, count * (sizeof(float) * (3 + 3 + 2)));
+	loadmodel->brushjk.data_normal3f = loadmodel->brushjk.data_vertex3f + count * 3;
+	loadmodel->brushjk.data_texcoordtexture2f = loadmodel->brushjk.data_normal3f + count * 3;
+
+	loadmodel->brushjk.data_texcoordlightmap2f = (float **)Mem_Alloc(loadmodel->mempool, MAX_LIGHTMAPS);
+	loadmodel->brushjk.data_texcoordlightmap2f[0] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
+	loadmodel->brushjk.data_texcoordlightmap2f[1] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
+	loadmodel->brushjk.data_texcoordlightmap2f[2] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
+	loadmodel->brushjk.data_texcoordlightmap2f[3] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
+	loadmodel->brushjk.data_color4f = (float **)Mem_Alloc(loadmodel->mempool, MAX_LIGHTMAPS);
+	loadmodel->brushjk.data_color4f[0] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+	loadmodel->brushjk.data_color4f[1] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+	loadmodel->brushjk.data_color4f[2] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+	loadmodel->brushjk.data_color4f[3] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+
+	for (i = 0; i < count; i++, in++)
+	{
+		loadmodel->brushjk.data_vertex3f[i * 3 + 0] = LittleFloat(in->origin3f[0]);
+		loadmodel->brushjk.data_vertex3f[i * 3 + 1] = LittleFloat(in->origin3f[1]);
+		loadmodel->brushjk.data_vertex3f[i * 3 + 2] = LittleFloat(in->origin3f[2]);
+		loadmodel->brushjk.data_normal3f[i * 3 + 0] = LittleFloat(in->normal3f[0]);
+		loadmodel->brushjk.data_normal3f[i * 3 + 1] = LittleFloat(in->normal3f[1]);
+		loadmodel->brushjk.data_normal3f[i * 3 + 2] = LittleFloat(in->normal3f[2]);
+		loadmodel->brushjk.data_texcoordtexture2f[i * 2 + 0] = LittleFloat(in->texcoord2f[0]);
+		loadmodel->brushjk.data_texcoordtexture2f[i * 2 + 1] = LittleFloat(in->texcoord2f[1]);
+		for (j = 0; j < MAX_LIGHTMAPS; j++)
+		{
+			loadmodel->brushjk.data_texcoordlightmap2f[j][i * 2 + 0] = LittleFloat(in->lightmap2f[j][0]);
+			loadmodel->brushjk.data_texcoordlightmap2f[j][i * 2 + 1] = LittleFloat(in->lightmap2f[j][1]);
+		}
+		// svector/tvector are calculated later in face loading
+		if(mod_q3bsp_sRGBlightmaps.integer)
+		{
+			// if lightmaps are sRGB, vertex colors are sRGB too, so we need to linearize them
+			// note: when this is in use, lightmap color 128 is no longer neutral, but "sRGB half power" is
+			// working like this may be odd, but matches q3map2 -gamma 2.2
+			if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+			{
+				for (j = 0; j < MAX_LIGHTMAPS; j++)
+				{
+					loadmodel->brushjk.data_color4f[j][i * 4 + 0] = in->color4ub[j][0] * (1.0f / 255.0f);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 1] = in->color4ub[j][1] * (1.0f / 255.0f);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 2] = in->color4ub[j][2] * (1.0f / 255.0f);
+				}
+				// we fix the brightness consistently via lightmapscale
+			}
+			else
+			{
+				for (j = 0; j < MAX_LIGHTMAPS; j++)
+				{
+					loadmodel->brushjk.data_color4f[j][i * 4 + 0] = Image_LinearFloatFromsRGB(in->color4ub[j][0]);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 1] = Image_LinearFloatFromsRGB(in->color4ub[j][1]);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 2] = Image_LinearFloatFromsRGB(in->color4ub[j][2]);
+				}
+			}
+		}
+		else
+		{
+			if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+			{
+				for (j = 0; j < MAX_LIGHTMAPS; j++)
+				{
+					loadmodel->brushjk.data_color4f[j][i * 4 + 0] = Image_sRGBFloatFromLinear_Lightmap(in->color4ub[j][0]);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 1] = Image_sRGBFloatFromLinear_Lightmap(in->color4ub[j][1]);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 2] = Image_sRGBFloatFromLinear_Lightmap(in->color4ub[j][2]);
+				}
+			}
+			else
+			{
+				for (j = 0; j < MAX_LIGHTMAPS; j++)
+				{
+					loadmodel->brushjk.data_color4f[j][i * 4 + 0] = in->color4ub[j][0] * (1.0f / 255.0f);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 1] = in->color4ub[j][1] * (1.0f / 255.0f);
+					loadmodel->brushjk.data_color4f[j][i * 4 + 2] = in->color4ub[j][2] * (1.0f / 255.0f);
+				}
+			}
+		}
+		for (j = 0; j < MAX_LIGHTMAPS; j++)
+			loadmodel->brushjk.data_color4f[j][i * 4 + 3] = in->color4ub[j][3] * (1.0f / 255.0f);
+		if(in->color4ub[0][0] != 255 || in->color4ub[0][1] != 255 || in->color4ub[0][2] != 255)
+			loadmodel->lit = true; // ~exidl: have to do lit[4] instead ?
+	}
+}
+
+static void Mod_JKBSP_LoadTriangles(lump_t *l)
+{
+	int *in;
+	int *out;
+	int i, count;
+
+	in = (int *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(int[3]))
+		Host_Error("Mod_JKBSP_LoadTriangles: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+
+	if(!loadmodel->brushjk.num_vertices)
+	{
+		if (count)
+			Con_Printf("Mod_JKBSP_LoadTriangles: %s has triangles but no vertexes, broken compiler, ignoring problem\n", loadmodel->name);
+		loadmodel->brushjk.num_triangles = 0;
+		return;
+	}
+
+	out = (int *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	loadmodel->brushjk.num_triangles = count / 3;
+	loadmodel->brushjk.data_element3i = out;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		*out = LittleLong(*in);
+		if (*out < 0 || *out >= loadmodel->brushjk.num_vertices)
+		{
+			Con_Printf("Mod_JKBSP_LoadTriangles: invalid vertexindex %i (%i vertices), setting to 0\n", *out, loadmodel->brushjk.num_vertices);
+			*out = 0;
+		}
+	}
+}
+
+static void Mod_JKBSP_LoadLightmaps(lump_t *l, lump_t *faceslump)
+{
+	jkdlightmap_t *input_pointer;
+	int i;
+	int j;
+	int k;
+	int count;
+	int powerx;
+	int powery;
+	int powerxy;
+	int powerdxy;
+	int endlightmap;
+	int mergegoal;
+	int lightmapindex;
+	int realcount;
+	int realindex;
+	int mergedwidth;
+	int mergedheight;
+	int mergedcolumns;
+	int mergedrows;
+	int mergedrowsxcolumns;
+	int size;
+	int bytesperpixel;
+	int rgbmap[3];
+	unsigned char *c;
+	unsigned char *mergedpixels;
+	unsigned char *mergeddeluxepixels;
+	unsigned char *mergebuf;
+	char mapname[MAX_QPATH];
+	qboolean external;
+	unsigned char *inpixels[10000]; // max count q3map2 can output (it uses 4 digits)
+	char vabuf[1024];
+
+	// defaults for q3bsp
+	size = 128;
+	bytesperpixel = 3;
+	rgbmap[0] = 2;
+	rgbmap[1] = 1;
+	rgbmap[2] = 0;
+	external = false;
+	loadmodel->brushjk.lightmapsize = 128;
+
+	if (cls.state == ca_dedicated)
+		return;
+
+	if(mod_q3bsp_nolightmaps.integer)
+	{
+		return;
+	}
+	else if(l->filelen)
+	{
+		// prefer internal LMs for compatibility (a BSP contains no info on whether external LMs exist)
+		if (developer_loading.integer)
+			Con_Printf("Using internal lightmaps\n");
+		input_pointer = (jkdlightmap_t *)(mod_base + l->fileofs);
+		if (l->filelen % sizeof(*input_pointer))
+			Host_Error("Mod_JKBSP_LoadLightmaps: funny lump size in %s",loadmodel->name);
+		count = l->filelen / sizeof(*input_pointer);
+		for(i = 0; i < count; ++i)
+			inpixels[i] = input_pointer[i].rgb;
+	}
+	else
+	{
+		// no internal lightmaps
+		// try external lightmaps
+		if (developer_loading.integer)
+			Con_Printf("Using external lightmaps\n");
+		FS_StripExtension(loadmodel->name, mapname, sizeof(mapname));
+		inpixels[0] = loadimagepixelsbgra(va(vabuf, sizeof(vabuf), "%s/lm_%04d", mapname, 0), false, false, false, NULL);
+		if(!inpixels[0])
+			return;
+
+		// using EXTERNAL lightmaps instead
+		if(image_width != (int) CeilPowerOf2(image_width) || image_width != image_height)
+		{
+			Mem_Free(inpixels[0]);
+			Host_Error("Mod_JKBSP_LoadLightmaps: invalid external lightmap size in %s",loadmodel->name);
+		}
+
+		size = image_width;
+		bytesperpixel = 4;
+		rgbmap[0] = 0;
+		rgbmap[1] = 1;
+		rgbmap[2] = 2;
+		external = true;
+
+		for(count = 1; ; ++count)
+		{
+			inpixels[count] = loadimagepixelsbgra(va(vabuf, sizeof(vabuf), "%s/lm_%04d", mapname, count), false, false, false, NULL);
+			if(!inpixels[count])
+				break; // we got all of them
+			if(image_width != size || image_height != size)
+			{
+				Mem_Free(inpixels[count]);
+				inpixels[count] = NULL;
+				Con_Printf("Mod_JKBSP_LoadLightmaps: mismatched lightmap size in %s - external lightmap %s/lm_%04d does not match earlier ones\n", loadmodel->name, mapname, count);
+				break;
+			}
+		}
+	}
+
+	loadmodel->brushjk.lightmapsize = size;
+	loadmodel->brushjk.num_originallightmaps = count;
+
+	// now check the surfaces to see if any of them index an odd numbered
+	// lightmap, if so this is not a deluxemapped bsp file
+	//
+	// also check what lightmaps are actually used, because q3map2 sometimes
+	// (always?) makes an unused one at the end, which
+	// q3map2 sometimes (or always?) makes a second blank lightmap for no
+	// reason when only one lightmap is used, which can throw off the
+	// deluxemapping detection method, so check 2-lightmap bsp's specifically
+	// to see if the second lightmap is blank, if so it is not deluxemapped.
+	// VorteX: autodetect only if previous attempt to find "deluxeMaps" key
+	// in Mod_JKBSP_LoadEntities was failed
+	if (!loadmodel->brushjk.deluxemapping)
+	{
+		loadmodel->brushjk.deluxemapping = !(count & 1);
+		loadmodel->brushjk.deluxemapping_modelspace = true;
+		endlightmap = 0;
+		if (loadmodel->brushjk.deluxemapping)
+		{
+			int facecount = faceslump->filelen / sizeof(jkdface_t);
+			jkdface_t *faces = (jkdface_t *)(mod_base + faceslump->fileofs);
+			for (i = 0;i < facecount;i++)
+			{
+				j = LittleLong(faces[i].lightmapindex);
+				if (j >= 0)
+				{
+					endlightmap = max(endlightmap, j + 1);
+					if ((j & 1) || j + 1 >= count)
+					{
+						loadmodel->brushjk.deluxemapping = false;
+						break;
+					}
+				}
+			}
+		}
+
+		// q3map2 sometimes (or always?) makes a second blank lightmap for no
+		// reason when only one lightmap is used, which can throw off the
+		// deluxemapping detection method, so check 2-lightmap bsp's specifically
+		// to see if the second lightmap is blank, if so it is not deluxemapped.
+		//
+		// further research has shown q3map2 sometimes creates a deluxemap and two
+		// blank lightmaps, which must be handled properly as well
+		if (endlightmap == 1 && count > 1)
+		{
+			c = inpixels[1];
+			for (i = 0;i < size*size;i++)
+			{
+				if (c[bytesperpixel*i + rgbmap[0]])
+					break;
+				if (c[bytesperpixel*i + rgbmap[1]])
+					break;
+				if (c[bytesperpixel*i + rgbmap[2]])
+					break;
+			}
+			if (i == size*size)
+			{
+				// all pixels in the unused lightmap were black...
+				loadmodel->brushjk.deluxemapping = false;
+			}
+		}
+	}
+
+	Con_DPrintf("%s is %sdeluxemapped\n", loadmodel->name, loadmodel->brushjk.deluxemapping ? "" : "not ");
+
+	// figure out what the most reasonable merge power is within limits
+
+	// find the appropriate NxN dimensions to merge to, to avoid wasted space
+	realcount = count >> (int)loadmodel->brushjk.deluxemapping;
+
+	// figure out how big the merged texture has to be
+	mergegoal = 128<<bound(0, mod_q3bsp_lightmapmergepower.integer, 6);
+	mergegoal = bound(size, mergegoal, (int)vid.maxtexturesize_2d);
+	while (mergegoal > size && mergegoal * mergegoal / 4 >= size * size * realcount)
+		mergegoal /= 2;
+	mergedwidth = mergegoal;
+	mergedheight = mergegoal;
+	// choose non-square size (2x1 aspect) if only half the space is used;
+	// this really only happens when the entire set fits in one texture, if
+	// there are multiple textures, we don't worry about shrinking the last
+	// one to fit, because the driver prefers the same texture size on
+	// consecutive draw calls...
+	if (mergedwidth * mergedheight / 2 >= size*size*realcount)
+		mergedheight /= 2;
+
+	loadmodel->brushjk.num_lightmapmergedwidthpower = 0;
+	loadmodel->brushjk.num_lightmapmergedheightpower = 0;
+	while (mergedwidth > size<<loadmodel->brushjk.num_lightmapmergedwidthpower)
+		loadmodel->brushjk.num_lightmapmergedwidthpower++;
+	while (mergedheight > size<<loadmodel->brushjk.num_lightmapmergedheightpower)
+		loadmodel->brushjk.num_lightmapmergedheightpower++;
+	loadmodel->brushjk.num_lightmapmergedwidthheightdeluxepower = loadmodel->brushjk.num_lightmapmergedwidthpower + loadmodel->brushjk.num_lightmapmergedheightpower + (loadmodel->brushjk.deluxemapping ? 1 : 0);
+
+	powerx = loadmodel->brushjk.num_lightmapmergedwidthpower;
+	powery = loadmodel->brushjk.num_lightmapmergedheightpower;
+	powerxy = powerx+powery;
+	powerdxy = loadmodel->brushjk.deluxemapping + powerxy;
+
+	mergedcolumns = 1 << powerx;
+	mergedrows = 1 << powery;
+	mergedrowsxcolumns = 1 << powerxy;
+
+	loadmodel->brushjk.num_mergedlightmaps = (realcount + (1 << powerxy) - 1) >> powerxy;
+	loadmodel->brushjk.data_lightmaps = (rtexture_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brushjk.num_mergedlightmaps * sizeof(rtexture_t *));
+	if (loadmodel->brushjk.deluxemapping)
+		loadmodel->brushjk.data_deluxemaps = (rtexture_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brushjk.num_mergedlightmaps * sizeof(rtexture_t *));
+
+	// allocate a texture pool if we need it
+	if (loadmodel->texturepool == NULL && cls.state != ca_dedicated)
+		loadmodel->texturepool = R_AllocTexturePool();
+
+	mergedpixels = (unsigned char *) Mem_Alloc(tempmempool, mergedwidth * mergedheight * 4);
+	mergeddeluxepixels = loadmodel->brushjk.deluxemapping ? (unsigned char *) Mem_Alloc(tempmempool, mergedwidth * mergedheight * 4) : NULL;
+	for (i = 0;i < count;i++)
+	{
+		// figure out which merged lightmap texture this fits into
+		realindex = i >> (int)loadmodel->brushjk.deluxemapping;
+		lightmapindex = i >> powerdxy;
+
+		// choose the destination address
+		mergebuf = (loadmodel->brushjk.deluxemapping && (i & 1)) ? mergeddeluxepixels : mergedpixels;
+		mergebuf += 4 * (realindex & (mergedcolumns-1))*size + 4 * ((realindex >> powerx) & (mergedrows-1))*mergedwidth*size;
+		if ((i & 1) == 0 || !loadmodel->brushjk.deluxemapping)
+			Con_DPrintf("copying original lightmap %i (%ix%i) to %i (at %i,%i)\n", i, size, size, lightmapindex, (realindex & (mergedcolumns-1))*size, ((realindex >> powerx) & (mergedrows-1))*size);
+
+		// convert pixels from RGB or BGRA while copying them into the destination rectangle
+		for (j = 0;j < size;j++)
+		for (k = 0;k < size;k++)
+		{
+			mergebuf[(j*mergedwidth+k)*4+0] = inpixels[i][(j*size+k)*bytesperpixel+rgbmap[0]];
+			mergebuf[(j*mergedwidth+k)*4+1] = inpixels[i][(j*size+k)*bytesperpixel+rgbmap[1]];
+			mergebuf[(j*mergedwidth+k)*4+2] = inpixels[i][(j*size+k)*bytesperpixel+rgbmap[2]];
+			mergebuf[(j*mergedwidth+k)*4+3] = 255;
+		}
+
+		// upload texture if this was the last tile being written to the texture
+		if (((realindex + 1) & (mergedrowsxcolumns - 1)) == 0 || (realindex + 1) == realcount)
+		{
+			if (loadmodel->brushjk.deluxemapping && (i & 1))
+				loadmodel->brushjk.data_deluxemaps[lightmapindex] = R_LoadTexture2D(loadmodel->texturepool, va(vabuf, sizeof(vabuf), "deluxemap%04i", lightmapindex), mergedwidth, mergedheight, mergeddeluxepixels, TEXTYPE_BGRA, TEXF_FORCELINEAR | (gl_texturecompression_q3bspdeluxemaps.integer ? TEXF_COMPRESS : 0), -1, NULL);
+			else
+			{
+				if(mod_q3bsp_sRGBlightmaps.integer)
+				{
+					textype_t t;
+					if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+					{
+						t = TEXTYPE_BGRA; // in stupid fallback mode, we upload lightmaps in sRGB form and just fix their brightness
+						// we fix the brightness consistently via lightmapscale
+					}
+					else
+						t = TEXTYPE_SRGB_BGRA; // normally, we upload lightmaps in sRGB form (possibly downconverted to linear)
+					loadmodel->brushjk.data_lightmaps [lightmapindex] = R_LoadTexture2D(loadmodel->texturepool, va(vabuf, sizeof(vabuf), "lightmap%04i", lightmapindex), mergedwidth, mergedheight, mergedpixels, t, TEXF_FORCELINEAR | (gl_texturecompression_q3bsplightmaps.integer ? TEXF_COMPRESS : 0), -1, NULL);
+				}
+				else
+				{
+					if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+						Image_MakesRGBColorsFromLinear_Lightmap(mergedpixels, mergedpixels, mergedwidth * mergedheight);
+					loadmodel->brushjk.data_lightmaps [lightmapindex] = R_LoadTexture2D(loadmodel->texturepool, va(vabuf, sizeof(vabuf), "lightmap%04i", lightmapindex), mergedwidth, mergedheight, mergedpixels, TEXTYPE_BGRA, TEXF_FORCELINEAR | (gl_texturecompression_q3bsplightmaps.integer ? TEXF_COMPRESS : 0), -1, NULL);
+				}
+			}
+		}
+	}
+
+	if (mergeddeluxepixels)
+		Mem_Free(mergeddeluxepixels);
+	Mem_Free(mergedpixels);
+	if(external)
+	{
+		for(i = 0; i < count; ++i)
+			Mem_Free(inpixels[i]);
+	}
+}
+
+static void Mod_JKBSP_BuildBBoxes(const int *element3i, int num_triangles, const float *vertex3f, float **collisionbbox6f, int *collisionstride, int stride)
+{
+	int j, k, cnt, tri;
+	float *mins, *maxs;
+	const float *vert;
+	*collisionstride = stride;
+	if(stride > 0)
+	{
+		cnt = (num_triangles + stride - 1) / stride;
+		*collisionbbox6f = (float *) Mem_Alloc(loadmodel->mempool, sizeof(float[6]) * cnt);
+		for(j = 0; j < cnt; ++j)
+		{
+			mins = &((*collisionbbox6f)[6 * j + 0]);
+			maxs = &((*collisionbbox6f)[6 * j + 3]);
+			for(k = 0; k < stride; ++k)
+			{
+				tri = j * stride + k;
+				if(tri >= num_triangles)
+					break;
+				vert = &(vertex3f[element3i[3 * tri + 0] * 3]);
+				if(!k || vert[0] < mins[0]) mins[0] = vert[0];
+				if(!k || vert[1] < mins[1]) mins[1] = vert[1];
+				if(!k || vert[2] < mins[2]) mins[2] = vert[2];
+				if(!k || vert[0] > maxs[0]) maxs[0] = vert[0];
+				if(!k || vert[1] > maxs[1]) maxs[1] = vert[1];
+				if(!k || vert[2] > maxs[2]) maxs[2] = vert[2];
+				vert = &(vertex3f[element3i[3 * tri + 1] * 3]);
+				if(vert[0] < mins[0]) mins[0] = vert[0];
+				if(vert[1] < mins[1]) mins[1] = vert[1];
+				if(vert[2] < mins[2]) mins[2] = vert[2];
+				if(vert[0] > maxs[0]) maxs[0] = vert[0];
+				if(vert[1] > maxs[1]) maxs[1] = vert[1];
+				if(vert[2] > maxs[2]) maxs[2] = vert[2];
+				vert = &(vertex3f[element3i[3 * tri + 2] * 3]);
+				if(vert[0] < mins[0]) mins[0] = vert[0];
+				if(vert[1] < mins[1]) mins[1] = vert[1];
+				if(vert[2] < mins[2]) mins[2] = vert[2];
+				if(vert[0] > maxs[0]) maxs[0] = vert[0];
+				if(vert[1] > maxs[1]) maxs[1] = vert[1];
+				if(vert[2] > maxs[2]) maxs[2] = vert[2];
+			}
+		}
+	}
+	else
+		*collisionbbox6f = NULL;
+}
+
+static void Mod_JKBSP_LoadFaces(lump_t *l)
+{
+	jkdface_t *in, *oldin;
+	msurface_t *out, *oldout;
+	int i, oldi, j, n, count, invalidelements, patchsize[2], finalwidth, finalheight, xtess, ytess, finalvertices, finaltriangles, firstvertex, firstelement, type, oldnumtriangles, oldnumtriangles2, meshvertices, meshtriangles, collisionvertices, collisiontriangles, numvertices, numtriangles, cxtess, cytess;
+	float lightmaptcbase[2], lightmaptcscale[2];
+	//int *originalelement3i;
+	//int *originalneighbor3i;
+	float *originalvertex3f;
+	//float *originalsvector3f;
+	//float *originaltvector3f;
+	float *originalnormal3f;
+	float *originalcolor4f;
+	float *originaltexcoordtexture2f;
+	float *originaltexcoordlightmap2f;
+	float *surfacecollisionvertex3f;
+	int *surfacecollisionelement3i;
+	float *v;
+	patchtess_t *patchtess = NULL;
+	int patchtesscount = 0;
+	qboolean again;
+
+	in = (jkdface_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadFaces: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (msurface_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->data_surfaces = out;
+	loadmodel->num_surfaces = count;
+
+	if(count > 0)
+		patchtess = (patchtess_t*) Mem_Alloc(tempmempool, count * sizeof(*patchtess));
+
+	i = 0;
+	oldi = i;
+	oldin = in;
+	oldout = out;
+	meshvertices = 0;
+	meshtriangles = 0;
+	for (;i < count;i++, in++, out++)
+	{
+		// check face type first
+		type = LittleLong(in->type);
+		if (type != Q3FACETYPE_FLAT
+		 && type != Q3FACETYPE_PATCH
+		 && type != Q3FACETYPE_MESH
+		 && type != Q3FACETYPE_FLARE)
+		{
+			Con_DPrintf("Mod_JKBSP_LoadFaces: face #%i: unknown face type %i\n", i, type);
+			continue;
+		}
+
+		n = LittleLong(in->textureindex);
+		if (n < 0 || n >= loadmodel->num_textures)
+		{
+			Con_DPrintf("Mod_JKBSP_LoadFaces: face #%i: invalid textureindex %i (%i textures)\n", i, n, loadmodel->num_textures);
+			continue;
+		}
+		out->texture = loadmodel->data_textures + n;
+		n = LittleLong(in->effectindex);
+		if (n < -1 || n >= loadmodel->brushjk.num_effects)
+		{
+			if (developer_extra.integer)
+				Con_DPrintf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): invalid effectindex %i (%i effects)\n", i, out->texture->name, n, loadmodel->brushjk.num_effects);
+			n = -1;
+		}
+		if (n == -1)
+			out->effect = NULL;
+		else
+			out->effect = loadmodel->brushjk.data_effects + n;
+
+		if (cls.state != ca_dedicated)
+		{
+			out->lightmaptexture = NULL;
+			out->deluxemaptexture = r_texture_blanknormalmap;
+			n = LittleLong(in->lightmapindex);
+			if (n < 0)
+				n = -1;
+			else if (n >= loadmodel->brushjk.num_originallightmaps)
+			{
+				if(loadmodel->brushjk.num_originallightmaps != 0)
+					Con_Printf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): invalid lightmapindex %i (%i lightmaps)\n", i, out->texture->name, n, loadmodel->brushjk.num_originallightmaps);
+				n = -1;
+			}
+			else
+			{
+				out->lightmaptexture = loadmodel->brushjk.data_lightmaps[n >> loadmodel->brushjk.num_lightmapmergedwidthheightdeluxepower];
+				if (loadmodel->brushjk.deluxemapping)
+					out->deluxemaptexture = loadmodel->brushjk.data_deluxemaps[n >> loadmodel->brushjk.num_lightmapmergedwidthheightdeluxepower];
+				loadmodel->lit = true;
+			}
+		}
+
+		firstvertex = LittleLong(in->firstvertex);
+		numvertices = LittleLong(in->numvertices);
+		firstelement = LittleLong(in->firstelement);
+		numtriangles = LittleLong(in->numelements) / 3;
+		if (numtriangles * 3 != LittleLong(in->numelements))
+		{
+			Con_Printf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): numelements %i is not a multiple of 3\n", i, out->texture->name, LittleLong(in->numelements));
+			continue;
+		}
+		if (firstvertex < 0 || firstvertex + numvertices > loadmodel->brushjk.num_vertices)
+		{
+			Con_Printf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): invalid vertex range %i : %i (%i vertices)\n", i, out->texture->name, firstvertex, firstvertex + numvertices, loadmodel->brushjk.num_vertices);
+			continue;
+		}
+		if (firstelement < 0 || firstelement + numtriangles * 3 > loadmodel->brushjk.num_triangles * 3)
+		{
+			Con_Printf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): invalid element range %i : %i (%i elements)\n", i, out->texture->name, firstelement, firstelement + numtriangles * 3, loadmodel->brushjk.num_triangles * 3);
+			continue;
+		}
+		switch(type)
+		{
+		case Q3FACETYPE_FLAT:
+		case Q3FACETYPE_MESH:
+			// no processing necessary
+			break;
+		case Q3FACETYPE_PATCH:
+			patchsize[0] = LittleLong(in->specific.patch.patchsize[0]);
+			patchsize[1] = LittleLong(in->specific.patch.patchsize[1]);
+			if (numvertices != (patchsize[0] * patchsize[1]) || patchsize[0] < 3 || patchsize[1] < 3 || !(patchsize[0] & 1) || !(patchsize[1] & 1) || patchsize[0] * patchsize[1] >= min(r_subdivisions_maxvertices.integer, r_subdivisions_collision_maxvertices.integer))
+			{
+				Con_Printf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): invalid patchsize %ix%i\n", i, out->texture->name, patchsize[0], patchsize[1]);
+				continue;
+			}
+			originalvertex3f = loadmodel->brushjk.data_vertex3f + firstvertex * 3;
+
+			// convert patch to Q3FACETYPE_MESH
+			xtess = Q3PatchTesselationOnX(patchsize[0], patchsize[1], 3, originalvertex3f, r_subdivisions_tolerance.value);
+			ytess = Q3PatchTesselationOnY(patchsize[0], patchsize[1], 3, originalvertex3f, r_subdivisions_tolerance.value);
+			// bound to user settings
+			xtess = bound(r_subdivisions_mintess.integer, xtess, r_subdivisions_maxtess.integer);
+			ytess = bound(r_subdivisions_mintess.integer, ytess, r_subdivisions_maxtess.integer);
+			// bound to sanity settings
+			xtess = bound(0, xtess, 1024);
+			ytess = bound(0, ytess, 1024);
+
+			// lower quality collision patches! Same procedure as before, but different cvars
+			// convert patch to Q3FACETYPE_MESH
+			cxtess = Q3PatchTesselationOnX(patchsize[0], patchsize[1], 3, originalvertex3f, r_subdivisions_collision_tolerance.value);
+			cytess = Q3PatchTesselationOnY(patchsize[0], patchsize[1], 3, originalvertex3f, r_subdivisions_collision_tolerance.value);
+			// bound to user settings
+			cxtess = bound(r_subdivisions_collision_mintess.integer, cxtess, r_subdivisions_collision_maxtess.integer);
+			cytess = bound(r_subdivisions_collision_mintess.integer, cytess, r_subdivisions_collision_maxtess.integer);
+			// bound to sanity settings
+			cxtess = bound(0, cxtess, 1024);
+			cytess = bound(0, cytess, 1024);
+
+			// store it for the LOD grouping step
+	 		patchtess[patchtesscount].info.xsize = patchsize[0];
+	 		patchtess[patchtesscount].info.ysize = patchsize[1];
+	 		patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].xtess = xtess;
+	 		patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].ytess = ytess;
+	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].xtess = cxtess;
+	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].ytess = cytess;
+
+			patchtess[patchtesscount].surface_id = i;
+			patchtess[patchtesscount].lodgroup[0] = LittleFloat(in->specific.patch.mins[0]);
+			patchtess[patchtesscount].lodgroup[1] = LittleFloat(in->specific.patch.mins[1]);
+			patchtess[patchtesscount].lodgroup[2] = LittleFloat(in->specific.patch.mins[2]);
+			patchtess[patchtesscount].lodgroup[3] = LittleFloat(in->specific.patch.maxs[0]);
+			patchtess[patchtesscount].lodgroup[4] = LittleFloat(in->specific.patch.maxs[1]);
+			patchtess[patchtesscount].lodgroup[5] = LittleFloat(in->specific.patch.maxs[2]);
+			patchtess[patchtesscount].originalvertex3f = originalvertex3f;
+			++patchtesscount;
+			break;
+		case Q3FACETYPE_FLARE:
+			if (developer_extra.integer)
+				Con_DPrintf("Mod_JKBSP_LoadFaces: face #%i (texture \"%s\"): Q3FACETYPE_FLARE not supported (yet)\n", i, out->texture->name);
+			// don't render it
+			continue;
+		}
+		out->num_vertices = numvertices;
+		out->num_triangles = numtriangles;
+		meshvertices += out->num_vertices;
+		meshtriangles += out->num_triangles;
+	}
+
+	// Fix patches tesselations so that they make no seams
+	do
+	{
+		again = false;
+		for(i = 0; i < patchtesscount; ++i)
+		{
+			for(j = i+1; j < patchtesscount; ++j)
+			{
+				if (!PATCHTESS_SAME_LODGROUP(patchtess[i], patchtess[j]))
+					continue;
+
+				if (Q3PatchAdjustTesselation(3, &patchtess[i].info, patchtess[i].originalvertex3f, &patchtess[j].info, patchtess[j].originalvertex3f) )
+					again = true;
+			}
+		}
+	}
+	while (again);
+
+	// Calculate resulting number of triangles
+	collisionvertices = 0;
+	collisiontriangles = 0;
+	for(i = 0; i < patchtesscount; ++i)
+	{
+		finalwidth = Q3PatchDimForTess(patchtess[i].info.xsize, patchtess[i].info.lods[PATCH_LOD_VISUAL].xtess);
+		finalheight = Q3PatchDimForTess(patchtess[i].info.ysize,patchtess[i].info.lods[PATCH_LOD_VISUAL].ytess);
+		numvertices = finalwidth * finalheight;
+		numtriangles = (finalwidth - 1) * (finalheight - 1) * 2;
+
+		oldout[patchtess[i].surface_id].num_vertices = numvertices;
+		oldout[patchtess[i].surface_id].num_triangles = numtriangles;
+		meshvertices += oldout[patchtess[i].surface_id].num_vertices;
+		meshtriangles += oldout[patchtess[i].surface_id].num_triangles;
+
+		finalwidth = Q3PatchDimForTess(patchtess[i].info.xsize, patchtess[i].info.lods[PATCH_LOD_COLLISION].xtess);
+		finalheight = Q3PatchDimForTess(patchtess[i].info.ysize,patchtess[i].info.lods[PATCH_LOD_COLLISION].ytess);
+		numvertices = finalwidth * finalheight;
+		numtriangles = (finalwidth - 1) * (finalheight - 1) * 2;
+
+		oldout[patchtess[i].surface_id].num_collisionvertices = numvertices;
+		oldout[patchtess[i].surface_id].num_collisiontriangles = numtriangles;
+		collisionvertices += oldout[patchtess[i].surface_id].num_collisionvertices;
+		collisiontriangles += oldout[patchtess[i].surface_id].num_collisiontriangles;
+	}
+
+	i = oldi;
+	in = oldin;
+	out = oldout;
+	Mod_AllocSurfMesh(loadmodel->mempool, meshvertices, meshtriangles, false, true, false);
+	if (collisiontriangles)
+	{
+		loadmodel->brush.data_collisionvertex3f = (float *)Mem_Alloc(loadmodel->mempool, collisionvertices * sizeof(float[3]));
+		loadmodel->brush.data_collisionelement3i = (int *)Mem_Alloc(loadmodel->mempool, collisiontriangles * sizeof(int[3]));
+	}
+	meshvertices = 0;
+	meshtriangles = 0;
+	collisionvertices = 0;
+	collisiontriangles = 0;
+	for (;i < count && meshvertices + out->num_vertices <= loadmodel->surfmesh.num_vertices;i++, in++, out++)
+	{
+		if (out->num_vertices < 3 || out->num_triangles < 1)
+			continue;
+
+		type = LittleLong(in->type);
+		firstvertex = LittleLong(in->firstvertex);
+		firstelement = LittleLong(in->firstelement);
+		out->num_firstvertex = meshvertices;
+		out->num_firsttriangle = meshtriangles;
+		out->num_firstcollisiontriangle = collisiontriangles;
+		switch(type)
+		{
+		case Q3FACETYPE_FLAT:
+		case Q3FACETYPE_MESH:
+			// no processing necessary, except for lightmap merging
+			for (j = 0;j < out->num_vertices;j++)
+			{
+				(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[j * 3 + 0] = loadmodel->brushjk.data_vertex3f[(firstvertex + j) * 3 + 0];
+				(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[j * 3 + 1] = loadmodel->brushjk.data_vertex3f[(firstvertex + j) * 3 + 1];
+				(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[j * 3 + 2] = loadmodel->brushjk.data_vertex3f[(firstvertex + j) * 3 + 2];
+				(loadmodel->surfmesh.data_normal3f + 3 * out->num_firstvertex)[j * 3 + 0] = loadmodel->brushjk.data_normal3f[(firstvertex + j) * 3 + 0];
+				(loadmodel->surfmesh.data_normal3f + 3 * out->num_firstvertex)[j * 3 + 1] = loadmodel->brushjk.data_normal3f[(firstvertex + j) * 3 + 1];
+				(loadmodel->surfmesh.data_normal3f + 3 * out->num_firstvertex)[j * 3 + 2] = loadmodel->brushjk.data_normal3f[(firstvertex + j) * 3 + 2];
+				(loadmodel->surfmesh.data_texcoordtexture2f + 2 * out->num_firstvertex)[j * 2 + 0] = loadmodel->brushjk.data_texcoordtexture2f[(firstvertex + j) * 2 + 0];
+				(loadmodel->surfmesh.data_texcoordtexture2f + 2 * out->num_firstvertex)[j * 2 + 1] = loadmodel->brushjk.data_texcoordtexture2f[(firstvertex + j) * 2 + 1];
+
+				// ~exidl: TODO, multi-lightmapped mesh surfaces
+				//for (g = 0; g < MAX_LIGHTMAPS; g++)
+				//{
+					(loadmodel->surfmesh.data_texcoordlightmap2f + 2 * out->num_firstvertex)[j * 2 + 0] = loadmodel->brushjk.data_texcoordlightmap2f[0][(firstvertex + j) * 2 + 0];
+					(loadmodel->surfmesh.data_texcoordlightmap2f + 2 * out->num_firstvertex)[j * 2 + 1] = loadmodel->brushjk.data_texcoordlightmap2f[0][(firstvertex + j) * 2 + 1];
+					(loadmodel->surfmesh.data_lightmapcolor4f + 4 * out->num_firstvertex)[j * 4 + 0] = loadmodel->brushjk.data_color4f[0][(firstvertex + j) * 4 + 0];
+					(loadmodel->surfmesh.data_lightmapcolor4f + 4 * out->num_firstvertex)[j * 4 + 1] = loadmodel->brushjk.data_color4f[0][(firstvertex + j) * 4 + 1];
+					(loadmodel->surfmesh.data_lightmapcolor4f + 4 * out->num_firstvertex)[j * 4 + 2] = loadmodel->brushjk.data_color4f[0][(firstvertex + j) * 4 + 2];
+					(loadmodel->surfmesh.data_lightmapcolor4f + 4 * out->num_firstvertex)[j * 4 + 3] = loadmodel->brushjk.data_color4f[0][(firstvertex + j) * 4 + 3];
+				//}
+			}
+			for (j = 0;j < out->num_triangles*3;j++)
+				(loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] = loadmodel->brushjk.data_element3i[firstelement + j] + out->num_firstvertex;
+			break;
+		case Q3FACETYPE_PATCH:
+			patchsize[0] = LittleLong(in->specific.patch.patchsize[0]);
+			patchsize[1] = LittleLong(in->specific.patch.patchsize[1]);
+			originalvertex3f = loadmodel->brushjk.data_vertex3f + firstvertex * 3;
+			originalnormal3f = loadmodel->brushjk.data_normal3f + firstvertex * 3;
+			originaltexcoordtexture2f = loadmodel->brushjk.data_texcoordtexture2f + firstvertex * 2;
+
+			// ~exidl: TODO, multi-lightmapped mesh surfaces
+			originaltexcoordlightmap2f = loadmodel->brushjk.data_texcoordlightmap2f[0] + firstvertex * 2;
+			originalcolor4f = loadmodel->brushjk.data_color4f[0] + firstvertex * 4;
+
+			xtess = ytess = cxtess = cytess = -1;
+			for(j = 0; j < patchtesscount; ++j)
+				if(patchtess[j].surface_id == i)
+				{
+					xtess = patchtess[j].info.lods[PATCH_LOD_VISUAL].xtess;
+					ytess = patchtess[j].info.lods[PATCH_LOD_VISUAL].ytess;
+					cxtess = patchtess[j].info.lods[PATCH_LOD_COLLISION].xtess;
+					cytess = patchtess[j].info.lods[PATCH_LOD_COLLISION].ytess;
+					break;
+				}
+			if(xtess == -1)
+			{
+				Con_Printf("ERROR: patch %d isn't preprocessed?!?\n", i);
+				xtess = ytess = cxtess = cytess = 0;
+			}
+
+			finalwidth = Q3PatchDimForTess(patchsize[0],xtess); //((patchsize[0] - 1) * xtess) + 1;
+			finalheight = Q3PatchDimForTess(patchsize[1],ytess); //((patchsize[1] - 1) * ytess) + 1;
+			finalvertices = finalwidth * finalheight;
+			oldnumtriangles = finaltriangles = (finalwidth - 1) * (finalheight - 1) * 2;
+			type = Q3FACETYPE_MESH;
+			// generate geometry
+			// (note: normals are skipped because they get recalculated)
+			Q3PatchTesselateFloat(3, sizeof(float[3]), (loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex), patchsize[0], patchsize[1], sizeof(float[3]), originalvertex3f, xtess, ytess);
+			Q3PatchTesselateFloat(3, sizeof(float[3]), (loadmodel->surfmesh.data_normal3f + 3 * out->num_firstvertex), patchsize[0], patchsize[1], sizeof(float[3]), originalnormal3f, xtess, ytess);
+			Q3PatchTesselateFloat(2, sizeof(float[2]), (loadmodel->surfmesh.data_texcoordtexture2f + 2 * out->num_firstvertex), patchsize[0], patchsize[1], sizeof(float[2]), originaltexcoordtexture2f, xtess, ytess);
+			Q3PatchTesselateFloat(2, sizeof(float[2]), (loadmodel->surfmesh.data_texcoordlightmap2f + 2 * out->num_firstvertex), patchsize[0], patchsize[1], sizeof(float[2]), originaltexcoordlightmap2f, xtess, ytess);
+			Q3PatchTesselateFloat(4, sizeof(float[4]), (loadmodel->surfmesh.data_lightmapcolor4f + 4 * out->num_firstvertex), patchsize[0], patchsize[1], sizeof(float[4]), originalcolor4f, xtess, ytess);
+			Q3PatchTriangleElements((loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle), finalwidth, finalheight, out->num_firstvertex);
+
+			out->num_triangles = Mod_RemoveDegenerateTriangles(out->num_triangles, (loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle), (loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle), loadmodel->surfmesh.data_vertex3f);
+
+			if (developer_extra.integer)
+			{
+				if (out->num_triangles < finaltriangles)
+					Con_DPrintf("Mod_JKBSP_LoadFaces: %ix%i curve subdivided to %i vertices / %i triangles, %i degenerate triangles removed (leaving %i)\n", patchsize[0], patchsize[1], out->num_vertices, finaltriangles, finaltriangles - out->num_triangles, out->num_triangles);
+				else
+					Con_DPrintf("Mod_JKBSP_LoadFaces: %ix%i curve subdivided to %i vertices / %i triangles\n", patchsize[0], patchsize[1], out->num_vertices, out->num_triangles);
+			}
+			// q3map does not put in collision brushes for curves... ugh
+			// build the lower quality collision geometry
+			finalwidth = Q3PatchDimForTess(patchsize[0],cxtess); //((patchsize[0] - 1) * cxtess) + 1;
+			finalheight = Q3PatchDimForTess(patchsize[1],cytess); //((patchsize[1] - 1) * cytess) + 1;
+			finalvertices = finalwidth * finalheight;
+			oldnumtriangles2 = finaltriangles = (finalwidth - 1) * (finalheight - 1) * 2;
+
+			// legacy collision geometry implementation
+			out->deprecatedq3data_collisionvertex3f = (float *)Mem_Alloc(loadmodel->mempool, sizeof(float[3]) * finalvertices);
+			out->deprecatedq3data_collisionelement3i = (int *)Mem_Alloc(loadmodel->mempool, sizeof(int[3]) * finaltriangles);
+			out->num_collisionvertices = finalvertices;
+			out->num_collisiontriangles = finaltriangles;
+			Q3PatchTesselateFloat(3, sizeof(float[3]), out->deprecatedq3data_collisionvertex3f, patchsize[0], patchsize[1], sizeof(float[3]), originalvertex3f, cxtess, cytess);
+			Q3PatchTriangleElements(out->deprecatedq3data_collisionelement3i, finalwidth, finalheight, 0);
+
+			//Mod_SnapVertices(3, out->num_vertices, (loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex), 0.25);
+			Mod_SnapVertices(3, finalvertices, out->deprecatedq3data_collisionvertex3f, 1);
+
+			out->num_collisiontriangles = Mod_RemoveDegenerateTriangles(finaltriangles, out->deprecatedq3data_collisionelement3i, out->deprecatedq3data_collisionelement3i, out->deprecatedq3data_collisionvertex3f);
+
+			// now optimize the collision mesh by finding triangle bboxes...
+			Mod_JKBSP_BuildBBoxes(out->deprecatedq3data_collisionelement3i, out->num_collisiontriangles, out->deprecatedq3data_collisionvertex3f, &out->deprecatedq3data_collisionbbox6f, &out->deprecatedq3num_collisionbboxstride, mod_q3bsp_curves_collisions_stride.integer);
+			Mod_JKBSP_BuildBBoxes(loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle, out->num_triangles, loadmodel->surfmesh.data_vertex3f, &out->deprecatedq3data_bbox6f, &out->deprecatedq3num_bboxstride, mod_q3bsp_curves_stride.integer);
+
+			// store collision geometry for BIH collision tree
+			surfacecollisionvertex3f = loadmodel->brush.data_collisionvertex3f + collisionvertices * 3;
+			surfacecollisionelement3i = loadmodel->brush.data_collisionelement3i + collisiontriangles * 3;
+			Q3PatchTesselateFloat(3, sizeof(float[3]), surfacecollisionvertex3f, patchsize[0], patchsize[1], sizeof(float[3]), originalvertex3f, cxtess, cytess);
+			Q3PatchTriangleElements(surfacecollisionelement3i, finalwidth, finalheight, collisionvertices);
+			Mod_SnapVertices(3, finalvertices, surfacecollisionvertex3f, 1);
+#if 1
+			// remove this once the legacy code is removed
+			{
+				int nc = out->num_collisiontriangles;
+#endif
+			out->num_collisiontriangles = Mod_RemoveDegenerateTriangles(finaltriangles, surfacecollisionelement3i, surfacecollisionelement3i, loadmodel->brush.data_collisionvertex3f);
+#if 1
+				if(nc != out->num_collisiontriangles)
+				{
+					Con_Printf("number of collision triangles differs between BIH and BSP. FAIL.\n");
+				}
+			}
+#endif
+
+			if (developer_extra.integer)
+				Con_DPrintf("Mod_JKBSP_LoadFaces: %ix%i curve became %i:%i vertices / %i:%i triangles (%i:%i degenerate)\n", patchsize[0], patchsize[1], out->num_vertices, out->num_collisionvertices, oldnumtriangles, oldnumtriangles2, oldnumtriangles - out->num_triangles, oldnumtriangles2 - out->num_collisiontriangles);
+
+			collisionvertices += finalvertices;
+			collisiontriangles += out->num_collisiontriangles;
+			break;
+		default:
+			break;
+		}
+		meshvertices += out->num_vertices;
+		meshtriangles += out->num_triangles;
+		for (j = 0, invalidelements = 0;j < out->num_triangles * 3;j++)
+			if ((loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] < out->num_firstvertex || (loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] >= out->num_firstvertex + out->num_vertices)
+				invalidelements++;
+		if (invalidelements)
+		{
+			Con_Printf("Mod_JKBSP_LoadFaces: Warning: face #%i has %i invalid elements, type = %i, texture->name = \"%s\", texture->surfaceflags = %i, firstvertex = %i, numvertices = %i, firstelement = %i, numelements = %i, elements list:\n", i, invalidelements, type, out->texture->name, out->texture->surfaceflags, firstvertex, out->num_vertices, firstelement, out->num_triangles * 3);
+			for (j = 0;j < out->num_triangles * 3;j++)
+			{
+				Con_Printf(" %i", (loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] - out->num_firstvertex);
+				if ((loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] < out->num_firstvertex || (loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] >= out->num_firstvertex + out->num_vertices)
+					(loadmodel->surfmesh.data_element3i + 3 * out->num_firsttriangle)[j] = out->num_firstvertex;
+			}
+			Con_Print("\n");
+		}
+		// calculate a bounding box
+		VectorClear(out->mins);
+		VectorClear(out->maxs);
+		if (out->num_vertices)
+		{
+			if (cls.state != ca_dedicated && out->lightmaptexture)
+			{
+				// figure out which part of the merged lightmap this fits into
+				int lightmapindex = LittleLong(in->lightmapindex) >> (loadmodel->brushjk.deluxemapping ? 1 : 0);
+				int mergewidth = R_TextureWidth(out->lightmaptexture) / loadmodel->brushjk.lightmapsize;
+				int mergeheight = R_TextureHeight(out->lightmaptexture) / loadmodel->brushjk.lightmapsize;
+				lightmapindex &= mergewidth * mergeheight - 1;
+				lightmaptcscale[0] = 1.0f / mergewidth;
+				lightmaptcscale[1] = 1.0f / mergeheight;
+				lightmaptcbase[0] = (lightmapindex % mergewidth) * lightmaptcscale[0];
+				lightmaptcbase[1] = (lightmapindex / mergewidth) * lightmaptcscale[1];
+				// modify the lightmap texcoords to match this region of the merged lightmap
+				for (j = 0, v = loadmodel->surfmesh.data_texcoordlightmap2f + 2 * out->num_firstvertex;j < out->num_vertices;j++, v += 2)
+				{
+					v[0] = v[0] * lightmaptcscale[0] + lightmaptcbase[0];
+					v[1] = v[1] * lightmaptcscale[1] + lightmaptcbase[1];
+				}
+			}
+			VectorCopy((loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex), out->mins);
+			VectorCopy((loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex), out->maxs);
+			for (j = 1, v = (loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex) + 3;j < out->num_vertices;j++, v += 3)
+			{
+				out->mins[0] = min(out->mins[0], v[0]);
+				out->maxs[0] = max(out->maxs[0], v[0]);
+				out->mins[1] = min(out->mins[1], v[1]);
+				out->maxs[1] = max(out->maxs[1], v[1]);
+				out->mins[2] = min(out->mins[2], v[2]);
+				out->maxs[2] = max(out->maxs[2], v[2]);
+			}
+			out->mins[0] -= 1.0f;
+			out->mins[1] -= 1.0f;
+			out->mins[2] -= 1.0f;
+			out->maxs[0] += 1.0f;
+			out->maxs[1] += 1.0f;
+			out->maxs[2] += 1.0f;
+		}
+		// set lightmap styles for consistency with q1bsp
+		//out->lightmapinfo->styles[0] = 0;
+		//out->lightmapinfo->styles[1] = 255;
+		//out->lightmapinfo->styles[2] = 255;
+		//out->lightmapinfo->styles[3] = 255;
+	}
+
+	i = oldi;
+	out = oldout;
+	for (;i < count;i++, out++)
+	{
+		if(out->num_vertices && out->num_triangles)
+			continue;
+		if(out->num_vertices == 0)
+		{
+			Con_Printf("Mod_JKBSP_LoadFaces: surface %d (texture %s) has no vertices, ignoring\n", i, out->texture ? out->texture->name : "(none)");
+			if(out->num_triangles == 0)
+				Con_Printf("Mod_JKBSP_LoadFaces: surface %d (texture %s) has no triangles, ignoring\n", i, out->texture ? out->texture->name : "(none)");
+		}
+		else if(out->num_triangles == 0)
+			Con_Printf("Mod_JKBSP_LoadFaces: surface %d (texture %s, near %f %f %f) has no triangles, ignoring\n", i, out->texture ? out->texture->name : "(none)",
+					(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[0 * 3 + 0],
+					(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[1 * 3 + 0],
+					(loadmodel->surfmesh.data_vertex3f + 3 * out->num_firstvertex)[2 * 3 + 0]);
+	}
+
+	// for per pixel lighting
+	Mod_BuildTextureVectorsFromNormals(0, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->surfmesh.data_vertex3f, loadmodel->surfmesh.data_texcoordtexture2f, loadmodel->surfmesh.data_normal3f, loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.data_svector3f, loadmodel->surfmesh.data_tvector3f, r_smoothnormals_areaweighting.integer != 0);
+
+	// generate ushort elements array if possible
+	if (loadmodel->surfmesh.data_element3s)
+		for (i = 0;i < loadmodel->surfmesh.num_triangles*3;i++)
+			loadmodel->surfmesh.data_element3s[i] = loadmodel->surfmesh.data_element3i[i];
+
+	// free the no longer needed vertex data
+	loadmodel->brushjk.num_vertices = 0;
+	if (loadmodel->brushjk.data_vertex3f)
+		Mem_Free(loadmodel->brushjk.data_vertex3f);
+	loadmodel->brushjk.data_vertex3f = NULL;
+	loadmodel->brushjk.data_normal3f = NULL;
+	loadmodel->brushjk.data_texcoordtexture2f = NULL;
+	loadmodel->brushjk.data_texcoordlightmap2f = NULL;
+	loadmodel->brushjk.data_color4f = NULL;
+	// free the no longer needed triangle data
+	loadmodel->brushjk.num_triangles = 0;
+	if (loadmodel->brushjk.data_element3i)
+		Mem_Free(loadmodel->brushjk.data_element3i);
+	loadmodel->brushjk.data_element3i = NULL;
+
+	if(patchtess)
+		Mem_Free(patchtess);
+}
+
+static void Mod_JKBSP_LoadModels(lump_t *l)
+{
+	jkdmodel_t *in;
+	jkdmodel_t *out;
+	int i, j, n, c, count;
+
+	in = (jkdmodel_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadModels: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (jkdmodel_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brushjk.data_models = out;
+	loadmodel->brushjk.num_models = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		for (j = 0;j < 3;j++)
+		{
+			out->mins[j] = LittleFloat(in->mins[j]);
+			out->maxs[j] = LittleFloat(in->maxs[j]);
+		}
+		n = LittleLong(in->firstface);
+		c = LittleLong(in->numfaces);
+		if (n < 0 || n + c > loadmodel->num_surfaces)
+			Host_Error("Mod_JKBSP_LoadModels: invalid face range %i : %i (%i faces)", n, n + c, loadmodel->num_surfaces);
+		out->firstface = n;
+		out->numfaces = c;
+		n = LittleLong(in->firstbrush);
+		c = LittleLong(in->numbrushes);
+		if (n < 0 || n + c > loadmodel->brush.num_brushes)
+			Host_Error("Mod_JKBSP_LoadModels: invalid brush range %i : %i (%i brushes)", n, n + c, loadmodel->brush.num_brushes);
+		out->firstbrush = n;
+		out->numbrushes = c;
+	}
+}
+
+static void Mod_JKBSP_LoadLeafBrushes(lump_t *l)
+{
+	int *in;
+	int *out;
+	int i, n, count;
+
+	in = (int *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadLeafBrushes: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (int *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_leafbrushes = out;
+	loadmodel->brush.num_leafbrushes = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		n = LittleLong(*in);
+		if (n < 0 || n >= loadmodel->brush.num_brushes)
+			Host_Error("Mod_JKBSP_LoadLeafBrushes: invalid brush index %i (%i brushes)", n, loadmodel->brush.num_brushes);
+		*out = n;
+	}
+}
+
+static void Mod_JKBSP_LoadLeafFaces(lump_t *l)
+{
+	int *in;
+	int *out;
+	int i, n, count;
+
+	in = (int *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadLeafFaces: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (int *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_leafsurfaces = out;
+	loadmodel->brush.num_leafsurfaces = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		n = LittleLong(*in);
+		if (n < 0 || n >= loadmodel->num_surfaces)
+			Host_Error("Mod_JKBSP_LoadLeafFaces: invalid face index %i (%i faces)", n, loadmodel->num_surfaces);
+		*out = n;
+	}
+}
+
+static void Mod_JKBSP_LoadLeafs(lump_t *l)
+{
+	jkdleaf_t *in;
+	mleaf_t *out;
+	int i, j, n, c, count;
+
+	in = (jkdleaf_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadLeafs: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	out = (mleaf_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_leafs = out;
+	loadmodel->brush.num_leafs = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		out->parent = NULL;
+		out->plane = NULL;
+		out->clusterindex = LittleLong(in->clusterindex);
+		out->areaindex = LittleLong(in->areaindex);
+		for (j = 0;j < 3;j++)
+		{
+			// yes the mins/maxs are ints
+			out->mins[j] = LittleLong(in->mins[j]) - 1;
+			out->maxs[j] = LittleLong(in->maxs[j]) + 1;
+		}
+		n = LittleLong(in->firstleafface);
+		c = LittleLong(in->numleaffaces);
+		if (n < 0 || n + c > loadmodel->brush.num_leafsurfaces)
+			Host_Error("Mod_JKBSP_LoadLeafs: invalid leafsurface range %i : %i (%i leafsurfaces)", n, n + c, loadmodel->brush.num_leafsurfaces);
+		out->firstleafsurface = loadmodel->brush.data_leafsurfaces + n;
+		out->numleafsurfaces = c;
+		n = LittleLong(in->firstleafbrush);
+		c = LittleLong(in->numleafbrushes);
+		if (n < 0 || n + c > loadmodel->brush.num_leafbrushes)
+			Host_Error("Mod_JKBSP_LoadLeafs: invalid leafbrush range %i : %i (%i leafbrushes)", n, n + c, loadmodel->brush.num_leafbrushes);
+		out->firstleafbrush = loadmodel->brush.data_leafbrushes + n;
+		out->numleafbrushes = c;
+	}
+}
+
+static void Mod_JKBSP_LoadNodes(lump_t *l)
+{
+	jkdnode_t *in;
+	mnode_t *out;
+	int i, j, n, count;
+
+	in = (jkdnode_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadNodes: funny lump size in %s",loadmodel->name);
+	count = l->filelen / sizeof(*in);
+	if (count == 0)
+		Host_Error("Mod_JKBSP_LoadNodes: missing BSP tree in %s",loadmodel->name);
+	out = (mnode_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+
+	loadmodel->brush.data_nodes = out;
+	loadmodel->brush.num_nodes = count;
+
+	for (i = 0;i < count;i++, in++, out++)
+	{
+		out->parent = NULL;
+		n = LittleLong(in->planeindex);
+		if (n < 0 || n >= loadmodel->brush.num_planes)
+			Host_Error("Mod_JKBSP_LoadNodes: invalid planeindex %i (%i planes)", n, loadmodel->brush.num_planes);
+		out->plane = loadmodel->brush.data_planes + n;
+		for (j = 0;j < 2;j++)
+		{
+			n = LittleLong(in->childrenindex[j]);
+			if (n >= 0)
+			{
+				if (n >= loadmodel->brush.num_nodes)
+					Host_Error("Mod_JKBSP_LoadNodes: invalid child node index %i (%i nodes)", n, loadmodel->brush.num_nodes);
+				out->children[j] = loadmodel->brush.data_nodes + n;
+			}
+			else
+			{
+				n = -1 - n;
+				if (n >= loadmodel->brush.num_leafs)
+					Host_Error("Mod_JKBSP_LoadNodes: invalid child leaf index %i (%i leafs)", n, loadmodel->brush.num_leafs);
+				out->children[j] = (mnode_t *)(loadmodel->brush.data_leafs + n);
+			}
+		}
+		for (j = 0;j < 3;j++)
+		{
+			// yes the mins/maxs are ints
+			out->mins[j] = LittleLong(in->mins[j]) - 1;
+			out->maxs[j] = LittleLong(in->maxs[j]) + 1;
+		}
+	}
+
+	// set the parent pointers
+	Mod_Q1BSP_LoadNodes_RecursiveSetParent(loadmodel->brush.data_nodes, NULL);
+}
+
+static void Mod_JKBSP_LoadLightGrid(lump_t *l)
+{
+	jkdlightgrid_t *in;
+	jkdlightgrid_t *out;
+	int count;
+	int i;
+
+	in = (jkdlightgrid_t *)(mod_base + l->fileofs);
+	if (l->filelen % sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadLightGrid: funny lump size in %s",loadmodel->name);
+	loadmodel->brushjk.num_lightgrid_scale[0] = 1.0f / loadmodel->brushjk.num_lightgrid_cellsize[0];
+	loadmodel->brushjk.num_lightgrid_scale[1] = 1.0f / loadmodel->brushjk.num_lightgrid_cellsize[1];
+	loadmodel->brushjk.num_lightgrid_scale[2] = 1.0f / loadmodel->brushjk.num_lightgrid_cellsize[2];
+	loadmodel->brushjk.num_lightgrid_imins[0] = (int)ceil(loadmodel->brushjk.data_models->mins[0] * loadmodel->brushjk.num_lightgrid_scale[0]);
+	loadmodel->brushjk.num_lightgrid_imins[1] = (int)ceil(loadmodel->brushjk.data_models->mins[1] * loadmodel->brushjk.num_lightgrid_scale[1]);
+	loadmodel->brushjk.num_lightgrid_imins[2] = (int)ceil(loadmodel->brushjk.data_models->mins[2] * loadmodel->brushjk.num_lightgrid_scale[2]);
+	loadmodel->brushjk.num_lightgrid_imaxs[0] = (int)floor(loadmodel->brushjk.data_models->maxs[0] * loadmodel->brushjk.num_lightgrid_scale[0]);
+	loadmodel->brushjk.num_lightgrid_imaxs[1] = (int)floor(loadmodel->brushjk.data_models->maxs[1] * loadmodel->brushjk.num_lightgrid_scale[1]);
+	loadmodel->brushjk.num_lightgrid_imaxs[2] = (int)floor(loadmodel->brushjk.data_models->maxs[2] * loadmodel->brushjk.num_lightgrid_scale[2]);
+	loadmodel->brushjk.num_lightgrid_isize[0] = loadmodel->brushjk.num_lightgrid_imaxs[0] - loadmodel->brushjk.num_lightgrid_imins[0] + 1;
+	loadmodel->brushjk.num_lightgrid_isize[1] = loadmodel->brushjk.num_lightgrid_imaxs[1] - loadmodel->brushjk.num_lightgrid_imins[1] + 1;
+	loadmodel->brushjk.num_lightgrid_isize[2] = loadmodel->brushjk.num_lightgrid_imaxs[2] - loadmodel->brushjk.num_lightgrid_imins[2] + 1;
+	count = loadmodel->brushjk.num_lightgrid_isize[0] * loadmodel->brushjk.num_lightgrid_isize[1] * loadmodel->brushjk.num_lightgrid_isize[2];
+	Matrix4x4_CreateScale3(&loadmodel->brushjk.num_lightgrid_indexfromworld, loadmodel->brushjk.num_lightgrid_scale[0], loadmodel->brushjk.num_lightgrid_scale[1], loadmodel->brushjk.num_lightgrid_scale[2]);
+	Matrix4x4_ConcatTranslate(&loadmodel->brushjk.num_lightgrid_indexfromworld, -loadmodel->brushjk.num_lightgrid_imins[0] * loadmodel->brushjk.num_lightgrid_cellsize[0], -loadmodel->brushjk.num_lightgrid_imins[1] * loadmodel->brushjk.num_lightgrid_cellsize[1], -loadmodel->brushjk.num_lightgrid_imins[2] * loadmodel->brushjk.num_lightgrid_cellsize[2]);
+
+	// if lump is empty there is nothing to load, we can deal with that in the LightPoint code
+	if (l->filelen)
+	{
+		if (l->filelen < count * (int)sizeof(*in))
+		{
+			Con_Printf("Mod_JKBSP_LoadLightGrid: invalid lightgrid lump size %i bytes, should be %i bytes (%ix%ix%i)", l->filelen, (int)(count * sizeof(*in)), loadmodel->brushjk.num_lightgrid_isize[0], loadmodel->brushjk.num_lightgrid_isize[1], loadmodel->brushjk.num_lightgrid_isize[2]);
+			return; // ignore the grid if we cannot understand it
+		}
+		if (l->filelen != count * (int)sizeof(*in))
+			Con_Printf("Mod_JKBSP_LoadLightGrid: Warning: calculated lightgrid size %i bytes does not match lump size %i\n", (int)(count * sizeof(*in)), l->filelen);
+		out = (jkdlightgrid_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+		loadmodel->brushjk.data_lightgrid = out;
+		loadmodel->brushjk.num_lightgrid = count;
+		// no swapping or validation necessary
+		memcpy(out, in, count * (int)sizeof(*out));
+
+		if(mod_q3bsp_sRGBlightmaps.integer)
+		{
+			if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+			{
+				// we fix the brightness consistently via lightmapscale
+			}
+			else
+			{
+				int j;
+				for(i = 0; i < count; ++i)
+				{
+					for (j = 0; j < MAX_LIGHTMAPS; j++)
+					{
+						out[i].ambientrgb[j][0] = floor(Image_LinearFloatFromsRGB(out[i].ambientrgb[j][0]) * 255.0f + 0.5f);
+						out[i].ambientrgb[j][1] = floor(Image_LinearFloatFromsRGB(out[i].ambientrgb[j][1]) * 255.0f + 0.5f);
+						out[i].ambientrgb[j][2] = floor(Image_LinearFloatFromsRGB(out[i].ambientrgb[j][2]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][0] = floor(Image_LinearFloatFromsRGB(out[i].diffusergb[j][0]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][1] = floor(Image_LinearFloatFromsRGB(out[i].diffusergb[j][1]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][2] = floor(Image_LinearFloatFromsRGB(out[i].diffusergb[j][2]) * 255.0f + 0.5f);
+					}
+				}
+			}
+		}
+		else
+		{
+			if(vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+			{
+				int j;
+				for(i = 0; i < count; ++i)
+				{
+					for (j = 0; j < MAX_LIGHTMAPS; j++)
+					{
+						out[i].ambientrgb[j][0] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].ambientrgb[j][0]) * 255.0f + 0.5f);
+						out[i].ambientrgb[j][1] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].ambientrgb[j][1]) * 255.0f + 0.5f);
+						out[i].ambientrgb[j][2] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].ambientrgb[j][2]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][0] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].diffusergb[j][0]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][1] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].diffusergb[j][1]) * 255.0f + 0.5f);
+						out[i].diffusergb[j][2] = floor(Image_sRGBFloatFromLinear_Lightmap(out[i].diffusergb[j][2]) * 255.0f + 0.5f);
+					}
+				}
+			}
+			else
+			{
+				// all is good
+			}
+		}
+	}
+}
+
+static void Mod_JKBSP_LoadPVS(lump_t *l)
+{
+	jkdpvs_t *in;
+	int totalchains;
+
+	if (l->filelen == 0)
+	{
+		int i;
+		// unvised maps often have cluster indices even without pvs, so check
+		// leafs to find real number of clusters
+		loadmodel->brush.num_pvsclusters = 1;
+		for (i = 0;i < loadmodel->brush.num_leafs;i++)
+			loadmodel->brush.num_pvsclusters = max(loadmodel->brush.num_pvsclusters, loadmodel->brush.data_leafs[i].clusterindex + 1);
+
+		// create clusters
+		loadmodel->brush.num_pvsclusterbytes = (loadmodel->brush.num_pvsclusters + 7) / 8;
+		totalchains = loadmodel->brush.num_pvsclusterbytes * loadmodel->brush.num_pvsclusters;
+		loadmodel->brush.data_pvsclusters = (unsigned char *)Mem_Alloc(loadmodel->mempool, totalchains);
+		memset(loadmodel->brush.data_pvsclusters, 0xFF, totalchains);
+		return;
+	}
+
+	in = (jkdpvs_t *)(mod_base + l->fileofs);
+	if (l->filelen < 9)
+		Host_Error("Mod_JKBSP_LoadPVS: funny lump size in %s",loadmodel->name);
+
+	loadmodel->brush.num_pvsclusters = LittleLong(in->numclusters);
+	loadmodel->brush.num_pvsclusterbytes = LittleLong(in->chainlength);
+	if (loadmodel->brush.num_pvsclusterbytes < ((loadmodel->brush.num_pvsclusters + 7) / 8))
+		Host_Error("Mod_JKBSP_LoadPVS: (chainlength = %i) < ((numclusters = %i) + 7) / 8", loadmodel->brush.num_pvsclusterbytes, loadmodel->brush.num_pvsclusters);
+	totalchains = loadmodel->brush.num_pvsclusterbytes * loadmodel->brush.num_pvsclusters;
+	if (l->filelen < totalchains + (int)sizeof(*in))
+		Host_Error("Mod_JKBSP_LoadPVS: lump too small ((numclusters = %i) * (chainlength = %i) + sizeof(jkdpvs_t) == %i bytes, lump is %i bytes)", loadmodel->brush.num_pvsclusters, loadmodel->brush.num_pvsclusterbytes, (int)(totalchains + sizeof(*in)), l->filelen);
+
+	loadmodel->brush.data_pvsclusters = (unsigned char *)Mem_Alloc(loadmodel->mempool, totalchains);
+	memcpy(loadmodel->brush.data_pvsclusters, (unsigned char *)(in + 1), totalchains);
+}
+
+static void Mod_JKBSP_LightPoint(dp_model_t *model, const vec3_t p, vec3_t ambientcolor, vec3_t diffusecolor, vec3_t diffusenormal)
+{
+	int i, j, g, k, index[3];
+	float transformed[3], blend1, blend2, blend, stylescale = 1;
+	jkdlightgrid_t *a, *s;
+
+	// scale lighting by lightstyle[0] so that darkmode in dpmod works properly
+	switch(vid.renderpath)
+	{
+	case RENDERPATH_GL20:
+	case RENDERPATH_D3D9:
+	case RENDERPATH_D3D10:
+	case RENDERPATH_D3D11:
+	case RENDERPATH_SOFT:
+	case RENDERPATH_GLES2:
+		// LordHavoc: FIXME: is this true?
+		stylescale = 1; // added while render
+		break;
+	case RENDERPATH_GL11:
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
+		stylescale = r_refdef.scene.rtlightstylevalue[0];
+		break;
+	}
+
+	if (!model->brushjk.num_lightgrid)
+	{
+		ambientcolor[0] = stylescale;
+		ambientcolor[1] = stylescale;
+		ambientcolor[2] = stylescale;
+		return;
+	}
+
+	Matrix4x4_Transform(&model->brushjk.num_lightgrid_indexfromworld, p, transformed);
+	//Matrix4x4_Print(&model->brushjk.num_lightgrid_indexfromworld);
+	//Con_Printf("%f %f %f transformed %f %f %f clamped ", p[0], p[1], p[2], transformed[0], transformed[1], transformed[2]);
+	transformed[0] = bound(0, transformed[0], model->brushjk.num_lightgrid_isize[0] - 1);
+	transformed[1] = bound(0, transformed[1], model->brushjk.num_lightgrid_isize[1] - 1);
+	transformed[2] = bound(0, transformed[2], model->brushjk.num_lightgrid_isize[2] - 1);
+	index[0] = (int)floor(transformed[0]);
+	index[1] = (int)floor(transformed[1]);
+	index[2] = (int)floor(transformed[2]);
+	//Con_Printf("%f %f %f index %i %i %i:\n", transformed[0], transformed[1], transformed[2], index[0], index[1], index[2]);
+
+	// now lerp the values
+	VectorClear(diffusenormal);
+	a = &model->brushjk.data_lightgrid[(index[2] * model->brushjk.num_lightgrid_isize[1] + index[1]) * model->brushjk.num_lightgrid_isize[0] + index[0]];
+	for (k = 0;k < 2;k++)
+	{
+		blend1 = (k ? (transformed[2] - index[2]) : (1 - (transformed[2] - index[2])));
+		if (blend1 < 0.001f || index[2] + k >= model->brushjk.num_lightgrid_isize[2])
+			continue;
+		for (j = 0;j < 2;j++)
+		{
+			blend2 = blend1 * (j ? (transformed[1] - index[1]) : (1 - (transformed[1] - index[1])));
+			if (blend2 < 0.001f || index[1] + j >= model->brushjk.num_lightgrid_isize[1])
+				continue;
+			for (i = 0;i < 2;i++)
+			{
+				blend = blend2 * (i ? (transformed[0] - index[0]) : (1 - (transformed[0] - index[0]))) * stylescale;
+				if (blend < 0.001f || index[0] + i >= model->brushjk.num_lightgrid_isize[0])
+					continue;
+				s = a + (k * model->brushjk.num_lightgrid_isize[1] + j) * model->brushjk.num_lightgrid_isize[0] + i;
+				for (g = 0; g < MAX_LIGHTMAPS; g++)
+				{
+					VectorMA(ambientcolor, blend * (1.0f / 128.0f), s->ambientrgb[g], ambientcolor);
+					VectorMA(diffusecolor, blend * (1.0f / 128.0f), s->diffusergb[g], diffusecolor);
+				}
+				// this uses the mod_md3_sin table because the values are
+				// already in the 0-255 range, the 64+ bias fetches a cosine
+				// instead of a sine value
+				diffusenormal[0] += blend * (mod_md3_sin[64 + s->diffuseyaw] * mod_md3_sin[s->diffusepitch]);
+				diffusenormal[1] += blend * (mod_md3_sin[     s->diffuseyaw] * mod_md3_sin[s->diffusepitch]);
+				diffusenormal[2] += blend * (mod_md3_sin[64 + s->diffusepitch]);
+				//Con_Printf("blend %f: ambient %i %i %i, diffuse %i %i %i, diffusepitch %i diffuseyaw %i (%f %f, normal %f %f %f)\n", blend, s->ambientrgb[0], s->ambientrgb[1], s->ambientrgb[2], s->diffusergb[0], s->diffusergb[1], s->diffusergb[2], s->diffusepitch, s->diffuseyaw, pitch, yaw, (cos(yaw) * cospitch), (sin(yaw) * cospitch), (-sin(pitch)));
+			}
+		}
+	}
+
+	// normalize the light direction before turning
+	VectorNormalize(diffusenormal);
+	//Con_Printf("result: ambient %f %f %f diffuse %f %f %f diffusenormal %f %f %f\n", ambientcolor[0], ambientcolor[1], ambientcolor[2], diffusecolor[0], diffusecolor[1], diffusecolor[2], diffusenormal[0], diffusenormal[1], diffusenormal[2]);
+}
+
+static int Mod_JKBSP_TraceLineOfSight_RecursiveNodeCheck(mnode_t *node, double p1[3], double p2[3])
+{
+	double t1, t2;
+	double midf, mid[3];
+	int ret, side;
+
+	// check for empty
+	while (node->plane)
+	{
+		// find the point distances
+		mplane_t *plane = node->plane;
+		if (plane->type < 3)
+		{
+			t1 = p1[plane->type] - plane->dist;
+			t2 = p2[plane->type] - plane->dist;
+		}
+		else
+		{
+			t1 = DotProduct (plane->normal, p1) - plane->dist;
+			t2 = DotProduct (plane->normal, p2) - plane->dist;
+		}
+
+		if (t1 < 0)
+		{
+			if (t2 < 0)
+			{
+				node = node->children[1];
+				continue;
+			}
+			side = 1;
+		}
+		else
+		{
+			if (t2 >= 0)
+			{
+				node = node->children[0];
+				continue;
+			}
+			side = 0;
+		}
+
+		midf = t1 / (t1 - t2);
+		VectorLerp(p1, midf, p2, mid);
+
+		// recurse both sides, front side first
+		// return 2 if empty is followed by solid (hit something)
+		// do not return 2 if both are solid or both empty,
+		// or if start is solid and end is empty
+		// as these degenerate cases usually indicate the eye is in solid and
+		// should see the target point anyway
+		ret = Mod_JKBSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side    ], p1, mid);
+		if (ret != 0)
+			return ret;
+		ret = Mod_JKBSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side ^ 1], mid, p2);
+		if (ret != 1)
+			return ret;
+		return 2;
+	}
+	return ((mleaf_t *)node)->clusterindex < 0;
+}
+
+static qboolean Mod_JKBSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
+{
+	if (model->brush.submodel || mod_q3bsp_tracelineofsight_brushes.integer)
+	{
+		trace_t trace;
+		model->TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK);
+		return trace.fraction == 1;
+	}
+	else
+	{
+		double tracestart[3], traceend[3];
+		VectorCopy(start, tracestart);
+		VectorCopy(end, traceend);
+		return !Mod_JKBSP_TraceLineOfSight_RecursiveNodeCheck(model->brush.data_nodes, tracestart, traceend);
+	}
+}
+
+static void Mod_JKBSP_TracePoint_RecursiveBSPNode(trace_t *trace, dp_model_t *model, mnode_t *node, const vec3_t point, int markframe)
+{
+	int i;
+	mleaf_t *leaf;
+	colbrushf_t *brush;
+	// find which leaf the point is in
+	while (node->plane)
+		node = node->children[(node->plane->type < 3 ? point[node->plane->type] : DotProduct(point, node->plane->normal)) < node->plane->dist];
+	// point trace the brushes
+	leaf = (mleaf_t *)node;
+	for (i = 0;i < leaf->numleafbrushes;i++)
+	{
+		brush = model->brush.data_brushes[leaf->firstleafbrush[i]].colbrushf;
+		if (brush && brush->markframe != markframe && BoxesOverlap(point, point, brush->mins, brush->maxs))
+		{
+			brush->markframe = markframe;
+			Collision_TracePointBrushFloat(trace, point, brush);
+		}
+	}
+	// can't do point traces on curves (they have no thickness)
+}
+
+static void Mod_JKBSP_TraceLine_RecursiveBSPNode(trace_t *trace, dp_model_t *model, mnode_t *node, const vec3_t start, const vec3_t end, vec_t startfrac, vec_t endfrac, const vec3_t linestart, const vec3_t lineend, int markframe, const vec3_t segmentmins, const vec3_t segmentmaxs)
+{
+	int i, startside, endside;
+	float dist1, dist2, midfrac, mid[3], nodesegmentmins[3], nodesegmentmaxs[3];
+	mleaf_t *leaf;
+	msurface_t *surface;
+	mplane_t *plane;
+	colbrushf_t *brush;
+	// walk the tree until we hit a leaf, recursing for any split cases
+	while (node->plane)
+	{
+#if 0
+		if (!BoxesOverlap(segmentmins, segmentmaxs, node->mins, node->maxs))
+			return;
+		Mod_JKBSP_TraceLine_RecursiveBSPNode(trace, model, node->children[0], start, end, startfrac, endfrac, linestart, lineend, markframe, segmentmins, segmentmaxs);
+		node = node->children[1];
+#else
+		// abort if this part of the bsp tree can not be hit by this trace
+//		if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+//			return;
+		plane = node->plane;
+		// axial planes are much more common than non-axial, so an optimized
+		// axial case pays off here
+		if (plane->type < 3)
+		{
+			dist1 = start[plane->type] - plane->dist;
+			dist2 = end[plane->type] - plane->dist;
+		}
+		else
+		{
+			dist1 = DotProduct(start, plane->normal) - plane->dist;
+			dist2 = DotProduct(end, plane->normal) - plane->dist;
+		}
+		startside = dist1 < 0;
+		endside = dist2 < 0;
+		if (startside == endside)
+		{
+			// most of the time the line fragment is on one side of the plane
+			node = node->children[startside];
+		}
+		else
+		{
+			// line crosses node plane, split the line
+			dist1 = PlaneDiff(linestart, plane);
+			dist2 = PlaneDiff(lineend, plane);
+			midfrac = dist1 / (dist1 - dist2);
+			VectorLerp(linestart, midfrac, lineend, mid);
+			// take the near side first
+			Mod_JKBSP_TraceLine_RecursiveBSPNode(trace, model, node->children[startside], start, mid, startfrac, midfrac, linestart, lineend, markframe, segmentmins, segmentmaxs);
+			// if we found an impact on the front side, don't waste time
+			// exploring the far side
+			if (midfrac <= trace->realfraction)
+				Mod_JKBSP_TraceLine_RecursiveBSPNode(trace, model, node->children[endside], mid, end, midfrac, endfrac, linestart, lineend, markframe, segmentmins, segmentmaxs);
+			return;
+		}
+#endif
+	}
+	// abort if this part of the bsp tree can not be hit by this trace
+//	if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+//		return;
+	// hit a leaf
+	nodesegmentmins[0] = min(start[0], end[0]) - 1;
+	nodesegmentmins[1] = min(start[1], end[1]) - 1;
+	nodesegmentmins[2] = min(start[2], end[2]) - 1;
+	nodesegmentmaxs[0] = max(start[0], end[0]) + 1;
+	nodesegmentmaxs[1] = max(start[1], end[1]) + 1;
+	nodesegmentmaxs[2] = max(start[2], end[2]) + 1;
+	// line trace the brushes
+	leaf = (mleaf_t *)node;
+#if 0
+	if (!BoxesOverlap(segmentmins, segmentmaxs, leaf->mins, leaf->maxs))
+		return;
+#endif
+	for (i = 0;i < leaf->numleafbrushes;i++)
+	{
+		brush = model->brush.data_brushes[leaf->firstleafbrush[i]].colbrushf;
+		if (brush && brush->markframe != markframe && BoxesOverlap(nodesegmentmins, nodesegmentmaxs, brush->mins, brush->maxs))
+		{
+			brush->markframe = markframe;
+			Collision_TraceLineBrushFloat(trace, linestart, lineend, brush, brush);
+		}
+	}
+	// can't do point traces on curves (they have no thickness)
+	if (leaf->containscollisionsurfaces && mod_q3bsp_curves_collisions.integer && !VectorCompare(start, end))
+	{
+		// line trace the curves
+		for (i = 0;i < leaf->numleafsurfaces;i++)
+		{
+			surface = model->data_surfaces + leaf->firstleafsurface[i];
+			if (surface->num_collisiontriangles && surface->deprecatedq3collisionmarkframe != markframe && BoxesOverlap(nodesegmentmins, nodesegmentmaxs, surface->mins, surface->maxs))
+			{
+				surface->deprecatedq3collisionmarkframe = markframe;
+				Collision_TraceLineTriangleMeshFloat(trace, linestart, lineend, surface->num_collisiontriangles, surface->deprecatedq3data_collisionelement3i, surface->deprecatedq3data_collisionvertex3f, surface->deprecatedq3num_collisionbboxstride, surface->deprecatedq3data_collisionbbox6f, surface->texture->supercontents, surface->texture->surfaceflags, surface->texture, segmentmins, segmentmaxs);
+			}
+		}
+	}
+}
+
+static void Mod_JKBSP_TraceBrush_RecursiveBSPNode(trace_t *trace, dp_model_t *model, mnode_t *node, const colbrushf_t *thisbrush_start, const colbrushf_t *thisbrush_end, int markframe, const vec3_t segmentmins, const vec3_t segmentmaxs)
+{
+	int i;
+	int sides;
+	mleaf_t *leaf;
+	colbrushf_t *brush;
+	msurface_t *surface;
+	mplane_t *plane;
+	float nodesegmentmins[3], nodesegmentmaxs[3];
+	// walk the tree until we hit a leaf, recursing for any split cases
+	while (node->plane)
+	{
+#if 0
+		if (!BoxesOverlap(segmentmins, segmentmaxs, node->mins, node->maxs))
+			return;
+		Mod_JKBSP_TraceBrush_RecursiveBSPNode(trace, model, node->children[0], thisbrush_start, thisbrush_end, markframe, segmentmins, segmentmaxs);
+		node = node->children[1];
+#else
+		// abort if this part of the bsp tree can not be hit by this trace
+//		if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+//			return;
+		plane = node->plane;
+		// axial planes are much more common than non-axial, so an optimized
+		// axial case pays off here
+		if (plane->type < 3)
+		{
+			// this is an axial plane, compare bounding box directly to it and
+			// recurse sides accordingly
+			// recurse down node sides
+			// use an inlined axial BoxOnPlaneSide to slightly reduce overhead
+			//sides = BoxOnPlaneSide(nodesegmentmins, nodesegmentmaxs, plane);
+			//sides = ((segmentmaxs[plane->type] >= plane->dist) | ((segmentmins[plane->type] < plane->dist) << 1));
+			sides = ((segmentmaxs[plane->type] >= plane->dist) + ((segmentmins[plane->type] < plane->dist) * 2));
+		}
+		else
+		{
+			// this is a non-axial plane, so check if the start and end boxes
+			// are both on one side of the plane to handle 'diagonal' cases
+			sides = BoxOnPlaneSide(thisbrush_start->mins, thisbrush_start->maxs, plane) | BoxOnPlaneSide(thisbrush_end->mins, thisbrush_end->maxs, plane);
+		}
+		if (sides == 3)
+		{
+			// segment crosses plane
+			Mod_JKBSP_TraceBrush_RecursiveBSPNode(trace, model, node->children[0], thisbrush_start, thisbrush_end, markframe, segmentmins, segmentmaxs);
+			sides = 2;
+		}
+		// if sides == 0 then the trace itself is bogus (Not A Number values),
+		// in this case we simply pretend the trace hit nothing
+		if (sides == 0)
+			return; // ERROR: NAN bounding box!
+		// take whichever side the segment box is on
+		node = node->children[sides - 1];
+#endif
+	}
+	// abort if this part of the bsp tree can not be hit by this trace
+//	if (!(node->combinedsupercontents & trace->hitsupercontentsmask))
+//		return;
+	nodesegmentmins[0] = max(segmentmins[0], node->mins[0] - 1);
+	nodesegmentmins[1] = max(segmentmins[1], node->mins[1] - 1);
+	nodesegmentmins[2] = max(segmentmins[2], node->mins[2] - 1);
+	nodesegmentmaxs[0] = min(segmentmaxs[0], node->maxs[0] + 1);
+	nodesegmentmaxs[1] = min(segmentmaxs[1], node->maxs[1] + 1);
+	nodesegmentmaxs[2] = min(segmentmaxs[2], node->maxs[2] + 1);
+	// hit a leaf
+	leaf = (mleaf_t *)node;
+#if 0
+	if (!BoxesOverlap(segmentmins, segmentmaxs, leaf->mins, leaf->maxs))
+		return;
+#endif
+	for (i = 0;i < leaf->numleafbrushes;i++)
+	{
+		brush = model->brush.data_brushes[leaf->firstleafbrush[i]].colbrushf;
+		if (brush && brush->markframe != markframe && BoxesOverlap(nodesegmentmins, nodesegmentmaxs, brush->mins, brush->maxs))
+		{
+			brush->markframe = markframe;
+			Collision_TraceBrushBrushFloat(trace, thisbrush_start, thisbrush_end, brush, brush);
+		}
+	}
+	if (leaf->containscollisionsurfaces && mod_q3bsp_curves_collisions.integer)
+	{
+		for (i = 0;i < leaf->numleafsurfaces;i++)
+		{
+			surface = model->data_surfaces + leaf->firstleafsurface[i];
+			if (surface->num_collisiontriangles && surface->deprecatedq3collisionmarkframe != markframe && BoxesOverlap(nodesegmentmins, nodesegmentmaxs, surface->mins, surface->maxs))
+			{
+				surface->deprecatedq3collisionmarkframe = markframe;
+				Collision_TraceBrushTriangleMeshFloat(trace, thisbrush_start, thisbrush_end, surface->num_collisiontriangles, surface->deprecatedq3data_collisionelement3i, surface->deprecatedq3data_collisionvertex3f, surface->deprecatedq3num_collisionbboxstride, surface->deprecatedq3data_collisionbbox6f, surface->texture->supercontents, surface->texture->surfaceflags, surface->texture, segmentmins, segmentmaxs);
+			}
+		}
+	}
+}
+
+static void Mod_JKBSP_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask)
+{
+	int i;
+	q3mbrush_t *brush;
+	memset(trace, 0, sizeof(*trace));
+	trace->fraction = 1;
+	trace->realfraction = 1;
+	trace->hitsupercontentsmask = hitsupercontentsmask;
+	if (mod_collision_bih.integer)
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+	else if (model->brush.submodel)
+	{
+		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
+			if (brush->colbrushf)
+				Collision_TracePointBrushFloat(trace, start, brush->colbrushf);
+	}
+	else
+		Mod_JKBSP_TracePoint_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, ++markframe);
+}
+
+static void Mod_JKBSP_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+{
+	int i;
+	float segmentmins[3], segmentmaxs[3];
+	msurface_t *surface;
+	q3mbrush_t *brush;
+
+	if (VectorCompare(start, end))
+	{
+		Mod_JKBSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		return;
+	}
+
+	memset(trace, 0, sizeof(*trace));
+	trace->fraction = 1;
+	trace->realfraction = 1;
+	trace->hitsupercontentsmask = hitsupercontentsmask;
+	segmentmins[0] = min(start[0], end[0]) - 1;
+	segmentmins[1] = min(start[1], end[1]) - 1;
+	segmentmins[2] = min(start[2], end[2]) - 1;
+	segmentmaxs[0] = max(start[0], end[0]) + 1;
+	segmentmaxs[1] = max(start[1], end[1]) + 1;
+	segmentmaxs[2] = max(start[2], end[2]) + 1;
+	if (mod_collision_bih.integer)
+		Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+	else if (model->brush.submodel)
+	{
+		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
+			if (brush->colbrushf && BoxesOverlap(segmentmins, segmentmaxs, brush->colbrushf->mins, brush->colbrushf->maxs))
+				Collision_TraceLineBrushFloat(trace, start, end, brush->colbrushf, brush->colbrushf);
+		if (mod_q3bsp_curves_collisions.integer)
+			for (i = 0, surface = model->data_surfaces + model->firstmodelsurface;i < model->nummodelsurfaces;i++, surface++)
+				if (surface->num_collisiontriangles && BoxesOverlap(segmentmins, segmentmaxs, surface->mins, surface->maxs))
+					Collision_TraceLineTriangleMeshFloat(trace, start, end, surface->num_collisiontriangles, surface->deprecatedq3data_collisionelement3i, surface->deprecatedq3data_collisionvertex3f, surface->deprecatedq3num_collisionbboxstride, surface->deprecatedq3data_collisionbbox6f, surface->texture->supercontents, surface->texture->surfaceflags, surface->texture, segmentmins, segmentmaxs);
+	}
+	else
+		Mod_JKBSP_TraceLine_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, 0, 1, start, end, ++markframe, segmentmins, segmentmaxs);
+}
+
+static void Mod_JKBSP_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *start, colbrushf_t *end, int hitsupercontentsmask)
+{
+	float segmentmins[3], segmentmaxs[3];
+	int i;
+	msurface_t *surface;
+	q3mbrush_t *brush;
+
+	if (mod_q3bsp_optimizedtraceline.integer && VectorCompare(start->mins, start->maxs) && VectorCompare(end->mins, end->maxs))
+	{
+		if (VectorCompare(start->mins, end->mins))
+			Mod_JKBSP_TracePoint(model, frameblend, skeleton, trace, start->mins, hitsupercontentsmask);
+		else
+			Mod_JKBSP_TraceLine(model, frameblend, skeleton, trace, start->mins, end->mins, hitsupercontentsmask);
+		return;
+	}
+
+	// box trace, performed as brush trace
+	memset(trace, 0, sizeof(*trace));
+	trace->fraction = 1;
+	trace->realfraction = 1;
+	trace->hitsupercontentsmask = hitsupercontentsmask;
+	segmentmins[0] = min(start->mins[0], end->mins[0]);
+	segmentmins[1] = min(start->mins[1], end->mins[1]);
+	segmentmins[2] = min(start->mins[2], end->mins[2]);
+	segmentmaxs[0] = max(start->maxs[0], end->maxs[0]);
+	segmentmaxs[1] = max(start->maxs[1], end->maxs[1]);
+	segmentmaxs[2] = max(start->maxs[2], end->maxs[2]);
+	if (mod_collision_bih.integer)
+		Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+	else if (model->brush.submodel)
+	{
+		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
+			if (brush->colbrushf && BoxesOverlap(segmentmins, segmentmaxs, brush->colbrushf->mins, brush->colbrushf->maxs))
+				Collision_TraceBrushBrushFloat(trace, start, end, brush->colbrushf, brush->colbrushf);
+		if (mod_q3bsp_curves_collisions.integer)
+			for (i = 0, surface = model->data_surfaces + model->firstmodelsurface;i < model->nummodelsurfaces;i++, surface++)
+				if (surface->num_collisiontriangles && BoxesOverlap(segmentmins, segmentmaxs, surface->mins, surface->maxs))
+					Collision_TraceBrushTriangleMeshFloat(trace, start, end, surface->num_collisiontriangles, surface->deprecatedq3data_collisionelement3i, surface->deprecatedq3data_collisionvertex3f, surface->deprecatedq3num_collisionbboxstride, surface->deprecatedq3data_collisionbbox6f, surface->texture->supercontents, surface->texture->surfaceflags, surface->texture, segmentmins, segmentmaxs);
+	}
+	else
+		Mod_JKBSP_TraceBrush_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, ++markframe, segmentmins, segmentmaxs);
+}
+
+static void Mod_JKBSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask)
+{
+	colboxbrushf_t thisbrush_start, thisbrush_end;
+	vec3_t boxstartmins, boxstartmaxs, boxendmins, boxendmaxs;
+
+	// box trace, performed as brush trace
+	VectorAdd(start, boxmins, boxstartmins);
+	VectorAdd(start, boxmaxs, boxstartmaxs);
+	VectorAdd(end, boxmins, boxendmins);
+	VectorAdd(end, boxmaxs, boxendmaxs);
+	Collision_BrushForBox(&thisbrush_start, boxstartmins, boxstartmaxs, 0, 0, NULL);
+	Collision_BrushForBox(&thisbrush_end, boxendmins, boxendmaxs, 0, 0, NULL);
+	Mod_JKBSP_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask);
+}
+
+static int Mod_JKBSP_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
+{
+	int i;
+	int supercontents = 0;
+	q3mbrush_t *brush;
+	if (mod_collision_bih.integer)
+	{
+		supercontents = Mod_CollisionBIH_PointSuperContents(model, frame, point);
+	}
+	// test if the point is inside each brush
+	else if (model->brush.submodel)
+	{
+		// submodels are effectively one leaf
+		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
+			if (brush->colbrushf && Collision_PointInsideBrushFloat(point, brush->colbrushf))
+				supercontents |= brush->colbrushf->supercontents;
+	}
+	else
+	{
+		mnode_t *node = model->brush.data_nodes;
+		mleaf_t *leaf;
+		// find which leaf the point is in
+		while (node->plane)
+			node = node->children[(node->plane->type < 3 ? point[node->plane->type] : DotProduct(point, node->plane->normal)) < node->plane->dist];
+		leaf = (mleaf_t *)node;
+		// now check the brushes in the leaf
+		for (i = 0;i < leaf->numleafbrushes;i++)
+		{
+			brush = model->brush.data_brushes + leaf->firstleafbrush[i];
+			if (brush->colbrushf && Collision_PointInsideBrushFloat(point, brush->colbrushf))
+				supercontents |= brush->colbrushf->supercontents;
+		}
+	}
+	return supercontents;
+}
+
+static void Mod_JKBSP_RecursiveFindNumLeafs(mnode_t *node)
+{
+	int numleafs;
+	while (node->plane)
+	{
+		Mod_JKBSP_RecursiveFindNumLeafs(node->children[0]);
+		node = node->children[1];
+	}
+	numleafs = ((mleaf_t *)node - loadmodel->brush.data_leafs) + 1;
+	if (loadmodel->brush.num_leafs < numleafs)
+		loadmodel->brush.num_leafs = numleafs;
+}
+
+static void Mod_JKBSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
+{
+	int i, j, lumps;
+	jkdheader_t *header;
+	float corner[3], yawradius, modelradius;
+
+	mod->modeldatatypestring = "JKBSP";
+
+	mod->type = mod_brushjk;
+	mod->numframes = 2; // although alternate textures are not supported it is annoying to complain about no such frame 1
+	mod->numskins = 1;
+
+	header = (jkdheader_t *)buffer;
+	if((char *) bufferend < (char *) buffer + sizeof(jkdheader_t))
+		Host_Error("Mod_JKBSP_Load: %s is smaller than its header", mod->name);
+
+	i = LittleLong(header->version);
+	if (i != JKBSPVERSION)
+		Host_Error("Mod_JKBSP_Load: %s has wrong version number (%i, should be %i)", mod->name, i, JKBSPVERSION);
+
+	mod->soundfromcenter = true;
+	mod->TraceBox = Mod_JKBSP_TraceBox;
+	mod->TraceBrush = Mod_JKBSP_TraceBrush;
+	mod->TraceLine = Mod_JKBSP_TraceLine;
+	mod->TracePoint = Mod_JKBSP_TracePoint;
+	mod->PointSuperContents = Mod_JKBSP_PointSuperContents;
+	mod->TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine;
+	mod->brush.TraceLineOfSight = Mod_JKBSP_TraceLineOfSight;
+	mod->brush.SuperContentsFromNativeContents = Mod_Q3BSP_SuperContentsFromNativeContents;
+	mod->brush.NativeContentsFromSuperContents = Mod_Q3BSP_NativeContentsFromSuperContents;
+	mod->brush.GetPVS = Mod_Q1BSP_GetPVS;
+	mod->brush.FatPVS = Mod_Q1BSP_FatPVS;
+	mod->brush.BoxTouchingPVS = Mod_Q1BSP_BoxTouchingPVS;
+	mod->brush.BoxTouchingLeafPVS = Mod_Q1BSP_BoxTouchingLeafPVS;
+	mod->brush.BoxTouchingVisibleLeafs = Mod_Q1BSP_BoxTouchingVisibleLeafs;
+	mod->brush.FindBoxClusters = Mod_Q1BSP_FindBoxClusters;
+	mod->brush.LightPoint = Mod_JKBSP_LightPoint;
+	mod->brush.FindNonSolidLocation = Mod_Q1BSP_FindNonSolidLocation;
+	mod->brush.AmbientSoundLevelsForPoint = NULL;
+	mod->brush.RoundUpToHullSize = NULL;
+	mod->brush.PointInLeaf = Mod_Q1BSP_PointInLeaf;
+	mod->Draw = R_Q1BSP_Draw;
+	mod->DrawDepth = R_Q1BSP_DrawDepth;
+	mod->DrawDebug = R_Q1BSP_DrawDebug;
+	mod->DrawPrepass = R_Q1BSP_DrawPrepass;
+	mod->GetLightInfo = R_Q1BSP_GetLightInfo;
+	mod->CompileShadowMap = R_Q1BSP_CompileShadowMap;
+	mod->DrawShadowMap = R_Q1BSP_DrawShadowMap;
+	mod->CompileShadowVolume = R_Q1BSP_CompileShadowVolume;
+	mod->DrawShadowVolume = R_Q1BSP_DrawShadowVolume;
+	mod->DrawLight = R_Q1BSP_DrawLight;
+
+	mod_base = (unsigned char *)header;
+
+	// swap all the lumps
+	header->ident = LittleLong(header->ident);
+	header->version = LittleLong(header->version);
+	lumps = JKHEADER_LUMPS;
+	for (i = 0;i < lumps;i++)
+	{
+		j = (header->lumps[i].fileofs = LittleLong(header->lumps[i].fileofs));
+		if((char *) bufferend < (char *) buffer + j)
+			Host_Error("Mod_JKBSP_Load: %s has a lump that starts outside the file!", mod->name);
+		j += (header->lumps[i].filelen = LittleLong(header->lumps[i].filelen));
+		if((char *) bufferend < (char *) buffer + j)
+			Host_Error("Mod_JKBSP_Load: %s has a lump that ends outside the file!", mod->name);
+	}
+	/*
+	 * NO, do NOT clear them!
+	 * they contain actual data referenced by other stuff.
+	 * Instead, before using the advertisements lump, check header->versio
+	 * again!
+	 * Sorry, but otherwise it breaks memory of the first lump.
+	for (i = lumps;i < Q3HEADER_LUMPS_MAX;i++)
+	{
+		header->lumps[i].fileofs = 0;
+		header->lumps[i].filelen = 0;
+	}
+	*/
+
+	mod->brush.qw_md4sum = 0;
+	mod->brush.qw_md4sum2 = 0;
+	for (i = 0;i < lumps;i++)
+	{
+		if (i == JKLUMP_ENTITIES)
+			continue;
+		mod->brush.qw_md4sum ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, header->lumps[i].filelen);
+		if (i == JKLUMP_PVS || i == JKLUMP_LEAFS || i == JKLUMP_NODES)
+			continue;
+		mod->brush.qw_md4sum2 ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, header->lumps[i].filelen);
+
+		// all this checksumming can take a while, so let's send keepalives here too
+		CL_KeepaliveMessage(false);
+	}
+
+	Mod_JKBSP_LoadEntities(&header->lumps[JKLUMP_ENTITIES]);
+	Mod_JKBSP_LoadTextures(&header->lumps[JKLUMP_TEXTURES]);
+	Mod_JKBSP_LoadPlanes(&header->lumps[JKLUMP_PLANES]);
+	Mod_JKBSP_LoadBrushSides(&header->lumps[JKLUMP_BRUSHSIDES]);
+	Mod_JKBSP_LoadBrushes(&header->lumps[JKLUMP_BRUSHES]);
+	Mod_JKBSP_LoadEffects(&header->lumps[JKLUMP_EFFECTS]);
+	Mod_JKBSP_LoadVertices(&header->lumps[JKLUMP_VERTICES]);
+	Mod_JKBSP_LoadTriangles(&header->lumps[JKLUMP_TRIANGLES]);
+	Mod_JKBSP_LoadLightmaps(&header->lumps[JKLUMP_LIGHTMAPS], &header->lumps[JKLUMP_FACES]);
+	Mod_JKBSP_LoadFaces(&header->lumps[JKLUMP_FACES]);
+	Mod_JKBSP_LoadModels(&header->lumps[JKLUMP_MODELS]);
+	Mod_JKBSP_LoadLeafBrushes(&header->lumps[JKLUMP_LEAFBRUSHES]);
+	Mod_JKBSP_LoadLeafFaces(&header->lumps[JKLUMP_LEAFFACES]);
+	Mod_JKBSP_LoadLeafs(&header->lumps[JKLUMP_LEAFS]);
+	Mod_JKBSP_LoadNodes(&header->lumps[JKLUMP_NODES]);
+	Mod_JKBSP_LoadLightGrid(&header->lumps[JKLUMP_LIGHTGRID]);
+	Mod_JKBSP_LoadPVS(&header->lumps[JKLUMP_PVS]);
+	loadmodel->brush.numsubmodels = loadmodel->brushjk.num_models;
+
+	// the MakePortals code works fine on the q3bsp data as well
+	if (mod_bsp_portalize.integer)
+		Mod_Q1BSP_MakePortals();
+
+	// FIXME: shader alpha should replace r_wateralpha support in q3bsp
+	loadmodel->brush.supportwateralpha = true;
+
+	// make a single combined shadow mesh to allow optimized shadow volume creation
+	Mod_Q1BSP_CreateShadowMesh(loadmodel);
+
+	loadmodel->brush.num_leafs = 0;
+	Mod_JKBSP_RecursiveFindNumLeafs(loadmodel->brush.data_nodes);
+
+	if (loadmodel->brush.numsubmodels)
+		loadmodel->brush.submodels = (dp_model_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brush.numsubmodels * sizeof(dp_model_t *));
+
+	mod = loadmodel;
+	for (i = 0;i < loadmodel->brush.numsubmodels;i++)
+	{
+		if (i > 0)
+		{
+			char name[10];
+			// duplicate the basic information
+			dpsnprintf(name, sizeof(name), "*%i", i);
+			mod = Mod_FindName(name, loadmodel->name);
+			// copy the base model to this one
+			*mod = *loadmodel;
+			// rename the clone back to its proper name
+			strlcpy(mod->name, name, sizeof(mod->name));
+			mod->brush.parentmodel = loadmodel;
+			// textures and memory belong to the main model
+			mod->texturepool = NULL;
+			mod->mempool = NULL;
+			mod->brush.GetPVS = NULL;
+			mod->brush.FatPVS = NULL;
+			mod->brush.BoxTouchingPVS = NULL;
+			mod->brush.BoxTouchingLeafPVS = NULL;
+			mod->brush.BoxTouchingVisibleLeafs = NULL;
+			mod->brush.FindBoxClusters = NULL;
+			mod->brush.LightPoint = NULL;
+			mod->brush.AmbientSoundLevelsForPoint = NULL;
+		}
+		mod->brush.submodel = i;
+		if (loadmodel->brush.submodels)
+			loadmodel->brush.submodels[i] = mod;
+
+		// make the model surface list (used by shadowing/lighting)
+		mod->firstmodelsurface = mod->brushjk.data_models[i].firstface;
+		mod->nummodelsurfaces = mod->brushjk.data_models[i].numfaces;
+		mod->firstmodelbrush = mod->brushjk.data_models[i].firstbrush;
+		mod->nummodelbrushes = mod->brushjk.data_models[i].numbrushes;
+		mod->sortedmodelsurfaces = (int *)Mem_Alloc(loadmodel->mempool, mod->nummodelsurfaces * sizeof(*mod->sortedmodelsurfaces));
+		Mod_MakeSortedSurfaces(mod);
+
+		VectorCopy(mod->brushjk.data_models[i].mins, mod->normalmins);
+		VectorCopy(mod->brushjk.data_models[i].maxs, mod->normalmaxs);
+		// enlarge the bounding box to enclose all geometry of this model,
+		// because q3map2 sometimes lies (mostly to affect the lightgrid),
+		// which can in turn mess up the farclip (as well as culling when
+		// outside the level - an unimportant concern)
+
+		//printf("Editing model %d... BEFORE re-bounding: %f %f %f - %f %f %f\n", i, mod->normalmins[0], mod->normalmins[1], mod->normalmins[2], mod->normalmaxs[0], mod->normalmaxs[1], mod->normalmaxs[2]);
+		for (j = 0;j < mod->nummodelsurfaces;j++)
+		{
+			const msurface_t *surface = mod->data_surfaces + j + mod->firstmodelsurface;
+			const float *v = mod->surfmesh.data_vertex3f + 3 * surface->num_firstvertex;
+			int k;
+			if (!surface->num_vertices)
+				continue;
+			for (k = 0;k < surface->num_vertices;k++, v += 3)
+			{
+				mod->normalmins[0] = min(mod->normalmins[0], v[0]);
+				mod->normalmins[1] = min(mod->normalmins[1], v[1]);
+				mod->normalmins[2] = min(mod->normalmins[2], v[2]);
+				mod->normalmaxs[0] = max(mod->normalmaxs[0], v[0]);
+				mod->normalmaxs[1] = max(mod->normalmaxs[1], v[1]);
+				mod->normalmaxs[2] = max(mod->normalmaxs[2], v[2]);
+			}
+		}
+		//printf("Editing model %d... AFTER re-bounding: %f %f %f - %f %f %f\n", i, mod->normalmins[0], mod->normalmins[1], mod->normalmins[2], mod->normalmaxs[0], mod->normalmaxs[1], mod->normalmaxs[2]);
+		corner[0] = max(fabs(mod->normalmins[0]), fabs(mod->normalmaxs[0]));
+		corner[1] = max(fabs(mod->normalmins[1]), fabs(mod->normalmaxs[1]));
+		corner[2] = max(fabs(mod->normalmins[2]), fabs(mod->normalmaxs[2]));
+		modelradius = sqrt(corner[0]*corner[0]+corner[1]*corner[1]+corner[2]*corner[2]);
+		yawradius = sqrt(corner[0]*corner[0]+corner[1]*corner[1]);
+		mod->rotatedmins[0] = mod->rotatedmins[1] = mod->rotatedmins[2] = -modelradius;
+		mod->rotatedmaxs[0] = mod->rotatedmaxs[1] = mod->rotatedmaxs[2] = modelradius;
+		mod->yawmaxs[0] = mod->yawmaxs[1] = yawradius;
+		mod->yawmins[0] = mod->yawmins[1] = -yawradius;
+		mod->yawmins[2] = mod->normalmins[2];
+		mod->yawmaxs[2] = mod->normalmaxs[2];
+		mod->radius = modelradius;
+		mod->radius2 = modelradius * modelradius;
+
+		// this gets altered below if sky or water is used
+		mod->DrawSky = NULL;
+		mod->DrawAddWaterPlanes = NULL;
+
+		for (j = 0;j < mod->nummodelsurfaces;j++)
+			if (mod->data_surfaces[j + mod->firstmodelsurface].texture->basematerialflags & MATERIALFLAG_SKY)
+				break;
+		if (j < mod->nummodelsurfaces)
+			mod->DrawSky = R_Q1BSP_DrawSky;
+
+		for (j = 0;j < mod->nummodelsurfaces;j++)
+			if (mod->data_surfaces[j + mod->firstmodelsurface].texture->basematerialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION | MATERIALFLAG_CAMERA))
+				break;
+		if (j < mod->nummodelsurfaces)
+			mod->DrawAddWaterPlanes = R_Q1BSP_DrawAddWaterPlanes;
+
+		Mod_MakeCollisionBIH(mod, false, &mod->collision_bih);
+		Mod_MakeCollisionBIH(mod, true, &mod->render_bih);
+
+		// generate VBOs and other shared data before cloning submodels
+		if (i == 0)
+			Mod_BuildVBOs();
+	}
+
+	if (mod_q3bsp_sRGBlightmaps.integer)
+	{
+		if (vid_sRGB.integer && vid_sRGB_fallback.integer && !vid.sRGB3D)
+		{
+			// actually we do in sRGB fallback with sRGB lightmaps: Image_sRGBFloatFromLinear_Lightmap(Image_LinearFloatFromsRGBFloat(x))
+			// neutral point is at Image_sRGBFloatFromLinearFloat(0.5)
+			// so we need to map Image_sRGBFloatFromLinearFloat(0.5) to 0.5
+			// factor is 0.5 / Image_sRGBFloatFromLinearFloat(0.5)
+			//loadmodel->lightmapscale *= 0.679942f; // fixes neutral level
+		}
+		else // if this is NOT set, regular rendering looks right by this requirement anyway
+		{
+			/*
+			// we want color 1 to do the same as without sRGB
+			// so, we want to map 1 to Image_LinearFloatFromsRGBFloat(2) instead of to 2
+			loadmodel->lightmapscale *= 2.476923f; // fixes max level
+			*/
+
+			// neutral level 0.5 gets uploaded as sRGB and becomes Image_LinearFloatFromsRGBFloat(0.5)
+			// we need to undo that
+			loadmodel->lightmapscale *= 2.336f; // fixes neutral level
+		}
+	}
+
+	Con_DPrintf("Stats for q3bsp model \"%s\": %i faces, %i nodes, %i leafs, %i clusters, %i clusterportals, mesh: %i vertices, %i triangles, %i surfaces\n", loadmodel->name, loadmodel->num_surfaces, loadmodel->brush.num_nodes, loadmodel->brush.num_leafs, mod->brush.num_pvsclusters, loadmodel->brush.num_portals, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->num_surfaces);
+}
+
+void Mod_RBSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
+{
+	int i = LittleLong(((int *)buffer)[1]);
+	if (i == JKBSPVERSION)
+		Mod_JKBSP_Load(mod, buffer, bufferend);
+	else
+		Host_Error("Mod_RBSP_Load: unknown/unsupported version %i", i);
 }
 
 void Mod_MAP_Load(dp_model_t *mod, void *buffer, void *bufferend)

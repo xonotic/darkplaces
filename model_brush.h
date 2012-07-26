@@ -707,6 +707,303 @@ typedef struct q3mbrushside_s
 }
 q3mbrushside_t;
 
+// [exidl-RBSP]
+#define MAX_LIGHTMAPS	4
+#define JKBSPVERSION	1
+
+#define	JKLUMP_ENTITIES		0 // entities to spawn (used by server and client)
+#define	JKLUMP_TEXTURES		1 // textures used (used by faces)
+#define	JKLUMP_PLANES		2 // planes used (used by bsp nodes)
+#define	JKLUMP_NODES		3 // bsp nodes (used by bsp nodes, bsp leafs, rendering, collisions)
+#define	JKLUMP_LEAFS		4 // bsp leafs (used by bsp nodes)
+#define	JKLUMP_LEAFFACES	5 // array of ints indexing faces (used by leafs)
+#define	JKLUMP_LEAFBRUSHES	6 // array of ints indexing brushes (used by leafs)
+#define	JKLUMP_MODELS		7 // models (used by rendering, collisions)
+#define	JKLUMP_BRUSHES		8 // brushes (used by effects, collisions)
+#define	JKLUMP_BRUSHSIDES	9 // brush faces (used by brushes)
+#define	JKLUMP_VERTICES		10 // mesh vertices (used by faces)
+#define	JKLUMP_TRIANGLES	11 // mesh triangles (used by faces)
+#define	JKLUMP_EFFECTS		12 // fog (used by faces)
+#define	JKLUMP_FACES		13 // surfaces (used by leafs)
+#define	JKLUMP_LIGHTMAPS	14 // lightmap textures (used by faces)
+#define	JKLUMP_LIGHTGRID	15 // lighting as a voxel grid (used by rendering)
+#define	JKLUMP_PVS			16 // potentially visible set; bit[clusters][clusters] (used by rendering)
+#define	JKHEADER_LUMPS		17
+
+typedef struct jkdheader_s
+{
+	int			ident;
+	int			version;
+	lump_t		lumps[JKHEADER_LUMPS];
+} jkdheader_t;
+
+typedef struct jkdtexture_s
+{
+	char name[Q3PATHLENGTH];
+	int surfaceflags;
+	int contents;
+}
+jkdtexture_t;
+
+// note: planes are paired, the pair of planes with i and i ^ 1 are opposites.
+typedef struct jkdplane_s
+{
+	float normal[3];
+	float dist;
+}
+jkdplane_t;
+
+typedef struct jkdnode_s
+{
+	int planeindex;
+	int childrenindex[2];
+	int mins[3];
+	int maxs[3];
+}
+jkdnode_t;
+
+typedef struct jkdleaf_s
+{
+	int clusterindex; // pvs index
+	int areaindex; // area index
+	int mins[3];
+	int maxs[3];
+	int firstleafface;
+	int numleaffaces;
+	int firstleafbrush;
+	int numleafbrushes;
+}
+jkdleaf_t;
+
+typedef struct jkdmodel_s
+{
+	float mins[3];
+	float maxs[3];
+	int firstface;
+	int numfaces;
+	int firstbrush;
+	int numbrushes;
+}
+jkdmodel_t;
+
+typedef struct jkdbrush_s
+{
+	int firstbrushside;
+	int numbrushsides;
+	int textureindex;
+}
+jkdbrush_t;
+
+typedef struct jkdbrushside_s
+{
+	int planeindex;
+	int textureindex;
+	int surfacenum;
+}
+jkdbrushside_t;
+
+typedef struct jkdvertex_s
+{
+	float origin3f[3];
+	float texcoord2f[2];
+	float lightmap2f[MAX_LIGHTMAPS][2];
+	float normal3f[3];
+	unsigned char color4ub[MAX_LIGHTMAPS][4];
+}
+jkdvertex_t;
+
+typedef struct jkdmeshvertex_s
+{
+	int offset; // first vertex index of mesh
+}
+jkdmeshvertex_t;
+
+typedef struct jkdeffect_s
+{
+	char shadername[Q3PATHLENGTH];
+	int brushindex;
+	int unknown; // I read this is always 5 except in jkdm8 which has one effect with -1
+}
+jkdeffect_t;
+
+#define JKFACETYPE_FLAT 1 // common
+#define JKFACETYPE_PATCH 2 // common
+#define JKFACETYPE_MESH 3 // common
+#define JKFACETYPE_FLARE 4 // rare (is this ever used?)
+
+typedef struct jkdface_s
+{
+	int textureindex;
+	int effectindex; // -1 if none
+	int type; // Q3FACETYPE
+	int firstvertex;
+	int numvertices;
+	unsigned firstelement;
+	int numelements;
+
+	unsigned char lightmapStyles[MAX_LIGHTMAPS];
+	unsigned char vertexStyles[MAX_LIGHTMAPS];
+
+	int lightmapindex[MAX_LIGHTMAPS]; // -1 if none
+	int lightmap_base[MAX_LIGHTMAPS][2];
+	int lightmap_size[2];
+	union
+	{
+		struct
+		{
+			// corrupt or don't care
+			int blah[14];
+		}
+		unknown;
+		struct
+		{
+			// Q3FACETYPE_FLAT
+			// mesh is a collection of triangles on a plane, renderable as a mesh (NOT a polygon)
+			float lightmap_origin[3];
+			float lightmap_vectors[2][3];
+			float normal[3];
+			int unused1[2];
+		}
+		flat;
+		struct
+		{
+			// Q3FACETYPE_PATCH
+			// patch renders as a bezier mesh, with adjustable tesselation
+			// level (optionally based on LOD using the bbox and polygon
+			// count to choose a tesselation level)
+			// note: multiple patches may have the same bbox to cause them to
+			// be LOD adjusted together as a group
+			int unused1[3];
+			float mins[3]; // LOD bbox
+			float maxs[3]; // LOD bbox
+			int unused2[3];
+			int patchsize[2]; // dimensions of vertex grid
+		}
+		patch;
+		struct
+		{
+			// Q3FACETYPE_MESH
+			// mesh renders as simply a triangle mesh
+			int unused1[3];
+			float mins[3];
+			float maxs[3];
+			int unused2[5];
+		}
+		mesh;
+		struct
+		{
+			// Q3FACETYPE_FLARE
+			// flare renders as a simple sprite at origin, no geometry
+			// exists, nor does it have a radius, a cvar controls the radius
+			// and another cvar controls distance fade
+			// (they were not used in Q3 I'm told)
+			float origin[3];
+			int unused1[11];
+		}
+		flare;
+	}
+	specific;
+}
+jkdface_t;
+
+typedef struct jkdlightmap_s
+{
+	unsigned char rgb[128*128*3];
+}
+jkdlightmap_t;
+
+typedef struct jkdlightgrid_s
+{
+	unsigned char ambientrgb[MAX_LIGHTMAPS][3];
+	unsigned char diffusergb[MAX_LIGHTMAPS][3];
+	unsigned char styles[MAX_LIGHTMAPS];
+	unsigned char diffusepitch;
+	unsigned char diffuseyaw;
+}
+jkdlightgrid_t;
+
+typedef struct jkdpvs_s
+{
+	int numclusters;
+	int chainlength;
+	// unsigned char chains[];
+	// containing bits in 0-7 order (not 7-0 order),
+	// pvschains[mycluster * chainlength + (thatcluster >> 3)] & (1 << (thatcluster & 7))
+}
+jkdpvs_t;
+
+// surfaceflags from bsp
+#define JKSURFACEFLAG_NODAMAGE 1
+#define JKSURFACEFLAG_SLICK 2
+#define JKSURFACEFLAG_SKY 4
+#define JKSURFACEFLAG_LADDER 8 // has no surfaceparm
+#define JKSURFACEFLAG_NOIMPACT 16
+#define JKSURFACEFLAG_NOMARKS 32
+#define JKSURFACEFLAG_FLESH 64 // has no surfaceparm
+#define JKSURFACEFLAG_NODRAW 128
+#define JKSURFACEFLAG_HINT 256
+#define JKSURFACEFLAG_SKIP 512 // has no surfaceparm
+#define JKSURFACEFLAG_NOLIGHTMAP 1024
+#define JKSURFACEFLAG_POINTLIGHT 2048
+#define JKSURFACEFLAG_METALSTEPS 4096
+#define JKSURFACEFLAG_NOSTEPS 8192 // has no surfaceparm
+#define JKSURFACEFLAG_NONSOLID 16384
+#define JKSURFACEFLAG_LIGHTFILTER 32768
+#define JKSURFACEFLAG_ALPHASHADOW 65536
+#define JKSURFACEFLAG_NODLIGHT 131072
+#define JKSURFACEFLAG_DUST 262144
+
+// surfaceparms from shaders
+#define JKSURFACEPARM_ALPHASHADOW 1
+#define JKSURFACEPARM_AREAPORTAL 2
+#define JKSURFACEPARM_CLUSTERPORTAL 4
+#define JKSURFACEPARM_DETAIL 8
+#define JKSURFACEPARM_DONOTENTER 16
+#define JKSURFACEPARM_FOG 32
+#define JKSURFACEPARM_LAVA 64
+#define JKSURFACEPARM_LIGHTFILTER 128
+#define JKSURFACEPARM_METALSTEPS 256
+#define JKSURFACEPARM_NODAMAGE 512
+#define JKSURFACEPARM_NODLIGHT 1024
+#define JKSURFACEPARM_NODRAW 2048
+#define JKSURFACEPARM_NODROP 4096
+#define JKSURFACEPARM_NOIMPACT 8192
+#define JKSURFACEPARM_NOLIGHTMAP 16384
+#define JKSURFACEPARM_NOMARKS 32768
+#define JKSURFACEPARM_NOMIPMAPS 65536
+#define JKSURFACEPARM_NONSOLID 131072
+#define JKSURFACEPARM_ORIGIN 262144
+#define JKSURFACEPARM_PLAYERCLIP 524288
+#define JKSURFACEPARM_SKY 1048576
+#define JKSURFACEPARM_SLICK 2097152
+#define JKSURFACEPARM_SLIME 4194304
+#define JKSURFACEPARM_STRUCTURAL 8388608
+#define JKSURFACEPARM_TRANS 16777216
+#define JKSURFACEPARM_WATER 33554432
+#define JKSURFACEPARM_POINTLIGHT 67108864
+#define JKSURFACEPARM_HINT 134217728
+#define JKSURFACEPARM_DUST 268435456
+#define JKSURFACEPARM_BOTCLIP 536870912
+#define JKSURFACEPARM_LIGHTGRID 1073741824
+#define JKSURFACEPARM_ANTIPORTAL 2147483648u
+
+typedef struct jkmbrush_s
+{
+	struct colbrushf_s *colbrushf;
+	int numbrushsides;
+	struct jkmbrushside_s *firstbrushside;
+	struct texture_s *texture;
+}
+jkmbrush_t;
+
+typedef struct jkmbrushside_s
+{
+	struct mplane_s *plane;
+	struct texture_s *texture;
+}
+jkmbrushside_t;
+// [/exidl-RBSP]
+
 // the first cast is to shut up a stupid warning by clang, the second cast is to make both sides have the same type
 #define CHECKPVSBIT(pvs,b) ((b) >= 0 ? (unsigned char) ((pvs)[(b) >> 3] & (1 << ((b) & 7))) : (unsigned char) false)
 #define SETPVSBIT(pvs,b) (void) ((b) >= 0 ? (unsigned char) ((pvs)[(b) >> 3] |= (1 << ((b) & 7))) : (unsigned char) false)

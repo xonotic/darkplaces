@@ -2041,7 +2041,7 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 		{
 			memset(buf, 0, 1024);
 			FS_Read(f, buf, 1024);
-			if (!memcmp(buf, "IBSP", 4))
+			if (!memcmp(buf, "IBSP", 4) || !memcmp(buf, "RBSP", 4))
 			{
 				p = LittleLong(((int *)buf)[1]);
 				if (p == Q3BSPVERSION)
@@ -2055,6 +2055,12 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 					q2dheader_t *header = (q2dheader_t *)buf;
 					lumpofs = LittleLong(header->lumps[Q2LUMP_ENTITIES].fileofs);
 					lumplen = LittleLong(header->lumps[Q2LUMP_ENTITIES].filelen);
+				}
+				else if (p == 1)
+				{
+					jkdheader_t *header = (jkdheader_t *)buf;
+					lumpofs = LittleLong(header->lumps[JKLUMP_ENTITIES].fileofs);
+					lumplen = LittleLong(header->lumps[JKLUMP_ENTITIES].fileofs);
 				}
 			}
 			else if((p = BuffLittleLong(buf)) == BSPVERSION || p == 30 || !memcmp(buf, "BSP2", 4))
@@ -2116,8 +2122,9 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 		case Q3BSPVERSION:	strlcpy((char *)buf, "Q3", sizeof(buf));break;
 		case Q2BSPVERSION:	strlcpy((char *)buf, "Q2", sizeof(buf));break;
 		case BSPVERSION:	strlcpy((char *)buf, "Q1", sizeof(buf));break;
-		case 30:			strlcpy((char *)buf, "HL", sizeof(buf));break;
-		default:			strlcpy((char *)buf, "??", sizeof(buf));break;
+		case 30:		strlcpy((char *)buf, "HL", sizeof(buf));break;
+		case 1:			strlcpy((char *)buf, "JK", sizeof(buf));break;
+		default:		strlcpy((char *)buf, "??", sizeof(buf));break;
 		}
 		Con_Printf("%16s (%s) %s\n", t->filenames[i]+5, buf, message);
 	}

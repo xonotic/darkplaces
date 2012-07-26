@@ -5911,7 +5911,7 @@ void R_Shadow_LoadWorldLightsFromMap_LightArghliteTyrlite(void)
 				pflags = (int)atof(value);
 			//else if (!strcmp("effects", key))
 			//	effects = (int)atof(value);
-			else if (cl.worldmodel->type == mod_brushq3)
+			else if (cl.worldmodel->type == mod_brushq3 || cl.worldmodel->type == mod_brushjk)
 			{
 				if (!strcmp("scale", key))
 					lightscale = atof(value);

@@ -30,7 +30,7 @@ m*_t structures are in-memory
 
 */
 
-typedef enum modtype_e {mod_invalid, mod_brushq1, mod_sprite, mod_alias, mod_brushq2, mod_brushq3, mod_obj, mod_null} modtype_t;
+typedef enum modtype_e {mod_invalid, mod_brushq1, mod_sprite, mod_alias, mod_brushq2, mod_brushq3, mod_brushjk, mod_obj, mod_null} modtype_t;
 
 typedef struct animscene_s
 {
@@ -936,6 +936,63 @@ typedef struct model_brushq3_s
 }
 model_brushq3_t;
 
+typedef struct model_brushjk_s
+{
+	int num_models;
+	jkdmodel_t *data_models;
+
+	// used only during loading - freed after loading!
+	int num_vertices;
+	float *data_vertex3f;
+	float *data_normal3f;
+	float *data_texcoordtexture2f;
+	float **data_texcoordlightmap2f;
+	float **data_color4f;
+
+	// freed after loading!
+	int num_triangles;
+	int *data_element3i;
+
+	int num_effects;
+	q3deffect_t *data_effects;
+
+	// lightmap textures
+	int num_originallightmaps;
+	int num_mergedlightmaps;
+	int num_lightmapmergedwidthpower;
+	int num_lightmapmergedheightpower;
+	int num_lightmapmergedwidthheightdeluxepower;
+	int num_lightmapmerge;
+	rtexture_t **data_lightmaps;
+	rtexture_t **data_deluxemaps;
+
+	// voxel light data with directional shading
+	int num_lightgrid;
+	jkdlightgrid_t *data_lightgrid;
+	// size of each cell (may vary by map, typically 64 64 128)
+	float num_lightgrid_cellsize[3];
+	// 1.0 / num_lightgrid_cellsize
+	float num_lightgrid_scale[3];
+	// dimensions of the world model in lightgrid cells
+	int num_lightgrid_imins[3];
+	int num_lightgrid_imaxs[3];
+	int num_lightgrid_isize[3];
+	// transform modelspace coordinates to lightgrid index
+	matrix4x4_t num_lightgrid_indexfromworld;
+
+	// true if this q3bsp file has been detected as using deluxemapping
+	// (lightmap texture pairs, every odd one is never directly refernced,
+	//  and contains lighting normals, not colors)
+	qboolean deluxemapping;
+	// true if the detected deluxemaps are the modelspace kind, rather than
+	// the faster tangentspace kind
+	qboolean deluxemapping_modelspace;
+	// size of lightmaps (128 by default, but may be another poweroftwo if
+	// external lightmaps are used (q3map2 -lightmapsize)
+	int lightmapsize;
+}
+model_brushjk_t;
+
 struct frameblend_s;
 struct skeleton_s;
 
@@ -1059,6 +1116,7 @@ typedef struct model_s
 	model_brushq2_t	brushq2;
 	*/
 	model_brushq3_t	brushq3;
+	model_brushjk_t brushjk;
 	// flags this model for offseting sounds to the model center (used by brush models)
 	int soundfromcenter;
 
@@ -1228,6 +1286,7 @@ void Mod_PSKMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend);
 void Mod_IDSP_Load(dp_model_t *mod, void *buffer, void *bufferend);
 void Mod_IDS2_Load(dp_model_t *mod, void *buffer, void *bufferend);
 void Mod_INTERQUAKEMODEL_Load(dp_model_t *mod, void *buffer, void *bufferend);
+void Mod_RBSP_Load(dp_model_t *mod, void *buffer, void *bufferend);
 
 #endif	// MODEL_SHARED_H
 
