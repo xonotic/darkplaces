@@ -946,8 +946,8 @@ typedef struct model_brushjk_s
 	float *data_vertex3f;
 	float *data_normal3f;
 	float *data_texcoordtexture2f;
-	float **data_texcoordlightmap2f;
-	float **data_color4f;
+	float *data_texcoordlightmap2f[MAX_LIGHTMAPS];
+	float *data_color4f[MAX_LIGHTMAPS];
 
 	// freed after loading!
 	int num_triangles;

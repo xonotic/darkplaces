@@ -7662,16 +7662,11 @@ static void Mod_JKBSP_LoadVertices(lump_t *l)
 	loadmodel->brushjk.data_normal3f = loadmodel->brushjk.data_vertex3f + count * 3;
 	loadmodel->brushjk.data_texcoordtexture2f = loadmodel->brushjk.data_normal3f + count * 3;
 
-	loadmodel->brushjk.data_texcoordlightmap2f = (float **)Mem_Alloc(loadmodel->mempool, MAX_LIGHTMAPS);
-	loadmodel->brushjk.data_texcoordlightmap2f[0] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
-	loadmodel->brushjk.data_texcoordlightmap2f[1] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
-	loadmodel->brushjk.data_texcoordlightmap2f[2] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
-	loadmodel->brushjk.data_texcoordlightmap2f[3] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
-	loadmodel->brushjk.data_color4f = (float **)Mem_Alloc(loadmodel->mempool, MAX_LIGHTMAPS);
-	loadmodel->brushjk.data_color4f[0] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
-	loadmodel->brushjk.data_color4f[1] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
-	loadmodel->brushjk.data_color4f[2] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
-	loadmodel->brushjk.data_color4f[3] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+	for (j = 0; j < MAX_LIGHTMAPS; j++)
+	{
+		loadmodel->brushjk.data_texcoordlightmap2f[j] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 2);
+		loadmodel->brushjk.data_color4f[j] = (float *)Mem_Alloc(loadmodel->mempool, count * sizeof(float) * 4);
+	}
 
 	for (i = 0; i < count; i++, in++)
 	{
@@ -7728,7 +7723,7 @@ static void Mod_JKBSP_LoadVertices(lump_t *l)
 			else
 			{
 				for (j = 0; j < MAX_LIGHTMAPS; j++)
-				{
+			  	{
 					loadmodel->brushjk.data_color4f[j][i * 4 + 0] = in->color4ub[j][0] * (1.0f / 255.0f);
 					loadmodel->brushjk.data_color4f[j][i * 4 + 1] = in->color4ub[j][1] * (1.0f / 255.0f);
 					loadmodel->brushjk.data_color4f[j][i * 4 + 2] = in->color4ub[j][2] * (1.0f / 255.0f);
@@ -7982,6 +7977,7 @@ static void Mod_JKBSP_LoadLightmaps(lump_t *l, lump_t *faceslump)
 	mergedrowsxcolumns = 1 << powerxy;
 
 	loadmodel->brushjk.num_mergedlightmaps = (realcount + (1 << powerxy) - 1) >> powerxy;
+	Con_Printf("mergedlightmaps = %d\n", loadmodel->brushjk.num_mergedlightmaps);
 	loadmodel->brushjk.data_lightmaps = (rtexture_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brushjk.num_mergedlightmaps * sizeof(rtexture_t *));
 	if (loadmodel->brushjk.deluxemapping)
 		loadmodel->brushjk.data_deluxemaps = (rtexture_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brushjk.num_mergedlightmaps * sizeof(rtexture_t *));
@@ -8579,8 +8575,14 @@ static void Mod_JKBSP_LoadFaces(lump_t *l)
 	loadmodel->brushjk.data_vertex3f = NULL;
 	loadmodel->brushjk.data_normal3f = NULL;
 	loadmodel->brushjk.data_texcoordtexture2f = NULL;
-	loadmodel->brushjk.data_texcoordlightmap2f = NULL;
-	loadmodel->brushjk.data_color4f = NULL;
+
+	for (i = 0; i < MAX_LIGHTMAPS; i++)
+	{
+	  Mem_Free(loadmodel->brushjk.data_texcoordlightmap2f[i]);
+	  Mem_Free(loadmodel->brushjk.data_color4f[i]);
+	  loadmodel->brushjk.data_texcoordlightmap2f[i] = NULL;
+	  loadmodel->brushjk.data_color4f[i] = NULL;
+	}
 	// free the no longer needed triangle data
 	loadmodel->brushjk.num_triangles = 0;
 	if (loadmodel->brushjk.data_element3i)
