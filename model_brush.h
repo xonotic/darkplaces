@@ -728,7 +728,8 @@ q3mbrushside_t;
 #define	JKLUMP_LIGHTMAPS	14 // lightmap textures (used by faces)
 #define	JKLUMP_LIGHTGRID	15 // lighting as a voxel grid (used by rendering)
 #define	JKLUMP_PVS			16 // potentially visible set; bit[clusters][clusters] (used by rendering)
-#define	JKHEADER_LUMPS		17
+#define JKLUMP_LIGHTARRAY 17
+#define	JKHEADER_LUMPS		18
 
 typedef struct jkdheader_s
 {

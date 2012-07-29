@@ -969,6 +969,8 @@ typedef struct model_brushjk_s
 	// voxel light data with directional shading
 	int num_lightgrid;
 	jkdlightgrid_t *data_lightgrid;
+	int num_lightarray;
+	jkdlightgrid_t *data_lightarray;
 	// size of each cell (may vary by map, typically 64 64 128)
 	float num_lightgrid_cellsize[3];
 	// 1.0 / num_lightgrid_cellsize

@@ -8864,6 +8864,26 @@ static void Mod_JKBSP_LoadLightGrid(lump_t *l)
 	}
 }
 
+static void Mod_JKBSP_LoadLightarray(lump_t *l)
+{
+  int i, count;
+  short *in;
+  jkdlightgrid_t **out;
+
+  in = ( void * )( mod_base + l->fileofs );
+  if( l->filelen % sizeof( *in ) )
+      Host_Error("Mod_JKBSP_LoadLightarray: funny lump size in %s", loadmodel->name );
+  Con_Printf("lightarray = %d\n", l->filelen);
+  count = l->filelen / sizeof( *in );
+  out = Mem_Alloc(loadmodel->mempool, count * sizeof( *out ) );
+
+  loadmodel->brushjk.data_lightarray = &out;
+  loadmodel->brushjk.num_lightarray = count;
+
+  for( i = 0; i < count; i++, in++, out++ )
+    *out = loadmodel->brushjk.data_lightgrid + LittleShort( *in );
+}
+
 static void Mod_JKBSP_LoadPVS(lump_t *l)
 {
 	jkdpvs_t *in;
@@ -9554,6 +9574,7 @@ static void Mod_JKBSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	Mod_JKBSP_LoadNodes(&header->lumps[JKLUMP_NODES]);
 	Mod_JKBSP_LoadLightGrid(&header->lumps[JKLUMP_LIGHTGRID]);
 	Mod_JKBSP_LoadPVS(&header->lumps[JKLUMP_PVS]);
+	Mod_JKBSP_LoadLightarray(&header->lumps[JKLUMP_LIGHTARRAY]);
 	loadmodel->brush.numsubmodels = loadmodel->brushjk.num_models;
 
 	// the MakePortals code works fine on the q3bsp data as well
