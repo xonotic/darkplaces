@@ -32,6 +32,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define DP_FUNC_NORETURN
 #endif
 
+#ifdef HARDENING
+# define IS_HARDENED false
+#else
+# define IS_HARDENED true
+#endif
+
 #ifdef ANTICHEAT
 #define _GNU_SOURCE // for memmem
 #endif
