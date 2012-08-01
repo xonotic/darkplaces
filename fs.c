@@ -3266,10 +3266,10 @@ void FS_StripExtension (const char *in, char *out, size_t size_out)
 
 /*
 ==================
-FS_DefaultExtension
+FS_SetExtension
 ==================
 */
-void FS_DefaultExtension (char *path, const char *extension, size_t size_path)
+void FS_SetExtension (char *path, const char *extension, size_t size_path, qboolean forceextension)
 {
 	const char *src;
 
@@ -3277,12 +3277,12 @@ void FS_DefaultExtension (char *path, const char *extension, size_t size_path)
 	// (extension should include the .)
 	src = path + strlen(path) - 1;
 
-	while (*src != '/' && src != path)
-	{
-		if (*src == '.')
-			return;                 // it has an extension
+	while (*src != '/' && *src != '.' && src != path)
 		src--;
-	}
+
+	if (*src == '.')
+		if(!forceextension || !strcasecmp(src, extension))
+			return;                 // it has an (or the) extension
 
 	strlcat (path, extension, size_path);
 }

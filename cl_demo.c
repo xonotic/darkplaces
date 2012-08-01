@@ -370,7 +370,7 @@ void CL_Record_f (void)
 
 	// get the demo name
 	strlcpy (name, Cmd_Argv(1), sizeof (name));
-	FS_DefaultExtension (name, ".dem", sizeof (name));
+	FS_SetExtension (name, ".dem", sizeof (name), true);
 
 	// start the map up
 	if (c > 2)
@@ -417,7 +417,7 @@ void CL_PlayDemo_f (void)
 
 	// open the demo file
 	strlcpy (name, Cmd_Argv(1), sizeof (name));
-	FS_DefaultExtension (name, ".dem", sizeof (name));
+	FS_SetExtension (name, ".dem", sizeof (name), true);
 	f = FS_OpenVirtualFile(name, false);
 	if (!f)
 	{

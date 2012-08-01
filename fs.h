@@ -118,7 +118,7 @@ qboolean FS_WriteFile (const char *filename, const void *data, fs_offset_t len);
 // ------ Other functions ------ //
 
 void FS_StripExtension (const char *in, char *out, size_t size_out);
-void FS_DefaultExtension (char *path, const char *extension, size_t size_path);
+void FS_SetExtension (char *path, const char *extension, size_t size_path, qboolean forceextension);
 
 #define FS_FILETYPE_NONE 0
 #define FS_FILETYPE_FILE 1

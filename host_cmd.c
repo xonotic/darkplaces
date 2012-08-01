@@ -741,7 +741,7 @@ static void Host_Savegame_f (void)
 	}
 
 	strlcpy (name, Cmd_Argv(1), sizeof (name));
-	FS_DefaultExtension (name, ".sav", sizeof (name));
+	FS_SetExtension (name, ".sav", sizeof (name), true);
 
 	Host_Savegame_to(prog, name);
 }
@@ -778,7 +778,7 @@ static void Host_Loadgame_f (void)
 	}
 
 	strlcpy (filename, Cmd_Argv(1), sizeof(filename));
-	FS_DefaultExtension (filename, ".sav", sizeof (filename));
+	FS_SetExtension (filename, ".sav", sizeof (filename), true);
 
 	Con_Printf("Loading game from %s...\n", filename);
 

@@ -12,7 +12,7 @@ void SV_StartDemoRecording(client_t *client, const char *filename, int forcetrac
 		return; // we already have a demo
 
 	strlcpy(name, filename, sizeof(name));
-	FS_DefaultExtension(name, ".dem", sizeof(name));
+	FS_SetExtension(name, ".dem", sizeof(name), true);
 
 	Con_Printf("Recording demo for # %d (%s) to %s\n", PRVM_NUM_FOR_EDICT(client->edict), client->netaddress, name);
 
