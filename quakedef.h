@@ -39,7 +39,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #endif
 
 #ifdef ANTICHEAT
-#define _GNU_SOURCE // for memmem
+# ifdef __linux__
+#  define _GNU_SOURCE // for memmem
+# endif
 #endif
 
 #include <sys/types.h>
