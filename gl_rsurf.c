@@ -393,7 +393,7 @@ void R_DrawPortals(void)
 						VectorAdd(center, portal->points[i].position, center);
 					f = ixtable[portal->numpoints];
 					VectorScale(center, f, center);
-					R_MeshQueue_AddTransparent(MESHQUEUE_SORT_DISTANCE, center, R_DrawPortal_Callback, (entity_render_t *)portal, leafnum, rsurface.rtlight);
+					R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, center, R_DrawPortal_Callback, (entity_render_t *)portal, leafnum, rsurface.rtlight);
 				}
 			}
 		}
@@ -894,7 +894,7 @@ static void R_Q1BSP_RecursiveGetLightInfo_BSP(r_q1bsp_getlightinfo_t *info, qboo
 						VectorCopy(v[0], v2[0]);
 						VectorCopy(v[1], v2[1]);
 						VectorCopy(v[2], v2[2]);
-						if (insidebox || TriangleOverlapsBox(v2[0], v2[1], v2[2], info->lightmins, info->lightmaxs))
+						if (insidebox || TriangleBBoxOverlapsBox(v2[0], v2[1], v2[2], info->lightmins, info->lightmaxs))
 							SVBSP_AddPolygon(&r_svbsp, 3, v2[0], true, NULL, NULL, 0);
 					}
 				}
@@ -922,7 +922,7 @@ static void R_Q1BSP_RecursiveGetLightInfo_BSP(r_q1bsp_getlightinfo_t *info, qboo
 						VectorCopy(v[0], v2[0]);
 						VectorCopy(v[1], v2[1]);
 						VectorCopy(v[2], v2[2]);
-						if (!insidebox && !TriangleOverlapsBox(v2[0], v2[1], v2[2], info->lightmins, info->lightmaxs))
+						if (!insidebox && !TriangleBBoxOverlapsBox(v2[0], v2[1], v2[2], info->lightmins, info->lightmaxs))
 							continue;
 						if (svbspactive && !(SVBSP_AddPolygon(&r_svbsp, 3, v2[0], false, NULL, NULL, 0) & 2))
 							continue;
@@ -1535,7 +1535,7 @@ void R_Q1BSP_DrawLight(entity_render_t *ent, int numsurfaces, const int *surface
 						center[1] += r_refdef.view.forward[1]*ent->transparent_offset;
 						center[2] += r_refdef.view.forward[2]*ent->transparent_offset;
 					}
-					R_MeshQueue_AddTransparent((rsurface.entity->flags & RENDER_WORLDOBJECT) ? MESHQUEUE_SORT_SKY : ((rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST) ? MESHQUEUE_SORT_HUD : MESHQUEUE_SORT_DISTANCE), center, R_Q1BSP_DrawLight_TransparentCallback, ent, surface - rsurface.modelsurfaces, rsurface.rtlight);
+					R_MeshQueue_AddTransparent((rsurface.entity->flags & RENDER_WORLDOBJECT) ? TRANSPARENTSORT_SKY : ((rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST) ? TRANSPARENTSORT_HUD : rsurface.texture->transparentsort), center, R_Q1BSP_DrawLight_TransparentCallback, ent, surface - rsurface.modelsurfaces, rsurface.rtlight);
 				}
 				continue;
 			}

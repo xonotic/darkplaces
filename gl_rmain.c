@@ -50,8 +50,8 @@ static qboolean r_savedds;
 //
 r_refdef_t r_refdef;
 
-cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended"};
-cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended"};
+cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
+cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
 cvar_t r_motionblur_averaging = {CVAR_SAVE, "r_motionblur_averaging", "0.1", "sliding average reaction time for velocity (higher = slower adaption to change)"};
 cvar_t r_motionblur_randomize = {CVAR_SAVE, "r_motionblur_randomize", "0.1", "randomizing coefficient to workaround ghosting"};
 cvar_t r_motionblur_minblur = {CVAR_SAVE, "r_motionblur_minblur", "0.5", "factor of blur to apply at all times (always have this amount of blur no matter what the other factors are)"};
@@ -227,7 +227,7 @@ cvar_t r_test = {0, "r_test", "0", "internal development use only, leave it alon
 cvar_t r_glsl_saturation = {CVAR_SAVE, "r_glsl_saturation", "1", "saturation multiplier (only working in glsl!)"};
 cvar_t r_glsl_saturation_redcompensate = {CVAR_SAVE, "r_glsl_saturation_redcompensate", "0", "a 'vampire sight' addition to desaturation effect, does compensation for red color, r_glsl_restart is required"};
 
-cvar_t r_glsl_vertextextureblend_usebothalphas = {CVAR_SAVE, "r_glsl_vertextextureblend_usebothalphas", "0", "use both alpha layers on vertex blended surfaces, each alpha layer sets amount of 'blend leak' on another layer."};
+cvar_t r_glsl_vertextextureblend_usebothalphas = {CVAR_SAVE, "r_glsl_vertextextureblend_usebothalphas", "0", "use both alpha layers on vertex blended surfaces, each alpha layer sets amount of 'blend leak' on another layer, requires mod_q3shader_force_terrain_alphaflag on."};
 
 cvar_t r_framedatasize = {CVAR_SAVE, "r_framedatasize", "0.5", "size of renderer data cache used during one frame (for skeletal animation caching, light processing, etc)"};
 
@@ -6380,6 +6380,8 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 	unsigned int permutation;
 	float uservecs[4][4];
 
+	R_EntityMatrix(&identitymatrix);
+
 	switch (vid.renderpath)
 	{
 	case RENDERPATH_GL20:
@@ -7357,7 +7359,7 @@ static void R_DrawEntityBBoxes(void)
 		if(PRVM_serveredictedict(edict, viewmodelforclient) != 0)
 			continue;
 		VectorLerp(edict->priv.server->areamins, 0.5f, edict->priv.server->areamaxs, center);
-		R_MeshQueue_AddTransparent(MESHQUEUE_SORT_DISTANCE, center, R_DrawEntityBBoxes_Callback, (entity_render_t *)NULL, i, (rtlight_t *)NULL);
+		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, center, R_DrawEntityBBoxes_Callback, (entity_render_t *)NULL, i, (rtlight_t *)NULL);
 	}
 }
 
@@ -7465,7 +7467,7 @@ void R_DrawNoModel(entity_render_t *ent)
 	vec3_t org;
 	Matrix4x4_OriginFromMatrix(&ent->matrix, org);
 	if ((ent->flags & RENDER_ADDITIVE) || (ent->alpha < 1))
-		R_MeshQueue_AddTransparent((ent->flags & RENDER_NODEPTHTEST) ? MESHQUEUE_SORT_HUD : MESHQUEUE_SORT_DISTANCE, org, R_DrawNoModel_TransparentCallback, ent, 0, rsurface.rtlight);
+		R_MeshQueue_AddTransparent((ent->flags & RENDER_NODEPTHTEST) ? TRANSPARENTSORT_HUD : TRANSPARENTSORT_DISTANCE, org, R_DrawNoModel_TransparentCallback, ent, 0, rsurface.rtlight);
 	else
 		R_DrawNoModel_TransparentCallback(ent, rsurface.rtlight, 0, NULL);
 }
@@ -9496,10 +9498,11 @@ static void RSurf_DrawBatch_GL11_ApplyFog(void)
 	if (rsurface.passcolor4f)
 	{
 		// generate color arrays
+		c = rsurface.passcolor4f + rsurface.batchfirstvertex * 4;
 		rsurface.passcolor4f = (float *)R_FrameData_Alloc(rsurface.batchnumvertices * sizeof(float[4]));
 		rsurface.passcolor4f_vertexbuffer = 0;
 		rsurface.passcolor4f_bufferoffset = 0;
-		for (i = 0, v = rsurface.batchvertex3f + rsurface.batchfirstvertex * 3, c = rsurface.passcolor4f + rsurface.batchfirstvertex * 4, c2 = rsurface.passcolor4f + rsurface.batchfirstvertex * 4;i < rsurface.batchnumvertices;i++, v += 3, c += 4, c2 += 4)
+		for (i = 0, v = rsurface.batchvertex3f + rsurface.batchfirstvertex * 3, c2 = rsurface.passcolor4f + rsurface.batchfirstvertex * 4;i < rsurface.batchnumvertices;i++, v += 3, c += 4, c2 += 4)
 		{
 			f = RSurf_FogVertex(v);
 			c2[0] = c[0] * f;
@@ -9977,8 +9980,8 @@ static void R_DrawTextureSurfaceList_GL13(int texturenumsurfaces, const msurface
 			R_Mesh_TexBind(1, 0);
 			R_Mesh_TexCoordPointer(1, 2, GL_FLOAT, sizeof(float[2]), NULL, 0, 0);
 			// generate a color array for the fog pass
-			R_Mesh_ColorPointer(4, GL_FLOAT, sizeof(float[4]), rsurface.passcolor4f, 0, 0);
 			RSurf_DrawBatch_GL11_MakeFogColor(layercolor[0], layercolor[1], layercolor[2], layercolor[3]);
+			R_Mesh_ColorPointer(4, GL_FLOAT, sizeof(float[4]), rsurface.passcolor4f, 0, 0);
 			RSurf_DrawBatch();
 			break;
 		default:
@@ -10020,7 +10023,7 @@ static void R_DrawTextureSurfaceList_GL11(int texturenumsurfaces, const msurface
 		switch (layer->type)
 		{
 		case TEXTURELAYERTYPE_LITTEXTURE:
-			if (layer->blendfunc1 == GL_ONE && layer->blendfunc2 == GL_ZERO)
+			if (layer->blendfunc1 == GL_ONE && layer->blendfunc2 == GL_ZERO && !(rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST))
 			{
 				// two-pass lit texture with 2x rgbscale
 				// first the lightmap pass
@@ -10053,6 +10056,8 @@ static void R_DrawTextureSurfaceList_GL11(int texturenumsurfaces, const msurface
 				R_Mesh_TexCoordPointer(0, 2, GL_FLOAT, sizeof(float[2]), rsurface.batchtexcoordtexture2f, rsurface.batchtexcoordtexture2f_vertexbuffer, rsurface.batchtexcoordtexture2f_bufferoffset);
 				if (rsurface.texture->currentmaterialflags & MATERIALFLAG_MODELLIGHT)
 					RSurf_DrawBatch_GL11_VertexShade(layer->color[0], layer->color[1], layer->color[2], layer->color[3], layer->color[0] != 1 || layer->color[1] != 1 || layer->color[2] != 1 || layer->color[3] != 1, applyfog);
+				else if (FAKELIGHT_ENABLED)
+					RSurf_DrawBatch_GL11_FakeLight(layer->color[0], layer->color[1], layer->color[2], layer->color[3], layer->color[0] != 1 || layer->color[1] != 1 || layer->color[2] != 1 || layer->color[3] != 1, applyfog);
 				else
 					RSurf_DrawBatch_GL11_VertexColor(layer->color[0], layer->color[1], layer->color[2], layer->color[3], layer->color[0] != 1 || layer->color[1] != 1 || layer->color[2] != 1 || layer->color[3] != 1, applyfog);
 			}
@@ -10080,8 +10085,8 @@ static void R_DrawTextureSurfaceList_GL11(int texturenumsurfaces, const msurface
 				R_Mesh_TexCoordPointer(0, 2, GL_FLOAT, sizeof(float[2]), NULL, 0, 0);
 			}
 			// generate a color array for the fog pass
-			R_Mesh_ColorPointer(4, GL_FLOAT, sizeof(float[4]), rsurface.passcolor4f, 0, 0);
 			RSurf_DrawBatch_GL11_MakeFogColor(layer->color[0], layer->color[1], layer->color[2], layer->color[3]);
+			R_Mesh_ColorPointer(4, GL_FLOAT, sizeof(float[4]), rsurface.passcolor4f, 0, 0);
 			RSurf_DrawBatch();
 			break;
 		default:
@@ -10498,7 +10503,7 @@ static void R_ProcessTransparentTextureSurfaceList(int texturenumsurfaces, const
 			center[1] += r_refdef.view.forward[1]*rsurface.entity->transparent_offset;
 			center[2] += r_refdef.view.forward[2]*rsurface.entity->transparent_offset;
 		}
-		R_MeshQueue_AddTransparent((rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST) ? MESHQUEUE_SORT_HUD : ((rsurface.entity->flags & RENDER_WORLDOBJECT) ? MESHQUEUE_SORT_SKY : MESHQUEUE_SORT_DISTANCE), center, R_DrawSurface_TransparentCallback, rsurface.entity, surface - rsurface.modelsurfaces, rsurface.rtlight);
+		R_MeshQueue_AddTransparent((rsurface.entity->flags & RENDER_WORLDOBJECT) ? TRANSPARENTSORT_SKY : (rsurface.texture->currentmaterialflags & MATERIALFLAG_NODEPTHTEST) ? TRANSPARENTSORT_HUD : rsurface.texture->transparentsort, center, R_DrawSurface_TransparentCallback, rsurface.entity, surface - rsurface.modelsurfaces, rsurface.rtlight);
 	}
 }
 
@@ -10745,7 +10750,7 @@ void R_DrawLocs(void)
 	for (loc = cl.locnodes, index = 0;loc;loc = loc->next, index++)
 	{
 		VectorLerp(loc->mins, 0.5f, loc->maxs, center);
-		R_MeshQueue_AddTransparent(MESHQUEUE_SORT_DISTANCE, center, R_DrawLoc_Callback, (entity_render_t *)loc, loc == nearestloc ? -1 : index, NULL);
+		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, center, R_DrawLoc_Callback, (entity_render_t *)loc, loc == nearestloc ? -1 : index, NULL);
 	}
 }
 

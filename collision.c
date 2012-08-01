@@ -1036,7 +1036,7 @@ void Collision_TraceBrushTriangleMeshFloat(trace_t *trace, const colbrushf_t *th
 	{
 		for (i = 0;i < numtriangles;i++, element3i += 3)
 		{
-			if (TriangleOverlapsBox(vertex3f + element3i[0]*3, vertex3f + element3i[1]*3, vertex3f + element3i[2]*3, segmentmins, segmentmaxs))
+			if (TriangleBBoxOverlapsBox(vertex3f + element3i[0]*3, vertex3f + element3i[1]*3, vertex3f + element3i[2]*3, segmentmins, segmentmaxs))
 			{
 				VectorCopy(vertex3f + element3i[0] * 3, points[0].v);
 				VectorCopy(vertex3f + element3i[1] * 3, points[1].v);
@@ -1954,7 +1954,7 @@ void Collision_CombineTraces(trace_t *cliptrace, const trace_t *trace, void *tou
 	//	cliptrace->inopen = true;
 	if (trace->inwater)
 		cliptrace->inwater = true;
-	if ((trace->realfraction <= cliptrace->realfraction) && (VectorLength2(trace->plane.normal) > 0))
+	if ((trace->realfraction < cliptrace->realfraction) && (VectorLength2(trace->plane.normal) > 0))
 	{
 		cliptrace->fraction = trace->fraction;
 		cliptrace->realfraction = trace->realfraction;

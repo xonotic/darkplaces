@@ -344,9 +344,9 @@ cvar_t r_shadow_bouncegrid_updateinterval = {CVAR_SAVE, "r_shadow_bouncegrid_upd
 cvar_t r_shadow_bouncegrid_x = {CVAR_SAVE, "r_shadow_bouncegrid_x", "64", "maximum texture size of bouncegrid on X axis"};
 cvar_t r_shadow_bouncegrid_y = {CVAR_SAVE, "r_shadow_bouncegrid_y", "64", "maximum texture size of bouncegrid on Y axis"};
 cvar_t r_shadow_bouncegrid_z = {CVAR_SAVE, "r_shadow_bouncegrid_z", "32", "maximum texture size of bouncegrid on Z axis"};
-cvar_t r_coronas = {CVAR_SAVE, "r_coronas", "1", "brightness of corona flare effects around certain lights, 0 disables corona effects"};
+cvar_t r_coronas = {CVAR_SAVE, "r_coronas", "0", "brightness of corona flare effects around certain lights, 0 disables corona effects"};
 cvar_t r_coronas_occlusionsizescale = {CVAR_SAVE, "r_coronas_occlusionsizescale", "0.1", "size of light source for corona occlusion checksum the proportion of hidden pixels controls corona intensity"};
-cvar_t r_coronas_occlusionquery = {CVAR_SAVE, "r_coronas_occlusionquery", "1", "use GL_ARB_occlusion_query extension if supported (fades coronas according to visibility)"};
+cvar_t r_coronas_occlusionquery = {CVAR_SAVE, "r_coronas_occlusionquery", "0", "use GL_ARB_occlusion_query extension if supported (fades coronas according to visibility) - bad performance (synchronous rendering) - worse on multi-gpu!"};
 cvar_t gl_flashblend = {CVAR_SAVE, "gl_flashblend", "0", "render bright coronas for dynamic lights instead of actual lighting, fast but ugly"};
 cvar_t gl_ext_separatestencil = {0, "gl_ext_separatestencil", "1", "make use of OpenGL 2.0 glStencilOpSeparate or GL_ATI_separate_stencil extension"};
 cvar_t gl_ext_stenciltwoside = {0, "gl_ext_stenciltwoside", "1", "make use of GL_EXT_stenciltwoside extension (NVIDIA only)"};
@@ -462,13 +462,13 @@ static void R_Shadow_SetShadowMode(void)
 			{
 				if (!r_fb.usedepthtextures)
 					r_shadow_shadowmappcf = 1;
-				else if(vid.support.amd_texture_texture4 || vid.support.arb_texture_gather)
-					r_shadow_shadowmappcf = 1;
-				else if(strstr(gl_vendor, "NVIDIA") || strstr(gl_renderer, "Radeon HD")) 
+				else if((strstr(gl_vendor, "NVIDIA") || strstr(gl_renderer, "Radeon HD")) && vid.support.arb_shadow && r_shadow_shadowmapshadowsampler) 
 				{
-					r_shadow_shadowmapsampler = vid.support.arb_shadow && r_shadow_shadowmapshadowsampler;
+					r_shadow_shadowmapsampler = true;
 					r_shadow_shadowmappcf = 1;
 				}
+                else if(vid.support.amd_texture_texture4 || vid.support.arb_texture_gather)
+                    r_shadow_shadowmappcf = 1;
 				else if((strstr(gl_vendor, "ATI") || strstr(gl_vendor, "Advanced Micro Devices")) && !strstr(gl_renderer, "Mesa") && !strstr(gl_version, "Mesa")) 
 					r_shadow_shadowmappcf = 1;
 				else 
@@ -1300,7 +1300,7 @@ void R_Shadow_MarkVolumeFromBox(int firsttriangle, int numtris, const float *inv
 				v[2] = invertex3f + e[2] * 3;
 				TriangleNormal(v[0], v[1], v[2], normal);
 				if (r_shadow_frontsidecasting.integer == (DotProduct(normal, projectdirection) < 0)
-				 && TriangleOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
+				 && TriangleBBoxOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
 					shadowmarklist[numshadowmark++] = t;
 			}
 		}
@@ -1312,7 +1312,7 @@ void R_Shadow_MarkVolumeFromBox(int firsttriangle, int numtris, const float *inv
 				v[1] = invertex3f + e[1] * 3;
 				v[2] = invertex3f + e[2] * 3;
 				if (r_shadow_frontsidecasting.integer == PointInfrontOfTriangle(projectorigin, v[0], v[1], v[2])
-				 && TriangleOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
+				 && TriangleBBoxOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
 					shadowmarklist[numshadowmark++] = t;
 			}
 		}
@@ -1684,7 +1684,7 @@ int R_Shadow_ChooseSidesFromBox(int firsttriangle, int numtris, const float *inv
 				v[0] = invertex3f + e[0] * 3, v[1] = invertex3f + e[1] * 3,	v[2] = invertex3f + e[2] * 3;
 				TriangleNormal(v[0], v[1], v[2], normal);
 				if (r_shadow_frontsidecasting.integer == (DotProduct(normal, projectdirection) < 0)
-				 && TriangleOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
+				 && TriangleBBoxOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
 				{
 					Matrix4x4_Transform(worldtolight, v[0], p[0]), Matrix4x4_Transform(worldtolight, v[1], p[1]), Matrix4x4_Transform(worldtolight, v[2], p[2]);
 					mask = R_Shadow_CalcTriangleSideMask(p[0], p[1], p[2], bias);
@@ -1704,7 +1704,7 @@ int R_Shadow_ChooseSidesFromBox(int firsttriangle, int numtris, const float *inv
 			{
 				v[0] = invertex3f + e[0] * 3, v[1] = invertex3f + e[1] * 3, v[2] = invertex3f + e[2] * 3;
 				if (r_shadow_frontsidecasting.integer == PointInfrontOfTriangle(projectorigin, v[0], v[1], v[2])
-				 && TriangleOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
+				 && TriangleBBoxOverlapsBox(v[0], v[1], v[2], lightmins, lightmaxs))
 				{
 					Matrix4x4_Transform(worldtolight, v[0], p[0]), Matrix4x4_Transform(worldtolight, v[1], p[1]), Matrix4x4_Transform(worldtolight, v[2], p[2]);
 					mask = R_Shadow_CalcTriangleSideMask(p[0], p[1], p[2], bias);
@@ -5472,10 +5472,10 @@ void R_Shadow_DrawLightSprites(void)
 	{
 		light = (dlight_t *) Mem_ExpandableArray_RecordAtIndex(&r_shadow_worldlightsarray, lightindex);
 		if (light)
-			R_MeshQueue_AddTransparent(MESHQUEUE_SORT_DISTANCE, light->origin, R_Shadow_DrawLightSprite_TransparentCallback, (entity_render_t *)light, 5, &light->rtlight);
+			R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, light->origin, R_Shadow_DrawLightSprite_TransparentCallback, (entity_render_t *)light, 5, &light->rtlight);
 	}
 	if (!r_editlights_lockcursor)
-		R_MeshQueue_AddTransparent(MESHQUEUE_SORT_DISTANCE, r_editlights_cursorlocation, R_Shadow_DrawCursor_TransparentCallback, NULL, 0, NULL);
+		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, r_editlights_cursorlocation, R_Shadow_DrawCursor_TransparentCallback, NULL, 0, NULL);
 }
 
 int R_Shadow_GetRTLightInfo(unsigned int lightindex, float *origin, float *radius, float *color)
