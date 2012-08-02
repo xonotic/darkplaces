@@ -611,7 +611,7 @@ static void HandleEvents(void)
 
 		case MotionNotify:
 			// mouse moved
-			if (vid_usingmouse)
+			if (vid_usingmouse && !event.xmotion.send_event)
 			{
 #ifdef USEDGA
 				if (vid_usingdgamouse)
@@ -622,14 +622,11 @@ static void HandleEvents(void)
 				else
 #endif
 				{
-					if (!event.xmotion.send_event)
-					{
-						in_mouse_x += event.xmotion.x - in_windowmouse_x;
-						in_mouse_y += event.xmotion.y - in_windowmouse_y;
-						//if (abs(vid.width/2 - event.xmotion.x) + abs(vid.height/2 - event.xmotion.y))
-						if (vid_stick_mouse.integer || abs(vid.width/2 - event.xmotion.x) > vid.width / 4 || abs(vid.height/2 - event.xmotion.y) > vid.height / 4)
-							dowarp = true;
-					}
+					in_mouse_x += event.xmotion.x - in_windowmouse_x;
+					in_mouse_y += event.xmotion.y - in_windowmouse_y;
+					//if (abs(vid.width/2 - event.xmotion.x) + abs(vid.height/2 - event.xmotion.y))
+					if (vid_stick_mouse.integer || abs(vid.width/2 - event.xmotion.x) > vid.width / 4 || abs(vid.height/2 - event.xmotion.y) > vid.height / 4)
+						dowarp = true;
 				}
 			}
 			in_windowmouse_x = event.xmotion.x;
