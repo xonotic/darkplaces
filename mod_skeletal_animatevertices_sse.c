@@ -308,18 +308,19 @@ void Mod_Skeletal_AnimateVertices_SSE(const dp_model_t * RESTRICT model, const f
 
 #define TRANSFORM_VECTOR(in, out) { \
 		__m128 vin = _mm_loadu_ps(in); \
-		\
+		__m128 z1 = _mm_movehl_ps(vin, vin); \
+		__m128 vinxy = _mm_unpacklo_ps(vin, vin); \
 		/* x */ \
-		__m128 x = _mm_shuffle_ps(vin, vin, 0x0); \
+		__m128 x = _mm_movelh_ps(vinxy, vinxy); \
 		__m128 t1 = _mm_mul_ps(x, m1); \
 		\
 		/* y, + x */ \
-		__m128 y = _mm_shuffle_ps(vin, vin, 0x55); \
+		__m128 y = _mm_movehl_ps(vinxy, vinxy); \
 		__m128 t2 = _mm_mul_ps(y, m2); \
+		__m128 z = _mm_unpacklo_ps(z1, z1); \
 		__m128 t3 = _mm_add_ps(t1, t2); \
 		\
 		/* nz, + (ny + nx) */ \
-		__m128 z = _mm_shuffle_ps(vin, vin, 0xaa); \
 		__m128 t4 = _mm_mul_ps(z, m3); \
 		__m128 vout = _mm_add_ps(t3, t4); \
 		_mm_storeu_ps((out), vout); \
