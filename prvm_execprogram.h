@@ -256,9 +256,10 @@
 					goto cleanup;
 				}
 				ed = PRVM_PROG_TO_EDICT(OPA->edict);
-				OPC->ivector[0] = ((prvm_eval_t *)(ed->fields.ip + OPB->_int))->ivector[0];
-				OPC->ivector[1] = ((prvm_eval_t *)(ed->fields.ip + OPB->_int))->ivector[1];
-				OPC->ivector[2] = ((prvm_eval_t *)(ed->fields.ip + OPB->_int))->ivector[2];
+				ptr = ((prvm_eval_t *)(ed->fields.ip + OPB->_int));
+				OPC->ivector[0] = ptr->ivector[0];
+				OPC->ivector[1] = ptr->ivector[1];
+				OPC->ivector[2] = ptr->ivector[2];
 				break;
 
 		//==================
