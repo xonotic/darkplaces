@@ -672,6 +672,7 @@ void MVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessag
 	int		restorevm_tempstringsbuf_cursize;
 	double  calltime;
 	double tm, starttm;
+	double tempfloat;
 
 	calltime = Sys_DirtyTime();
 
