@@ -47,17 +47,21 @@
 				OPC->_float = OPA->vector[0]*OPB->vector[0] + OPA->vector[1]*OPB->vector[1] + OPA->vector[2]*OPB->vector[2];
 				break;
 			case OP_MUL_FV:
-				tempfloat = OPA->_float;
+			{
+				prvm_vec_t tempfloat = OPA->_float;
 				OPC->vector[0] = tempfloat * OPB->vector[0];
 				OPC->vector[1] = tempfloat * OPB->vector[1];
 				OPC->vector[2] = tempfloat * OPB->vector[2];
 				break;
+			}
 			case OP_MUL_VF:
-				tempfloat = OPB->_float;
+			{
+				prvm_vec_t tempfloat = OPA->_float;
 				OPC->vector[0] = tempfloat * OPA->vector[0];
 				OPC->vector[1] = tempfloat * OPA->vector[1];
 				OPC->vector[2] = tempfloat * OPA->vector[2];
 				break;
+			}
 			case OP_DIV_F:
 				if( OPB->_float != 0.0f )
 				{
