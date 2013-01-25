@@ -53,7 +53,7 @@ r_refdef_t r_refdef;
 cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
 cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
 cvar_t r_motionblur_averaging = {CVAR_SAVE, "r_motionblur_averaging", "0.1", "sliding average reaction time for velocity (higher = slower adaption to change)"};
-cvar_t r_motionblur_randomize = {CVAR_SAVE, "r_motionblur_randomize", "0.1", "randomizing coefficient to workaround ghosting"};
+cvar_t r_motionblur_slowmo = {CVAR_SAVE, "r_motionblur_slowmo", "0", "0: Slowmo does not affect the amount of blur. 1: Slowmo scales the damage/motion blur. - NOTE: You might need to increase r_viewfbo to compensate for the high blur."};
 cvar_t r_motionblur_minblur = {CVAR_SAVE, "r_motionblur_minblur", "0.5", "factor of blur to apply at all times (always have this amount of blur no matter what the other factors are)"};
 cvar_t r_motionblur_maxblur = {CVAR_SAVE, "r_motionblur_maxblur", "0.9", "maxmimum amount of blur"};
 cvar_t r_motionblur_velocityfactor = {CVAR_SAVE, "r_motionblur_velocityfactor", "1", "factoring in of player velocity to the blur equation - the faster the player moves around the map, the more blur they get"};
@@ -260,6 +260,7 @@ rtexture_t *r_texture_gammaramps;
 unsigned int r_texture_gammaramps_serial;
 //rtexture_t *r_texture_fogintensity;
 rtexture_t *r_texture_reflectcube;
+rtexture_t *r_texture_dither;
 
 // TODO: hash lookups?
 typedef struct cubemapinfo_s
@@ -412,6 +413,26 @@ static void R_BuildWhiteCube(void)
 	unsigned char data[6*1*1*4];
 	memset(data, 255, sizeof(data));
 	r_texture_whitecube = R_LoadTextureCubeMap(r_main_texturepool, "whitecube", 1, data, TEXTYPE_BGRA, TEXF_CLAMP | TEXF_PERSISTENT, -1, NULL);
+}
+
+static void R_BuildDither(void)
+{
+#define DITHERSIZE 512
+	int i;
+	unsigned char *data;
+	data = (unsigned char *)Mem_Alloc(tempmempool, DITHERSIZE*DITHERSIZE*4);
+	for(i=0;i<DITHERSIZE*DITHERSIZE*4;i++)
+		data[i]=lhrandom(0,512);
+	r_texture_dither=R_LoadTexture2D(
+		r_main_texturepool,
+		"dither",
+		DITHERSIZE,DITHERSIZE,
+		&data[0],
+		TEXTYPE_RGBA,
+		TEXF_PERSISTENT | TEXF_FORCENEAREST ,
+		-1,NULL
+	);
+	Mem_Free(data);
 }
 
 static void R_BuildNormalizationCube(void)
@@ -689,6 +710,7 @@ shadermodeinfo_t glslshadermodeinfo[SHADERMODE_COUNT] =
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_SHOWDEPTH\n", " showdepth"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_DEFERREDGEOMETRY\n", " deferredgeometry"},
 	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_DEFERREDLIGHTSOURCE\n", " deferredlightsource"},
+	{"glsl/default.glsl", NULL, "glsl/default.glsl", "#define MODE_GHOSTMOTIONBLUR\n", " ghostmotionblur"},
 };
 
 shadermodeinfo_t hlslshadermodeinfo[SHADERMODE_COUNT] =
@@ -755,6 +777,7 @@ typedef struct r_glsl_permutation_s
 	int tex_Texture_ReflectMask;
 	int tex_Texture_ReflectCube;
 	int tex_Texture_BounceGrid;
+	int tex_Texture_Dither;
 	/// locations of detected uniforms in program object, or -1 if not found
 	int loc_Texture_First;
 	int loc_Texture_Second;
@@ -785,6 +808,7 @@ typedef struct r_glsl_permutation_s
 	int loc_Texture_ReflectMask;
 	int loc_Texture_ReflectCube;
 	int loc_Texture_BounceGrid;
+	int loc_Texture_Dither;
 	int loc_Alpha;
 	int loc_BloomBlur_Parameters;
 	int loc_ClientTime;
@@ -843,6 +867,9 @@ typedef struct r_glsl_permutation_s
 	int loc_NormalmapScrollBlend;
 	int loc_BounceGridMatrix;
 	int loc_BounceGridIntensity;
+	int loc_BitValue;
+	int loc_Rand1f;
+	int loc_Rand2f;
 }
 r_glsl_permutation_t;
 
@@ -1133,6 +1160,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_Texture_ReflectMask        = qglGetUniformLocation(p->program, "Texture_ReflectMask");
 		p->loc_Texture_ReflectCube        = qglGetUniformLocation(p->program, "Texture_ReflectCube");
 		p->loc_Texture_BounceGrid         = qglGetUniformLocation(p->program, "Texture_BounceGrid");
+		p->loc_Texture_Dither             = qglGetUniformLocation(p->program, "Texture_Dither");
 		p->loc_Alpha                      = qglGetUniformLocation(p->program, "Alpha");
 		p->loc_BloomBlur_Parameters       = qglGetUniformLocation(p->program, "BloomBlur_Parameters");
 		p->loc_ClientTime                 = qglGetUniformLocation(p->program, "ClientTime");
@@ -1191,6 +1219,9 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_NormalmapScrollBlend       = qglGetUniformLocation(p->program, "NormalmapScrollBlend");
 		p->loc_BounceGridMatrix           = qglGetUniformLocation(p->program, "BounceGridMatrix");
 		p->loc_BounceGridIntensity        = qglGetUniformLocation(p->program, "BounceGridIntensity");
+		p->loc_BitValue                   = qglGetUniformLocation(p->program, "BitValue");
+		p->loc_Rand1f                     = qglGetUniformLocation(p->program, "Rand1f");
+		p->loc_Rand2f                     = qglGetUniformLocation(p->program, "Rand2f");
 		// initialize the samplers to refer to the texture units we use
 		p->tex_Texture_First = -1;
 		p->tex_Texture_Second = -1;
@@ -1221,6 +1252,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->tex_Texture_ReflectMask = -1;
 		p->tex_Texture_ReflectCube = -1;
 		p->tex_Texture_BounceGrid = -1;
+		p->tex_Texture_Dither     = -1;
 		sampler = 0;
 		if (p->loc_Texture_First           >= 0) {p->tex_Texture_First            = sampler;qglUniform1i(p->loc_Texture_First           , sampler);sampler++;}
 		if (p->loc_Texture_Second          >= 0) {p->tex_Texture_Second           = sampler;qglUniform1i(p->loc_Texture_Second          , sampler);sampler++;}
@@ -1251,6 +1283,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		if (p->loc_Texture_ReflectMask     >= 0) {p->tex_Texture_ReflectMask      = sampler;qglUniform1i(p->loc_Texture_ReflectMask     , sampler);sampler++;}
 		if (p->loc_Texture_ReflectCube     >= 0) {p->tex_Texture_ReflectCube      = sampler;qglUniform1i(p->loc_Texture_ReflectCube     , sampler);sampler++;}
 		if (p->loc_Texture_BounceGrid      >= 0) {p->tex_Texture_BounceGrid       = sampler;qglUniform1i(p->loc_Texture_BounceGrid      , sampler);sampler++;}
+		if (p->loc_Texture_Dither          >= 0) {p->tex_Texture_Dither           = sampler;qglUniform1i(p->loc_Texture_Dither          , sampler);sampler++;}
 		CHECKGLERROR
 		Con_DPrintf("^5GLSL shader %s compiled (%i textures).\n", permutationname, sampler);
 	}
@@ -1308,6 +1341,17 @@ static void R_SetupShader_SetPermutationGLSL(unsigned int mode, unsigned int per
 	if (r_glsl_permutation->loc_ModelViewProjectionMatrix >= 0) qglUniformMatrix4fv(r_glsl_permutation->loc_ModelViewProjectionMatrix, 1, false, gl_modelviewprojection16f);
 	if (r_glsl_permutation->loc_ModelViewMatrix >= 0) qglUniformMatrix4fv(r_glsl_permutation->loc_ModelViewMatrix, 1, false, gl_modelview16f);
 	if (r_glsl_permutation->loc_ClientTime >= 0) qglUniform1f(r_glsl_permutation->loc_ClientTime, cl.time);
+	if (r_glsl_permutation->loc_Rand1f     >= 0) qglUniform1f(r_glsl_permutation->loc_Rand1f, lhrandom(-1.0,1.0));
+	if (r_glsl_permutation->loc_Rand2f     >= 0) qglUniform2f(r_glsl_permutation->loc_Rand2f, lhrandom(-1.0,1.0), lhrandom(-1.0,1.0));
+	if (r_glsl_permutation->loc_BitValue   >= 0){
+		switch(r_viewfbo.integer){
+			case 0:
+			case 1:  qglUniform1f(r_glsl_permutation->loc_BitValue, pow(2, -8)); break;
+			case 2:  qglUniform1f(r_glsl_permutation->loc_BitValue, pow(2,-10)); break;
+			case 3:
+			default: qglUniform1f(r_glsl_permutation->loc_BitValue, pow(2,-23));
+		};
+	}
 }
 
 #ifdef SUPPORTD3D
@@ -2033,6 +2077,41 @@ void R_SetupShader_DepthOrShadow(qboolean notrippy, qboolean depthrgb, qboolean 
 		break;
 	case RENDERPATH_SOFT:
 		R_SetupShader_SetPermutationSoft(SHADERMODE_DEPTH_OR_SHADOW, permutation);
+		break;
+	}
+}
+
+//Updates the render buffer to First*Alpha+Second*(1.0-Alpha)
+void R_SetupShader_GhostMotionBlur(rtexture_t *first,rtexture_t *second,rtexture_t *dither,float alpha)
+{
+	switch (vid.renderpath)
+	{
+	case RENDERPATH_D3D9:
+#ifdef SUPPORTD3D
+		R_SetupShader_SetPermutationHLSL(SHADERMODE_GENERIC, permutation);
+		R_Mesh_TexBind(GL20TU_FIRST , first );
+		R_Mesh_TexBind(GL20TU_SECOND, second);
+		R_Mesh_TexBind(GL20TU_DITHER, dither);
+#endif
+		break;
+	case RENDERPATH_D3D10:
+		Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_D3D11:
+		Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
+		break;
+	case RENDERPATH_GL20:
+	case RENDERPATH_GLES2:
+		R_SetupShader_SetPermutationGLSL(SHADERMODE_GHOSTMOTIONBLUR, 0);
+		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First , first );
+		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Second, second);
+		R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Dither, dither);
+		if (r_glsl_permutation->loc_Alpha >= 0) qglUniform1f(r_glsl_permutation->loc_Alpha,alpha);
+		break;
+	case RENDERPATH_GL13:
+	case RENDERPATH_GLES1:
+	case RENDERPATH_GL11:
+	case RENDERPATH_SOFT:
 		break;
 	}
 }
@@ -3977,6 +4056,7 @@ static void gl_main_start(void)
 	r_texture_fogattenuation = NULL;
 	r_texture_fogheighttexture = NULL;
 	r_texture_gammaramps = NULL;
+	r_texture_dither = NULL;
 	r_texture_numcubemaps = 0;
 
 	r_loaddds = r_texture_dds_load.integer != 0;
@@ -4185,7 +4265,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_motionblur);
 	Cvar_RegisterVariable(&r_damageblur);
 	Cvar_RegisterVariable(&r_motionblur_averaging);
-	Cvar_RegisterVariable(&r_motionblur_randomize);
+	Cvar_RegisterVariable(&r_motionblur_slowmo);
 	Cvar_RegisterVariable(&r_motionblur_minblur);
 	Cvar_RegisterVariable(&r_motionblur_maxblur);
 	Cvar_RegisterVariable(&r_motionblur_velocityfactor);
@@ -6548,21 +6628,48 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0) && r_fb.ghosttexture)
 			{
 				// declare variables
+				// Note: f(t)=e^-Lt
+				// In his code we are working the L to change the blending speed, NOT the e !
 				float blur_factor, blur_mouseaccel, blur_velocity;
-				static float blur_average; 
-				static vec3_t blur_oldangles; // used to see how quickly the mouse is moving
+				static float blur_average;
+				static vec3_t oldviewforward; // used to see how quickly the mouse is moving
+				float dt; //Delta Time (time passed)
+				static double oldrealtime=0;
+				float old_target_fps=60;
+				float view_arclength; //The distance that would have been traveled on a sphere after rotating view
+				//float temp_alpha_blend; //Temp var to use in local code
+
+				//Calc the delta-time
+				if (r_motionblur_slowmo.value>0){
+					dt = (cl.time-cl.oldtime) * slowmo.value;
+				}else{
+					dt = realtime - oldrealtime;
+					oldrealtime = realtime;
+				}
 
 				// set a goal for the factoring
+				// r_refdef.view.forward
+				// 1800/PI / OrgTarget_FPS
+				
+				view_arclength = asin(VectorDistance(oldviewforward, r_refdef.view.forward) / 2) * 2;
+				view_arclength *= 1800/(M_PI*dt*old_target_fps);
+				VectorCopy( r_refdef.view.forward, oldviewforward );
+
 				blur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value) 
 					/ max(1, r_motionblur_velocityfactor_maxspeed.value - r_motionblur_velocityfactor_minspeed.value), 1);
-				blur_mouseaccel = bound(0, ((fabs(VectorLength(cl.viewangles) - VectorLength(blur_oldangles)) * 10) - r_motionblur_mousefactor_minspeed.value) 
+				blur_mouseaccel = bound(0, (view_arclength - r_motionblur_mousefactor_minspeed.value)
 					/ max(1, r_motionblur_mousefactor_maxspeed.value - r_motionblur_mousefactor_minspeed.value), 1);
 				blur_factor = ((blur_velocity * r_motionblur_velocityfactor.value) 
 					+ (blur_mouseaccel * r_motionblur_mousefactor.value));
 
 				// from the goal, pick an averaged value between goal and last value
-				cl.motionbluralpha = bound(0, (cl.time - cl.oldtime) / max(0.001, r_motionblur_averaging.value), 1);
+				cl.motionbluralpha = bound(0, dt / max(0.001, r_motionblur_averaging.value), 1);
 				blur_average = blur_average * (1 - cl.motionbluralpha) + blur_factor * cl.motionbluralpha;
+				
+				//@Div: Replace with below ?
+				//cl.motionbluralpha = bound(0, dt / max(0.001, r_motionblur_averaging.value), 1);
+				//temp_alpha_blend = exp(-cl.motionbluralpha);
+				//blur_average = blur_average * temp_alpha_blend + blur_factor * (1 - temp_alpha_blend);
 
 				// enforce minimum amount of blur 
 				blur_factor = blur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
@@ -6579,17 +6686,26 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 						/
 						max(0.0001, cl.time - cl.oldtime) // fps independent
 					  );
-
-				// randomization for the blur value to combat persistent ghosting
-				cl.motionbluralpha *= lhrandom(1 - r_motionblur_randomize.value, 1 + r_motionblur_randomize.value);
+				//@Div: Replace with ???
+				//cl.motionbluralpha = 1 - exp(-
+				//		(
+				//		 (r_motionblur.value * blur_factor / 80)
+				//		 +
+				//		 (r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
+				//		)
+				//		*
+				//		dt // fps independent
+				//		* old_target_fps * old_target_fps //FPSFIX fps^2 to offset old bug -> Calc into 80 and 1600
+				//	  );
+				// Only apply max_blur, random is nolonger needed
 				cl.motionbluralpha = bound(0, cl.motionbluralpha, r_motionblur_maxblur.value);
 
 				// apply the blur
 				R_ResetViewRendering2D(fbo, depthtexture, colortexture);
-				if (cl.motionbluralpha > 0 && !r_refdef.envmap && r_fb.ghosttexture_valid)
+				//0.0 = Instant fading: no need to mix
+				if (cl.motionbluralpha > 0  && !r_refdef.envmap && r_fb.ghosttexture_valid)
 				{
-					GL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-					GL_Color(1, 1, 1, cl.motionbluralpha);
+					GL_BlendFunc(GL_ONE, GL_ZERO);
 					switch(vid.renderpath)
 					{
 					case RENDERPATH_GL11:
@@ -6606,18 +6722,19 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 						R_Mesh_PrepareVertices_Generic_Arrays(4, r_d3dscreenvertex3f, NULL, r_fb.screentexcoord2f);
 						break;
 					}
-					R_SetupShader_Generic(r_fb.ghosttexture, NULL, GL_MODULATE, 1, false, true, true);
+					if(!r_texture_dither) R_BuildDither();
+					R_SetupShader_GhostMotionBlur(r_fb.ghosttexture,r_fb.colortexture,r_texture_dither,cl.motionbluralpha);
 					R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 					r_refdef.stats.bloom_drawpixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 				}
 
-				// updates old view angles for next pass
-				VectorCopy(cl.viewangles, blur_oldangles);
-
-				// copy view into the ghost texture
-				R_Mesh_CopyToTexture(r_fb.ghosttexture, 0, 0, r_refdef.view.viewport.x, r_refdef.view.viewport.y, r_refdef.view.viewport.width, r_refdef.view.viewport.height);
+				//1.0 = Forever fading blur: no need to ghost texture, it's identical
+				if(cl.motionbluralpha<1.0){
+					// copy view into the ghost texture
+					R_Mesh_CopyToTexture(r_fb.ghosttexture, 0, 0, r_refdef.view.viewport.x, r_refdef.view.viewport.y, r_refdef.view.viewport.width, r_refdef.view.viewport.height);
+					r_fb.ghosttexture_valid = true;
+				}
 				r_refdef.stats.bloom_copypixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
-				r_fb.ghosttexture_valid = true;
 			}
 		}
 		else

@@ -475,6 +475,7 @@ void R_SetupShader_DepthOrShadow(qboolean notrippy, qboolean depthrgb, qboolean 
 void R_SetupShader_ShowDepth(qboolean notrippy);
 void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, float ambientscale, float diffusescale, float specularscale, rsurfacepass_t rsurfacepass, int texturenumsurfaces, const msurface_t **texturesurfacelist, void *waterplane, qboolean notrippy);
 void R_SetupShader_DeferredLight(const rtlight_t *rtlight);
+void R_SetupShader_GhostMotionBlur(rtexture_t *first, rtexture_t *second, rtexture_t *dither, float alpha);
 
 typedef struct r_waterstate_waterplane_s
 {

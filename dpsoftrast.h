@@ -120,7 +120,9 @@ typedef enum gl20_texunit_e
 	// fake reflections
 	GL20TU_REFLECTMASK = 5,
 	GL20TU_REFLECTCUBE = 6,
-	GL20TU_FOGHEIGHTTEXTURE = 14
+	GL20TU_FOGHEIGHTTEXTURE = 14,
+	// Dither
+	GL20TU_DITHER = 3
 }
 gl20_texunit;
 
@@ -160,6 +162,7 @@ typedef enum shadermode_e
 	SHADERMODE_SHOWDEPTH, ///< (debugging) renders depth as color
 	SHADERMODE_DEFERREDGEOMETRY, ///< (deferred) render material properties to screenspace geometry buffers
 	SHADERMODE_DEFERREDLIGHTSOURCE, ///< (deferred) use directional pixel shading from light source (rtlight) on screenspace geometry buffers
+	SHADERMODE_GHOSTMOTIONBLUR, ////< (motionblur) As used in ghosttexture
 	SHADERMODE_COUNT
 }
 shadermode_t;
@@ -310,6 +313,7 @@ typedef enum DPSOFTRAST_UNIFORM_e
 	DPSOFTRAST_UNIFORM_NormalmapScrollBlend,
 	DPSOFTRAST_UNIFORM_OffsetMapping_LodDistance,
 	DPSOFTRAST_UNIFORM_OffsetMapping_Bias,
+	DPSOFTRAST_UNIFORM_Dither,
 	DPSOFTRAST_UNIFORM_TOTAL
 }
 DPSOFTRAST_UNIFORM;
