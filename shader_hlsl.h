@@ -374,7 +374,7 @@
 "			int i;\n"
 "			float2 tc = TexCoord;\n"
 "			float3 tex1 = tex2D(Texture_First,  tc).rgb;\n"
-"			float3 tex1 = tex2D(Texture_Second, tc).rgb;\n"
+"			float3 tex2 = tex2D(Texture_Second, tc).rgb;\n"
 "			float3 tex3 = tex2D(Texture_Dither, tc*8.0+Rand2f).rgb;\n"
 "			dp_FragColor = (Alpha)*tex1 + (1.0-Alpha)*tex2 + (tex3-0.5)*BitValue;\n"
 "		}\n"

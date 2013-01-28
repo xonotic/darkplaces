@@ -6633,7 +6633,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 				r_refdef.stats.bloom_copypixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 			}
 
-			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0) && r_fb.ghosttexture)
+			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0) && r_fb.ghosttexture && !r_refdef.envmap)
 			{
 				float motionblur_maxfactor, motionblur_factor, motionblur_mouseaccel, motionblur_velocity;
 				static float motionblur_average; // FIXME move to cl.
@@ -6717,7 +6717,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 				R_ResetViewRendering2D(fbo, depthtexture, colortexture);
 
 				// if blur amount is very small, we don't need the old frame
-				if (cl.motionbluralpha > 1 / 256.0 && !r_refdef.envmap && r_fb.ghosttexture_valid)
+				if (cl.motionbluralpha > 0 && r_fb.ghosttexture_valid)
 				{
 					GL_BlendFunc(GL_ONE, GL_ZERO);
 					switch(vid.renderpath)
@@ -6743,7 +6743,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 				}
 
 				// only if the ghost texture changed
-				if(cl.motionbluralpha < 1.0)
+				if(cl.motionbluralpha < 1)
 				{
 					// copy view into the ghost texture
 					R_Mesh_CopyToTexture(r_fb.ghosttexture, 0, 0, r_refdef.view.viewport.x, r_refdef.view.viewport.y, r_refdef.view.viewport.width, r_refdef.view.viewport.height);
