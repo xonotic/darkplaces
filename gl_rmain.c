@@ -422,7 +422,7 @@ static void R_BuildDither(void)
 	unsigned char *data;
 	data = (unsigned char *)Mem_Alloc(tempmempool, DITHERSIZE*DITHERSIZE*4);
 	for(i=0;i<DITHERSIZE*DITHERSIZE*4;i++)
-		data[i]=lhrandom(0,512);
+		data[i]=lhrandom(0,255);
 	r_texture_dither=R_LoadTexture2D(
 		r_main_texturepool,
 		"dither",
@@ -2802,7 +2802,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			if (r_glsl_permutation->loc_Color_Ambient >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Ambient, colormod[0] * ambientscale, colormod[1] * ambientscale, colormod[2] * ambientscale);
 			if (r_glsl_permutation->loc_Color_Diffuse >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Diffuse, colormod[0] * diffusescale, colormod[1] * diffusescale, colormod[2] * diffusescale);
 			if (r_glsl_permutation->loc_Color_Specular >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Specular, r_refdef.view.colorscale * specularscale, r_refdef.view.colorscale * specularscale, r_refdef.view.colorscale * specularscale);
-	
+
 			// additive passes are only darkened by fog, not tinted
 			if (r_glsl_permutation->loc_FogColor >= 0)
 				qglUniform3f(r_glsl_permutation->loc_FogColor, 0, 0, 0);
@@ -6160,7 +6160,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 				r_refdef.view.usecustompvs = true;
 				r_refdef.scene.worldmodel->brush.FatPVS(r_refdef.scene.worldmodel, visorigin, 2, r_refdef.viewcache.world_pvsbits, (r_refdef.viewcache.world_numclusters+7)>>3, false);
 			}
-			
+
 			// camera needs no clipplane
 			r_refdef.view.useclipplane = false;
 
@@ -6627,83 +6627,81 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 
 			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0) && r_fb.ghosttexture)
 			{
-				// declare variables
-				// Note: f(t)=e^-Lt
-				// In his code we are working the L to change the blending speed, NOT the e !
-				float blur_factor, blur_mouseaccel, blur_velocity;
-				static float blur_average;
-				static vec3_t oldviewforward; // used to see how quickly the mouse is moving
-				float dt; //Delta Time (time passed)
-				static double oldrealtime=0;
-				float old_target_fps=60;
-				float view_arclength; //The distance that would have been traveled on a sphere after rotating view
-				//float temp_alpha_blend; //Temp var to use in local code
+				float motionblur_factor, motionblur_mouseaccel, motionblur_velocity;
+				static float motionblur_average; // FIXME move to cl.
+				static vec3_t oldviewforward; // FIXME move to cl.
+				static double oldrealtime = 0; // FIXME move to cl.
+				float blur_strength;
+				float dt;
+				const float old_target_fps = 125;
+				float view_arclength;
+				float motionblur_newweight = 1;
 
-				//Calc the delta-time
-				if (r_motionblur_slowmo.value>0){
-					dt = (cl.time-cl.oldtime) * slowmo.value;
-				}else{
-					dt = realtime - oldrealtime;
-					oldrealtime = realtime;
-				}
+				// Calc the delta-time
+				dt = realtime - oldrealtime;
+				oldrealtime = realtime;
 
-				// set a goal for the factoring
-				// r_refdef.view.forward
-				// 1800/PI / OrgTarget_FPS
-				
+				// no time back-steps
+				if(dt < 0)
+					dt = 0;
+
+				// if slowmo, apply it
+				if(r_motionblur_slowmo.value > 0)
+					dt *= slowmo.value;
+
+				// calculate the arc length of the view vector change
 				view_arclength = asin(VectorDistance(oldviewforward, r_refdef.view.forward) / 2) * 2;
-				view_arclength *= 1800/(M_PI*dt*old_target_fps);
-				VectorCopy( r_refdef.view.forward, oldviewforward );
+				view_arclength *= 1800 / (M_PI * dt * old_target_fps); // 5
+				VectorCopy(r_refdef.view.forward, oldviewforward);
 
-				blur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value) 
+				// calculate velocities
+				motionblur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value) 
 					/ max(1, r_motionblur_velocityfactor_maxspeed.value - r_motionblur_velocityfactor_minspeed.value), 1);
-				blur_mouseaccel = bound(0, (view_arclength - r_motionblur_mousefactor_minspeed.value)
+				motionblur_mouseaccel = bound(0, (view_arclength - r_motionblur_mousefactor_minspeed.value)
 					/ max(1, r_motionblur_mousefactor_maxspeed.value - r_motionblur_mousefactor_minspeed.value), 1);
-				blur_factor = ((blur_velocity * r_motionblur_velocityfactor.value) 
-					+ (blur_mouseaccel * r_motionblur_mousefactor.value));
+
+				// calculate new blur factor
+				motionblur_factor =
+					(motionblur_velocity * r_motionblur_velocityfactor.value) +
+					(motionblur_mouseaccel * r_motionblur_mousefactor.value);
 
 				// from the goal, pick an averaged value between goal and last value
-				cl.motionbluralpha = bound(0, dt / max(0.001, r_motionblur_averaging.value), 1);
-				blur_average = blur_average * (1 - cl.motionbluralpha) + blur_factor * cl.motionbluralpha;
-				
-				//@Div: Replace with below ?
-				//cl.motionbluralpha = bound(0, dt / max(0.001, r_motionblur_averaging.value), 1);
-				//temp_alpha_blend = exp(-cl.motionbluralpha);
-				//blur_average = blur_average * temp_alpha_blend + blur_factor * (1 - temp_alpha_blend);
+				if(r_motionblur_averaging.value > 0)
+					motionblur_newweight = 1 - exp(-dt / max(0.001, r_motionblur_averaging.value));
+				motionblur_average = motionblur_average * (1 - motionblur_newweight) + motionblur_factor * motionblur_newweight;
 
 				// enforce minimum amount of blur 
-				blur_factor = blur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
+				motionblur_factor = motionblur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
 
-				//Con_Printf("motionblur: direct factor: %f, averaged factor: %f, velocity: %f, mouse accel: %f \n", blur_factor, blur_average, blur_velocity, blur_mouseaccel);
+				// mix the blurs
+				// OLD: blur_strength =
+				// OLD: 	(r_motionblur.value * motionblur_factor / 80) +
+				// OLD: 	(r_damageblur.value * cl.cshifts[CSHIFT_DAMAGE].percent / 1600);
+				// at 125fps, r_motionblur 0.5, motionblur_factor == 0.5: 0.003125
+				// OLD: cl.motionbluralpha = 1 - exp(-blur_strength / dt);
+				// at 125fps, r_motionblur 0.5, motionblur_factor == 0.5: 0.323366
 
-				// calculate values into a standard alpha
-				cl.motionbluralpha = 1 - exp(-
-						(
-						 (r_motionblur.value * blur_factor / 80)
-						 +
-						 (r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
-						)
-						/
-						max(0.0001, cl.time - cl.oldtime) // fps independent
-					  );
-				//@Div: Replace with ???
-				//cl.motionbluralpha = 1 - exp(-
-				//		(
-				//		 (r_motionblur.value * blur_factor / 80)
-				//		 +
-				//		 (r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
-				//		)
-				//		*
-				//		dt // fps independent
-				//		* old_target_fps * old_target_fps //FPSFIX fps^2 to offset old bug -> Calc into 80 and 1600
-				//	  );
+				blur_strength =
+					(r_motionblur.value * motionblur_factor / 32) +
+					(r_damageblur.value * cl.cshifts[CSHIFT_DAMAGE].percent / 768);
+				// at 125fps, r_motionblur 0.5, motionblur_factor == 0.5: 0.0078125
+
+				// calculate motionblur from this
+				if(blur_strength > 0)
+					cl.motionbluralpha = exp(-dt / blur_strength);
+					// at 125fps, r_motionblur 0.5, motionblur_factor == 0.5: 0.3591554413294046
+					// CLOSE ENOUGH
+				else
+					cl.motionbluralpha = 0;
+
 				// Only apply max_blur, random is nolonger needed
 				cl.motionbluralpha = bound(0, cl.motionbluralpha, r_motionblur_maxblur.value);
 
-				// apply the blur
+				// prepare for applying the blur
 				R_ResetViewRendering2D(fbo, depthtexture, colortexture);
-				//0.0 = Instant fading: no need to mix
-				if (cl.motionbluralpha > 0  && !r_refdef.envmap && r_fb.ghosttexture_valid)
+
+				// if blur amount is very small, we don't need the old frame
+				if (cl.motionbluralpha > 1 / 256.0 && !r_refdef.envmap && r_fb.ghosttexture_valid)
 				{
 					GL_BlendFunc(GL_ONE, GL_ZERO);
 					switch(vid.renderpath)
@@ -6728,13 +6726,14 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 					r_refdef.stats.bloom_drawpixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 				}
 
-				//1.0 = Forever fading blur: no need to ghost texture, it's identical
-				if(cl.motionbluralpha<1.0){
+				// only if the ghost texture changed
+				if(cl.motionbluralpha < 1.0)
+				{
 					// copy view into the ghost texture
 					R_Mesh_CopyToTexture(r_fb.ghosttexture, 0, 0, r_refdef.view.viewport.x, r_refdef.view.viewport.y, r_refdef.view.viewport.width, r_refdef.view.viewport.height);
 					r_fb.ghosttexture_valid = true;
+					r_refdef.stats.bloom_copypixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 				}
-				r_refdef.stats.bloom_copypixels += r_refdef.view.viewport.width * r_refdef.view.viewport.height;
 			}
 		}
 		else

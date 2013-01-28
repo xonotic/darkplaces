@@ -462,7 +462,7 @@
 		"	vec4 tex1 = dp_texture2D(Texture_First , TexCoord1);\n"
 		"	vec4 tex2 = dp_texture2D(Texture_Second, TexCoord1);\n"
 		"	vec4 tex3 = dp_texture2D(Texture_Dither, TexCoord1*8.0+Rand2f);\n"
-		"	dp_FragColor = (Alpha)*tex1 + (1.0-Alpha)*tex2 + (tex3-0.5-1/512)*BitValue;\n"
+		"	dp_FragColor = (Alpha)*tex1 + (1.0-Alpha)*tex2 + (tex3-0.5)*BitValue;\n"
 		"//	dp_FragColor = tex3*0.5; //To check the quality of the noise\n"
 		"//	dp_FragColor = tex2*0.95+tex3*0.05*0.5; //To check for patterns in the noise (should be gray)\n"
 		"}\n"
