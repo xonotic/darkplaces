@@ -868,7 +868,6 @@ typedef struct r_glsl_permutation_s
 	int loc_BounceGridMatrix;
 	int loc_BounceGridIntensity;
 	int loc_BitValue;
-	int loc_Rand1f;
 	int loc_Rand2f;
 }
 r_glsl_permutation_t;
@@ -1220,7 +1219,6 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_BounceGridMatrix           = qglGetUniformLocation(p->program, "BounceGridMatrix");
 		p->loc_BounceGridIntensity        = qglGetUniformLocation(p->program, "BounceGridIntensity");
 		p->loc_BitValue                   = qglGetUniformLocation(p->program, "BitValue");
-		p->loc_Rand1f                     = qglGetUniformLocation(p->program, "Rand1f");
 		p->loc_Rand2f                     = qglGetUniformLocation(p->program, "Rand2f");
 		// initialize the samplers to refer to the texture units we use
 		p->tex_Texture_First = -1;
@@ -1341,7 +1339,6 @@ static void R_SetupShader_SetPermutationGLSL(unsigned int mode, unsigned int per
 	if (r_glsl_permutation->loc_ModelViewProjectionMatrix >= 0) qglUniformMatrix4fv(r_glsl_permutation->loc_ModelViewProjectionMatrix, 1, false, gl_modelviewprojection16f);
 	if (r_glsl_permutation->loc_ModelViewMatrix >= 0) qglUniformMatrix4fv(r_glsl_permutation->loc_ModelViewMatrix, 1, false, gl_modelview16f);
 	if (r_glsl_permutation->loc_ClientTime >= 0) qglUniform1f(r_glsl_permutation->loc_ClientTime, cl.time);
-	if (r_glsl_permutation->loc_Rand1f     >= 0) qglUniform1f(r_glsl_permutation->loc_Rand1f, lhrandom(-1.0,1.0));
 	if (r_glsl_permutation->loc_Rand2f     >= 0) qglUniform2f(r_glsl_permutation->loc_Rand2f, lhrandom(-1.0,1.0), lhrandom(-1.0,1.0));
 	if (r_glsl_permutation->loc_BitValue   >= 0){
 		switch(r_viewfbo.integer){
@@ -1444,7 +1441,9 @@ typedef enum D3DPSREGISTER_e
 	D3DPSREGISTER_NormalmapScrollBlend = 52,
 	D3DPSREGISTER_OffsetMapping_LodDistance = 53,
 	D3DPSREGISTER_OffsetMapping_Bias = 54,
-	// next at 54
+	D3DPSREGISTER_OffsetMapping_BitValue = 55,
+	D3DPSREGISTER_OffsetMapping_Rand2f = 56,
+	// next at 57
 }
 D3DPSREGISTER_t;
 
@@ -1850,6 +1849,14 @@ void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutatio
 	hlslVSSetParameter16f(D3DVSREGISTER_ModelViewProjectionMatrix, gl_modelviewprojection16f);
 	hlslVSSetParameter16f(D3DVSREGISTER_ModelViewMatrix, gl_modelview16f);
 	hlslPSSetParameter1f(D3DPSREGISTER_ClientTime, cl.time);
+	hlslPSSetParameter2f(D3DPSREGISTER_Rand2f, lhrandom(-1.0,1.0), lhrandom(-1.0,1.0));
+	switch(r_viewfbo.integer){
+		case 0:
+		case 1:  hlslPSSetParameter1f(D3DPSREGISTER_BitValue, pow(2, -8))); break;
+		case 2:  hlslPSSetParameter1f(D3DPSREGISTER_BitValue, pow(2,-10)); break;
+		case 3:
+		default: hlslPSSetParameter1f(D3DPSREGISTER_BitValue, pow(2,-23));
+	};
 }
 #endif
 
