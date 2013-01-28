@@ -364,7 +364,7 @@
 "		float2 TexCoord : TEXCOORD0,\n"
 "		uniform sampler Texture_First  : register(s0),\n"
 "		uniform sampler Texture_Second : register(s1),\n"
-"		uniform sampler Texture_Dither : register(s2),\n"
+"		uniform sampler Texture_Dither : register(s3),\n"
 "		uniform half   BitValue : register(c55),\n"
 "		uniform float2   Rand2f : register(c56),\n"
 "		uniform half      Alpha : register(c0),\n"
