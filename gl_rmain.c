@@ -2088,10 +2088,11 @@ void R_SetupShader_GhostMotionBlur(rtexture_t *first,rtexture_t *second,rtexture
 	{
 	case RENDERPATH_D3D9:
 #ifdef SUPPORTD3D
-		R_SetupShader_SetPermutationHLSL(SHADERMODE_GENERIC, permutation);
+		R_SetupShader_SetPermutationHLSL(SHADERMODE_GHOSTMOTIONBLUR, 0);
 		R_Mesh_TexBind(GL20TU_FIRST , first );
 		R_Mesh_TexBind(GL20TU_SECOND, second);
 		R_Mesh_TexBind(GL20TU_DITHER, dither);
+		hlslPSSetParameter1f(D3DPSREGISTER_Alpha, alpha);
 #endif
 		break;
 	case RENDERPATH_D3D10:
@@ -6627,7 +6628,7 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 
 			if(!R_Stereo_Active() && (r_motionblur.value > 0 || r_damageblur.value > 0) && r_fb.ghosttexture)
 			{
-				float motionblur_factor, motionblur_mouseaccel, motionblur_velocity;
+				float motionblur_maxfactor, motionblur_factor, motionblur_mouseaccel, motionblur_velocity;
 				static float motionblur_average; // FIXME move to cl.
 				static vec3_t oldviewforward; // FIXME move to cl.
 				static double oldrealtime = 0; // FIXME move to cl.
@@ -6664,6 +6665,9 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 				motionblur_factor =
 					(motionblur_velocity * r_motionblur_velocityfactor.value) +
 					(motionblur_mouseaccel * r_motionblur_mousefactor.value);
+				motionblur_maxfactor =
+					r_motionblur_velocityfactor.value +
+					r_motionblur_mousefactor.value;
 
 				// from the goal, pick an averaged value between goal and last value
 				if(r_motionblur_averaging.value > 0)
@@ -6671,7 +6675,12 @@ static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 				motionblur_average = motionblur_average * (1 - motionblur_newweight) + motionblur_factor * motionblur_newweight;
 
 				// enforce minimum amount of blur 
-				motionblur_factor = motionblur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
+				// map 0 to r_motionblur_minblur.value
+				// map motionblur_maxfactor to motionblur_maxfactor
+				if(motionblur_maxfactor > r_motionblur_minblur.value)
+					motionblur_factor = motionblur_average * (motionblur_maxfactor - r_motionblur_minblur.value) / motionblur_maxfactor + r_motionblur_minblur.value;
+				else
+					motionblur_factor = r_motionblur_minblur.value;
 
 				// mix the blurs
 				// OLD: blur_strength =
