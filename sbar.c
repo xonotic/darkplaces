@@ -1142,7 +1142,7 @@ void Sbar_ShowFPS(void)
 	}
 	if (showblur.integer)
 	{
-		dpsnprintf(blurstring, sizeof(blurstring), "%3i%% blur", (int)(cl.motionbluralpha * 100));
+		dpsnprintf(blurstring, sizeof(blurstring), "%.1f%% blur (HL: %.1f ms)", cl.motionblur_alpha * 100, cl.motionblur_strength * 1000 * log(2));
 		fps_strings++;
 	}
 	if (showsound.integer)
