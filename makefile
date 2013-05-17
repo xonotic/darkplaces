@@ -319,6 +319,10 @@ else
 	CFLAGS_FS=
 endif
 
+ifdef DISABLE_AVW
+CFLAGS_AVW=-DDISABLE_AVW
+endif
+
 ifdef LINK_TO_CURL
 CFLAGS_CURL=-DLINK_TO_CURL `pkg-config --cflags libcurl`
 LIB_CURL=`pkg-config --libs libcurl`
