@@ -6,7 +6,9 @@
 
 #include "quakedef.h"
 
-#define SUPPORTDLL
+/* Debian-specific: no dynamic loading please, it breaks versioned dependency
+ * tracking */
+#undef SUPPORTDLL
 
 #ifdef WIN32
 # include <windows.h>

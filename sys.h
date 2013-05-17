@@ -50,7 +50,7 @@ dllfunction_t;
  * \param handle
  * \param fcts
  */
-qboolean Sys_LoadLibrary (const char** dllnames, dllhandle_t* handle, const dllfunction_t *fcts);
+qboolean Sys_LoadLibrary (const char** dllnames, dllhandle_t* handle, const dllfunction_t *fcts) __attribute__ ((__warning__ ("in Debian, please link shared libraries at build time")));
 void Sys_UnloadLibrary (dllhandle_t* handle);
 void* Sys_GetProcAddress (dllhandle_t handle, const char* name);
 
