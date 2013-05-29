@@ -3,6 +3,7 @@
 #include "image.h"
 #include "jpeg.h"
 #include "image_png.h"
+#include "image_webp.h"
 #include "r_shadow.h"
 
 int		image_width;
@@ -881,29 +882,32 @@ imageformat_t imageformats_dq[] =
 
 imageformat_t imageformats_textures[] =
 {
-	{"%s.tga", LoadTGA_BGRA},
-	{"%s.png", PNG_LoadImage_BGRA},
-	{"%s.jpg", JPEG_LoadImage_BGRA},
-	{"%s.pcx", LoadPCX_BGRA},
-	{"%s.wal", LoadWAL_BGRA},
+	{"%s.tga",  LoadTGA_BGRA},
+	{"%s.png",  PNG_LoadImage_BGRA},
+	{"%s.jpg",  JPEG_LoadImage_BGRA},
+	{"%s.pcx",  LoadPCX_BGRA},
+	{"%s.wal",  LoadWAL_BGRA},
+	{"%s.webp", WEBP_LoadImage_BGRA},
 	{NULL, NULL}
 };
 
 imageformat_t imageformats_gfx[] =
 {
-	{"%s.tga", LoadTGA_BGRA},
-	{"%s.png", PNG_LoadImage_BGRA},
-	{"%s.jpg", JPEG_LoadImage_BGRA},
-	{"%s.pcx", LoadPCX_BGRA},
+	{"%s.tga",  LoadTGA_BGRA},
+	{"%s.png",  PNG_LoadImage_BGRA},
+	{"%s.jpg",  JPEG_LoadImage_BGRA},
+	{"%s.pcx",  LoadPCX_BGRA},
+	{"%s.webp", WEBP_LoadImage_BGRA},
 	{NULL, NULL}
 };
 
 imageformat_t imageformats_other[] =
 {
-	{"%s.tga", LoadTGA_BGRA},
-	{"%s.png", PNG_LoadImage_BGRA},
-	{"%s.jpg", JPEG_LoadImage_BGRA},
-	{"%s.pcx", LoadPCX_BGRA},
+	{"%s.tga",  LoadTGA_BGRA},
+	{"%s.png",  PNG_LoadImage_BGRA},
+	{"%s.jpg",  JPEG_LoadImage_BGRA},
+	{"%s.pcx",  LoadPCX_BGRA},
+	{"%s.webp", WEBP_LoadImage_BGRA},
 	{NULL, NULL}
 };
 

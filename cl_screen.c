@@ -51,6 +51,8 @@ cvar_t vid_pixelheight = {CVAR_SAVE, "vid_pixelheight", "1", "adjusts vertical f
 cvar_t scr_screenshot_jpeg = {CVAR_SAVE, "scr_screenshot_jpeg","1", "save jpeg instead of targa"};
 cvar_t scr_screenshot_jpeg_quality = {CVAR_SAVE, "scr_screenshot_jpeg_quality","0.9", "image quality of saved jpeg"};
 cvar_t scr_screenshot_png = {CVAR_SAVE, "scr_screenshot_png","0", "save png instead of targa"};
+cvar_t scr_screenshot_webp = {CVAR_SAVE, "scr_screenshot_webp", "0", "save webp instead of targa"};
+cvar_t scr_screenshot_webp_quality = {CVAR_SAVE, "scr_screenshot_webp_quality", "0.9", "image quality of saved webp"};
 cvar_t scr_screenshot_gammaboost = {CVAR_SAVE, "scr_screenshot_gammaboost","1", "gamma correction on saved screenshots and videos, 1.0 saves unmodified images"};
 cvar_t scr_screenshot_hwgamma = {CVAR_SAVE, "scr_screenshot_hwgamma","1", "apply the video gamma ramp to saved screenshots and videos"};
 cvar_t scr_screenshot_alpha = {CVAR_SAVE, "scr_screenshot_alpha","0", "try to write an alpha channel to screenshots (debugging feature)"};
@@ -1332,6 +1334,8 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable (&scr_screenshot_jpeg);
 	Cvar_RegisterVariable (&scr_screenshot_jpeg_quality);
 	Cvar_RegisterVariable (&scr_screenshot_png);
+	Cvar_RegisterVariable (&scr_screenshot_webp);
+	Cvar_RegisterVariable (&scr_screenshot_webp_quality);
 	Cvar_RegisterVariable (&scr_screenshot_gammaboost);
 	Cvar_RegisterVariable (&scr_screenshot_hwgamma);
 	Cvar_RegisterVariable (&scr_screenshot_name_in_mapdir);
@@ -1404,6 +1408,7 @@ void SCR_ScreenShot_f (void)
 	unsigned char *buffer2;
 	qboolean jpeg = (scr_screenshot_jpeg.integer != 0);
 	qboolean png = (scr_screenshot_png.integer != 0) && !jpeg;
+	qboolean webp = (scr_screenshot_webp.integer != 0) && !png;
 	char vabuf[1024];
 
 	if (Cmd_Argc() == 2)
@@ -1415,16 +1420,25 @@ void SCR_ScreenShot_f (void)
 		{
 			jpeg = true;
 			png = false;
+			webp = false;
 		}
 		else if (!strcasecmp(ext, "tga"))
 		{
 			jpeg = false;
 			png = false;
+			webp = false;
 		}
 		else if (!strcasecmp(ext, "png"))
 		{
 			jpeg = false;
 			png = true;
+			webp = false;
+		}
+		else if (!strcasecmp(ext, "webp"))
+		{
+			jpeg = false;
+			png = false;
+			webp = true;
 		}
 		else
 		{
@@ -1454,7 +1468,7 @@ void SCR_ScreenShot_f (void)
 			return;
 		}
 
-		dpsnprintf(filename, sizeof(filename), "screenshots/%s-%02d.%s", prefix_name, shotnumber100, jpeg ? "jpg" : png ? "png" : "tga");
+		dpsnprintf(filename, sizeof(filename), "screenshots/%s-%02d.%s", prefix_name, shotnumber100, jpeg ? "jpg" : png ? "png" : webp ? "webp" : "tga");
 	}
 	else
 	{
@@ -1485,7 +1499,7 @@ void SCR_ScreenShot_f (void)
 			return;
 		}
 
-		dpsnprintf(filename, sizeof(filename), "screenshots/%s%06d.%s", prefix_name, shotnumber, jpeg ? "jpg" : png ? "png" : "tga");
+		dpsnprintf(filename, sizeof(filename), "screenshots/%s%06d.%s", prefix_name, shotnumber, jpeg ? "jpg" : png ? "png" : webp ? "webp" : "tga");
 
 		shotnumber++;
 	}

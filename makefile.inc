@@ -133,6 +133,7 @@ OBJ_COMMON= \
 	host_cmd.o \
 	image.o \
 	image_png.o \
+	image_webp.o \
 	jpeg.o \
 	keys.o \
 	lhnet.o \

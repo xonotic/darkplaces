@@ -7,6 +7,7 @@ extern LPDIRECT3DDEVICE9 vid_d3d9dev;
 #include "image.h"
 #include "jpeg.h"
 #include "image_png.h"
+#include "image_webp.h"
 #include "intoverflow.h"
 #include "dpsoftrast.h"
 
@@ -795,6 +796,8 @@ static void r_textures_start(void)
 		Cvar_SetValueQuick (&scr_screenshot_jpeg, 0);
 	if (! PNG_OpenLibrary ())
 		Cvar_SetValueQuick (&scr_screenshot_png, 0);
+	if (! WEBP_OpenLibrary ())
+		Cvar_SetValueQuick (&scr_screenshot_webp, 0);
 }
 
 static void r_textures_shutdown(void)
@@ -802,6 +805,8 @@ static void r_textures_shutdown(void)
 	rtexturepool_t *temp;
 
 	JPEG_CloseLibrary ();
+	PNG_CloseLibrary ();
+	WEBP_CloseLibrary ();
 
 	while(gltexturepoolchain)
 	{
