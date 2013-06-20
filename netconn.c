@@ -2538,6 +2538,16 @@ static qboolean NetConn_PreventFlood(lhnetaddress_t *peeraddress, server_floodad
 			break;
 		}
 	}
+#ifdef NET_FLOODCONTROL_PARANOID
+	// no flood slot left? better be paranoid
+	// note that typical reflection attacks do not hit this, as this
+	// DDoS attacks are typically targeted at few IPs
+	if (realtime < floodlist[bestfloodslotnum].lasttime + floodtime)
+	{
+		//Con_Printf("Flood slots exhausted!\n");
+		return true;
+	}
+#endif
 	// begin a new timeout on this address
 	floodlist[bestfloodslotnum].address = noportpeeraddress;
 	floodlist[bestfloodslotnum].lasttime = realtime;
