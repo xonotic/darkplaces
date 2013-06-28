@@ -1062,6 +1062,7 @@ static char *R_GetShaderText(const char *filename, qboolean printfromdisknotice,
 	return shaderstring;
 }
 
+void R_GLSL_AddCacheEntry(unsigned int mode, unsigned int permutation);
 static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode, unsigned int permutation)
 {
 	int i;
@@ -1138,7 +1139,10 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 			fragstrings_list[fragstrings_count++] = "\n";
 		}
 	}
-
+	
+	// add to cache
+	R_GLSL_AddCacheEntry(mode, permutation);
+	
 	// add static parms
 	R_CompileShader_AddStaticParms(mode, permutation);
 	memcpy((char *)(vertstrings_list + vertstrings_count), shaderstaticparmstrings_list, sizeof(*vertstrings_list) * shaderstaticparms_count);
@@ -1852,6 +1856,121 @@ static void R_SetupShader_SetPermutationSoft(unsigned int mode, unsigned int per
 	DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_ClientTime, cl.time);
 }
 
+
+
+typedef struct r_glsl_cacheentry
+{
+	unsigned int mode;
+	unsigned int permutation;
+}
+r_glsl_cacheentry;
+
+const int cachesize = 1024;
+
+const int tempshadercachesize = 16; // temp. caching to reduce file access
+r_glsl_cacheentry tempshadercache[tempshadercachesize];
+int tempshadercachepos = 0;
+
+int R_GLSL_ParseCache(r_glsl_cacheentry *cache, int size)
+{
+	qfile_t *cacheFile;
+	cacheFile = FS_OpenRealFile("shadercache.txt", "rb", false);
+
+	int cachepos = 0;
+	
+	if(cacheFile)
+	{
+		char buf[256];
+		int bufpos;
+		int c;
+
+		bufpos = 0;
+		for(;;)
+		{
+			c = FS_Getc(cacheFile);
+			if(c < 0 || c == 0 || c == '\r' || c == '\n')
+			{
+				if(bufpos > 0)
+				{
+					buf[bufpos] = 0;
+					unsigned int mode = 0;
+					unsigned int permutation = 0;
+					if (sscanf(buf, "%d\t%d", &mode, &permutation) == 2)
+					{
+						Con_DPrintf("Loading cached permutation: %d, %d\n", mode, permutation);
+						cache[cachepos].mode = mode;
+						cache[cachepos].permutation = permutation;
+						if(++cachepos == size)
+							break;
+					}
+					bufpos = 0;
+				}
+				if(c < 0)
+					break;
+			}
+			else
+			{
+				if(bufpos < MAX_INPUTLINE - 1)
+					buf[bufpos++] = c;
+			}
+		}
+
+		FS_Close(cacheFile);
+	}
+	return cachepos;
+}
+
+void R_GLSL_FlushCache(void)
+{
+	qfile_t *cacheFile;
+	cacheFile = FS_OpenRealFile("shadercache.txt", "a", false);
+
+	r_glsl_cacheentry cache[cachesize];
+	int entries = R_GLSL_ParseCache(cache, cachesize);
+
+	for(int i = 0; i < tempshadercachepos; i++) 
+	{
+		bool alreadyCached = false;
+		for(int j = 0; j < entries; j++)
+		{
+			if (cache[j].mode == tempshadercache[i].mode && cache[j].permutation == tempshadercache[i].permutation)
+			{
+				alreadyCached = true;
+				break;
+			}
+		}
+		if(!alreadyCached)
+			FS_Printf(cacheFile, "%d\t%d\n", tempshadercache[i].mode, tempshadercache[i].permutation);
+	}
+	
+	FS_Close(cacheFile);
+
+	tempshadercachepos = 0;
+}
+
+void R_GLSL_AddCacheEntry(unsigned int mode, unsigned int permutation) 
+{
+	tempshadercache[tempshadercachepos].mode = mode;
+	tempshadercache[tempshadercachepos].permutation = permutation;
+	tempshadercachepos++;
+
+	if(tempshadercachepos == tempshadercachesize)
+		R_GLSL_FlushCache();
+}
+
+void R_GLSL_LoadCache(void)
+{
+	R_GLSL_FlushCache(); // make sure everything is stored
+
+	r_glsl_cacheentry cache[cachesize];
+	int entries = R_GLSL_ParseCache(cache, cachesize);
+
+	for(int i = 0; i < entries; i++)
+		R_SetupShader_SetPermutationGLSL(cache[i].mode, cache[i].permutation);
+}
+
+
+
 void R_GLSL_Restart_f(void)
 {
 	unsigned int i, limit;
@@ -1905,7 +2024,9 @@ void R_GLSL_Restart_f(void)
 				}
 			}
 			memset(r_glsl_permutationhash, 0, sizeof(r_glsl_permutationhash));
+			R_GLSL_LoadCache();
 		}
+
 		break;
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
