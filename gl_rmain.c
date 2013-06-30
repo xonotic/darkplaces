@@ -1867,17 +1867,16 @@ r_glsl_cacheentry;
 
 const int cachesize = 1024;
 
-const int tempshadercachesize = 16; // temp. caching to reduce file access
-r_glsl_cacheentry tempshadercache[tempshadercachesize];
+r_glsl_cacheentry tempshadercache[16];
 int tempshadercachepos = 0;
 
 int R_GLSL_ParseCache(r_glsl_cacheentry *cache, int size)
 {
 	qfile_t *cacheFile;
+	int cachepos = 0;
+
 	cacheFile = FS_OpenRealFile("shadercache.txt", "rb", false);
 
-	int cachepos = 0;
-	
 	if(cacheFile)
 	{
 		char buf[256];
@@ -1892,9 +1891,9 @@ int R_GLSL_ParseCache(r_glsl_cacheentry *cache, int size)
 			{
 				if(bufpos > 0)
 				{
-					buf[bufpos] = 0;
 					unsigned int mode = 0;
 					unsigned int permutation = 0;
+					buf[bufpos] = 0;
 					if (sscanf(buf, "%d\t%d", &mode, &permutation) == 2)
 					{
 						Con_DPrintf("Loading cached permutation: %d, %d\n", mode, permutation);
@@ -1923,15 +1922,15 @@ int R_GLSL_ParseCache(r_glsl_cacheentry *cache, int size)
 void R_GLSL_FlushCache(void)
 {
 	qfile_t *cacheFile;
-	cacheFile = FS_OpenRealFile("shadercache.txt", "a", false);
-
 	r_glsl_cacheentry cache[cachesize];
 	int entries = R_GLSL_ParseCache(cache, cachesize);
+	int i, j;
+	cacheFile = FS_OpenRealFile("shadercache.txt", "a", false);
 
-	for(int i = 0; i < tempshadercachepos; i++) 
+	for(i = 0; i < tempshadercachepos; i++) 
 	{
-		bool alreadyCached = false;
-		for(int j = 0; j < entries; j++)
+		qboolean alreadyCached = false;
+		for(j = 0; j < entries; j++)
 		{
 			if (cache[j].mode == tempshadercache[i].mode && cache[j].permutation == tempshadercache[i].permutation)
 			{
@@ -1954,18 +1953,19 @@ void R_GLSL_AddCacheEntry(unsigned int mode, unsigned int permutation)
 	tempshadercache[tempshadercachepos].permutation = permutation;
 	tempshadercachepos++;
 
-	if(tempshadercachepos == tempshadercachesize)
+	if(tempshadercachepos == 16)
 		R_GLSL_FlushCache();
 }
 
 void R_GLSL_LoadCache(void)
 {
-	R_GLSL_FlushCache(); // make sure everything is stored
-
 	r_glsl_cacheentry cache[cachesize];
 	int entries = R_GLSL_ParseCache(cache, cachesize);
+	int i;
 
-	for(int i = 0; i < entries; i++)
+	R_GLSL_FlushCache(); // make sure everything is stored
+
+	for(i = 0; i < entries; i++)
 		R_SetupShader_SetPermutationGLSL(cache[i].mode, cache[i].permutation);
 }
 
