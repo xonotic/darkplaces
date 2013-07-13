@@ -276,16 +276,20 @@ Writes key bindings and archived cvars to config.cfg
 static void Host_SaveConfig_to(const char *file)
 {
 	qfile_t *f;
+	char name[MAX_OSPATH];
+
+	strlcpy(name, file, sizeof(name));
+	FS_SetExtension(name, ".cfg", sizeof (name), IS_HARDENED);
 
 // dedicated servers initialize the host but don't parse and set the
 // config.cfg cvars
 	// LordHavoc: don't save a config if it crashed in startup
 	if (host_framecount >= 3 && cls.state != ca_dedicated && !COM_CheckParm("-benchmark") && !COM_CheckParm("-capturedemo"))
 	{
-		f = FS_OpenRealFile(file, "wb", false);
+		f = FS_OpenRealFile(name, "wb", false);
 		if (!f)
 		{
-			Con_Printf("Couldn't write %s.\n", file);
+			Con_Printf("Couldn't write %s.\n", name);
 			return;
 		}
 

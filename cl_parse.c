@@ -2992,6 +2992,12 @@ static void CL_IPLog_Add(const char *address, const char *name, qboolean checkex
 	if (addtofile)
 	{
 		// add it to the iplog.txt file
+		{
+			char name[MAX_OSPATH];
+			strlcpy(name, cl_iplog_name.string, sizeof(name));
+			FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
+			Cvar_SetQuick(cl_iplog_name, name);
+		}
 		// TODO: this ought to open the one in the userpath version of the base
 		// gamedir, not the current gamedir
 		Log_Printf(cl_iplog_name.string, "%s %s\n", address, name);
@@ -3009,6 +3015,12 @@ static void CL_IPLog_Load(void)
 	char line[MAX_INPUTLINE];
 	char address[MAX_INPUTLINE];
 	cl_iplog_loaded = true;
+	{
+		char name[MAX_OSPATH];
+		strlcpy(name, cl_iplog_name.string, sizeof(name));
+		FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
+		Cvar_SetQuick(cl_iplog_name, name);
+	}
 	// TODO: this ought to open the one in the userpath version of the base
 	// gamedir, not the current gamedir
 	filedata = FS_LoadFile(cl_iplog_name.string, tempmempool, true, &filesize);

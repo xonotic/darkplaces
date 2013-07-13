@@ -410,6 +410,13 @@ static void Log_Open (void)
 	if (logfile != NULL || log_file.string[0] == '\0')
 		return;
 
+	{
+		char name[MAX_OSPATH];
+		strlcpy(name, log_file.string, sizeof(name));
+		FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
+		Cvar_SetQuick(log_file, name);
+	}
+
 	logfile = FS_OpenRealFile(log_file.string, "a", false);
 	if (logfile != NULL)
 	{
@@ -692,12 +699,15 @@ static void Con_ConDump_f (void)
 {
 	int i;
 	qfile_t *file;
+	char name[MAX_OSPATH];
 	if (Cmd_Argc() != 2)
 	{
 		Con_Printf("usage: condump <filename>\n");
 		return;
 	}
-	file = FS_OpenRealFile(Cmd_Argv(1), "w", false);
+	strlcpy(name, Cmd_Argv(1), sizeof(name));
+	FS_SetExtension(name, ".txt", sizeof (name), IS_HARDENED);
+	file = FS_OpenRealFile(name, "w", false);
 	if (!file)
 	{
 		Con_Printf("condump: unable to write file \"%s\"\n", Cmd_Argv(1));
