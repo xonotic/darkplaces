@@ -649,10 +649,10 @@ void Sys_MakeProcessMean (void)
 # endif
 #endif
 
-#ifdef ANTICHEAT_UNSAFE
 // whole function only exists if anticheat is enabled
 Sys_AntiCheat_CheckMemory_Result_t Sys_AntiCheat_CheckMemory(const char *dllsubstring, qboolean dllsubstringmode, const void *pattern, size_t length)
 {
+#ifdef ANTICHEAT_UNSAFE
 # ifdef __linux__
 	Sys_AntiCheat_CheckMemory_Result_t ret = CHECKMEMORY_NODLL;
 	FILE *f = fopen("/proc/self/maps", "r");
@@ -703,6 +703,9 @@ Sys_AntiCheat_CheckMemory_Result_t Sys_AntiCheat_CheckMemory(const char *dllsubs
 # else
 	return CHECKMEMORY_N_A;
 # endif
+#else
+	return CHECKMEMORY_N_A;
+#endif
 }
 void Sys_AntiCheat_CheckMemory_f(void)
 {
@@ -726,7 +729,6 @@ void Sys_AntiCheat_CheckMemory_f(void)
 			break;
 	}
 }
-#endif
 
 qboolean Sys_AntiCheat_Init(char **envp)
 {

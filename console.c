@@ -414,7 +414,7 @@ static void Log_Open (void)
 		char name[MAX_OSPATH];
 		strlcpy(name, log_file.string, sizeof(name));
 		FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
-		Cvar_SetQuick(log_file, name);
+		Cvar_SetQuick(&log_file, name);
 	}
 
 	logfile = FS_OpenRealFile(log_file.string, "a", false);

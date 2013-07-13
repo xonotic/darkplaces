@@ -3005,7 +3005,7 @@ static void CL_IPLog_Add(const char *address, const char *name, qboolean checkex
 			char name[MAX_OSPATH];
 			strlcpy(name, cl_iplog_name.string, sizeof(name));
 			FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
-			Cvar_SetQuick(cl_iplog_name, name);
+			Cvar_SetQuick(&cl_iplog_name, name);
 		}
 		// TODO: this ought to open the one in the userpath version of the base
 		// gamedir, not the current gamedir
@@ -3028,7 +3028,7 @@ static void CL_IPLog_Load(void)
 		char name[MAX_OSPATH];
 		strlcpy(name, cl_iplog_name.string, sizeof(name));
 		FS_SetExtension(name, ".log", sizeof (name), IS_HARDENED);
-		Cvar_SetQuick(cl_iplog_name, name);
+		Cvar_SetQuick(&cl_iplog_name, name);
 	}
 	// TODO: this ought to open the one in the userpath version of the base
 	// gamedir, not the current gamedir
