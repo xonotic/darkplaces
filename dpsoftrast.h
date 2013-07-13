@@ -157,7 +157,6 @@ typedef enum shadermode_e
 	SHADERMODE_LIGHTSOURCE, ///< (lightsource) use directional pixel shading from light source (rtlight)
 	SHADERMODE_REFRACTION, ///< refract background (the material is rendered normally after this pass)
 	SHADERMODE_WATER, ///< refract background and reflection (the material is rendered normally after this pass)
-	SHADERMODE_SHOWDEPTH, ///< (debugging) renders depth as color
 	SHADERMODE_DEFERREDGEOMETRY, ///< (deferred) render material properties to screenspace geometry buffers
 	SHADERMODE_DEFERREDLIGHTSOURCE, ///< (deferred) use directional pixel shading from light source (rtlight) on screenspace geometry buffers
 	SHADERMODE_COUNT
@@ -196,7 +195,8 @@ typedef enum shaderpermutation_e
 	SHADERPERMUTATION_TRIPPY = 1<<27, ///< use trippy vertex shader effect
 	SHADERPERMUTATION_DEPTHRGB = 1<<28, ///< read/write depth values in RGB color coded format for older hardware without depth samplers
 	SHADERPERMUTATION_ALPHAGEN_VERTEX = 1<<29, ///< alphaGen vertex
-	SHADERPERMUTATION_COUNT = 30 ///< size of shaderpermutationinfo array
+	SHADERPERMUTATION_SKELETAL = 1<<30, ///< (skeletal models) use skeletal matrices to deform vertices (gpu-skinning)
+	SHADERPERMUTATION_COUNT = 31 ///< size of shaderpermutationinfo array
 }
 shaderpermutation_t;
 

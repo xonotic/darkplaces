@@ -165,7 +165,7 @@ static void VM_CL_setsize (prvm_prog_t *prog)
 	CL_LinkEdict(e);
 }
 
-// #8 void(entity e, float chan, string samp, float volume, float atten) sound
+// #8 void(entity e, float chan, string samp, float volume, float atten[, float pitchchange[, float flags]]) sound
 static void VM_CL_sound (prvm_prog_t *prog)
 {
 	const char			*sample;
@@ -174,6 +174,7 @@ static void VM_CL_sound (prvm_prog_t *prog)
 	float 				volume;
 	float				attenuation;
 	float pitchchange;
+	float				startposition;
 	int flags;
 	vec3_t				org;
 
@@ -201,12 +202,23 @@ static void VM_CL_sound (prvm_prog_t *prog)
 		pitchchange = 0;
 	else
 		pitchchange = PRVM_G_FLOAT(OFS_PARM5);
-	// ignoring prog->argc < 7 for now (no flags supported yet)
 
 	if (prog->argc < 7)
 		flags = 0;
 	else
-		flags = PRVM_G_FLOAT(OFS_PARM6);
+	{
+		// LordHavoc: we only let the qc set certain flags, others are off-limits
+		flags = (int)PRVM_G_FLOAT(OFS_PARM6) & (CHANNELFLAG_RELIABLE | CHANNELFLAG_FORCELOOP | CHANNELFLAG_PAUSED);
+	}
+
+	// sound_starttime exists instead of sound_startposition because in a
+	// networking sense you might not know when something is being received,
+	// so making sounds match up in sync would be impossible if relative
+	// position was sent
+	if (PRVM_clientglobalfloat(sound_starttime))
+		startposition = cl.time - PRVM_clientglobalfloat(sound_starttime);
+	else
+		startposition = 0;
 
 	channel = CHAN_USER2ENGINE(channel);
 
@@ -217,7 +229,7 @@ static void VM_CL_sound (prvm_prog_t *prog)
 	}
 
 	CL_VM_GetEntitySoundOrigin(MAX_EDICTS + PRVM_NUM_FOR_EDICT(entity), org);
-	S_StartSound_StartPosition_Flags(MAX_EDICTS + PRVM_NUM_FOR_EDICT(entity), channel, S_FindName(sample), org, volume, attenuation, 0, flags, pitchchange > 0.0f ? pitchchange * 0.01f : 1.0f);
+	S_StartSound_StartPosition_Flags(MAX_EDICTS + PRVM_NUM_FOR_EDICT(entity), channel, S_FindName(sample), org, volume, attenuation, startposition, flags, pitchchange > 0.0f ? pitchchange * 0.01f : 1.0f);
 }
 
 // #483 void(vector origin, string sample, float volume, float attenuation) pointsound
@@ -443,22 +455,6 @@ static void VM_CL_precache_model (prvm_prog_t *prog)
 	VM_Warning(prog, "VM_CL_precache_model: model \"%s\" not found\n", name);
 }
 
-static int CSQC_EntitiesInBox (prvm_prog_t *prog, vec3_t mins, vec3_t maxs, int maxlist, prvm_edict_t **list)
-{
-	prvm_edict_t	*ent;
-	int				i, k;
-
-	ent = PRVM_NEXT_EDICT(prog->edicts);
-	for(k=0,i=1; i<prog->num_edicts ;i++, ent = PRVM_NEXT_EDICT(ent))
-	{
-		if (ent->priv.required->free)
-			continue;
-		if(BoxesOverlap(mins, maxs, PRVM_clientedictvector(ent, absmin), PRVM_clientedictvector(ent, absmax)))
-			list[k++] = ent;
-	}
-	return k;
-}
-
 // #22 entity(vector org, float rad) findradius
 static void VM_CL_findradius (prvm_prog_t *prog)
 {
@@ -490,7 +486,7 @@ static void VM_CL_findradius (prvm_prog_t *prog)
 	maxs[0] = org[0] + (radius + 1);
 	maxs[1] = org[1] + (radius + 1);
 	maxs[2] = org[2] + (radius + 1);
-	numtouchedicts = CSQC_EntitiesInBox(prog, mins, maxs, MAX_EDICTS, touchedicts);
+	numtouchedicts = World_EntitiesInBox(&cl.world, mins, maxs, MAX_EDICTS, touchedicts);
 	if (numtouchedicts > MAX_EDICTS)
 	{
 		// this never happens	//[515]: for what then ?
@@ -3964,13 +3960,12 @@ static void VM_CL_skel_build(prvm_prog_t *prog)
 	int firstbone = PRVM_G_FLOAT(OFS_PARM4) - 1;
 	int lastbone = PRVM_G_FLOAT(OFS_PARM5) - 1;
 	dp_model_t *model = CL_GetModelByIndex(modelindex);
-	float blendfrac;
 	int numblends;
 	int bonenum;
 	int blendindex;
 	framegroupblend_t framegroupblend[MAX_FRAMEGROUPBLENDS];
 	frameblend_t frameblend[MAX_FRAMEBLENDS];
-	matrix4x4_t blendedmatrix;
+	matrix4x4_t bonematrix;
 	matrix4x4_t matrix;
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 	if (skeletonindex < 0 || skeletonindex >= MAX_EDICTS || !(skeleton = prog->skeletons[skeletonindex]))
@@ -3980,19 +3975,18 @@ static void VM_CL_skel_build(prvm_prog_t *prog)
 	lastbone = min(lastbone, skeleton->model->num_bones - 1);
 	VM_GenerateFrameGroupBlend(prog, framegroupblend, ed);
 	VM_FrameBlendFromFrameGroupBlend(frameblend, framegroupblend, model, cl.time);
-	blendfrac = 1.0f - retainfrac;
 	for (numblends = 0;numblends < MAX_FRAMEBLENDS && frameblend[numblends].lerp;numblends++)
-		frameblend[numblends].lerp *= blendfrac;
+		;
 	for (bonenum = firstbone;bonenum <= lastbone;bonenum++)
 	{
-		memset(&blendedmatrix, 0, sizeof(blendedmatrix));
-		Matrix4x4_Accumulate(&blendedmatrix, &skeleton->relativetransforms[bonenum], retainfrac);
+		memset(&bonematrix, 0, sizeof(bonematrix));
 		for (blendindex = 0;blendindex < numblends;blendindex++)
 		{
 			Matrix4x4_FromBonePose7s(&matrix, model->num_posescale, model->data_poses7s + 7 * (frameblend[blendindex].subframe * model->num_bones + bonenum));
-			Matrix4x4_Accumulate(&blendedmatrix, &matrix, frameblend[blendindex].lerp);
+			Matrix4x4_Accumulate(&bonematrix, &matrix, frameblend[blendindex].lerp);
 		}
-		skeleton->relativetransforms[bonenum] = blendedmatrix;
+		Matrix4x4_Normalize3(&bonematrix, &bonematrix);
+		Matrix4x4_Interpolate(&skeleton->relativetransforms[bonenum], &bonematrix, &skeleton->relativetransforms[bonenum], retainfrac);
 	}
 	PRVM_G_FLOAT(OFS_RETURN) = skeletonindex + 1;
 }

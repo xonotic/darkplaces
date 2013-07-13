@@ -713,7 +713,7 @@ void Host_Main(void)
 			// Look for clients who have spawned
 			playing = false;
 			for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
-				if(host_client->spawned)
+				if(host_client->begun)
 					if(host_client->netconnection)
 						playing = true;
 			if(sv.time < 10)
@@ -929,7 +929,7 @@ void Host_Main(void)
 		{
 			R_TimeReport("---");
 			Collision_Cache_NewFrame();
-			R_TimeReport("collisioncache");
+			R_TimeReport("photoncache");
 			// decide the simulation time
 			if (cls.capturevideo.active)
 			{
@@ -1110,7 +1110,7 @@ void Host_LockSession(void)
 	if(locksession_run)
 		return;
 	locksession_run = true;
-	if(locksession.integer != 0)
+	if(locksession.integer != 0 && !COM_CheckParm("-readonly"))
 	{
 		char vabuf[1024];
 		char *p = va(vabuf, sizeof(vabuf), "%slock%s", *fs_userdir ? fs_userdir : fs_basedir, sessionid.string);

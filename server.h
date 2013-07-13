@@ -191,8 +191,12 @@ typedef struct client_s
 	qboolean active;
 	/// false = don't do ClientDisconnect on drop
 	qboolean clientconnectcalled;
-	/// false = don't send datagrams
+	/// false = don't allow spawn
+	qboolean prespawned;
+	/// false = don't allow begin
 	qboolean spawned;
+	/// false = don't send datagrams
+	qboolean begun;
 	/// 1 = send svc_serverinfo and advance to 2, 2 doesn't send, then advances to 0 (allowing unlimited sending) when prespawn is received
 	int sendsignon;
 
@@ -458,7 +462,6 @@ extern cvar_t sv_gameplayfix_nogravityonground;
 extern cvar_t sv_gameplayfix_setmodelrealbox;
 extern cvar_t sv_gameplayfix_slidemoveprojectiles;
 extern cvar_t sv_gameplayfix_stepdown;
-extern cvar_t sv_gameplayfix_stepwhilejumping;
 extern cvar_t sv_gameplayfix_stepmultipletimes;
 extern cvar_t sv_gameplayfix_nostepmoveonsteepslopes;
 extern cvar_t sv_gameplayfix_swiminbmodels;
@@ -563,6 +566,10 @@ void SV_LinkEdict_TouchAreaGrid_Call(prvm_edict_t *touch, prvm_edict_t *ent); //
  * returns true if it found a better place
  */
 qboolean SV_UnstickEntity (prvm_edict_t *ent);
+/*! move an entity that is stuck out of the surface it is stuck in (can move large amounts)
+ * returns true if it found a better place
+ */
+qboolean SV_NudgeOutOfSolid(prvm_edict_t *ent);
 
 /// calculates hitsupercontentsmask for a generic qc entity
 int SV_GenericHitSuperContentsMask(const prvm_edict_t *edict);

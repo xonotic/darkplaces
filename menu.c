@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define TYPE_BOTH 3
 
 static cvar_t forceqmenu = { 0, "forceqmenu", "0", "enables the quake menu instead of the quakec menu.dat (if present)" };
+static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.dat file" };
 
 static int NehGameType;
 
@@ -1757,16 +1758,16 @@ static void M_Options_Key (int k, int ascii)
 			M_Menu_Options_Graphics_f ();
 			break;
 		case 22: // Lighting: Flares
-			Cbuf_AddText("r_coronas 1;gl_flashblend 1;r_shadow_gloss 0;r_shadow_realtime_dlight 0;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0;r_hdr 0");
+			Cbuf_AddText("r_coronas 1;gl_flashblend 1;r_shadow_gloss 0;r_shadow_realtime_dlight 0;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
 		case 23: // Lighting: Normal
-			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0;r_hdr 0");
+			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 0;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 0");
 			break;
 		case 24: // Lighting: High
-			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1;r_hdr 0");
+			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 0;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
 		case 25: // Lighting: Full
-			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 1;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1;r_hdr 0");
+			Cbuf_AddText("r_coronas 1;gl_flashblend 0;r_shadow_gloss 1;r_shadow_realtime_dlight 1;r_shadow_realtime_dlight_shadows 1;r_shadow_realtime_world 1;r_shadow_realtime_world_lightmaps 0;r_shadow_realtime_world_shadows 1;r_bloom 1");
 			break;
 		case 26:
 			M_Menu_ModList_f ();
@@ -3201,6 +3202,7 @@ static int M_ChooseQuitMessage(int request)
 	case GAME_NORMAL:
 	case GAME_HIPNOTIC:
 	case GAME_ROGUE:
+	case GAME_QUOTH:
 	case GAME_NEHAHRA:
 	case GAME_DEFEATINDETAIL2:
 		if (request-- == 0) return M_QuitMessage("Are you gonna quit","this game just like","everything else?",NULL,NULL,NULL,NULL,NULL);
@@ -3936,6 +3938,7 @@ static gameinfo_t gamelist[] =
 	{GAME_NORMAL, &sharewarequakegame, &registeredquakegame},
 	{GAME_HIPNOTIC, &hipnoticgame, &hipnoticgame},
 	{GAME_ROGUE, &roguegame, &roguegame},
+	{GAME_QUOTH, &sharewarequakegame, &registeredquakegame},
 	{GAME_NEHAHRA, &nehahragame, &nehahragame},
 	{GAME_TRANSFUSION, &transfusiongame, &transfusiongame},
 	{GAME_GOODVSBAD2, &goodvsbad2game, &goodvsbad2game},
@@ -5362,9 +5365,9 @@ static void MP_Init (void)
 	prog->ExecuteProgram        = MVM_ExecuteProgram;
 
 	// allocate the mempools
-	prog->progs_mempool = Mem_AllocPool(M_PROG_FILENAME, 0, NULL);
+	prog->progs_mempool = Mem_AllocPool(menu_progs.string, 0, NULL);
 
-	PRVM_Prog_Load(prog, M_PROG_FILENAME, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
+	PRVM_Prog_Load(prog, menu_progs.string, NULL, 0, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
 
 	// note: OP_STATE is not supported by menu qc, we don't even try to detect
 	// it here
@@ -5387,7 +5390,7 @@ void (*MR_NewMap) (void);
 void MR_SetRouting(qboolean forceold)
 {
 	// if the menu prog isnt available or forceqmenu ist set, use the old menu
-	if(!FS_FileExists(M_PROG_FILENAME) || forceqmenu.integer || forceold)
+	if(!FS_FileExists(menu_progs.string) || forceqmenu.integer || forceold)
 	{
 		// set menu router function pointers
 		MR_KeyEvent = M_KeyEvent;
@@ -5430,6 +5433,7 @@ void MR_Init_Commands(void)
 	// set router console commands
 	Cvar_RegisterVariable (&forceqmenu);
 	Cvar_RegisterVariable (&menu_options_colorcontrol_correctionvalue);
+	Cvar_RegisterVariable (&menu_progs);
 	Cmd_AddCommand ("menu_restart",MR_Restart, "restart menu system (reloads menu.dat)");
 	Cmd_AddCommand ("togglemenu", Call_MR_ToggleMenu_f, "opens or closes menu");
 }

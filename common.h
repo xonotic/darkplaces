@@ -268,6 +268,7 @@ typedef enum gamemode_e
 	GAME_NORMAL,
 	GAME_HIPNOTIC,
 	GAME_ROGUE,
+	GAME_QUOTH,
 	GAME_NEHAHRA,
 	GAME_NEXUIZ,
 	GAME_XONOTIC,
@@ -277,7 +278,6 @@ typedef enum gamemode_e
 	GAME_BATTLEMECH,
 	GAME_ZYMOTIC,
 	GAME_SETHERAL,
-	GAME_SOM,
 	GAME_TENEBRAE, // full of evil hackery
 	GAME_NEOTERIC,
 	GAME_OPENQUARTZ, //this game sucks

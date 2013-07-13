@@ -18,7 +18,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 #undef WIN32_LEAN_AND_MEAN  //hush a warning, SDL.h redefines this
 #include <SDL.h>
-#include <SDL_syswm.h>
 #include <stdio.h>
 
 #include "quakedef.h"
@@ -1559,13 +1558,6 @@ void GLES_Init(void)
 	vid.support.ext_draw_range_elements = true;
 	vid.support.ext_framebuffer_object = false;//true;
 
-	// FIXME remove this workaround once FBO + npot texture mapping is fixed
-	if(!vid.support.arb_texture_non_power_of_two)
-	{
-		vid.support.arb_framebuffer_object = false;
-		vid.support.ext_framebuffer_object = false;
-	}
-
 	vid.support.ext_packed_depth_stencil = false;
 	vid.support.ext_stencil_two_side = false;
 	vid.support.ext_texture_3d = SDL_GL_ExtensionSupported("GL_OES_texture_3D");
@@ -1767,6 +1759,11 @@ static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, 
 // Adding the OS independent XPM version --blub
 #include "darkplaces.xpm"
 #include "nexuiz.xpm"
+#if SDL_MAJOR_VERSION == 1
+#if SDL_VIDEO_DRIVER_X11 && !SDL_VIDEO_DRIVER_QUARTZ
+#include <SDL_syswm.h>
+#endif
+#endif
 static SDL_Surface *icon = NULL;
 static SDL_Surface *VID_WrapSDL_SetVideoMode(int screenwidth, int screenheight, int screenbpp, int screenflags)
 {

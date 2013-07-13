@@ -224,7 +224,12 @@ void PRVM_StackTrace (prvm_prog_t *prog)
 		if (!f)
 			Con_Print("<NULL FUNCTION>\n");
 		else
-			Con_Printf("%12s : %s : statement %i\n", PRVM_GetString(prog, f->s_file), PRVM_GetString(prog, f->s_name), prog->stack[i].s - f->first_statement);
+		{
+			if (prog->statement_linenums)
+				Con_Printf("%12s:%i : %s : statement %i\n", PRVM_GetString(prog, f->s_file), prog->statement_linenums[prog->stack[i].s], PRVM_GetString(prog, f->s_name), prog->stack[i].s - f->first_statement);
+			else
+				Con_Printf("%12s : %s : statement %i\n", PRVM_GetString(prog, f->s_file), PRVM_GetString(prog, f->s_name), prog->stack[i].s - f->first_statement);
+		}
 	}
 }
 
@@ -475,21 +480,26 @@ void PRVM_ChildProfile_f (void)
 	PRVM_Profile(prog, howmany, 0, 1);
 }
 
-void PRVM_PrintState(prvm_prog_t *prog)
+void PRVM_PrintState(prvm_prog_t *prog, int stack_index)
 {
 	int i;
+	mfunction_t *func = prog->xfunction;
+	int st = prog->xstatement;
+	if (stack_index > 0 && stack_index <= prog->depth)
+	{
+		func = prog->stack[prog->depth - stack_index].f;
+		st = prog->stack[prog->depth - stack_index].s;
+	}
 	if (prog->statestring)
 	{
 		Con_Printf("Caller-provided information: %s\n", prog->statestring);
 	}
-	if (prog->xfunction)
+	if (func)
 	{
 		for (i = -7; i <= 0;i++)
-			if (prog->xstatement + i >= prog->xfunction->first_statement)
-				PRVM_PrintStatement(prog, prog->statements + prog->xstatement + i);
+			if (st + i >= func->first_statement)
+				PRVM_PrintStatement(prog, prog->statements + st + i);
 	}
-	else
-		Con_Print("null function executing??\n");
 	PRVM_StackTrace(prog);
 }
 
@@ -507,7 +517,7 @@ void PRVM_Crash(prvm_prog_t *prog)
 	if( prog->depth > 0 )
 	{
 		Con_Printf("QuakeC crash report for %s:\n", prog->name);
-		PRVM_PrintState(prog);
+		PRVM_PrintState(prog, 0);
 	}
 
 	if(prvm_errordump.integer)
@@ -667,6 +677,20 @@ void MVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessag
 	int		restorevm_tempstringsbuf_cursize;
 	double  calltime;
 	double tm, starttm;
+	prvm_vec_t tempfloat;
+	// these may become out of date when a builtin is called, and are updated accordingly
+	prvm_vec_t *cached_edictsfields = prog->edictsfields;
+	unsigned int cached_entityfields = prog->entityfields;
+	unsigned int cached_entityfields_3 = prog->entityfields - 3;
+	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
+	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
+	unsigned int cached_max_edicts = prog->max_edicts;
+	// these do not change
+	mstatement_t *cached_statements = prog->statements;
+	qboolean cached_allowworldwrites = prog->allowworldwrites;
+	unsigned int cached_flag = prog->flag;
 
 	calltime = Sys_DirtyTime();
 
@@ -701,7 +725,7 @@ void MVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessag
 
 chooseexecprogram:
 	cachedpr_trace = prog->trace;
-	if (prvm_statementprofiling.integer || prog->trace)
+	if (prvm_statementprofiling.integer || prog->trace || prog->watch_global >= 0 || prog->watch_edict >= 0 || prog->break_statement >= 0)
 	{
 #define PRVMSLOWINTERPRETER 1
 		if (prvm_timeprofiling.integer)
@@ -758,6 +782,20 @@ void CLVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	int		restorevm_tempstringsbuf_cursize;
 	double  calltime;
 	double tm, starttm;
+	prvm_vec_t tempfloat;
+	// these may become out of date when a builtin is called, and are updated accordingly
+	prvm_vec_t *cached_edictsfields = prog->edictsfields;
+	unsigned int cached_entityfields = prog->entityfields;
+	unsigned int cached_entityfields_3 = prog->entityfields - 3;
+	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
+	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
+	unsigned int cached_max_edicts = prog->max_edicts;
+	// these do not change
+	mstatement_t *cached_statements = prog->statements;
+	qboolean cached_allowworldwrites = prog->allowworldwrites;
+	unsigned int cached_flag = prog->flag;
 
 	calltime = Sys_DirtyTime();
 
@@ -792,7 +830,7 @@ void CLVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 
 chooseexecprogram:
 	cachedpr_trace = prog->trace;
-	if (prvm_statementprofiling.integer || prog->trace)
+	if (prvm_statementprofiling.integer || prog->trace || prog->watch_global >= 0 || prog->watch_edict >= 0 || prog->break_statement >= 0)
 	{
 #define PRVMSLOWINTERPRETER 1
 		if (prvm_timeprofiling.integer)
@@ -854,6 +892,20 @@ void PRVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	int		restorevm_tempstringsbuf_cursize;
 	double  calltime;
 	double tm, starttm;
+	prvm_vec_t tempfloat;
+	// these may become out of date when a builtin is called, and are updated accordingly
+	prvm_vec_t *cached_edictsfields = prog->edictsfields;
+	unsigned int cached_entityfields = prog->entityfields;
+	unsigned int cached_entityfields_3 = prog->entityfields - 3;
+	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
+	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
+	unsigned int cached_max_edicts = prog->max_edicts;
+	// these do not change
+	mstatement_t *cached_statements = prog->statements;
+	qboolean cached_allowworldwrites = prog->allowworldwrites;
+	unsigned int cached_flag = prog->flag;
 
 	calltime = Sys_DirtyTime();
 
@@ -888,7 +940,7 @@ void PRVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 
 chooseexecprogram:
 	cachedpr_trace = prog->trace;
-	if (prvm_statementprofiling.integer || prog->trace)
+	if (prvm_statementprofiling.integer || prog->trace || prog->watch_global >= 0 || prog->watch_edict >= 0 || prog->break_statement >= 0)
 	{
 #define PRVMSLOWINTERPRETER 1
 		if (prvm_timeprofiling.integer)

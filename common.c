@@ -1449,6 +1449,7 @@ static const gamemode_info_t gamemode_info [GAME_COUNT] =
 { GAME_HIPNOTIC,		GAME_NORMAL,			"hipnotic",			"-hipnotic",		"Darkplaces-Hipnotic",	"id1",		"hipnotic",		"dp",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -hipnotic runs Quake mission pack 1: The Scourge of Armagon
 { GAME_ROGUE,			GAME_NORMAL,			"rogue",			"-rogue",			"Darkplaces-Rogue",		"id1",		"rogue",		"dp",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -rogue runs Quake mission pack 2: The Dissolution of Eternity
 { GAME_NEHAHRA,			GAME_NORMAL,			"nehahra",			"-nehahra",			"DarkPlaces-Nehahra",	"id1",		"nehahra",		"dp",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -nehahra runs The Seal of Nehahra movie and game
+{ GAME_QUOTH,			GAME_NORMAL,			"quoth",			"-quoth",			"Darkplaces-Quoth",		"id1",		"quoth",		"dp",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -quoth runs the Quoth mod for playing community maps made for it
 { GAME_NEXUIZ,			GAME_NEXUIZ,			"nexuiz",			"-nexuiz",			"Nexuiz",				"data",		NULL,			"nexuiz",		"nexuiz"			}, // COMMANDLINEOPTION: Game: -nexuiz runs the multiplayer game Nexuiz
 { GAME_XONOTIC,			GAME_XONOTIC,			"xonotic",			"-xonotic",			"Xonotic",				"data",		NULL,			"xonotic",		"xonotic"			}, // COMMANDLINEOPTION: Game: -xonotic runs the multiplayer game Xonotic
 { GAME_TRANSFUSION,		GAME_TRANSFUSION,		"transfusion",		"-transfusion",		"Transfusion",			"basetf",	NULL,			"transfusion",	"transfusion"		}, // COMMANDLINEOPTION: Game: -transfusion runs Transfusion (the recreation of Blood in Quake)
@@ -1457,7 +1458,6 @@ static const gamemode_info_t gamemode_info [GAME_COUNT] =
 { GAME_BATTLEMECH,		GAME_BATTLEMECH,		"battlemech",		"-battlemech",		"Battlemech",			"base",		NULL,			"battlemech",	"battlemech"		}, // COMMANDLINEOPTION: Game: -battlemech runs the multiplayer topdown deathmatch game BattleMech
 { GAME_ZYMOTIC,			GAME_ZYMOTIC,			"zymotic",			"-zymotic",			"Zymotic",				"basezym",	NULL,			"zymotic",		"zymotic"			}, // COMMANDLINEOPTION: Game: -zymotic runs the singleplayer game Zymotic
 { GAME_SETHERAL,		GAME_SETHERAL,			"setheral",			"-setheral",		"Setheral",				"data",		NULL,			"setheral",		"setheral"			}, // COMMANDLINEOPTION: Game: -setheral runs the multiplayer game Setheral
-{ GAME_SOM,				GAME_NORMAL,			"sonofman",			"-som",				"Son of Man",			"id1",		"sonofman",		"som",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -som runs the multiplayer game Son Of Man
 { GAME_TENEBRAE,		GAME_NORMAL,			"tenebrae",			"-tenebrae",		"DarkPlaces-Tenebrae",	"id1",		"tenebrae",		"dp",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -tenebrae runs the graphics test mod known as Tenebrae (some features not implemented)
 { GAME_NEOTERIC,		GAME_NORMAL,			"neoteric",			"-neoteric",		"Neoteric",				"id1",		"neobase",		"neo",			"darkplaces"		}, // COMMANDLINEOPTION: Game: -neoteric runs the game Neoteric
 { GAME_OPENQUARTZ,		GAME_NORMAL,			"openquartz",		"-openquartz",		"OpenQuartz",			"id1",		NULL,			"openquartz",	"darkplaces"		}, // COMMANDLINEOPTION: Game: -openquartz runs the game OpenQuartz, a standalone GPL replacement of the quake content

@@ -170,8 +170,8 @@ r_shadow_rendermode_t;
 
 typedef enum r_shadow_shadowmode_e
 {
-    R_SHADOW_SHADOWMODE_STENCIL,
-    R_SHADOW_SHADOWMODE_SHADOWMAP2D
+	R_SHADOW_SHADOWMODE_STENCIL,
+	R_SHADOW_SHADOWMODE_SHADOWMAP2D
 }
 r_shadow_shadowmode_t;
 
@@ -202,7 +202,7 @@ int r_shadow_shadowmapborder;
 matrix4x4_t r_shadow_shadowmapmatrix;
 int r_shadow_lightscissor[4];
 qboolean r_shadow_usingdeferredprepass;
-
+qboolean r_shadow_shadowmapdepthtexture;
 int maxshadowtriangles;
 int *shadowelements;
 
@@ -452,6 +452,7 @@ static void R_Shadow_SetShadowMode(void)
 	r_shadow_shadowmapsize = 0;
 	r_shadow_shadowmapsampler = false;
 	r_shadow_shadowmappcf = 0;
+	r_shadow_shadowmapdepthtexture = r_fb.usedepthtextures;
 	r_shadow_shadowmode = R_SHADOW_SHADOWMODE_STENCIL;
 	if ((r_shadow_shadowmapping.integer || r_shadow_deferred.integer) && vid.support.ext_framebuffer_object)
 	{
@@ -467,8 +468,8 @@ static void R_Shadow_SetShadowMode(void)
 					r_shadow_shadowmapsampler = true;
 					r_shadow_shadowmappcf = 1;
 				}
-                else if(vid.support.amd_texture_texture4 || vid.support.arb_texture_gather)
-                    r_shadow_shadowmappcf = 1;
+				else if(vid.support.amd_texture_texture4 || vid.support.arb_texture_gather)
+					r_shadow_shadowmappcf = 1;
 				else if((strstr(gl_vendor, "ATI") || strstr(gl_vendor, "Advanced Micro Devices")) && !strstr(gl_renderer, "Mesa") && !strstr(gl_version, "Mesa")) 
 					r_shadow_shadowmappcf = 1;
 				else 
@@ -476,13 +477,12 @@ static void R_Shadow_SetShadowMode(void)
 			}
 			else 
 			{
+                r_shadow_shadowmapsampler = vid.support.arb_shadow && r_shadow_shadowmapshadowsampler;
 				switch (r_shadow_shadowmapfilterquality)
 				{
 				case 1:
-					r_shadow_shadowmapsampler = vid.support.arb_shadow && r_shadow_shadowmapshadowsampler;
 					break;
 				case 2:
-					r_shadow_shadowmapsampler = vid.support.arb_shadow && r_shadow_shadowmapshadowsampler;
 					r_shadow_shadowmappcf = 1;
 					break;
 				case 3:
@@ -940,10 +940,10 @@ void R_Shadow_PrepareShadowMark(int numtris)
 
 void R_Shadow_PrepareShadowSides(int numtris)
 {
-    if (maxshadowsides < numtris)
-    {
-        maxshadowsides = numtris;
-        if (shadowsides)
+	if (maxshadowsides < numtris)
+	{
+		maxshadowsides = numtris;
+		if (shadowsides)
 			Mem_Free(shadowsides);
 		if (shadowsideslist)
 			Mem_Free(shadowsideslist);
@@ -1384,7 +1384,7 @@ void R_Shadow_VolumeFromList(int numverts, int numtris, const float *invertex3f,
 	else if (r_shadow_rendermode == R_SHADOW_RENDERMODE_VISIBLEVOLUMES)
 	{
 		tris = R_Shadow_ConstructShadowVolume_ZFail(numverts, numtris, elements, neighbors, invertex3f, &outverts, shadowelements, shadowvertex3f, projectorigin, projectdirection, projectdistance, nummarktris, marktris);
-		R_Mesh_PrepareVertices_Vertex3f(outverts, shadowvertex3f, NULL);
+		R_Mesh_PrepareVertices_Vertex3f(outverts, shadowvertex3f, NULL, 0);
 		R_Mesh_Draw(0, outverts, 0, tris, shadowelements, NULL, 0, NULL, NULL, 0);
 	}
 	else
@@ -1396,8 +1396,8 @@ void R_Shadow_VolumeFromList(int numverts, int numtris, const float *invertex3f,
 			tris = R_Shadow_ConstructShadowVolume_ZPass(numverts, numtris, elements, neighbors, invertex3f, &outverts, shadowelements, shadowvertex3f, projectorigin, projectdirection, projectdistance, nummarktris, marktris);
 		else
 			tris = R_Shadow_ConstructShadowVolume_ZFail(numverts, numtris, elements, neighbors, invertex3f, &outverts, shadowelements, shadowvertex3f, projectorigin, projectdirection, projectdistance, nummarktris, marktris);
-		r_refdef.stats.lights_dynamicshadowtriangles += tris;
-		r_refdef.stats.lights_shadowtriangles += tris;
+		r_refdef.stats[r_stat_lights_dynamicshadowtriangles] += tris;
+		r_refdef.stats[r_stat_lights_shadowtriangles] += tris;
 		if (r_shadow_rendermode == R_SHADOW_RENDERMODE_ZPASS_STENCIL)
 		{
 			// increment stencil if frontface is infront of depthbuffer
@@ -1418,58 +1418,58 @@ void R_Shadow_VolumeFromList(int numverts, int numtris, const float *invertex3f,
 			GL_CullFace(r_refdef.view.cullface_back);
 			R_SetStencil(true, 255, GL_KEEP, GL_INCR, GL_KEEP, GL_ALWAYS, 128, 255);
 		}
-		R_Mesh_PrepareVertices_Vertex3f(outverts, shadowvertex3f, NULL);
+		R_Mesh_PrepareVertices_Vertex3f(outverts, shadowvertex3f, NULL, 0);
 		R_Mesh_Draw(0, outverts, 0, tris, shadowelements, NULL, 0, NULL, NULL, 0);
 	}
 }
 
 int R_Shadow_CalcTriangleSideMask(const vec3_t p1, const vec3_t p2, const vec3_t p3, float bias)
 {
-    // p1, p2, p3 are in the cubemap's local coordinate system
-    // bias = border/(size - border)
+	// p1, p2, p3 are in the cubemap's local coordinate system
+	// bias = border/(size - border)
 	int mask = 0x3F;
 
-    float dp1 = p1[0] + p1[1], dn1 = p1[0] - p1[1], ap1 = fabs(dp1), an1 = fabs(dn1),
-    	  dp2 = p2[0] + p2[1], dn2 = p2[0] - p2[1], ap2 = fabs(dp2), an2 = fabs(dn2),
-    	  dp3 = p3[0] + p3[1], dn3 = p3[0] - p3[1], ap3 = fabs(dp3), an3 = fabs(dn3);
+	float dp1 = p1[0] + p1[1], dn1 = p1[0] - p1[1], ap1 = fabs(dp1), an1 = fabs(dn1),
+		  dp2 = p2[0] + p2[1], dn2 = p2[0] - p2[1], ap2 = fabs(dp2), an2 = fabs(dn2),
+		  dp3 = p3[0] + p3[1], dn3 = p3[0] - p3[1], ap3 = fabs(dp3), an3 = fabs(dn3);
 	if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
-    	mask &= (3<<4)
+		mask &= (3<<4)
 			| (dp1 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2))
 			| (dp2 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2))
 			| (dp3 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2));
-    if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
-        mask &= (3<<4)
-            | (dn1 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
-            | (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))            
-            | (dn3 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
+	if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
+		mask &= (3<<4)
+			| (dn1 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
+			| (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))			
+			| (dn3 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
 
-    dp1 = p1[1] + p1[2], dn1 = p1[1] - p1[2], ap1 = fabs(dp1), an1 = fabs(dn1),
-    dp2 = p2[1] + p2[2], dn2 = p2[1] - p2[2], ap2 = fabs(dp2), an2 = fabs(dn2),
-    dp3 = p3[1] + p3[2], dn3 = p3[1] - p3[2], ap3 = fabs(dp3), an3 = fabs(dn3);
-    if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
-        mask &= (3<<0)
-            | (dp1 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
-            | (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))            
-            | (dp3 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
-    if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
-        mask &= (3<<0)
-            | (dn1 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
-            | (dn2 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
-            | (dn3 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
+	dp1 = p1[1] + p1[2], dn1 = p1[1] - p1[2], ap1 = fabs(dp1), an1 = fabs(dn1),
+	dp2 = p2[1] + p2[2], dn2 = p2[1] - p2[2], ap2 = fabs(dp2), an2 = fabs(dn2),
+	dp3 = p3[1] + p3[2], dn3 = p3[1] - p3[2], ap3 = fabs(dp3), an3 = fabs(dn3);
+	if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
+		mask &= (3<<0)
+			| (dp1 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
+			| (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))			
+			| (dp3 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
+	if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
+		mask &= (3<<0)
+			| (dn1 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
+			| (dn2 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
+			| (dn3 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
 
-    dp1 = p1[2] + p1[0], dn1 = p1[2] - p1[0], ap1 = fabs(dp1), an1 = fabs(dn1),
-    dp2 = p2[2] + p2[0], dn2 = p2[2] - p2[0], ap2 = fabs(dp2), an2 = fabs(dn2),
-    dp3 = p3[2] + p3[0], dn3 = p3[2] - p3[0], ap3 = fabs(dp3), an3 = fabs(dn3);
-    if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
-        mask &= (3<<2)
-            | (dp1 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
-            | (dp2 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
-            | (dp3 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
-    if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
-        mask &= (3<<2)
-            | (dn1 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
-            | (dn2 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
-            | (dn3 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
+	dp1 = p1[2] + p1[0], dn1 = p1[2] - p1[0], ap1 = fabs(dp1), an1 = fabs(dn1),
+	dp2 = p2[2] + p2[0], dn2 = p2[2] - p2[0], ap2 = fabs(dp2), an2 = fabs(dn2),
+	dp3 = p3[2] + p3[0], dn3 = p3[2] - p3[0], ap3 = fabs(dp3), an3 = fabs(dn3);
+	if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
+		mask &= (3<<2)
+			| (dp1 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
+			| (dp2 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
+			| (dp3 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
+	if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
+		mask &= (3<<2)
+			| (dn1 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
+			| (dn2 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
+			| (dn3 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
 
 	return mask;
 }
@@ -1481,66 +1481,66 @@ static int R_Shadow_CalcBBoxSideMask(const vec3_t mins, const vec3_t maxs, const
 	int mask = 0x3F;
 
 	VectorSubtract(maxs, mins, radius);
-    VectorScale(radius, 0.5f, radius);
-    VectorAdd(mins, radius, center);
-    Matrix4x4_Transform(worldtolight, center, lightcenter);
+	VectorScale(radius, 0.5f, radius);
+	VectorAdd(mins, radius, center);
+	Matrix4x4_Transform(worldtolight, center, lightcenter);
 	Matrix4x4_Transform3x3(radiustolight, radius, lightradius);
 	VectorSubtract(lightcenter, lightradius, pmin);
 	VectorAdd(lightcenter, lightradius, pmax);
 
-    dp1 = pmax[0] + pmax[1], dn1 = pmax[0] - pmin[1], ap1 = fabs(dp1), an1 = fabs(dn1),
-    dp2 = pmin[0] + pmin[1], dn2 = pmin[0] - pmax[1], ap2 = fabs(dp2), an2 = fabs(dn2);
-    if(ap1 > bias*an1 && ap2 > bias*an2)
-        mask &= (3<<4)
-            | (dp1 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2))
-            | (dp2 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2));
-    if(an1 > bias*ap1 && an2 > bias*ap2)
-        mask &= (3<<4)
-            | (dn1 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
-            | (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
+	dp1 = pmax[0] + pmax[1], dn1 = pmax[0] - pmin[1], ap1 = fabs(dp1), an1 = fabs(dn1),
+	dp2 = pmin[0] + pmin[1], dn2 = pmin[0] - pmax[1], ap2 = fabs(dp2), an2 = fabs(dn2);
+	if(ap1 > bias*an1 && ap2 > bias*an2)
+		mask &= (3<<4)
+			| (dp1 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2))
+			| (dp2 >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2));
+	if(an1 > bias*ap1 && an2 > bias*ap2)
+		mask &= (3<<4)
+			| (dn1 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
+			| (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
 
-    dp1 = pmax[1] + pmax[2], dn1 = pmax[1] - pmin[2], ap1 = fabs(dp1), an1 = fabs(dn1),
-    dp2 = pmin[1] + pmin[2], dn2 = pmin[1] - pmax[2], ap2 = fabs(dp2), an2 = fabs(dn2);
-    if(ap1 > bias*an1 && ap2 > bias*an2)
-        mask &= (3<<0)
-            | (dp1 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
-            | (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
-    if(an1 > bias*ap1 && an2 > bias*ap2)
-        mask &= (3<<0)
-            | (dn1 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
-            | (dn2 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
+	dp1 = pmax[1] + pmax[2], dn1 = pmax[1] - pmin[2], ap1 = fabs(dp1), an1 = fabs(dn1),
+	dp2 = pmin[1] + pmin[2], dn2 = pmin[1] - pmax[2], ap2 = fabs(dp2), an2 = fabs(dn2);
+	if(ap1 > bias*an1 && ap2 > bias*an2)
+		mask &= (3<<0)
+			| (dp1 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
+			| (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
+	if(an1 > bias*ap1 && an2 > bias*ap2)
+		mask &= (3<<0)
+			| (dn1 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4))
+			| (dn2 >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
 
-    dp1 = pmax[2] + pmax[0], dn1 = pmax[2] - pmin[0], ap1 = fabs(dp1), an1 = fabs(dn1),
-    dp2 = pmin[2] + pmin[0], dn2 = pmin[2] - pmax[0], ap2 = fabs(dp2), an2 = fabs(dn2);
-    if(ap1 > bias*an1 && ap2 > bias*an2)
-        mask &= (3<<2)
-            | (dp1 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
-            | (dp2 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
-    if(an1 > bias*ap1 && an2 > bias*ap2)
-        mask &= (3<<2)
-            | (dn1 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
-            | (dn2 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
+	dp1 = pmax[2] + pmax[0], dn1 = pmax[2] - pmin[0], ap1 = fabs(dp1), an1 = fabs(dn1),
+	dp2 = pmin[2] + pmin[0], dn2 = pmin[2] - pmax[0], ap2 = fabs(dp2), an2 = fabs(dn2);
+	if(ap1 > bias*an1 && ap2 > bias*an2)
+		mask &= (3<<2)
+			| (dp1 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0))
+			| (dp2 >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
+	if(an1 > bias*ap1 && an2 > bias*ap2)
+		mask &= (3<<2)
+			| (dn1 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0))
+			| (dn2 >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
 
-    return mask;
+	return mask;
 }
 
 #define R_Shadow_CalcEntitySideMask(ent, worldtolight, radiustolight, bias) R_Shadow_CalcBBoxSideMask((ent)->mins, (ent)->maxs, worldtolight, radiustolight, bias)
 
 int R_Shadow_CalcSphereSideMask(const vec3_t p, float radius, float bias)
 {
-    // p is in the cubemap's local coordinate system
-    // bias = border/(size - border)
-    float dxyp = p[0] + p[1], dxyn = p[0] - p[1], axyp = fabs(dxyp), axyn = fabs(dxyn);
-    float dyzp = p[1] + p[2], dyzn = p[1] - p[2], ayzp = fabs(dyzp), ayzn = fabs(dyzn);
-    float dzxp = p[2] + p[0], dzxn = p[2] - p[0], azxp = fabs(dzxp), azxn = fabs(dzxn);
-    int mask = 0x3F;
-    if(axyp > bias*axyn + radius) mask &= dxyp < 0 ? ~((1<<0)|(1<<2)) : ~((2<<0)|(2<<2));
-    if(axyn > bias*axyp + radius) mask &= dxyn < 0 ? ~((1<<0)|(2<<2)) : ~((2<<0)|(1<<2));
-    if(ayzp > bias*ayzn + radius) mask &= dyzp < 0 ? ~((1<<2)|(1<<4)) : ~((2<<2)|(2<<4));
-    if(ayzn > bias*ayzp + radius) mask &= dyzn < 0 ? ~((1<<2)|(2<<4)) : ~((2<<2)|(1<<4));
-    if(azxp > bias*azxn + radius) mask &= dzxp < 0 ? ~((1<<4)|(1<<0)) : ~((2<<4)|(2<<0));
-    if(azxn > bias*azxp + radius) mask &= dzxn < 0 ? ~((1<<4)|(2<<0)) : ~((2<<4)|(1<<0));
-    return mask;
+	// p is in the cubemap's local coordinate system
+	// bias = border/(size - border)
+	float dxyp = p[0] + p[1], dxyn = p[0] - p[1], axyp = fabs(dxyp), axyn = fabs(dxyn);
+	float dyzp = p[1] + p[2], dyzn = p[1] - p[2], ayzp = fabs(dyzp), ayzn = fabs(dyzn);
+	float dzxp = p[2] + p[0], dzxn = p[2] - p[0], azxp = fabs(dzxp), azxn = fabs(dzxn);
+	int mask = 0x3F;
+	if(axyp > bias*axyn + radius) mask &= dxyp < 0 ? ~((1<<0)|(1<<2)) : ~((2<<0)|(2<<2));
+	if(axyn > bias*axyp + radius) mask &= dxyn < 0 ? ~((1<<0)|(2<<2)) : ~((2<<0)|(1<<2));
+	if(ayzp > bias*ayzn + radius) mask &= dyzp < 0 ? ~((1<<2)|(1<<4)) : ~((2<<2)|(2<<4));
+	if(ayzn > bias*ayzp + radius) mask &= dyzn < 0 ? ~((1<<2)|(2<<4)) : ~((2<<2)|(1<<4));
+	if(azxp > bias*azxn + radius) mask &= dzxp < 0 ? ~((1<<4)|(1<<0)) : ~((2<<4)|(2<<0));
+	if(azxn > bias*azxp + radius) mask &= dzxn < 0 ? ~((1<<4)|(2<<0)) : ~((2<<4)|(1<<0));
+	return mask;
 }
 
 static int R_Shadow_CullFrustumSides(rtlight_t *rtlight, float size, float border)
@@ -1565,8 +1565,8 @@ static int R_Shadow_CullFrustumSides(rtlight_t *rtlight, float size, float borde
 	}
 	if (PlaneDiff(o, &r_refdef.view.frustum[4]) >= r_refdef.farclip - r_refdef.nearclip + 0.03125)
 	{
-        Matrix4x4_Transform3x3(&rtlight->matrix_worldtolight, r_refdef.view.frustum[4].normal, n);
-        len = scale*VectorLength2(n);
+		Matrix4x4_Transform3x3(&rtlight->matrix_worldtolight, r_refdef.view.frustum[4].normal, n);
+		len = scale*VectorLength2(n);
 		if(n[0]*n[0] > len) sides &= n[0] >= 0 ? ~(1<<0) : ~(2 << 0);
 		if(n[1]*n[1] > len) sides &= n[1] >= 0 ? ~(1<<2) : ~(2 << 2);
 		if(n[2]*n[2] > len) sides &= n[2] >= 0 ? ~(1<<4) : ~(2 << 4);
@@ -1574,33 +1574,33 @@ static int R_Shadow_CullFrustumSides(rtlight_t *rtlight, float size, float borde
 	// this next test usually clips off more sides than the former, but occasionally clips fewer/different ones, so do both and combine results
 	// check if frustum corners/origin cross plane sides
 #if 1
-    // infinite version, assumes frustum corners merely give direction and extend to infinite distance
-    Matrix4x4_Transform(&rtlight->matrix_worldtolight, r_refdef.view.origin, p);
-    dp = p[0] + p[1], dn = p[0] - p[1], ap = fabs(dp), an = fabs(dn);
-    masks[0] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2));
-    masks[1] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
-    dp = p[1] + p[2], dn = p[1] - p[2], ap = fabs(dp), an = fabs(dn);
-    masks[2] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
-    masks[3] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
-    dp = p[2] + p[0], dn = p[2] - p[0], ap = fabs(dp), an = fabs(dn);
-    masks[4] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
-    masks[5] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
-    for (i = 0;i < 4;i++)
-    {
-        Matrix4x4_Transform(&rtlight->matrix_worldtolight, r_refdef.view.frustumcorner[i], n);
-        VectorSubtract(n, p, n);
-        dp = n[0] + n[1], dn = n[0] - n[1], ap = fabs(dp), an = fabs(dn);
-        if(ap > 0) masks[0] |= dp >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2);
-        if(an > 0) masks[1] |= dn >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2);
-        dp = n[1] + n[2], dn = n[1] - n[2], ap = fabs(dp), an = fabs(dn);
-        if(ap > 0) masks[2] |= dp >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4);
-        if(an > 0) masks[3] |= dn >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4);
-        dp = n[2] + n[0], dn = n[2] - n[0], ap = fabs(dp), an = fabs(dn);
-        if(ap > 0) masks[4] |= dp >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0);
-        if(an > 0) masks[5] |= dn >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0);
-    }
+	// infinite version, assumes frustum corners merely give direction and extend to infinite distance
+	Matrix4x4_Transform(&rtlight->matrix_worldtolight, r_refdef.view.origin, p);
+	dp = p[0] + p[1], dn = p[0] - p[1], ap = fabs(dp), an = fabs(dn);
+	masks[0] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2));
+	masks[1] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
+	dp = p[1] + p[2], dn = p[1] - p[2], ap = fabs(dp), an = fabs(dn);
+	masks[2] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
+	masks[3] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4));
+	dp = p[2] + p[0], dn = p[2] - p[0], ap = fabs(dp), an = fabs(dn);
+	masks[4] |= ap <= bias*an ? 0x3F : (dp >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0));
+	masks[5] |= an <= bias*ap ? 0x3F : (dn >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0));
+	for (i = 0;i < 4;i++)
+	{
+		Matrix4x4_Transform(&rtlight->matrix_worldtolight, r_refdef.view.frustumcorner[i], n);
+		VectorSubtract(n, p, n);
+		dp = n[0] + n[1], dn = n[0] - n[1], ap = fabs(dp), an = fabs(dn);
+		if(ap > 0) masks[0] |= dp >= 0 ? (1<<0)|(1<<2) : (2<<0)|(2<<2);
+		if(an > 0) masks[1] |= dn >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2);
+		dp = n[1] + n[2], dn = n[1] - n[2], ap = fabs(dp), an = fabs(dn);
+		if(ap > 0) masks[2] |= dp >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4);
+		if(an > 0) masks[3] |= dn >= 0 ? (1<<2)|(2<<4) : (2<<2)|(1<<4);
+		dp = n[2] + n[0], dn = n[2] - n[0], ap = fabs(dp), an = fabs(dn);
+		if(ap > 0) masks[4] |= dp >= 0 ? (1<<4)|(1<<0) : (2<<4)|(2<<0);
+		if(an > 0) masks[5] |= dn >= 0 ? (1<<4)|(2<<0) : (2<<4)|(1<<0);
+	}
 #else
-    // finite version, assumes corners are a finite distance from origin dependent on far plane
+	// finite version, assumes corners are a finite distance from origin dependent on far plane
 	for (i = 0;i < 5;i++)
 	{
 		Matrix4x4_Transform(&rtlight->matrix_worldtolight, !i ? r_refdef.view.origin : r_refdef.view.frustumcorner[i-1], p);
@@ -2063,7 +2063,7 @@ void R_Shadow_RenderMode_Reset(void)
 void R_Shadow_ClearStencil(void)
 {
 	GL_Clear(GL_STENCIL_BUFFER_BIT, NULL, 1.0f, 128);
-	r_refdef.stats.lights_clears++;
+	r_refdef.stats[r_stat_lights_clears]++;
 }
 
 void R_Shadow_RenderMode_StencilShadowVolumes(qboolean zpass)
@@ -2076,7 +2076,7 @@ void R_Shadow_RenderMode_StencilShadowVolumes(qboolean zpass)
 	GL_ColorMask(0, 0, 0, 0);
 	GL_PolygonOffset(r_refdef.shadowpolygonfactor, r_refdef.shadowpolygonoffset);CHECKGLERROR
 	GL_CullFace(GL_NONE);
-	R_SetupShader_DepthOrShadow(false, false);
+	R_SetupShader_DepthOrShadow(false, false, false); // FIXME test if we have a skeletal model?
 	r_shadow_rendermode = mode;
 	switch(mode)
 	{
@@ -2173,7 +2173,7 @@ static void R_Shadow_RenderMode_ShadowMap(int side, int clear, int size)
 		R_Mesh_SetRenderTargets(fbo2d, r_shadow_shadowmap2ddepthbuffer, r_shadow_shadowmap2ddepthtexture, NULL, NULL, NULL);
 	else
 		R_Mesh_SetRenderTargets(fbo2d, r_shadow_shadowmap2ddepthtexture, NULL, NULL, NULL, NULL);
-	R_SetupShader_DepthOrShadow(true, r_shadow_shadowmap2ddepthbuffer != NULL);
+	R_SetupShader_DepthOrShadow(true, r_shadow_shadowmap2ddepthbuffer != NULL, false); // FIXME test if we have a skeletal model?
 	GL_PolygonOffset(r_shadow_shadowmapping_polygonfactor.value, r_shadow_shadowmapping_polygonoffset.value);
 	GL_DepthMask(true);
 	GL_DepthTest(true);
@@ -2321,7 +2321,7 @@ void R_Shadow_RenderMode_DrawDeferredLight(qboolean stenciltest, qboolean shadow
 	GL_DepthTest(true);
 	GL_DepthFunc(GL_GREATER);
 	GL_CullFace(r_refdef.view.cullface_back);
-	R_Mesh_PrepareVertices_Vertex3f(8, vertex3f, NULL);
+	R_Mesh_PrepareVertices_Vertex3f(8, vertex3f, NULL, 0);
 	R_Mesh_Draw(0, 8, 0, 12, NULL, NULL, 0, bboxelements, NULL, 0);
 }
 
@@ -2694,8 +2694,8 @@ void R_Shadow_UpdateBounceGridTexture(void)
 		radius = rtlight->radius * settings.lightradiusscale;
 		s = settings.particleintensity / shootparticles;
 		VectorScale(rtlight->photoncolor, s, baseshotcolor);
-		r_refdef.stats.bouncegrid_lights++;
-		r_refdef.stats.bouncegrid_particles += shootparticles;
+		r_refdef.stats[r_stat_bouncegrid_lights]++;
+		r_refdef.stats[r_stat_bouncegrid_particles] += shootparticles;
 		for (shotparticles = 0;shotparticles < shootparticles;shotparticles++)
 		{
 			if (settings.stablerandom > 0)
@@ -2709,7 +2709,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 			VectorMA(clipstart, radius, clipend, clipend);
 			for (bouncecount = 0;;bouncecount++)
 			{
-				r_refdef.stats.bouncegrid_traces++;
+				r_refdef.stats[r_stat_bouncegrid_traces]++;
 				//r_refdef.scene.worldmodel->TraceLineAgainstSurfaces(r_refdef.scene.worldmodel, NULL, NULL, &cliptrace, clipstart, clipend, hitsupercontentsmask);
 				//r_refdef.scene.worldmodel->TraceLine(r_refdef.scene.worldmodel, NULL, NULL, &cliptrace2, clipstart, clipend, hitsupercontentsmask);
 				if (settings.staticmode)
@@ -2775,7 +2775,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 					VectorMA(clipstart, 0.5f, stepdelta, steppos);
 					for (step = 0;step < numsteps;step++)
 					{
-						r_refdef.stats.bouncegrid_splats++;
+						r_refdef.stats[r_stat_bouncegrid_splats]++;
 						// figure out which texture pixel this is in
 						texlerp[1][0] = ((steppos[0] - mins[0]) * ispacing[0]) - 0.5f;
 						texlerp[1][1] = ((steppos[1] - mins[1]) * ispacing[1]) - 0.5f;
@@ -2829,7 +2829,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 				}
 				if (cliptrace.fraction >= 1.0f)
 					break;
-				r_refdef.stats.bouncegrid_hits++;
+				r_refdef.stats[r_stat_bouncegrid_hits]++;
 				if (bouncecount >= maxbounce)
 					break;
 				// scale down shot color by bounce intensity and texture color (or 50% if no texture reported)
@@ -2845,7 +2845,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 				VectorMultiply(shotcolor, surfcolor, shotcolor);
 				if (VectorLength2(baseshotcolor) == 0.0f)
 					break;
-				r_refdef.stats.bouncegrid_bounces++;
+				r_refdef.stats[r_stat_bouncegrid_bounces]++;
 				if (settings.bounceanglediffuse)
 				{
 					// random direction, primarily along plane normal
@@ -2991,7 +2991,7 @@ qboolean R_Shadow_ScissorForBBox(const float *mins, const float *maxs)
 	|| r_shadow_lightscissor[1] != r_refdef.view.viewport.y
 	|| r_shadow_lightscissor[2] != r_refdef.view.viewport.width
 	|| r_shadow_lightscissor[3] != r_refdef.view.viewport.height)
-		r_refdef.stats.lights_scissored++;
+		r_refdef.stats[r_stat_lights_scissored]++;
 	return false;
 }
 
@@ -3764,11 +3764,8 @@ static void R_Shadow_DrawWorldShadow_ShadowMap(int numsurfaces, int *surfacelist
 		{
 			if (!mesh->sidetotals[r_shadow_shadowmapside])
 				continue;
-			r_refdef.stats.lights_shadowtriangles += mesh->sidetotals[r_shadow_shadowmapside];
-			if (mesh->vertex3fbuffer)
-				R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vertex3fbuffer);
-			else
-				R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vbo_vertexbuffer);
+			r_refdef.stats[r_stat_lights_shadowtriangles] += mesh->sidetotals[r_shadow_shadowmapside];
+			R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vbo_vertexbuffer, mesh->vbooffset_vertex3f);
 			R_Mesh_Draw(0, mesh->numverts, mesh->sideoffsets[r_shadow_shadowmapside], mesh->sidetotals[r_shadow_shadowmapside], mesh->element3i, mesh->element3i_indexbuffer, mesh->element3i_bufferoffset, mesh->element3s, mesh->element3s_indexbuffer, mesh->element3s_bufferoffset);
 		}
 		CHECKGLERROR
@@ -3804,11 +3801,8 @@ static void R_Shadow_DrawWorldShadow_ShadowVolume(int numsurfaces, int *surfacel
 		mesh = zpass ? rsurface.rtlight->static_meshchain_shadow_zpass : rsurface.rtlight->static_meshchain_shadow_zfail;
 		for (;mesh;mesh = mesh->next)
 		{
-			r_refdef.stats.lights_shadowtriangles += mesh->numtriangles;
-			if (mesh->vertex3fbuffer)
-				R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vertex3fbuffer);
-			else
-				R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vbo_vertexbuffer);
+			r_refdef.stats[r_stat_lights_shadowtriangles] += mesh->numtriangles;
+			R_Mesh_PrepareVertices_Vertex3f(mesh->numverts, mesh->vertex3f, mesh->vbo_vertexbuffer, mesh->vbooffset_vertex3f);
 			if (r_shadow_rendermode == R_SHADOW_RENDERMODE_ZPASS_STENCIL)
 			{
 				// increment stencil if frontface is infront of depthbuffer
@@ -4129,18 +4123,16 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 		return;
 
 	// count this light in the r_speeds
-	r_refdef.stats.lights++;
+	r_refdef.stats[r_stat_lights]++;
 
 	// flag it as worth drawing later
 	rtlight->draw = true;
 
 	// cache all the animated entities that cast a shadow but are not visible
 	for (i = 0;i < numshadowentities;i++)
-		if (!shadowentities[i]->animcache_vertex3f)
-			R_AnimCache_GetEntity(shadowentities[i], false, false);
+		R_AnimCache_GetEntity(shadowentities[i], false, false);
 	for (i = 0;i < numshadowentities_noselfshadow;i++)
-		if (!shadowentities_noselfshadow[i]->animcache_vertex3f)
-			R_AnimCache_GetEntity(shadowentities_noselfshadow[i], false, false);
+		R_AnimCache_GetEntity(shadowentities_noselfshadow[i], false, false);
 
 	// allocate some temporary memory for rendering this light later in the frame
 	// reusable buffers need to be copied, static data can be used as-is
@@ -4533,7 +4525,8 @@ void R_Shadow_PrepareLights(int fbo, rtexture_t *depthtexture, rtexture_t *color
 		r_shadow_shadowmapfilterquality != r_shadow_shadowmapping_filterquality.integer || 
 		r_shadow_shadowmapshadowsampler != (vid.support.arb_shadow && r_shadow_shadowmapping_useshadowsampler.integer) || 
 		r_shadow_shadowmapdepthbits != r_shadow_shadowmapping_depthbits.integer || 
-		r_shadow_shadowmapborder != bound(0, r_shadow_shadowmapping_bordersize.integer, 16))
+		r_shadow_shadowmapborder != bound(0, r_shadow_shadowmapping_bordersize.integer, 16) ||
+		r_shadow_shadowmapdepthtexture != r_fb.usedepthtextures)
 		R_Shadow_FreeShadowMaps();
 
 	r_shadow_fb_fbo = fbo;
@@ -4674,6 +4667,10 @@ void R_Shadow_DrawLights(void)
 	R_Shadow_RenderMode_End();
 }
 
+#define MAX_MODELSHADOWS 1024
+static int r_shadow_nummodelshadows;
+static entity_render_t *r_shadow_modelshadows[MAX_MODELSHADOWS];
+
 void R_Shadow_PrepareModelShadows(void)
 {
 	int i;
@@ -4682,6 +4679,7 @@ void R_Shadow_PrepareModelShadows(void)
 	vec3_t shadowdir, shadowforward, shadowright, shadoworigin, shadowfocus, shadowmins, shadowmaxs;
 	entity_render_t *ent;
 
+	r_shadow_nummodelshadows = 0;
 	if (!r_refdef.scene.numentities)
 		return;
 
@@ -4692,11 +4690,18 @@ void R_Shadow_PrepareModelShadows(void)
 			break;
 		// fall through
 	case R_SHADOW_SHADOWMODE_STENCIL:
+		if (!vid.stencil)
+			return;
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			ent = r_refdef.scene.entities[i];
-			if (!ent->animcache_vertex3f && ent->model && ent->model->DrawShadowVolume != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
+			if (ent->model && ent->model->DrawShadowVolume != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
+			{
+				if (r_shadow_nummodelshadows >= MAX_MODELSHADOWS)
+					break;
+				r_shadow_modelshadows[r_shadow_nummodelshadows++] = ent;
 				R_AnimCache_GetEntity(ent, false, false);
+			}
 		}
 		return;
 	default:
@@ -4741,8 +4746,13 @@ void R_Shadow_PrepareModelShadows(void)
 		if (!BoxesOverlap(ent->mins, ent->maxs, shadowmins, shadowmaxs))
 			continue;
 		// cast shadows from anything of the map (submodels are optional)
-		if (!ent->animcache_vertex3f && ent->model && ent->model->DrawShadowMap != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
+		if (ent->model && ent->model->DrawShadowMap != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
+		{
+			if (r_shadow_nummodelshadows >= MAX_MODELSHADOWS)
+				break;
+			r_shadow_modelshadows[r_shadow_nummodelshadows++] = ent;
 			R_AnimCache_GetEntity(ent, false, false);
+		}
 	}
 }
 
@@ -4762,7 +4772,7 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	GLuint shadowfbo = 0;
 	float clearcolor[4];
 
-	if (!r_refdef.scene.numentities)
+	if (!r_shadow_nummodelshadows)
 		return;
 
 	switch (r_shadow_shadowmode)
@@ -4800,7 +4810,7 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	radius = 0.5f / scale;
 	nearclip = -r_shadows_throwdistance.value;
 	farclip = r_shadows_throwdistance.value;
-	bias = r_shadow_shadowmapping_bias.value * r_shadow_shadowmapping_nearclip.value / (2 * r_shadows_throwdistance.value) * (1024.0f / size);
+	bias = (r_shadows_shadowmapbias.value < 0) ? r_shadow_shadowmapping_bias.value : r_shadows_shadowmapbias.value * r_shadow_shadowmapping_nearclip.value / (2 * r_shadows_throwdistance.value) * (1024.0f / size);
 
 	r_shadow_shadowmap_parameters[0] = size;
 	r_shadow_shadowmap_parameters[1] = size;
@@ -4842,7 +4852,7 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 		R_Mesh_SetRenderTargets(shadowfbo, r_shadow_shadowmap2ddepthbuffer, r_shadow_shadowmap2ddepthtexture, NULL, NULL, NULL);
 	else
 		R_Mesh_SetRenderTargets(shadowfbo, r_shadow_shadowmap2ddepthtexture, NULL, NULL, NULL, NULL);
-	R_SetupShader_DepthOrShadow(true, r_shadow_shadowmap2ddepthbuffer != NULL);
+	R_SetupShader_DepthOrShadow(true, r_shadow_shadowmap2ddepthbuffer != NULL, false); // FIXME test if we have a skeletal model?
 	GL_PolygonOffset(r_shadow_shadowmapping_polygonfactor.value, r_shadow_shadowmapping_polygonoffset.value);
 	GL_DepthMask(true);
 	GL_DepthTest(true);
@@ -4860,36 +4870,23 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	// outside the usable area
 	GL_Scissor(viewport.x + r_shadow_shadowmapborder, viewport.y + r_shadow_shadowmapborder, viewport.width - 2*r_shadow_shadowmapborder, viewport.height - 2*r_shadow_shadowmapborder);
 
-#if 0
-	// debugging
-	R_Mesh_SetRenderTargets(r_shadow_fb_fbo, r_shadow_fb_depthtexture, r_shadow_fb_colortexture, NULL, NULL, NULL);
-	R_SetupShader_ShowDepth(true);
-	GL_ColorMask(1,1,1,1);
-	GL_Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, clearcolor, 1.0f, 0);
-#endif
-
-	for (i = 0;i < r_refdef.scene.numentities;i++)
+	for (i = 0;i < r_shadow_nummodelshadows;i++)
 	{
-		ent = r_refdef.scene.entities[i];
-
-		// cast shadows from anything of the map (submodels are optional)
-		if (ent->model && ent->model->DrawShadowMap != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
-		{
-			relativethrowdistance = r_shadows_throwdistance.value * Matrix4x4_ScaleFromMatrix(&ent->inversematrix);
-			Matrix4x4_Transform(&ent->inversematrix, shadoworigin, relativelightorigin);
-			Matrix4x4_Transform3x3(&ent->inversematrix, shadowdir, relativelightdirection);
-			Matrix4x4_Transform3x3(&ent->inversematrix, shadowforward, relativeforward);
-			Matrix4x4_Transform3x3(&ent->inversematrix, shadowright, relativeright);
-			relativeshadowmins[0] = relativelightorigin[0] - r_shadows_throwdistance.value * fabs(relativelightdirection[0]) - radius * (fabs(relativeforward[0]) + fabs(relativeright[0]));
-			relativeshadowmins[1] = relativelightorigin[1] - r_shadows_throwdistance.value * fabs(relativelightdirection[1]) - radius * (fabs(relativeforward[1]) + fabs(relativeright[1]));
-			relativeshadowmins[2] = relativelightorigin[2] - r_shadows_throwdistance.value * fabs(relativelightdirection[2]) - radius * (fabs(relativeforward[2]) + fabs(relativeright[2]));
-			relativeshadowmaxs[0] = relativelightorigin[0] + r_shadows_throwdistance.value * fabs(relativelightdirection[0]) + radius * (fabs(relativeforward[0]) + fabs(relativeright[0]));
-			relativeshadowmaxs[1] = relativelightorigin[1] + r_shadows_throwdistance.value * fabs(relativelightdirection[1]) + radius * (fabs(relativeforward[1]) + fabs(relativeright[1]));
-			relativeshadowmaxs[2] = relativelightorigin[2] + r_shadows_throwdistance.value * fabs(relativelightdirection[2]) + radius * (fabs(relativeforward[2]) + fabs(relativeright[2]));
-			RSurf_ActiveModelEntity(ent, false, false, false);
-			ent->model->DrawShadowMap(0, ent, relativelightorigin, relativelightdirection, relativethrowdistance, ent->model->nummodelsurfaces, ent->model->sortedmodelsurfaces, NULL, relativeshadowmins, relativeshadowmaxs);
-			rsurface.entity = NULL; // used only by R_GetCurrentTexture and RSurf_ActiveWorldEntity/RSurf_ActiveModelEntity
-		}
+		ent = r_shadow_modelshadows[i];
+		relativethrowdistance = r_shadows_throwdistance.value * Matrix4x4_ScaleFromMatrix(&ent->inversematrix);
+		Matrix4x4_Transform(&ent->inversematrix, shadoworigin, relativelightorigin);
+		Matrix4x4_Transform3x3(&ent->inversematrix, shadowdir, relativelightdirection);
+		Matrix4x4_Transform3x3(&ent->inversematrix, shadowforward, relativeforward);
+		Matrix4x4_Transform3x3(&ent->inversematrix, shadowright, relativeright);
+		relativeshadowmins[0] = relativelightorigin[0] - r_shadows_throwdistance.value * fabs(relativelightdirection[0]) - radius * (fabs(relativeforward[0]) + fabs(relativeright[0]));
+		relativeshadowmins[1] = relativelightorigin[1] - r_shadows_throwdistance.value * fabs(relativelightdirection[1]) - radius * (fabs(relativeforward[1]) + fabs(relativeright[1]));
+		relativeshadowmins[2] = relativelightorigin[2] - r_shadows_throwdistance.value * fabs(relativelightdirection[2]) - radius * (fabs(relativeforward[2]) + fabs(relativeright[2]));
+		relativeshadowmaxs[0] = relativelightorigin[0] + r_shadows_throwdistance.value * fabs(relativelightdirection[0]) + radius * (fabs(relativeforward[0]) + fabs(relativeright[0]));
+		relativeshadowmaxs[1] = relativelightorigin[1] + r_shadows_throwdistance.value * fabs(relativelightdirection[1]) + radius * (fabs(relativeforward[1]) + fabs(relativeright[1]));
+		relativeshadowmaxs[2] = relativelightorigin[2] + r_shadows_throwdistance.value * fabs(relativelightdirection[2]) + radius * (fabs(relativeforward[2]) + fabs(relativeright[2]));
+		RSurf_ActiveModelEntity(ent, false, false, false);
+		ent->model->DrawShadowMap(0, ent, relativelightorigin, relativelightdirection, relativethrowdistance, ent->model->nummodelsurfaces, ent->model->sortedmodelsurfaces, NULL, relativeshadowmins, relativeshadowmaxs);
+		rsurface.entity = NULL; // used only by R_GetCurrentTexture and RSurf_ActiveWorldEntity/RSurf_ActiveModelEntity
 	}
 
 #if 0
@@ -4926,7 +4923,7 @@ void R_DrawModelShadowMaps(int fbo, rtexture_t *depthtexture, rtexture_t *colort
 	case RENDERPATH_D3D9:
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
-#ifdef OPENGL_ORIENTATION
+#ifdef MATRIX4x4_OPENGLORIENTATION
 		r_shadow_shadowmapmatrix.m[0][0]	*= -1.0f;
 		r_shadow_shadowmapmatrix.m[0][1]	*= -1.0f;
 		r_shadow_shadowmapmatrix.m[0][2]	*= -1.0f;
@@ -4962,7 +4959,7 @@ void R_DrawModelShadows(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 	vec3_t tmp, shadowdir;
 	prvm_vec3_t prvmshadowdir;
 
-	if (!r_refdef.scene.numentities || !vid.stencil || (r_shadow_shadowmode != R_SHADOW_SHADOWMODE_STENCIL && r_shadows.integer != 1))
+	if (!r_shadow_nummodelshadows || (r_shadow_shadowmode != R_SHADOW_SHADOWMODE_STENCIL && r_shadows.integer != 1))
 		return;
 
 	r_shadow_fb_fbo = fbo;
@@ -4990,60 +4987,57 @@ void R_DrawModelShadows(int fbo, rtexture_t *depthtexture, rtexture_t *colortext
 
 	R_Shadow_ClearStencil();
 
-	for (i = 0;i < r_refdef.scene.numentities;i++)
+	for (i = 0;i < r_shadow_nummodelshadows;i++)
 	{
-		ent = r_refdef.scene.entities[i];
+		ent = r_shadow_modelshadows[i];
 
 		// cast shadows from anything of the map (submodels are optional)
-		if (ent->model && ent->model->DrawShadowVolume != NULL && (!ent->model->brush.submodel || r_shadows_castfrombmodels.integer) && (ent->flags & RENDER_SHADOW))
+		relativethrowdistance = r_shadows_throwdistance.value * Matrix4x4_ScaleFromMatrix(&ent->inversematrix);
+		VectorSet(relativeshadowmins, -relativethrowdistance, -relativethrowdistance, -relativethrowdistance);
+		VectorSet(relativeshadowmaxs, relativethrowdistance, relativethrowdistance, relativethrowdistance);
+		if (r_shadows.integer == 2) // 2: simpler mode, throw shadows always in same direction
+			Matrix4x4_Transform3x3(&ent->inversematrix, shadowdir, relativelightdirection);
+		else
 		{
-			relativethrowdistance = r_shadows_throwdistance.value * Matrix4x4_ScaleFromMatrix(&ent->inversematrix);
-			VectorSet(relativeshadowmins, -relativethrowdistance, -relativethrowdistance, -relativethrowdistance);
-			VectorSet(relativeshadowmaxs, relativethrowdistance, relativethrowdistance, relativethrowdistance);
-			if (r_shadows.integer == 2) // 2: simpler mode, throw shadows always in same direction
-				Matrix4x4_Transform3x3(&ent->inversematrix, shadowdir, relativelightdirection);
-			else
+			if(ent->entitynumber != 0)
 			{
-				if(ent->entitynumber != 0)
+				if(ent->entitynumber >= MAX_EDICTS) // csqc entity
 				{
-					if(ent->entitynumber >= MAX_EDICTS) // csqc entity
-					{
-						// FIXME handle this
-						VectorNegate(ent->modellight_lightdir, relativelightdirection);
-					}
-					else
-					{
-						// networked entity - might be attached in some way (then we should use the parent's light direction, to not tear apart attached entities)
-						int entnum, entnum2, recursion;
-						entnum = entnum2 = ent->entitynumber;
-						for(recursion = 32; recursion > 0; --recursion)
-						{
-							entnum2 = cl.entities[entnum].state_current.tagentity;
-							if(entnum2 >= 1 && entnum2 < cl.num_entities && cl.entities_active[entnum2])
-								entnum = entnum2;
-							else
-								break;
-						}
-						if(recursion && recursion != 32) // if we followed a valid non-empty attachment chain
-						{
-							VectorNegate(cl.entities[entnum].render.modellight_lightdir, relativelightdirection);
-							// transform into modelspace of OUR entity
-							Matrix4x4_Transform3x3(&cl.entities[entnum].render.matrix, relativelightdirection, tmp);
-							Matrix4x4_Transform3x3(&ent->inversematrix, tmp, relativelightdirection);
-						}
-						else
-							VectorNegate(ent->modellight_lightdir, relativelightdirection);
-					}
+					// FIXME handle this
+					VectorNegate(ent->modellight_lightdir, relativelightdirection);
 				}
 				else
-					VectorNegate(ent->modellight_lightdir, relativelightdirection);
+				{
+					// networked entity - might be attached in some way (then we should use the parent's light direction, to not tear apart attached entities)
+					int entnum, entnum2, recursion;
+					entnum = entnum2 = ent->entitynumber;
+					for(recursion = 32; recursion > 0; --recursion)
+					{
+						entnum2 = cl.entities[entnum].state_current.tagentity;
+						if(entnum2 >= 1 && entnum2 < cl.num_entities && cl.entities_active[entnum2])
+							entnum = entnum2;
+						else
+							break;
+					}
+					if(recursion && recursion != 32) // if we followed a valid non-empty attachment chain
+					{
+						VectorNegate(cl.entities[entnum].render.modellight_lightdir, relativelightdirection);
+						// transform into modelspace of OUR entity
+						Matrix4x4_Transform3x3(&cl.entities[entnum].render.matrix, relativelightdirection, tmp);
+						Matrix4x4_Transform3x3(&ent->inversematrix, tmp, relativelightdirection);
+					}
+					else
+						VectorNegate(ent->modellight_lightdir, relativelightdirection);
+				}
 			}
-
-			VectorScale(relativelightdirection, -relativethrowdistance, relativelightorigin);
-			RSurf_ActiveModelEntity(ent, false, false, false);
-			ent->model->DrawShadowVolume(ent, relativelightorigin, relativelightdirection, relativethrowdistance, ent->model->nummodelsurfaces, ent->model->sortedmodelsurfaces, relativeshadowmins, relativeshadowmaxs);
-			rsurface.entity = NULL; // used only by R_GetCurrentTexture and RSurf_ActiveWorldEntity/RSurf_ActiveModelEntity
+			else
+				VectorNegate(ent->modellight_lightdir, relativelightdirection);
 		}
+
+		VectorScale(relativelightdirection, -relativethrowdistance, relativelightorigin);
+		RSurf_ActiveModelEntity(ent, false, false, false);
+		ent->model->DrawShadowVolume(ent, relativelightorigin, relativelightdirection, relativethrowdistance, ent->model->nummodelsurfaces, ent->model->sortedmodelsurfaces, relativeshadowmins, relativeshadowmaxs);
+		rsurface.entity = NULL; // used only by R_GetCurrentTexture and RSurf_ActiveWorldEntity/RSurf_ActiveModelEntity
 	}
 
 	// not really the right mode, but this will disable any silly stencil features
@@ -5111,13 +5105,13 @@ static void R_BeginCoronaQuery(rtlight_t *rtlight, float scale, qboolean usequer
 			qglBeginQueryARB(GL_SAMPLES_PASSED_ARB, rtlight->corona_queryindex_allpixels);
 			GL_DepthFunc(GL_ALWAYS);
 			R_CalcSprite_Vertex3f(vertex3f, centerorigin, r_refdef.view.right, r_refdef.view.up, scale, -scale, -scale, scale);
-			R_Mesh_PrepareVertices_Vertex3f(4, vertex3f, NULL);
+			R_Mesh_PrepareVertices_Vertex3f(4, vertex3f, NULL, 0);
 			R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 			qglEndQueryARB(GL_SAMPLES_PASSED_ARB);
 			GL_DepthFunc(GL_LEQUAL);
 			qglBeginQueryARB(GL_SAMPLES_PASSED_ARB, rtlight->corona_queryindex_visiblepixels);
 			R_CalcSprite_Vertex3f(vertex3f, rtlight->shadoworigin, r_refdef.view.right, r_refdef.view.up, scale, -scale, -scale, scale);
-			R_Mesh_PrepareVertices_Vertex3f(4, vertex3f, NULL);
+			R_Mesh_PrepareVertices_Vertex3f(4, vertex3f, NULL, 0);
 			R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 			qglEndQueryARB(GL_SAMPLES_PASSED_ARB);
 			CHECKGLERROR
@@ -5200,7 +5194,7 @@ static void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 		}
 		R_CalcSprite_Vertex3f(vertex3f, rtlight->shadoworigin, r_refdef.view.right, r_refdef.view.up, scale, -scale, -scale, scale);
 		RSurf_ActiveCustomEntity(&identitymatrix, &identitymatrix, RENDER_NODEPTHTEST, 0, color[0], color[1], color[2], 1, 4, vertex3f, spritetexcoord2f, NULL, NULL, NULL, NULL, 2, polygonelement3i, polygonelement3s, false, false);
-		R_DrawCustomSurface(r_shadow_lightcorona, &identitymatrix, MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE, 0, 4, 0, 2, false, false);
+		R_DrawCustomSurface(r_shadow_lightcorona, &identitymatrix, MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE | MATERIALFLAG_NODEPTHTEST, 0, 4, 0, 2, false, false);
 		if(negated)
 			GL_BlendEquationSubtract(false);
 	}
