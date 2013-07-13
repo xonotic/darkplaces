@@ -94,7 +94,7 @@ static void Cmd_Defer_f (void)
 			Mem_Free(cmd);
 		}
 	} else if(Cmd_Argc() == 3
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_CONTROVERSIAL
 		&& (cls.state != ca_connected || cls.demoplayback)
 #endif
 	)
@@ -121,7 +121,7 @@ static void Cmd_Defer_f (void)
 		  cmd_deferred_list = defcmd;*/
 	} else {
 		Con_Printf("usage: defer <seconds> <command>\n"
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_CONTROVERSIAL
 			   "         (only works while not connected)\n"
 #endif
 			   "       defer clear\n");
@@ -386,7 +386,7 @@ void Cbuf_Execute (void)
 
 void Cbuf_Frame(void)
 {
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_CONTROVERSIAL
 	if(cls.state != ca_connected || cls.demoplayback)
 #endif
 	Cbuf_Execute_Deferred();

@@ -641,7 +641,7 @@ void Sys_MakeProcessMean (void)
 }
 #endif
 
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_UNSAFE
 # ifndef WIN32
 #  include <sys/ptrace.h>
 #  include <sys/wait.h>
@@ -649,7 +649,7 @@ void Sys_MakeProcessMean (void)
 # endif
 #endif
 
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_UNSAFE
 // whole function only exists if anticheat is enabled
 Sys_AntiCheat_CheckMemory_Result_t Sys_AntiCheat_CheckMemory(const char *dllsubstring, qboolean dllsubstringmode, const void *pattern, size_t length)
 {
@@ -730,16 +730,14 @@ void Sys_AntiCheat_CheckMemory_f(void)
 
 qboolean Sys_AntiCheat_Init(char **envp)
 {
-#ifdef ANTICHEAT
-# define FAIL return false
-
+#ifdef ANTICHEAT_CONTROVERSIAL
 	// anti LD_PRELOAD
 	// note that we're using envp here, so one doesn't simply hook into getenv()
 	static char *unsecure_envvars =
 		// UNSECURE_ENVVARS from glibc
 		"GCONV_PATH\0" // libraries are loaded from here
-		//"GETCONF_DIR\0" // harmless, can only fake getconf() output
-		//"HOSTALIASES\0" // harmless, just messes with DNS
+		// "GETCONF_DIR\0" // harmless, can only fake getconf() output
+		// "HOSTALIASES\0" // harmless, just messes with DNS
 		"LD_AUDIT\0" // loads libraries
 		// "LD_DEBUG\0" // harmless, just shows data
 		// "LD_DEBUG_OUTPUT\0" // harmless, just shows data
@@ -759,6 +757,7 @@ qboolean Sys_AntiCheat_Init(char **envp)
 		// "RES_OPTIONS\0" // harmless, just messes with DNS
 		// "TMPDIR\0" // harmless, we don't use temp files anyway
 		// "TZDIR\0" // harmless, just enables time travel
+
 		// EXTRA_UNSECURE_ENVVARS from glibc
 		"LD_AOUT_LIBRARY_PATH\0" // loads libraries
 		"LD_AOUT_PRELOAD\0" // loads libraries
@@ -778,7 +777,7 @@ qboolean Sys_AntiCheat_Init(char **envp)
 					++q;
 				}
 				if(*p == 0 && *q == '=')
-					FAIL; // match!
+					return false; // match!
 				// next!
 				while(*p)
 					++p;
@@ -787,13 +786,15 @@ qboolean Sys_AntiCheat_Init(char **envp)
 			++envp;
 		}
 	}
+#endif
 
+#ifdef ANTICHEAT_UNSAFE
 # ifndef WIN32
 	// anti ptrace; also, make a forked process copy to detach from debuggers
 	{
 		pid_t pid = fork();
 		if(pid < 0)
-			FAIL;
+			return false;
 		if(pid == 0)
 		{
 			// nothing to do here
@@ -805,14 +806,14 @@ qboolean Sys_AntiCheat_Init(char **envp)
 			if(ptrace(PTRACE_ATTACH, pid, NULL, NULL) < 0)
 			{
 				kill(pid, SIGKILL);
-				FAIL;
+				return false;
 			}
 			for(;;)
 			{
 				if(waitpid(pid, &status, 0) == (pid_t) -1)
 				{
 					if(errno == ECHILD) // process no longer exists
-						FAIL;
+						return false;
 				}
 				if(WIFEXITED(status))
 				{

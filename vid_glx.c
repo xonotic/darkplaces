@@ -587,7 +587,7 @@ static void HandleEvents(void)
 	{
 		XNextEvent(vidx11_display, &event);
 
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_SAFE
 		if(event.xany.send_event && event.type != MotionNotify)
 			continue;
 		// note: synthetic MotionNotify already only change
@@ -1341,7 +1341,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	drivername = "libGL.so.1";
 #endif
 
-#ifndef ANTICHEAT
+#ifndef ANTICHEAT_CONTROVERSIAL
 // COMMANDLINEOPTION: Linux GLX: -gl_driver <drivername> selects a GL driver library, default is libGL.so.1, useful only for using fxmesa or similar, if you don't know what this is for, you don't need it
 // COMMANDLINEOPTION: BSD GLX: -gl_driver <drivername> selects a GL driver library, default is libGL.so.1, useful only for using fxmesa or similar, if you don't know what this is for, you don't need it
 // LordHavoc: although this works on MacOSX, it's useless there (as there is only one system libGL)

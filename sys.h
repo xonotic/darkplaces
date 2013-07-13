@@ -117,7 +117,7 @@ void Sys_MakeProcessMean (void);
 
 // call this from main(); if it returns false, exit using return
 qboolean Sys_AntiCheat_Init(char **envp);
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_UNSAFE
 typedef enum
 {
 	CHECKMEMORY_N_A,

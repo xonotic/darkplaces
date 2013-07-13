@@ -32,13 +32,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define DP_FUNC_NORETURN
 #endif
 
+// Security features:
+// HARDENING: disable some nasty things evil servers may do via stuffcmd
+// ANTICHEAT_SAFE: some safe anti-cheating means
+// ANTICHEAT_CONTROVERSIAL: some controversial anti-cheating means
+// ANTICHEAT_UNSAFE: some more problematic anti-cheating means
+
 #ifdef HARDENING
 # define IS_HARDENED false
 #else
 # define IS_HARDENED true
 #endif
 
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_UNSAFE
 # ifdef __linux__
 #  define _GNU_SOURCE // for memmem
 # endif

@@ -76,7 +76,7 @@ void Sys_PrintToTerminal(const char *text)
 
 char *Sys_ConsoleInput(void)
 {
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_CONTROVERSIAL
 	if (cls.state == ca_dedicated)
 #endif
 	{

@@ -2627,7 +2627,7 @@ static const char *RCon_Authenticate(lhnetaddress_t *peeraddress, const char *pa
 	qboolean have_usernames = false;
 	char vabuf[1024];
 
-#ifdef ANTICHEAT
+#ifdef ANTICHEAT_CONTROVERSIAL
 	if(cls.state != ca_dedicated)
 		return NULL;
 #endif

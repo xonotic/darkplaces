@@ -2046,7 +2046,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	// SDL usually knows best
 	drivername = NULL;
 
-#ifndef ANTICHEAT
+#ifndef ANTICHEAT_CONTROVERSIAL
 // COMMANDLINEOPTION: SDL GL: -gl_driver <drivername> selects a GL driver library, default is whatever SDL recommends, useful only for 3dfxogl.dll/3dfxvgl.dll or fxmesa or similar, if you don't know what this is for, you don't need it
 	i = COM_CheckParm("-gl_driver");
 	if (i && i < com_argc - 1)
