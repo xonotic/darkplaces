@@ -32,18 +32,12 @@ ifneq ($(DP_MAKE_TARGET), mingw)
 	DP_MACHINE:=$(shell uname -m)
 endif
 
-# Makefile name
-MAKEFILE=makefile
 
-# Commands
+# Command used to delete files
 ifdef windir
 	CMD_RM=del
-	CMD_CP=copy /y
-	CMD_MKDIR=mkdir
 else
 	CMD_RM=$(CMD_UNIXRM)
-	CMD_CP=$(CMD_UNIXCP)
-	CMD_MKDIR=$(CMD_UNIXMKDIR)
 endif
 
 # 64bits AMD CPUs use another lib directory
@@ -260,7 +254,7 @@ ifeq ($(DP_MAKE_TARGET), mingw)
 	EXE_SVNEXUIZ=$(EXE_WINSVNEXUIZ)
 	EXE_SDLNEXUIZ=$(EXE_WINSDLNEXUIZ)
 
-	DP_LINK_ZLIB?=shared
+	DP_LINK_ZLIB?=dlopen
 	DP_LINK_JPEG?=shared
 	DP_LINK_ODE?=dlopen
 endif
@@ -378,7 +372,7 @@ endif
 
 ##### GNU Make specific definitions #####
 
-DO_LD=$(CC) -o ../../../$@ $^ $(LDFLAGS)
+DO_LD=$(CC) -o $@ $^ $(LDFLAGS)
 
 
 ##### Definitions shared by all makefiles #####
