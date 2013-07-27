@@ -1496,6 +1496,8 @@ static void CL_NewParticlesFromEffectinfo(int effectnameindex, float pcount, con
 					continue;
 				if ((info->flags & PARTICLEEFFECT_NOTUNDERWATER) && underwater)
 					continue;
+
+				// if trailspacing is set, only ever use this effect as trail
 				if (info->trailspacing > 0 && !istrail)
 					continue;
 
@@ -1579,7 +1581,8 @@ static void CL_NewParticlesFromEffectinfo(int effectnameindex, float pcount, con
 					{
 						float cnt = info->countabsolute;
 						cnt += (pcount * info->countmultiplier) * cl_particles_quality.value;
-						cnt += (traillen / info->trailspacing) * cl_particles_quality.value;
+						if (info->trailspacing > 0)
+							cnt += (traillen / info->trailspacing) * cl_particles_quality.value;
 						cnt *= fade;
 						info->particleaccumulator += cnt;
 						trailstep = traillen / cnt;
