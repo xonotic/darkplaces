@@ -45,7 +45,8 @@ renderpath_t;
 typedef struct viddef_support_s
 {
 	qboolean gl20shaders;
-	qboolean gl20shaders130;
+	qboolean gl20shaders130; // indicates glBindFragDataLocation is available
+	int glshaderversion; // typical values: 100 110 120 130 140 ...
 	qboolean amd_texture_texture4;
 	qboolean arb_depth_texture;
 	qboolean arb_draw_buffers;
@@ -59,9 +60,11 @@ typedef struct viddef_support_s
 	qboolean arb_texture_gather;
 	qboolean arb_texture_non_power_of_two;
 	qboolean arb_vertex_buffer_object;
+	qboolean arb_uniform_buffer_object;
 	qboolean ati_separate_stencil;
 	qboolean ext_blend_minmax;
 	qboolean ext_blend_subtract;
+	qboolean ext_blend_func_separate;
 	qboolean ext_draw_range_elements;
 	qboolean ext_framebuffer_object;
 	qboolean ext_packed_depth_stencil;
@@ -185,10 +188,15 @@ extern cvar_t vid_bitsperpixel;
 extern cvar_t vid_samples;
 extern cvar_t vid_refreshrate;
 extern cvar_t vid_userefreshrate;
+extern cvar_t vid_touchscreen_density;
+extern cvar_t vid_touchscreen_xdpi;
+extern cvar_t vid_touchscreen_ydpi;
 extern cvar_t vid_vsync;
 extern cvar_t vid_mouse;
 extern cvar_t vid_grabkeyboard;
 extern cvar_t vid_touchscreen;
+extern cvar_t vid_touchscreen_showkeyboard;
+extern cvar_t vid_touchscreen_supportshowkeyboard;
 extern cvar_t vid_stick_mouse;
 extern cvar_t vid_resizable;
 extern cvar_t vid_minwidth;
@@ -267,6 +275,10 @@ void VID_UpdateGamma(qboolean force, int rampsize);
 // turns off hardware gamma ramps immediately
 // (called from various shutdown/deactivation functions)
 void VID_RestoreSystemGamma(void);
+
+qboolean VID_HasScreenKeyboardSupport(void);
+void VID_ShowKeyboard(qboolean show);
+qboolean VID_ShowingKeyboard(void);
 
 void VID_SetMouse (qboolean fullscreengrab, qboolean relative, qboolean hidecursor);
 void VID_Finish (void);

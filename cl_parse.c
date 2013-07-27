@@ -20,7 +20,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_parse.c  -- parse a message received from the server
 
 #include "quakedef.h"
+#ifdef CONFIG_CD
 #include "cdaudio.h"
+#endif
 #include "cl_collision.h"
 #include "csprogs.h"
 #include "libcurl.h"
@@ -368,7 +370,7 @@ void CL_KeepaliveMessage (qboolean readmessages)
 		msg.data = buf;
 		msg.maxsize = sizeof(buf);
 		MSG_WriteChar(&msg, clc_nop);
-		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, false);
+		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, 0, false);
 	}
 
 	recursive = thisrecursive;
@@ -1552,6 +1554,9 @@ static void CL_SendPlayerInfo(void)
 
 	MSG_WriteByte (&cls.netcon->message, clc_stringcmd);
 	MSG_WriteString (&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate %i", cl_rate.integer));
+
+	MSG_WriteByte (&cls.netcon->message, clc_stringcmd);
+	MSG_WriteString (&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate_burstsize %i", cl_rate_burstsize.integer));
 
 	if (cl_pmodel.integer)
 	{
@@ -3003,9 +3008,12 @@ static void CL_IPLog_Add(const char *address, const char *name, qboolean checkex
 		// add it to the iplog.txt file
 		// TODO: this ought to open the one in the userpath version of the base
 		// gamedir, not the current gamedir
+// not necessary for mobile
+#ifndef DP_MOBILETOUCH
 		Log_Printf(cl_iplog_name.string, "%s %s\n", address, name);
 		if (developer_extra.integer)
 			Con_DPrintf("CL_IPLog_Add: appending this line to %s: %s %s\n", cl_iplog_name.string, address, name);
+#endif
 	}
 }
 
@@ -3020,7 +3028,12 @@ static void CL_IPLog_Load(void)
 	cl_iplog_loaded = true;
 	// TODO: this ought to open the one in the userpath version of the base
 	// gamedir, not the current gamedir
+// not necessary for mobile
+#ifndef DP_MOBILETOUCH
 	filedata = FS_LoadFile(cl_iplog_name.string, tempmempool, true, &filesize);
+#else
+	filedata = NULL;
+#endif
 	if (!filedata)
 		return;
 	text = (char *)filedata;
@@ -3597,10 +3610,12 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_cdtrack:
 				cl.cdtrack = cl.looptrack = MSG_ReadByte(&cl_message);
+#ifdef CONFIG_CD
 				if ( (cls.demoplayback || cls.demorecording) && (cls.forcetrack != -1) )
 					CDAudio_Play ((unsigned char)cls.forcetrack, true);
 				else
 					CDAudio_Play ((unsigned char)cl.cdtrack, true);
+#endif
 				break;
 
 			case qw_svc_intermission:
@@ -3719,10 +3734,12 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_setpause:
 				cl.paused = MSG_ReadByte(&cl_message) != 0;
+#ifdef CONFIG_CD
 				if (cl.paused)
 					CDAudio_Pause ();
 				else
 					CDAudio_Resume ();
+#endif
 				S_PauseGameSounds (cl.paused);
 				break;
 			}
@@ -4046,10 +4063,12 @@ void CL_ParseServerMessage(void)
 
 			case svc_setpause:
 				cl.paused = MSG_ReadByte(&cl_message) != 0;
+#ifdef CONFIG_CD
 				if (cl.paused)
 					CDAudio_Pause ();
 				else
 					CDAudio_Resume ();
+#endif
 				S_PauseGameSounds (cl.paused);
 				break;
 
@@ -4096,10 +4115,12 @@ void CL_ParseServerMessage(void)
 			case svc_cdtrack:
 				cl.cdtrack = MSG_ReadByte(&cl_message);
 				cl.looptrack = MSG_ReadByte(&cl_message);
+#ifdef CONFIG_CD
 				if ( (cls.demoplayback || cls.demorecording) && (cls.forcetrack != -1) )
 					CDAudio_Play ((unsigned char)cls.forcetrack, true);
 				else
 					CDAudio_Play ((unsigned char)cl.cdtrack, true);
+#endif
 				break;
 
 			case svc_intermission:

@@ -18,7 +18,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 #include "quakedef.h"
+#ifdef CONFIG_CD
 #include "cdaudio.h"
+#endif
 #include "image.h"
 #include "progsvm.h"
 
@@ -29,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define TYPE_BOTH 3
 
 static cvar_t forceqmenu = { 0, "forceqmenu", "0", "enables the quake menu instead of the quakec menu.dat (if present)" };
+static cvar_t menu_progs = { 0, "menu_progs", "menu.dat", "name of quakec menu.dat file" };
 
 static int NehGameType;
 
@@ -1698,7 +1701,9 @@ static void M_Options_Draw (void)
 	M_Options_PrintSlider(  "            Brightness", true, v_contrast.value, 1, 2);
 	M_Options_PrintSlider(  "                 Gamma", true, v_gamma.value, 0.5, 3);
 	M_Options_PrintSlider(  "          Sound Volume", snd_initialized.integer, volume.value, 0, 1);
+#ifdef CONFIG_CD
 	M_Options_PrintSlider(  "          Music Volume", cdaudioinitialized.integer, bgmvolume.value, 0, 1);
+#endif
 	M_Options_PrintCommand( "     Customize Effects", true);
 	M_Options_PrintCommand( "       Effects:  Quake", true);
 	M_Options_PrintCommand( "       Effects: Normal", true);
@@ -5364,9 +5369,9 @@ static void MP_Init (void)
 	prog->ExecuteProgram        = MVM_ExecuteProgram;
 
 	// allocate the mempools
-	prog->progs_mempool = Mem_AllocPool(M_PROG_FILENAME, 0, NULL);
+	prog->progs_mempool = Mem_AllocPool(menu_progs.string, 0, NULL);
 
-	PRVM_Prog_Load(prog, M_PROG_FILENAME, NULL, 0, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
+	PRVM_Prog_Load(prog, menu_progs.string, NULL, 0, m_numrequiredfunc, m_required_func, m_numrequiredfields, m_required_fields, m_numrequiredglobals, m_required_globals);
 
 	// note: OP_STATE is not supported by menu qc, we don't even try to detect
 	// it here
@@ -5389,7 +5394,7 @@ void (*MR_NewMap) (void);
 void MR_SetRouting(qboolean forceold)
 {
 	// if the menu prog isnt available or forceqmenu ist set, use the old menu
-	if(!FS_FileExists(M_PROG_FILENAME) || forceqmenu.integer || forceold)
+	if(!FS_FileExists(menu_progs.string) || forceqmenu.integer || forceold)
 	{
 		// set menu router function pointers
 		MR_KeyEvent = M_KeyEvent;
@@ -5432,6 +5437,7 @@ void MR_Init_Commands(void)
 	// set router console commands
 	Cvar_RegisterVariable (&forceqmenu);
 	Cvar_RegisterVariable (&menu_options_colorcontrol_correctionvalue);
+	Cvar_RegisterVariable (&menu_progs);
 	Cmd_AddCommand ("menu_restart",MR_Restart, "restart menu system (reloads menu.dat)");
 	Cmd_AddCommand ("togglemenu", Call_MR_ToggleMenu_f, "opens or closes menu");
 }

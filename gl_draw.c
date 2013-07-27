@@ -1971,8 +1971,6 @@ void DrawQ_Mesh (drawqueuemesh_t *mesh, int flags, qboolean hasalpha)
 
 void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 {
-	int num;
-
 	_DrawQ_SetupAndProcessDrawFlag(flags, NULL, 1);
 	if(!r_draw2d.integer && !r_draw2d_force)
 		return;
@@ -1984,16 +1982,19 @@ void DrawQ_LineLoop (drawqueuemesh_t *mesh, int flags)
 	case RENDERPATH_GL13:
 	case RENDERPATH_GL20:
 #ifndef USE_GLES2
-		CHECKGLERROR
-		qglBegin(GL_LINE_LOOP);
-		for (num = 0;num < mesh->num_vertices;num++)
 		{
-			if (mesh->data_color4f)
-				GL_Color(mesh->data_color4f[num*4+0], mesh->data_color4f[num*4+1], mesh->data_color4f[num*4+2], mesh->data_color4f[num*4+3]);
-			qglVertex2f(mesh->data_vertex3f[num*3+0], mesh->data_vertex3f[num*3+1]);
+			int num;
+			CHECKGLERROR
+			qglBegin(GL_LINE_LOOP);
+			for (num = 0;num < mesh->num_vertices;num++)
+			{
+				if (mesh->data_color4f)
+					GL_Color(mesh->data_color4f[num*4+0], mesh->data_color4f[num*4+1], mesh->data_color4f[num*4+2], mesh->data_color4f[num*4+3]);
+				qglVertex2f(mesh->data_vertex3f[num*3+0], mesh->data_vertex3f[num*3+1]);
+			}
+			qglEnd();
+			CHECKGLERROR
 		}
-		qglEnd();
-		CHECKGLERROR
 #endif
 		break;
 	case RENDERPATH_D3D9:
@@ -2062,14 +2063,8 @@ void DrawQ_Line (float width, float x1, float y1, float x2, float y2, float r, f
 	}
 }
 
-void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float *color4f, int flags)
+void DrawQ_Lines (float width, int numlines, int flags, qboolean hasalpha)
 {
-	int i;
-	qboolean hasalpha = false;
-	for (i = 0;i < numlines*2;i++)
-		if (color4f[i*4+3] < 1.0f)
-			hasalpha = true;
-
 	_DrawQ_SetupAndProcessDrawFlag(flags, NULL, hasalpha ? 0.5f : 1.0f);
 
 	if(!r_draw2d.integer && !r_draw2d_force)
@@ -2087,7 +2082,6 @@ void DrawQ_Lines (float width, int numlines, const float *vertex3f, const float 
 		//qglLineWidth(width);CHECKGLERROR
 
 		CHECKGLERROR
-		R_Mesh_PrepareVertices_Generic_Arrays(numlines*2, vertex3f, color4f, NULL);
 		qglDrawArrays(GL_LINES, 0, numlines*2);
 		CHECKGLERROR
 		break;

@@ -549,12 +549,15 @@ static void VM_SV_sound(prvm_prog_t *prog)
 		flags = 0;
 		if(channel >= 8 && channel <= 15) // weird QW feature
 		{
-			flags |= CHANFLAG_RELIABLE;
+			flags |= CHANNELFLAG_RELIABLE;
 			channel -= 8;
 		}
 	}
 	else
-		flags = PRVM_G_FLOAT(OFS_PARM6);
+	{
+		// LordHavoc: we only let the qc set certain flags, others are off-limits
+		flags = (int)PRVM_G_FLOAT(OFS_PARM6) & (CHANNELFLAG_RELIABLE | CHANNELFLAG_FORCELOOP | CHANNELFLAG_PAUSED);
+	}
 
 	if (volume < 0 || volume > 255)
 	{
@@ -576,7 +579,7 @@ static void VM_SV_sound(prvm_prog_t *prog)
 		return;
 	}
 
-	SV_StartSound (entity, channel, sample, volume, attenuation, flags & CHANFLAG_RELIABLE, pitchchange);
+	SV_StartSound (entity, channel, sample, volume, attenuation, flags & CHANNELFLAG_RELIABLE, pitchchange);
 }
 
 /*
@@ -1148,8 +1151,7 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 	end[2] -= 256;
 
 	if (sv_gameplayfix_droptofloorstartsolid_nudgetocorrect.integer)
-		if (sv_gameplayfix_unstickentities.integer)
-			SV_UnstickEntity(ent);
+		SV_NudgeOutOfSolid(ent);
 
 	VectorCopy(PRVM_serveredictvector(ent, origin), entorigin);
 	VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
@@ -1165,8 +1167,6 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 		if (trace.startsolid)
 		{
 			Con_DPrintf("droptofloor at %f %f %f - COULD NOT FIX BADLY PLACED ENTITY\n", PRVM_serveredictvector(ent, origin)[0], PRVM_serveredictvector(ent, origin)[1], PRVM_serveredictvector(ent, origin)[2]);
-			if (sv_gameplayfix_unstickentities.integer)
-				SV_UnstickEntity(ent);
 			SV_LinkEdict(ent);
 			PRVM_serveredictfloat(ent, flags) = (int)PRVM_serveredictfloat(ent, flags) | FL_ONGROUND;
 			PRVM_serveredictedict(ent, groundentity) = 0;
@@ -1176,8 +1176,8 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 		{
 			Con_DPrintf("droptofloor at %f %f %f - FIXED BADLY PLACED ENTITY\n", PRVM_serveredictvector(ent, origin)[0], PRVM_serveredictvector(ent, origin)[1], PRVM_serveredictvector(ent, origin)[2]);
 			VectorCopy (trace.endpos, PRVM_serveredictvector(ent, origin));
-			if (sv_gameplayfix_unstickentities.integer)
-				SV_UnstickEntity(ent);
+			if (sv_gameplayfix_droptofloorstartsolid_nudgetocorrect.integer)
+				SV_NudgeOutOfSolid(ent);
 			SV_LinkEdict(ent);
 			PRVM_serveredictfloat(ent, flags) = (int)PRVM_serveredictfloat(ent, flags) | FL_ONGROUND;
 			PRVM_serveredictedict(ent, groundentity) = PRVM_EDICT_TO_PROG(trace.ent);
@@ -1188,10 +1188,9 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 	}
 	else
 	{
-		if (trace.fraction != 1)
+		if (!trace.allsolid && trace.fraction < 1)
 		{
-			if (trace.fraction < 1)
-				VectorCopy (trace.endpos, PRVM_serveredictvector(ent, origin));
+			VectorCopy (trace.endpos, PRVM_serveredictvector(ent, origin));
 			SV_LinkEdict(ent);
 			PRVM_serveredictfloat(ent, flags) = (int)PRVM_serveredictfloat(ent, flags) | FL_ONGROUND;
 			PRVM_serveredictedict(ent, groundentity) = PRVM_EDICT_TO_PROG(trace.ent);
@@ -2906,7 +2905,6 @@ static void VM_SV_skel_build(prvm_prog_t *prog)
 	int firstbone = PRVM_G_FLOAT(OFS_PARM4) - 1;
 	int lastbone = PRVM_G_FLOAT(OFS_PARM5) - 1;
 	dp_model_t *model = SV_GetModelByIndex(modelindex);
-	float blendfrac;
 	int numblends;
 	int bonenum;
 	int blendindex;
@@ -2922,7 +2920,6 @@ static void VM_SV_skel_build(prvm_prog_t *prog)
 	lastbone = min(lastbone, skeleton->model->num_bones - 1);
 	VM_GenerateFrameGroupBlend(prog, framegroupblend, ed);
 	VM_FrameBlendFromFrameGroupBlend(frameblend, framegroupblend, model, sv.time);
-	blendfrac = 1.0f - retainfrac;
 	for (numblends = 0;numblends < MAX_FRAMEBLENDS && frameblend[numblends].lerp;numblends++)
 		;
 	for (bonenum = firstbone;bonenum <= lastbone;bonenum++)
@@ -2934,8 +2931,7 @@ static void VM_SV_skel_build(prvm_prog_t *prog)
 			Matrix4x4_Accumulate(&bonematrix, &matrix, frameblend[blendindex].lerp);
 		}
 		Matrix4x4_Normalize3(&bonematrix, &bonematrix);
-		Matrix4x4_Scale(&skeleton->relativetransforms[bonenum], retainfrac, retainfrac);
-		Matrix4x4_Accumulate(&skeleton->relativetransforms[bonenum], &bonematrix, blendfrac);
+		Matrix4x4_Interpolate(&skeleton->relativetransforms[bonenum], &bonematrix, &skeleton->relativetransforms[bonenum], retainfrac);
 	}
 	PRVM_G_FLOAT(OFS_RETURN) = skeletonindex + 1;
 }

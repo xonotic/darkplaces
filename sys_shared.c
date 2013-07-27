@@ -5,6 +5,7 @@
 #endif
 
 #include "quakedef.h"
+#include "thread.h"
 
 #define SUPPORTDLL
 
@@ -43,6 +44,10 @@ char *Sys_TimeString(const char *timeformat)
 extern qboolean host_shuttingdown;
 void Sys_Quit (int returnvalue)
 {
+	// Unlock mutexes because the quit command may jump directly here, causing a deadlock
+	Cbuf_UnlockThreadMutex();
+	SV_UnlockThreadMutex();
+
 	if (COM_CheckParm("-profilegameonly"))
 		Sys_AllowProfiling(false);
 	host_shuttingdown = true;
@@ -50,16 +55,22 @@ void Sys_Quit (int returnvalue)
 	exit(returnvalue);
 }
 
-#if defined(__linux__) || defined(__FreeBSD__)
 #ifdef __cplusplus
 extern "C"
 #endif
-int moncontrol(int);
-#endif
-
 void Sys_AllowProfiling(qboolean enable)
 {
-#if defined(__linux__) || defined(__FreeBSD__)
+#ifdef __ANDROID__
+#ifdef USE_PROFILER
+	extern void monstartup(const char *libname);
+	extern void moncleanup(void);
+	if (enable)
+		monstartup("libmain.so");
+	else
+		moncleanup();
+#endif
+#elif defined(__linux__) || defined(__FreeBSD__)
+	extern int moncontrol(int);
 	moncontrol(enable);
 #endif
 }
@@ -260,7 +271,7 @@ static cvar_t sys_usesdldelay = {CVAR_SAVE, "sys_usesdldelay", "0", "use SDL_Del
 static cvar_t sys_usequeryperformancecounter = {CVAR_SAVE, "sys_usequeryperformancecounter", "0", "use windows QueryPerformanceCounter timer (which has issues on multicore/multiprocessor machines and processors which are designed to conserve power) for timing rather than timeGetTime function (which has issues on some motherboards)"};
 #endif
 #if HAVE_CLOCKGETTIME
-static cvar_t sys_useclockgettime = {CVAR_SAVE, "sys_useclockgettime", "0", "use POSIX clock_gettime function (which has issues if the system clock speed is far off, as it can't get fixed by NTP) for timing rather than gettimeofday (which has issues if the system time is stepped by ntpdate, or apparently on some Xen installations)"};
+static cvar_t sys_useclockgettime = {CVAR_SAVE, "sys_useclockgettime", "1", "use POSIX clock_gettime function (not adjusted by NTP on some older Linux kernels) for timing rather than gettimeofday (which has issues if the system time is stepped by ntpdate, or apparently on some Xen installations)"};
 #endif
 
 static double benchmark_time; // actually always contains an integer amount of milliseconds, will eventually "overflow"

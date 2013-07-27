@@ -200,12 +200,6 @@ void Mod_UnloadModel (dp_model_t *mod)
 	used = mod->used;
 	if (mod->mempool)
 	{
-		if (mod->surfmesh.vertex3fbuffer)
-			R_Mesh_DestroyMeshBuffer(mod->surfmesh.vertex3fbuffer);
-		mod->surfmesh.vertex3fbuffer = NULL;
-		if (mod->surfmesh.vertexmeshbuffer)
-			R_Mesh_DestroyMeshBuffer(mod->surfmesh.vertexmeshbuffer);
-		mod->surfmesh.vertexmeshbuffer = NULL;
 		if (mod->surfmesh.data_element3i_indexbuffer)
 			R_Mesh_DestroyMeshBuffer(mod->surfmesh.data_element3i_indexbuffer);
 		mod->surfmesh.data_element3i_indexbuffer = NULL;
@@ -507,7 +501,7 @@ dp_model_t *Mod_LoadModel(dp_model_t *mod, qboolean crash, qboolean checkdisk)
 		else if (!memcmp(buf, "ACTRHEAD", 8)) Mod_PSKMODEL_Load(mod, buf, bufend);
 		else if (!memcmp(buf, "INTERQUAKEMODEL", 16)) Mod_INTERQUAKEMODEL_Load(mod, buf, bufend);
 		else if (strlen(mod->name) >= 4 && !strcmp(mod->name + strlen(mod->name) - 4, ".map")) Mod_MAP_Load(mod, buf, bufend);
-		else if (num == BSPVERSION || num == 30 || !memcmp(buf, "BSP2", 4)) Mod_Q1BSP_Load(mod, buf, bufend);
+		else if (num == BSPVERSION || num == 30 || !memcmp(buf, "BSP2", 4) || !memcmp(buf, "2PSB", 4)) Mod_Q1BSP_Load(mod, buf, bufend);
 		else Con_Printf("Mod_LoadModel: model \"%s\" is of unknown/unsupported type\n", mod->name);
 		Mem_Free(buf);
 
@@ -1235,21 +1229,13 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 		}
 	}
 
-	// upload r_vertexmesh_t array as a buffer
-	if (mesh->vertexmesh && !mesh->vertexmeshbuffer)
-		mesh->vertexmeshbuffer = R_Mesh_CreateMeshBuffer(mesh->vertexmesh, mesh->numverts * sizeof(*mesh->vertexmesh), loadmodel->name, false, false, false);
-
-	// upload vertex3f array as a buffer
-	if (mesh->vertex3f && !mesh->vertex3fbuffer)
-		mesh->vertex3fbuffer = R_Mesh_CreateMeshBuffer(mesh->vertex3f, mesh->numverts * sizeof(float[3]), loadmodel->name, false, false, false);
-
 	// upload short indices as a buffer
 	if (mesh->element3s && !mesh->element3s_indexbuffer)
-		mesh->element3s_indexbuffer = R_Mesh_CreateMeshBuffer(mesh->element3s, mesh->numtriangles * sizeof(short[3]), loadmodel->name, true, false, true);
+		mesh->element3s_indexbuffer = R_Mesh_CreateMeshBuffer(mesh->element3s, mesh->numtriangles * sizeof(short[3]), loadmodel->name, true, false, false, true);
 
 	// upload int indices as a buffer
 	if (mesh->element3i && !mesh->element3i_indexbuffer && !mesh->element3s)
-		mesh->element3i_indexbuffer = R_Mesh_CreateMeshBuffer(mesh->element3i, mesh->numtriangles * sizeof(int[3]), loadmodel->name, true, false, false);
+		mesh->element3i_indexbuffer = R_Mesh_CreateMeshBuffer(mesh->element3i, mesh->numtriangles * sizeof(int[3]), loadmodel->name, true, false, false, false);
 
 	// vertex buffer is several arrays and we put them in the same buffer
 	//
@@ -1261,18 +1247,20 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 		size_t size;
 		unsigned char *mem;
 		size = 0;
+		mesh->vbooffset_vertexmesh         = size;if (mesh->vertexmesh        ) size += mesh->numverts * sizeof(r_vertexmesh_t);
 		mesh->vbooffset_vertex3f           = size;if (mesh->vertex3f          ) size += mesh->numverts * sizeof(float[3]);
 		mesh->vbooffset_svector3f          = size;if (mesh->svector3f         ) size += mesh->numverts * sizeof(float[3]);
 		mesh->vbooffset_tvector3f          = size;if (mesh->tvector3f         ) size += mesh->numverts * sizeof(float[3]);
 		mesh->vbooffset_normal3f           = size;if (mesh->normal3f          ) size += mesh->numverts * sizeof(float[3]);
 		mesh->vbooffset_texcoord2f         = size;if (mesh->texcoord2f        ) size += mesh->numverts * sizeof(float[2]);
 		mem = (unsigned char *)Mem_Alloc(tempmempool, size);
+		if (mesh->vertexmesh        ) memcpy(mem + mesh->vbooffset_vertexmesh        , mesh->vertexmesh        , mesh->numverts * sizeof(r_vertexmesh_t));
 		if (mesh->vertex3f          ) memcpy(mem + mesh->vbooffset_vertex3f          , mesh->vertex3f          , mesh->numverts * sizeof(float[3]));
 		if (mesh->svector3f         ) memcpy(mem + mesh->vbooffset_svector3f         , mesh->svector3f         , mesh->numverts * sizeof(float[3]));
 		if (mesh->tvector3f         ) memcpy(mem + mesh->vbooffset_tvector3f         , mesh->tvector3f         , mesh->numverts * sizeof(float[3]));
 		if (mesh->normal3f          ) memcpy(mem + mesh->vbooffset_normal3f          , mesh->normal3f          , mesh->numverts * sizeof(float[3]));
 		if (mesh->texcoord2f        ) memcpy(mem + mesh->vbooffset_texcoord2f        , mesh->texcoord2f        , mesh->numverts * sizeof(float[2]));
-		mesh->vbo_vertexbuffer = R_Mesh_CreateMeshBuffer(mem, size, "shadowmesh", false, false, false);
+		mesh->vbo_vertexbuffer = R_Mesh_CreateMeshBuffer(mem, size, "shadowmesh", false, false, false, false);
 		Mem_Free(mem);
 	}
 }
@@ -1361,10 +1349,6 @@ void Mod_ShadowMesh_Free(shadowmesh_t *mesh)
 	shadowmesh_t *nextmesh;
 	for (;mesh;mesh = nextmesh)
 	{
-		if (mesh->vertex3fbuffer)
-			R_Mesh_DestroyMeshBuffer(mesh->vertex3fbuffer);
-		if (mesh->vertexmeshbuffer)
-			R_Mesh_DestroyMeshBuffer(mesh->vertexmeshbuffer);
 		if (mesh->element3i_indexbuffer)
 			R_Mesh_DestroyMeshBuffer(mesh->element3i_indexbuffer);
 		if (mesh->element3s_indexbuffer)
@@ -3018,12 +3002,12 @@ void Mod_BuildVBOs(void)
 
 	// build r_vertexmesh_t array
 	// (compressed interleaved array for D3D)
-	if (!loadmodel->surfmesh.vertexmesh && vid.useinterleavedarrays)
+	if (!loadmodel->surfmesh.data_vertexmesh && vid.useinterleavedarrays)
 	{
 		int vertexindex;
 		int numvertices = loadmodel->surfmesh.num_vertices;
 		r_vertexmesh_t *vertexmesh;
-		loadmodel->surfmesh.vertexmesh = vertexmesh = (r_vertexmesh_t*)Mem_Alloc(loadmodel->mempool, numvertices * sizeof(*loadmodel->surfmesh.vertexmesh));
+		loadmodel->surfmesh.data_vertexmesh = vertexmesh = (r_vertexmesh_t*)Mem_Alloc(loadmodel->mempool, numvertices * sizeof(r_vertexmesh_t));
 		for (vertexindex = 0;vertexindex < numvertices;vertexindex++, vertexmesh++)
 		{
 			VectorCopy(loadmodel->surfmesh.data_vertex3f + 3*vertexindex, vertexmesh->vertex3f);
@@ -3035,24 +3019,20 @@ void Mod_BuildVBOs(void)
 			Vector2Copy(loadmodel->surfmesh.data_texcoordtexture2f + 2*vertexindex, vertexmesh->texcoordtexture2f);
 			if (loadmodel->surfmesh.data_texcoordlightmap2f)
 				Vector2Scale(loadmodel->surfmesh.data_texcoordlightmap2f + 2*vertexindex, 1.0f, vertexmesh->texcoordlightmap2f);
+			if (loadmodel->surfmesh.data_skeletalindex4ub)
+				Vector4Copy(loadmodel->surfmesh.data_skeletalindex4ub + 4*vertexindex, vertexmesh->skeletalindex4ub);
+			if (loadmodel->surfmesh.data_skeletalweight4ub)
+				Vector4Copy(loadmodel->surfmesh.data_skeletalweight4ub + 4*vertexindex, vertexmesh->skeletalweight4ub);
 		}
 	}
 
-	// upload r_vertexmesh_t array as a buffer
-	if (loadmodel->surfmesh.vertexmesh && !loadmodel->surfmesh.vertexmeshbuffer)
-		loadmodel->surfmesh.vertexmeshbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.vertexmesh, loadmodel->surfmesh.num_vertices * sizeof(*loadmodel->surfmesh.vertexmesh), loadmodel->name, false, false, false);
-
-	// upload vertex3f array as a buffer
-	if (loadmodel->surfmesh.data_vertex3f && !loadmodel->surfmesh.vertex3fbuffer)
-		loadmodel->surfmesh.vertex3fbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_vertex3f, loadmodel->surfmesh.num_vertices * sizeof(float[3]), loadmodel->name, false, false, false);
-
 	// upload short indices as a buffer
 	if (loadmodel->surfmesh.data_element3s && !loadmodel->surfmesh.data_element3s_indexbuffer)
-		loadmodel->surfmesh.data_element3s_indexbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_element3s, loadmodel->surfmesh.num_triangles * sizeof(short[3]), loadmodel->name, true, false, true);
+		loadmodel->surfmesh.data_element3s_indexbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_element3s, loadmodel->surfmesh.num_triangles * sizeof(short[3]), loadmodel->name, true, false, false, true);
 
 	// upload int indices as a buffer
 	if (loadmodel->surfmesh.data_element3i && !loadmodel->surfmesh.data_element3i_indexbuffer && !loadmodel->surfmesh.data_element3s)
-		loadmodel->surfmesh.data_element3i_indexbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles * sizeof(int[3]), loadmodel->name, true, false, false);
+		loadmodel->surfmesh.data_element3i_indexbuffer = R_Mesh_CreateMeshBuffer(loadmodel->surfmesh.data_element3i, loadmodel->surfmesh.num_triangles * sizeof(int[3]), loadmodel->name, true, false, false, false);
 
 	// only build a vbo if one has not already been created (this is important for brush models which load specially)
 	// vertex buffer is several arrays and we put them in the same buffer
@@ -3065,6 +3045,7 @@ void Mod_BuildVBOs(void)
 		size_t size;
 		unsigned char *mem;
 		size = 0;
+		loadmodel->surfmesh.vbooffset_vertexmesh         = size;if (loadmodel->surfmesh.data_vertexmesh        ) size += loadmodel->surfmesh.num_vertices * sizeof(r_vertexmesh_t);
 		loadmodel->surfmesh.vbooffset_vertex3f           = size;if (loadmodel->surfmesh.data_vertex3f          ) size += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
 		loadmodel->surfmesh.vbooffset_svector3f          = size;if (loadmodel->surfmesh.data_svector3f         ) size += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
 		loadmodel->surfmesh.vbooffset_tvector3f          = size;if (loadmodel->surfmesh.data_tvector3f         ) size += loadmodel->surfmesh.num_vertices * sizeof(float[3]);
@@ -3072,7 +3053,10 @@ void Mod_BuildVBOs(void)
 		loadmodel->surfmesh.vbooffset_texcoordtexture2f  = size;if (loadmodel->surfmesh.data_texcoordtexture2f ) size += loadmodel->surfmesh.num_vertices * sizeof(float[2]);
 		loadmodel->surfmesh.vbooffset_texcoordlightmap2f = size;if (loadmodel->surfmesh.data_texcoordlightmap2f) size += loadmodel->surfmesh.num_vertices * sizeof(float[2]);
 		loadmodel->surfmesh.vbooffset_lightmapcolor4f    = size;if (loadmodel->surfmesh.data_lightmapcolor4f   ) size += loadmodel->surfmesh.num_vertices * sizeof(float[4]);
+		loadmodel->surfmesh.vbooffset_skeletalindex4ub   = size;if (loadmodel->surfmesh.data_skeletalindex4ub  ) size += loadmodel->surfmesh.num_vertices * sizeof(unsigned char[4]);
+		loadmodel->surfmesh.vbooffset_skeletalweight4ub  = size;if (loadmodel->surfmesh.data_skeletalweight4ub ) size += loadmodel->surfmesh.num_vertices * sizeof(unsigned char[4]);
 		mem = (unsigned char *)Mem_Alloc(tempmempool, size);
+		if (loadmodel->surfmesh.data_vertexmesh        ) memcpy(mem + loadmodel->surfmesh.vbooffset_vertexmesh        , loadmodel->surfmesh.data_vertexmesh        , loadmodel->surfmesh.num_vertices * sizeof(r_vertexmesh_t));
 		if (loadmodel->surfmesh.data_vertex3f          ) memcpy(mem + loadmodel->surfmesh.vbooffset_vertex3f          , loadmodel->surfmesh.data_vertex3f          , loadmodel->surfmesh.num_vertices * sizeof(float[3]));
 		if (loadmodel->surfmesh.data_svector3f         ) memcpy(mem + loadmodel->surfmesh.vbooffset_svector3f         , loadmodel->surfmesh.data_svector3f         , loadmodel->surfmesh.num_vertices * sizeof(float[3]));
 		if (loadmodel->surfmesh.data_tvector3f         ) memcpy(mem + loadmodel->surfmesh.vbooffset_tvector3f         , loadmodel->surfmesh.data_tvector3f         , loadmodel->surfmesh.num_vertices * sizeof(float[3]));
@@ -3080,7 +3064,9 @@ void Mod_BuildVBOs(void)
 		if (loadmodel->surfmesh.data_texcoordtexture2f ) memcpy(mem + loadmodel->surfmesh.vbooffset_texcoordtexture2f , loadmodel->surfmesh.data_texcoordtexture2f , loadmodel->surfmesh.num_vertices * sizeof(float[2]));
 		if (loadmodel->surfmesh.data_texcoordlightmap2f) memcpy(mem + loadmodel->surfmesh.vbooffset_texcoordlightmap2f, loadmodel->surfmesh.data_texcoordlightmap2f, loadmodel->surfmesh.num_vertices * sizeof(float[2]));
 		if (loadmodel->surfmesh.data_lightmapcolor4f   ) memcpy(mem + loadmodel->surfmesh.vbooffset_lightmapcolor4f   , loadmodel->surfmesh.data_lightmapcolor4f   , loadmodel->surfmesh.num_vertices * sizeof(float[4]));
-		loadmodel->surfmesh.vbo_vertexbuffer = R_Mesh_CreateMeshBuffer(mem, size, loadmodel->name, false, false, false);
+		if (loadmodel->surfmesh.data_skeletalindex4ub  ) memcpy(mem + loadmodel->surfmesh.vbooffset_skeletalindex4ub  , loadmodel->surfmesh.data_skeletalindex4ub  , loadmodel->surfmesh.num_vertices * sizeof(unsigned char[4]));
+		if (loadmodel->surfmesh.data_skeletalweight4ub ) memcpy(mem + loadmodel->surfmesh.vbooffset_skeletalweight4ub , loadmodel->surfmesh.data_skeletalweight4ub , loadmodel->surfmesh.num_vertices * sizeof(unsigned char[4]));
+		loadmodel->surfmesh.vbo_vertexbuffer = R_Mesh_CreateMeshBuffer(mem, size, loadmodel->name, false, false, false, false);
 		Mem_Free(mem);
 	}
 }
@@ -4054,15 +4040,6 @@ static void Mod_GenerateLightmaps_UnweldTriangles(dp_model_t *model)
 	if (model->surfmesh.num_vertices > 65536)
 		model->surfmesh.data_element3s = NULL;
 
-	if (model->surfmesh.vertexmesh)
-		Mem_Free(model->surfmesh.vertexmesh);
-	model->surfmesh.vertexmesh = NULL;
-	if (model->surfmesh.vertex3fbuffer)
-		R_Mesh_DestroyMeshBuffer(model->surfmesh.vertex3fbuffer);
-	model->surfmesh.vertex3fbuffer = NULL;
-	if (model->surfmesh.vertexmeshbuffer)
-		R_Mesh_DestroyMeshBuffer(model->surfmesh.vertexmeshbuffer);
-	model->surfmesh.vertexmeshbuffer = NULL;
 	if (model->surfmesh.data_element3i_indexbuffer)
 		R_Mesh_DestroyMeshBuffer(model->surfmesh.data_element3i_indexbuffer);
 	model->surfmesh.data_element3i_indexbuffer = NULL;

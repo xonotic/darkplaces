@@ -112,7 +112,7 @@ r_vertexgeneric_t;
 
 typedef struct r_vertexmesh_s
 {
-	// 80 bytes
+	// 88 bytes
 	float vertex3f[3];
 	float color4f[4];
 	float texcoordtexture2f[2];
@@ -120,6 +120,8 @@ typedef struct r_vertexmesh_s
 	float svector3f[3];
 	float tvector3f[3];
 	float normal3f[3];
+	unsigned char skeletalindex4ub[4];
+	unsigned char skeletalweight4ub[4];
 }
 r_vertexmesh_t;
 
@@ -129,6 +131,7 @@ typedef struct r_meshbuffer_s
 	void *devicebuffer; // Direct3D
 	size_t size;
 	qboolean isindexbuffer;
+	qboolean isuniformbuffer;
 	qboolean isdynamic;
 	qboolean isindex16;
 	char name[MAX_QPATH];
@@ -157,16 +160,22 @@ typedef struct surfmesh_s
 	float *data_texcoordtexture2f; // float[verts*2] texcoords for surface texture
 	float *data_texcoordlightmap2f; // float[verts*2] texcoords for lightmap texture
 	float *data_lightmapcolor4f;
+	unsigned char *data_skeletalindex4ub;
+	unsigned char *data_skeletalweight4ub;
 	int *data_lightmapoffsets; // index into surface's lightmap samples for vertex lighting
+	r_vertexmesh_t *data_vertexmesh; // interleaved arrays for D3D
 	// vertex buffer object (stores geometry in video memory)
 	r_meshbuffer_t *vbo_vertexbuffer;
-	size_t vbooffset_vertex3f;
-	size_t vbooffset_svector3f;
-	size_t vbooffset_tvector3f;
-	size_t vbooffset_normal3f;
-	size_t vbooffset_texcoordtexture2f;
-	size_t vbooffset_texcoordlightmap2f;
-	size_t vbooffset_lightmapcolor4f;
+	int vbooffset_vertex3f;
+	int vbooffset_svector3f;
+	int vbooffset_tvector3f;
+	int vbooffset_normal3f;
+	int vbooffset_texcoordtexture2f;
+	int vbooffset_texcoordlightmap2f;
+	int vbooffset_lightmapcolor4f;
+	int vbooffset_skeletalindex4ub;
+	int vbooffset_skeletalweight4ub;
+	int vbooffset_vertexmesh;
 	// morph blending, these are zero if model is skeletal or static
 	int num_morphframes;
 	struct md3vertex_s *data_morphmd3vertex;
@@ -183,9 +192,7 @@ typedef struct surfmesh_s
 	qboolean isanimated;
 
 	// vertex and index buffers for rendering
-	r_vertexmesh_t *vertexmesh;
-	r_meshbuffer_t *vertex3fbuffer;
-	r_meshbuffer_t *vertexmeshbuffer;
+	r_meshbuffer_t *vertexmesh_vertexbuffer;
 }
 surfmesh_t;
 
@@ -217,10 +224,13 @@ typedef struct shadowmesh_s
 	// used always
 	int *element3i;
 	r_meshbuffer_t *element3i_indexbuffer;
-	size_t element3i_bufferoffset;
+	int element3i_bufferoffset;
 	unsigned short *element3s;
 	r_meshbuffer_t *element3s_indexbuffer;
-	size_t element3s_bufferoffset;
+	int element3s_bufferoffset;
+	// vertex/index buffers for rendering
+	// (created by Mod_ShadowMesh_Finish if possible)
+	r_vertexmesh_t *vertexmesh; // usually NULL
 	// used for shadow mapping cubemap side partitioning
 	int sideoffsets[6], sidetotals[6];
 	// used for shadow mesh (NULL on light mesh)
@@ -229,16 +239,12 @@ typedef struct shadowmesh_s
 	// while building meshes
 	shadowmeshvertexhash_t **vertexhashtable, *vertexhashentries;
 	r_meshbuffer_t *vbo_vertexbuffer;
-	size_t vbooffset_vertex3f;
-	size_t vbooffset_svector3f;
-	size_t vbooffset_tvector3f;
-	size_t vbooffset_normal3f;
-	size_t vbooffset_texcoord2f;
-	// vertex/index buffers for rendering
-	// (created by Mod_ShadowMesh_Finish if possible)
-	r_vertexmesh_t *vertexmesh; // usually NULL
-	r_meshbuffer_t *vertex3fbuffer;
-	r_meshbuffer_t *vertexmeshbuffer; // usually NULL
+	int vbooffset_vertex3f;
+	int vbooffset_svector3f;
+	int vbooffset_tvector3f;
+	int vbooffset_normal3f;
+	int vbooffset_texcoord2f;
+	int vbooffset_vertexmesh;
 }
 shadowmesh_t;
 
@@ -737,7 +743,9 @@ typedef struct model_brush_s
 {
 	// true if this model is a HalfLife .bsp file
 	qboolean ishlbsp;
-	// true if this model is a BSP2 .bsp file (expanded 32bit bsp format for DarkPlaces, RMQ, others?)
+	// true if this model is a BSP2rmqe .bsp file (expanded 32bit bsp format for rmqe)
+	qboolean isbsp2rmqe;
+	// true if this model is a BSP2 .bsp file (expanded 32bit bsp format for DarkPlaces, others?)
 	qboolean isbsp2;
 	// string of entity definitions (.map format)
 	char *entities;
