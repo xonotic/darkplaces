@@ -24,8 +24,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define ENGINE_ICON ( (gamemode == GAME_NEXUIZ) ? nexuiz_xpm : darkplaces_xpm )
 
-extern int cl_available;
-
 #define MAX_TEXTUREUNITS 16
 
 typedef enum renderpath_e

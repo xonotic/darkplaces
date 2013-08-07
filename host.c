@@ -186,9 +186,11 @@ static void Host_ServerOptions (void)
 // COMMANDLINEOPTION: Server: -listen [playerlimit] starts a multiplayer server with graphical client, like singleplayer but other players can connect, default playerlimit is 8
 	// if no client is in the executable or -dedicated is specified on
 	// commandline, start a dedicated server
+#ifdef CONFIG_CLIENT
 	i = COM_CheckParm ("-dedicated");
-	if (i || !cl_available)
+	if (i)
 	{
+#endif
 		cls.state = ca_dedicated;
 		// check for -dedicated specifying how many players
 		if (i && i + 1 < com_argc && atoi (com_argv[i+1]) >= 1)
@@ -197,8 +199,9 @@ static void Host_ServerOptions (void)
 			Con_Printf ("Only one of -dedicated or -listen can be specified\n");
 		// default sv_public on for dedicated servers (often hosted by serious administrators), off for listen servers (often hosted by clueless users)
 		Cvar_SetValue("sv_public", 1);
+#ifdef CONFIG_CLIENT
 	}
-	else if (cl_available)
+	else
 	{
 		// client exists and not dedicated, check if -listen is specified
 		cls.state = ca_disconnected;
@@ -216,6 +219,7 @@ static void Host_ServerOptions (void)
 				svs.maxclients = 1;
 		}
 	}
+#endif
 
 	svs.maxclients = svs.maxclients_next = bound(1, svs.maxclients, MAX_SCOREBOARD);
 

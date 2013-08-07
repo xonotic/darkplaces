@@ -55,9 +55,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "nexuiz.xpm"
 #include "darkplaces.xpm"
 
-// Tell startup code that we have a client
-int cl_available = true;
-
 // note: if we used the XRandR extension we could support refresh rates
 qboolean vid_supportrefreshrate = false;
 

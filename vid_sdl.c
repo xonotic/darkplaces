@@ -60,9 +60,6 @@ io_connect_t IN_GetIOHandle(void)
 #define SDL_R_RESTART
 #endif
 
-// Tell startup code that we have a client
-int cl_available = true;
-
 qboolean vid_supportrefreshrate = false;
 
 static qboolean vid_usingmouse = false;

@@ -36,9 +36,6 @@
 #define kCGLCEMPEngine 313
 #endif
 
-// Tell startup code that we have a client
-int cl_available = true;
-
 qboolean vid_supportrefreshrate = true;
 
 // AGL prototypes

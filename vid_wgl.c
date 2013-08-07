@@ -75,9 +75,6 @@ static HINSTANCE gldll;
 #define WM_MOUSEWHEEL                   0x020A
 #endif
 
-// Tell startup code that we have a client
-int cl_available = true;
-
 qboolean vid_supportrefreshrate = true;
 
 static int (WINAPI *qwglChoosePixelFormat)(HDC, CONST PIXELFORMATDESCRIPTOR *);
