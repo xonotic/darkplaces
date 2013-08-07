@@ -1275,6 +1275,7 @@ static void Host_Init (void)
 		Cmd_AddCommand ("disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
 	else
 	{
+#ifdef CONFIG_CLIENT
 		Con_DPrintf("Initializing client\n");
 
 		R_Modules_Init();
@@ -1291,6 +1292,7 @@ static void Host_Init (void)
 #endif
 		Key_Init();
 		CL_Init();
+#endif
 	}
 
 	// save off current state of aliases, commands and cvars for later restore if FS_GameDir_f is called
@@ -1440,7 +1442,9 @@ void Host_Shutdown(void)
 
 	if (cls.state != ca_dedicated)
 	{
+#ifdef CONFIG_CLIENT
 		R_Modules_Shutdown();
+#endif
 		VID_Shutdown();
 	}
 

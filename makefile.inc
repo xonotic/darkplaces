@@ -98,18 +98,12 @@ OBJ_COMMON= \
 	csprogs.o \
 	curves.o \
 	cvar.o \
-	dpsoftrast.o \
 	dpvsimpledecode.o \
 	filematch.o \
 	fractalnoise.o \
 	fs.o \
 	ft2.o \
 	utf8lib.o \
-	gl_backend.o \
-	gl_draw.o \
-	gl_rmain.o \
-	gl_rsurf.o \
-	gl_textures.o \
 	hmac.o \
 	host.o \
 	host_cmd.o \
@@ -137,13 +131,6 @@ OBJ_COMMON= \
 	prvm_cmds.o \
 	prvm_edict.o \
 	prvm_exec.o \
-	r_explosion.o \
-	r_lerpanim.o \
-	r_lightning.o \
-	r_modules.o \
-	r_shadow.o \
-	r_sky.o \
-	r_sprites.o \
 	sbar.o \
 	sv_demo.o \
 	sv_main.o \
@@ -159,6 +146,21 @@ OBJ_COMMON= \
 	world.o \
 	zone.o
 
+OBJ_RENDERER= \
+	dpsoftrast.o \
+	gl_backend.o \
+	gl_draw.o \
+	gl_rmain.o \
+	gl_rsurf.o \
+	gl_textures.o \
+	r_explosion.o \
+	r_lerpanim.o \
+	r_lightning.o \
+	r_modules.o \
+	r_shadow.o \
+	r_sky.o \
+	r_sprites.o
+
 OBJ_MENU= \
 	menu.o \
 	mvm_cmds.o
@@ -166,13 +168,13 @@ OBJ_MENU= \
 # note that builddate.c is very intentionally not compiled to a .o before
 # being linked, because it should be recompiled every time an executable is
 # built to give the executable a proper date string
-OBJ_SV= builddate.c sys_linux.o vid_null.o thread_null.o $(OBJ_SND_NULL) $(OBJ_COMMON)
-OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMMON) snd_sdl.o $(OBJ_SDLCD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_SV= builddate.c sys_linux.o vid_null.o thread_null.o r_null.o $(OBJ_SND_NULL) $(OBJ_COMMON)
+OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_RENDERER) $(OBJ_MENU) $(OBJ_SND_COMMON) snd_sdl.o $(OBJ_SDLCD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
 
 # Compilation
 CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
-CFLAGS_CLIENT=-DCONFIG_MENU -DCONFIG_CD $(CFLAGS_VIDEO_CAPTURE)
+CFLAGS_CLIENT=-DCONFIG_CLIENT -DCONFIG_MENU -DCONFIG_CD $(CFLAGS_VIDEO_CAPTURE)
 CFLAGS_SERVER=
 CFLAGS_DEBUG=-ggdb
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs
@@ -202,7 +204,7 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 ##### UNIX specific variables #####
 
-OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_MENU) $(OBJ_SOUND) $(OBJ_CD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_RENDERER) $(OBJ_MENU) $(OBJ_SOUND) $(OBJ_CD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
 LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL)
 LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86vm -pthread $(LIB_SOUND)
@@ -242,7 +244,7 @@ LDFLAGS_MACOSXCL=$(LDFLAGS_UNIXCOMMON) -ldl -framework IOKit -framework Carbon $
 LDFLAGS_MACOSXSV=$(LDFLAGS_UNIXCOMMON) -ldl
 LDFLAGS_MACOSXSDL=$(LDFLAGS_UNIXCOMMON) -ldl -framework IOKit $(SDLCONFIG_STATICLIBS) ../../../SDLMain.m
 
-OBJ_AGL= builddate.c sys_linux.o vid_agl.o thread_null.o $(OBJ_MENU) $(OBJ_SOUND) $(OBJ_CD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_AGL= builddate.c sys_linux.o vid_agl.o thread_null.o $(OBJ_RENDERER) $(OBJ_MENU) $(OBJ_SOUND) $(OBJ_CD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
 EXE_MACOSXCL=darkplaces-agl
 EXE_MACOSXCLNEXUIZ=nexuiz-agl
@@ -273,7 +275,7 @@ LDFLAGS_BSDSDL=$(LDFLAGS_UNIXCOMMON) $(LDFLAGS_UNIXSDL)
 
 WINDRES ?= windres
 
-OBJ_WGL= builddate.c sys_win.o vid_wgl.o thread_null.o $(OBJ_MENU) $(OBJ_SND_WIN) $(OBJ_WINCD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_WGL= builddate.c sys_win.o vid_wgl.o thread_null.o $(OBJ_RENDERER) $(OBJ_MENU) $(OBJ_SND_WIN) $(OBJ_WINCD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
 # Link
 # see LDFLAGS_WINCOMMON in makefile

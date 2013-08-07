@@ -1919,14 +1919,18 @@ static int VID_Mode(int fullscreen, int width, int height, int bpp, float refres
 
 static void VID_OpenSystems(void)
 {
+#ifdef CONFIG_CLIENT
 	R_Modules_Start();
+#endif
 	S_Startup();
 }
 
 static void VID_CloseSystems(void)
 {
 	S_Shutdown();
+#ifdef CONFIG_CLIENT
 	R_Modules_Shutdown();
+#endif
 }
 
 qboolean vid_commandlinecheck = true;

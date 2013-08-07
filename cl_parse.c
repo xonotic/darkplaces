@@ -494,8 +494,10 @@ static void CL_SetupWorldModel(void)
 	// make sure we send enough keepalives
 	CL_KeepaliveMessage(false);
 
+#ifdef CONFIG_CLIENT
 	// reset particles and other per-level things
 	R_Modules_NewMap();
+#endif
 
 	// make sure we send enough keepalives
 	CL_KeepaliveMessage(false);
