@@ -3356,7 +3356,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	int mymiplevel;
 	char vabuf[1024];
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	// return an existing skinframe if already loaded
@@ -3565,7 +3565,7 @@ skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, co
 	skinframe_t *skinframe;
 	char vabuf[1024];
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	// if already loaded just return it, otherwise make a new skinframe
@@ -3635,7 +3635,7 @@ skinframe_t *R_SkinFrame_LoadInternalQuake(const char *name, int textureflags, i
 	int featuresmask;
 	skinframe_t *skinframe;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	// if already loaded just return it, otherwise make a new skinframe
@@ -3759,7 +3759,7 @@ skinframe_t *R_SkinFrame_LoadInternal8bit(const char *name, int textureflags, co
 	skinframe_t *skinframe;
 	char vabuf[1024];
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	// if already loaded just return it, otherwise make a new skinframe
@@ -3812,7 +3812,7 @@ skinframe_t *R_SkinFrame_LoadMissing(void)
 {
 	skinframe_t *skinframe;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	skinframe = R_SkinFrame_Find("missing", TEXF_FORCENEAREST, 0, 0, 0, true);

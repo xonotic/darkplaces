@@ -358,9 +358,9 @@ static void Cvar_SetQuick_Internal (cvar_t *var, const char *value)
 		}
 	}
 #endif
-	if ((var->flags & CVAR_USERINFO) && cls.state != ca_dedicated)
+	if ((var->flags & CVAR_USERINFO) && !sv_dedicated)
 		CL_SetInfo(var->name, var->string, true, false, false, false);
-	else if ((var->flags & CVAR_NQUSERINFOHACK) && cls.state != ca_dedicated)
+	else if ((var->flags & CVAR_NQUSERINFOHACK) && !sv_dedicated)
 	{
 		// update the cls.userinfo to have proper values for the
 		// silly nq config variables.

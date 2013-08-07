@@ -331,7 +331,7 @@ void CL_KeepaliveMessage (qboolean readmessages)
 
 	if(!thisrecursive)
 	{
-		if(cls.state != ca_dedicated)
+		if(!sv_dedicated)
 		{
 			if(countdownupdate <= 0) // check if time stepped backwards
 			{

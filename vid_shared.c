@@ -1542,7 +1542,7 @@ void VID_UpdateGamma(qboolean force, int rampsize)
 	qboolean gamma_changed = false;
 
 	// LordHavoc: don't mess with gamma tables if running dedicated
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return;
 
 	wantgamma = v_hwgamma.integer;

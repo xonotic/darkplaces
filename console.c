@@ -1114,7 +1114,7 @@ void Con_MaskPrint(int additionalmask, const char *msg)
 			// send to log file
 			Log_ConPrint(line);
 			// send to scrollable buffer
-			if (con_initialized && cls.state != ca_dedicated)
+			if (con_initialized && !sv_dedicated)
 			{
 				Con_PrintToHistory(line, mask);
 			}

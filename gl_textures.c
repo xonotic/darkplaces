@@ -1609,7 +1609,7 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 	unsigned char *temppixels = NULL;
 	qboolean swaprb;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	// see if we need to swap red and blue (BGRA <-> RGBA conversion)
@@ -1944,7 +1944,7 @@ rtexture_t *R_LoadTextureRenderBuffer(rtexturepool_t *rtexturepool, const char *
 	gltexturepool_t *pool = (gltexturepool_t *)rtexturepool;
 	textypeinfo_t *texinfo;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 	texinfo = R_GetTexTypeInfo(textype, TEXF_RENDERTARGET | TEXF_CLAMP);
@@ -2221,7 +2221,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	KTX_dimensions sizes;
 #endif
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return NULL;
 
 #ifdef __ANDROID__

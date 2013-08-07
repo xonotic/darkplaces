@@ -2793,7 +2793,7 @@ void VM_isserver(prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(0,VM_serverstate);
 
-	PRVM_G_FLOAT(OFS_RETURN) = sv.active && (svs.maxclients > 1 || cls.state == ca_dedicated);
+	PRVM_G_FLOAT(OFS_RETURN) = sv.active && (svs.maxclients > 1 || sv_dedicated);
 }
 
 /*
@@ -2821,21 +2821,22 @@ void VM_clientstate(prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(0,VM_clientstate);
 
-
-	switch( cls.state ) {
-		case ca_uninitialized:
-		case ca_dedicated:
-			PRVM_G_FLOAT(OFS_RETURN) = 0;
-			break;
-		case ca_disconnected:
-			PRVM_G_FLOAT(OFS_RETURN) = 1;
-			break;
-		case ca_connected:
-			PRVM_G_FLOAT(OFS_RETURN) = 2;
-			break;
-		default:
-			// should never be reached!
-			break;
+	if(sv_dedicated)
+		PRVM_G_FLOAT(OFS_RETURN) = 0;
+	else
+	{
+		switch( cls.state ) {
+			case ca_uninitialized:
+			case ca_disconnected:
+				PRVM_G_FLOAT(OFS_RETURN) = 1;
+				break;
+			case ca_connected:
+				PRVM_G_FLOAT(OFS_RETURN) = 2;
+				break;
+			default:
+				// should never be reached!
+				break;
+		}
 	}
 }
 

@@ -1556,7 +1556,7 @@ static void R_Q1BSP_LoadSplitSky (unsigned char *src, int width, int height, int
 	unsigned int *alphapixels = (unsigned int *)Mem_Alloc(tempmempool, w*h*sizeof(unsigned char[4]));
 
 	// allocate a texture pool if we need it
-	if (loadmodel->texturepool == NULL && cls.state != ca_dedicated)
+	if (loadmodel->texturepool == NULL && !sv_dedicated)
 		loadmodel->texturepool = R_AllocTexturePool();
 
 	if (bytesperpixel == 4)
@@ -1646,7 +1646,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 	loadmodel->data_textures = (texture_t *)Mem_Alloc(loadmodel->mempool, loadmodel->num_textures * sizeof(texture_t));
 
 	// fill out all slots with notexture
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 		skinframe = R_SkinFrame_LoadMissing();
 	else
 		skinframe = NULL;
@@ -1655,7 +1655,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		strlcpy(tx->name, "NO TEXTURE FOUND", sizeof(tx->name));
 		tx->width = 16;
 		tx->height = 16;
-		if (cls.state != ca_dedicated)
+		if (!sv_dedicated)
 		{
 			tx->numskinframes = 1;
 			tx->skinframerate = 1;
@@ -1801,7 +1801,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 			tx->surfaceflags = mod_q1bsp_texture_solid.surfaceflags;
 		}
 
-		if (cls.state != ca_dedicated)
+		if (!sv_dedicated)
 		{
 			// LordHavoc: HL sky textures are entirely different than quake
 			if (!loadmodel->brush.ishlbsp && !strncmp(tx->name, "sky", 3) && mtwidth == mtheight * 2)
@@ -2644,7 +2644,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 		;
 
 	// now that we've decided the lightmap texture size, we can do the rest
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 		int stainmapsize = 0;
 		mod_alloclightmap_state_t allocState;
@@ -3731,7 +3731,7 @@ static int Mod_Q1BSP_CreateShadowMesh(dp_model_t *mod)
 	int j;
 	int numshadowmeshtriangles = 0;
 	msurface_t *surface;
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return 0;
 	// make a single combined shadow mesh to allow optimized shadow volume creation
 
@@ -4959,7 +4959,7 @@ static void Mod_Q3BSP_LoadLightmaps(lump_t *l, lump_t *faceslump)
 	external = false;
 	loadmodel->brushq3.lightmapsize = 128;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return;
 
 	if(mod_q3bsp_nolightmaps.integer)
@@ -5128,7 +5128,7 @@ static void Mod_Q3BSP_LoadLightmaps(lump_t *l, lump_t *faceslump)
 		loadmodel->brushq3.data_deluxemaps = (rtexture_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brushq3.num_mergedlightmaps * sizeof(rtexture_t *));
 
 	// allocate a texture pool if we need it
-	if (loadmodel->texturepool == NULL && cls.state != ca_dedicated)
+	if (loadmodel->texturepool == NULL && !sv_dedicated)
 		loadmodel->texturepool = R_AllocTexturePool();
 
 	mergedpixels = (unsigned char *) Mem_Alloc(tempmempool, mergedwidth * mergedheight * 4);
@@ -5333,7 +5333,7 @@ static void Mod_Q3BSP_LoadFaces(lump_t *l)
 		else
 			out->effect = loadmodel->brushq3.data_effects + n;
 
-		if (cls.state != ca_dedicated)
+		if (!sv_dedicated)
 		{
 			out->lightmaptexture = NULL;
 			out->deluxemaptexture = r_texture_blanknormalmap;
@@ -5656,7 +5656,7 @@ static void Mod_Q3BSP_LoadFaces(lump_t *l)
 		VectorClear(out->maxs);
 		if (out->num_vertices)
 		{
-			if (cls.state != ca_dedicated && out->lightmaptexture)
+			if (!sv_dedicated && out->lightmaptexture)
 			{
 				// figure out which part of the merged lightmap this fits into
 				int lightmapindex = LittleLong(in->lightmapindex) >> (loadmodel->brushq3.deluxemapping ? 1 : 0);

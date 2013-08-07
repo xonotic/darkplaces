@@ -1025,7 +1025,7 @@ void NetConn_OpenServerPorts(int opennetports)
 	Con_Printf("Server using port %i\n", port);
 	if (sv_netport.integer != port)
 		Cvar_SetValueQuick(&sv_netport, port);
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 		NetConn_OpenServerPort(NULL, LHNETADDRESSTYPE_LOOP, 1, 1);
 	if (opennetports)
 	{
@@ -1116,7 +1116,7 @@ void NetConn_UpdateSockets(void)
 	// TODO add logic to automatically close sockets if needed
 	LHNET_DefaultDSCP(net_tos_dscp.integer);
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 		if (clientport2 != cl_netport.integer)
 		{

@@ -2560,7 +2560,7 @@ nothing                GL_ZERO GL_ONE
 			texture->skinframerate = primarylayer->framerate;
 			for (j = 0;j < primarylayer->numframes;j++)
 			{
-				if(cls.state == ca_dedicated)
+				if(sv_dedicated)
 				{
 					texture->skinframes[j] = NULL;
 				}
@@ -2581,7 +2581,7 @@ nothing                GL_ZERO GL_ONE
 			texture->backgroundskinframerate = backgroundlayer->framerate;
 			for (j = 0;j < backgroundlayer->numframes;j++)
 			{
-				if(cls.state == ca_dedicated)
+				if(sv_dedicated)
 				{
 					texture->skinframes[j] = NULL;
 				}
@@ -2733,7 +2733,7 @@ nothing                GL_ZERO GL_ONE
 			texture->supercontents = SUPERCONTENTS_SOLID | SUPERCONTENTS_OPAQUE;
 		}
 		texture->numskinframes = 1;
-		if(cls.state == ca_dedicated)
+		if(sv_dedicated)
 		{
 			texture->skinframes[0] = NULL;
 			success = false;

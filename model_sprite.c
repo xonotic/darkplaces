@@ -203,7 +203,7 @@ static void Mod_Sprite_SharedSetup(const unsigned char *datapointer, int version
 			if (modelradius < x + y)
 				modelradius = x + y;
 
-			if (cls.state != ca_dedicated)
+			if (!sv_dedicated)
 			{
 				skinframe = NULL;
 				// note: Nehahra's null.spr has width == 0 and height == 0
@@ -454,7 +454,7 @@ void Mod_IDS2_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			modelradius = x + y;
 	}
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 		for (i = 0;i < loadmodel->numframes;i++)
 		{

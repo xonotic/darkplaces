@@ -67,13 +67,13 @@ void Sys_Error (const char *error, ...)
 	Con_Printf ("Quake Error: %s\n", text);
 
 	// close video so the message box is visible, unless we already tried that
-	if (!in_sys_error0 && cls.state != ca_dedicated)
+	if (!in_sys_error0 && !sv_dedicated)
 	{
 		in_sys_error0 = 1;
 		VID_Shutdown();
 	}
 
-	if (!in_sys_error3 && cls.state != ca_dedicated)
+	if (!in_sys_error3 && !sv_dedicated)
 	{
 		in_sys_error3 = true;
 		MessageBox(NULL, text, "Quake Error", MB_OK | MB_SETFOREGROUND | MB_ICONSTOP);
@@ -102,7 +102,7 @@ void Sys_Shutdown (void)
 		CloseHandle (tevent);
 #endif
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		FreeConsole ();
 
 #ifdef QHOST
@@ -128,7 +128,7 @@ char *Sys_ConsoleInput (void)
 	int ch;
 	DWORD numread, numevents, dummy;
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 		return NULL;
 
 	for ( ;; )
@@ -241,7 +241,7 @@ void Sys_InitConsole (void)
 	hinput = GetStdHandle (STD_INPUT_HANDLE);
 
 	// LordHavoc: can't check cls.state because it hasn't been initialized yet
-	// if (cls.state == ca_dedicated)
+	// if (sv_dedicated)
 	if (COM_CheckParm("-dedicated"))
 	{
 		//if ((houtput == 0) || (houtput == INVALID_HANDLE_VALUE)) // LordHavoc: on Windows XP this is never 0 or invalid, but hinput is invalid

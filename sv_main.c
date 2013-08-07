@@ -3254,10 +3254,10 @@ void SV_SpawnServer (const char *server)
 
 //	SV_LockThreadMutex();
 
-	if(cls.state == ca_dedicated)
+	if(sv_dedicated)
 		Sys_MakeProcessNice();
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 		SCR_BeginLoadingPlaque(false);
 		S_StopAllSounds();
@@ -3283,7 +3283,7 @@ void SV_SpawnServer (const char *server)
 	{
 		Con_Printf("Couldn't load map %s\n", modelname);
 
-		if(cls.state == ca_dedicated)
+		if(sv_dedicated)
 			Sys_MakeProcessMean();
 
 //		SV_UnlockThreadMutex();
@@ -3485,7 +3485,7 @@ void SV_SpawnServer (const char *server)
 		SV_Physics ();
 	}
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		Mod_PurgeUnused();
 
 // create a baseline for more efficient communications
@@ -3529,7 +3529,7 @@ void SV_SpawnServer (const char *server)
 	Con_DPrint("Server spawned.\n");
 	NetConn_Heartbeat (2);
 
-	if(cls.state == ca_dedicated)
+	if(sv_dedicated)
 		Sys_MakeProcessMean();
 
 //	SV_UnlockThreadMutex();

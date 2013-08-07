@@ -1373,7 +1373,7 @@ static void Host_Say(qboolean teamonly)
 
 	if (cmd_source == src_command)
 	{
-		if (cls.state == ca_dedicated)
+		if (sv_dedicated)
 		{
 			fromServer = true;
 			teamonly = false;
@@ -1424,7 +1424,7 @@ static void Host_Say(qboolean teamonly)
 			SV_ClientPrint(text);
 	host_client = save;
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		Con_Print(&text[1]);
 }
 
@@ -1454,7 +1454,7 @@ static void Host_Tell_f(void)
 
 	if (cmd_source == src_command)
 	{
-		if (cls.state == ca_dedicated)
+		if (sv_dedicated)
 			fromServer = true;
 		else
 		{
@@ -1767,7 +1767,7 @@ static void Host_Pause_f (void)
 	{
 		if (cmd_source == src_client)
 		{
-			if(cls.state == ca_dedicated || host_client != &svs.clients[0]) // non-admin
+			if(sv_dedicated || host_client != &svs.clients[0]) // non-admin
 			{
 				print("Pause not allowed.\n");
 				return;
@@ -1903,7 +1903,7 @@ static void Host_Spawn_f (void)
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(ClientConnect), "QC function ClientConnect is missing");
 
-		if (cls.state == ca_dedicated)
+		if (sv_dedicated)
 			Con_Printf("%s connected\n", host_client->name);
 
 		PRVM_serverglobalfloat(time) = sv.time;
@@ -2066,7 +2066,7 @@ static void Host_Kick_f (void)
 	{
 		if (cmd_source == src_command)
 		{
-			if (cls.state == ca_dedicated)
+			if (sv_dedicated)
 				who = "Console";
 			else
 				who = cl_name.string;
@@ -2390,7 +2390,7 @@ static void Host_Startdemos_f (void)
 {
 	int		i, c;
 
-	if (cls.state == ca_dedicated || COM_CheckParm("-listen") || COM_CheckParm("-benchmark") || COM_CheckParm("-demo") || COM_CheckParm("-capturedemo"))
+	if (sv_dedicated || COM_CheckParm("-listen") || COM_CheckParm("-benchmark") || COM_CheckParm("-demo") || COM_CheckParm("-capturedemo"))
 		return;
 
 	c = Cmd_Argc() - 1;
@@ -2427,7 +2427,7 @@ Return to looping demos
 */
 static void Host_Demos_f (void)
 {
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return;
 	if (cls.demonum == -1)
 		cls.demonum = 1;
@@ -2476,7 +2476,7 @@ static void Host_SendCvar_f (void)
 		return;
 
 	old = host_client;
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 		i = 1;
 	else
 		i = 0;

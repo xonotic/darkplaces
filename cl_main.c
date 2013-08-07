@@ -335,7 +335,7 @@ This is also called on Host_Error, so it shouldn't cause any errors
 */
 void CL_Disconnect(void)
 {
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return;
 
 	if (COM_CheckParm("-profilegameonly"))
@@ -420,7 +420,7 @@ Host should be either "local" or a net address
 */
 void CL_EstablishConnection(const char *host, int firstarg)
 {
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		return;
 
 	// don't connect to a server if we're benchmarking a demo

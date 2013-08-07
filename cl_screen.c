@@ -2589,7 +2589,7 @@ void SCR_UpdateLoadingScreen (qboolean clear, qboolean startup)
 	int			old_key_consoleactive;
 
 	// don't do anything if not initialized yet
-	if (vid_hidden || cls.state == ca_dedicated)
+	if (vid_hidden || sv_dedicated)
 		return;
 
 	// limit update rate

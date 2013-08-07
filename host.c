@@ -50,6 +50,8 @@ Memory is cleared / released when a server or client begins, not when they end.
 int host_framecount = 0;
 // LordHavoc: set when quit is executed
 qboolean host_shuttingdown = false;
+// dedicated server
+qboolean sv_dedicated = false;
 
 // the accumulated mainloop time since application started (with filtering), without any slowmo or clamping
 double realtime;
@@ -164,7 +166,7 @@ void Host_Error (const char *error, ...)
 	Host_ShutdownServer ();
 	SV_UnlockThreadMutex();
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		Sys_Error ("Host_Error: %s",hosterrorstring2);	// dedicated servers exit
 
 	CL_Disconnect ();
@@ -191,7 +193,7 @@ static void Host_ServerOptions (void)
 	if (i)
 	{
 #endif
-		cls.state = ca_dedicated;
+		sv_dedicated = true;
 		// check for -dedicated specifying how many players
 		if (i && i + 1 < com_argc && atoi (com_argv[i+1]) >= 1)
 			svs.maxclients = atoi (com_argv[i+1]);
@@ -288,7 +290,7 @@ static void Host_SaveConfig_to(const char *file)
 // dedicated servers initialize the host but don't parse and set the
 // config.cfg cvars
 	// LordHavoc: don't save a config if it crashed in startup
-	if (host_framecount >= 3 && cls.state != ca_dedicated && !COM_CheckParm("-benchmark") && !COM_CheckParm("-capturedemo"))
+	if (host_framecount >= 3 && !sv_dedicated && !COM_CheckParm("-benchmark") && !COM_CheckParm("-capturedemo"))
 	{
 		f = FS_OpenRealFile(file, "wb", false);
 		if (!f)
@@ -410,7 +412,7 @@ void SV_BroadcastPrint(const char *msg)
 		}
 	}
 
-	if (sv_echobprint.integer && cls.state == ca_dedicated)
+	if (sv_echobprint.integer && sv_dedicated)
 		Con_Print(msg);
 }
 
@@ -788,7 +790,7 @@ void Host_Main(void)
 		//Con_Printf("%6.0f %6.0f\n", cl_timer * 1000000.0, sv_timer * 1000000.0);
 
 		// if the accumulators haven't become positive yet, wait a while
-		if (cls.state == ca_dedicated)
+		if (sv_dedicated)
 			wait = sv_timer * -1000000.0;
 		else if (!sv.active || svs.threaded)
 			wait = cl_timer * -1000000.0;
@@ -931,7 +933,7 @@ void Host_Main(void)
 	//
 	//-------------------
 
-		if (cls.state != ca_dedicated && (cl_timer > 0 || cls.timedemo || ((vid_activewindow ? cl_maxfps : cl_maxidlefps).value < 1)))
+		if (!sv_dedicated && (cl_timer > 0 || cls.timedemo || ((vid_activewindow ? cl_maxfps : cl_maxidlefps).value < 1)))
 		{
 			R_TimeReport("---");
 			Collision_Cache_NewFrame();
@@ -1079,7 +1081,7 @@ void Host_Main(void)
 qboolean vid_opened = false;
 void Host_StartVideo(void)
 {
-	if (!vid_opened && cls.state != ca_dedicated)
+	if (!vid_opened && !sv_dedicated)
 	{
 		vid_opened = true;
 		// make sure we open sockets before opening video because the Windows Firewall "unblock?" dialog can screw up the graphics context on some graphics drivers
@@ -1275,7 +1277,7 @@ static void Host_Init (void)
 
 	Thread_Init();
 
-	if (cls.state == ca_dedicated)
+	if (sv_dedicated)
 		Cmd_AddCommand ("disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
 	else
 	{
@@ -1325,7 +1327,7 @@ static void Host_Init (void)
 	SCR_BeginLoadingPlaque(true);
 
 #ifdef CONFIG_MENU
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 		MR_Init();
 	}
@@ -1360,7 +1362,7 @@ static void Host_Init (void)
 		Cbuf_Execute();
 	}
 
-	if (cls.state == ca_dedicated || COM_CheckParm("-listen"))
+	if (sv_dedicated || COM_CheckParm("-listen"))
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 		Cbuf_AddText("startmap_dm\n");
@@ -1379,7 +1381,7 @@ static void Host_Init (void)
 
 	//Host_StartVideo();
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 		SV_StartThread();
 }
 
@@ -1444,7 +1446,7 @@ void Host_Shutdown(void)
 	NetConn_Shutdown ();
 	//PR_Shutdown ();
 
-	if (cls.state != ca_dedicated)
+	if (!sv_dedicated)
 	{
 #ifdef CONFIG_CLIENT
 		R_Modules_Shutdown();
