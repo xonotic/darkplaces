@@ -764,7 +764,7 @@ void Host_Main(void)
 		if (sv.active && !svs.threaded)
 			NetConn_ServerFrame();
 		//TODO: IDW main loop
-		IDWMaster_Loop();
+		lobby_Loop();
 		Curl_Run();
 
 		// check for commands typed to the host
