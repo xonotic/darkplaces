@@ -763,7 +763,8 @@ void Host_Main(void)
 		// be undersleeping due to select() detecting a new packet
 		if (sv.active && !svs.threaded)
 			NetConn_ServerFrame();
-
+		//TODO: IDW main loop
+		IDWMaster_Loop();
 		Curl_Run();
 
 		// check for commands typed to the host

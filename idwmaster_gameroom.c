@@ -50,7 +50,9 @@ static void TCPConnect(const char* hostname, int port, void(*connectDgate)(int))
 	memcpy(ptr->hostname,hostname,strlen(hostname)+1);
 	Thread_CreateThread(callback,ptr);
 }
+void IDWMaster_Loop() {
 
+}
 static void msgloop(int sock) {
 	unsigned char buffer[2048];
 	while(recv(sock,buffer,sizeof(buffer),0)>0) {

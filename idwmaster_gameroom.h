@@ -8,7 +8,7 @@
 #ifndef IDWMASTER_GAMEROOM_H_
 #define IDWMASTER_GAMEROOM_H_
 void IDWMaster_Init();
-
+void IDWMaster_Loop();
 
 
 #endif /* IDWMASTER_GAMEROOM_H_ */
