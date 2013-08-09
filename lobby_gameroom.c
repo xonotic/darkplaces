@@ -21,6 +21,25 @@ typedef struct {
 } hostinfo;
 
 static mempool_t* idwpool;
+static void printmsg_chat(void* msg) {
+	Con_MaskPrint(CON_MASK_CHAT,(char*)msg);
+}
+static void printmsg(void* msg) {
+	Con_Print((char*)msg);
+}
+
+static void* syncmtx;
+static void* dispatchMsg = 0;
+static void(*dispatchFunc)(void*) = 0;
+static void* syncevt;
+static void runOnMainThread(void(*func)(void*),void* message) {
+	Thread_LockMutex(syncmtx);
+	dispatchMsg = message;
+	dispatchFunc = func;
+
+	Thread_CondWait(syncevt,syncmtx);
+	Thread_UnlockMutex(syncmtx);
+}
 static int callback(void* ptr) {
 	hostinfo* ifo = (hostinfo*)ptr;
 	struct sockaddr_in client;
@@ -32,7 +51,8 @@ static int callback(void* ptr) {
 	int sock = socket(AF_INET,SOCK_STREAM,0);
 	int status;
 	if((status = connect(sock,(struct sockaddr_t*)&client,sizeof(client))) <0) {
-		Con_Printf("Connect failed (code %i).\n",status);
+		//Con_Printf("Connect failed (code %i).\n",status);
+		runOnMainThread(printmsg,"Connect failed.");
 	}else {
 		ifo->connectDgate(sock);
 	}
@@ -41,7 +61,6 @@ static int callback(void* ptr) {
 	Mem_Free(ifo);
 	return 0;
 }
-
 static void TCPConnect(const char* hostname, int port, void(*connectDgate)(int)) {
 	hostinfo* ptr = (hostinfo*)Mem_Alloc(idwpool,sizeof(hostinfo));
 	ptr->connectDgate = connectDgate;
@@ -54,19 +73,27 @@ static void TCPConnect(const char* hostname, int port, void(*connectDgate)(int))
 
 
 void lobby_Loop() {
+Thread_LockMutex(syncmtx);
+if(dispatchFunc !=0) {
 
+	dispatchFunc(dispatchMsg);
+	dispatchFunc = 0;
+	Thread_CondSignal(syncevt);
+}
+Thread_UnlockMutex(syncmtx);
 }
 static void msgloop(int sock) {
 	unsigned char buffer[2048];
 	while(recv(sock,buffer,sizeof(buffer),0)>0) {
 		unsigned char* ptr = buffer;
 		if(*ptr == 0) {
-			Con_DPrint("Server found!");
+			runOnMainThread(printmsg,"Server found!");
+			//TODO: Connect to the server
 		}else {
 			if(*ptr == 1) {
 				//Chat message (process)
 				ptr++;
-				Con_MaskPrint(CON_MASK_CHAT,(char*)ptr);
+				runOnMainThread(printmsg_chat,(char*)ptr);
 			}
 		}
 
@@ -105,9 +132,7 @@ static void dosay() {
 //TODO: Also reference mvm_cmds.c to see how builtins work
 static void onConnected(int sock) {
 _sock = sock;
-Con_Print("Connected to backend! Scanning for servers....\n");
-
-Con_MaskPrint(CON_MASK_CHAT,"Welcome to the lobbyist group.\n");
+runOnMainThread(printmsg,"Connected to backend! Scanning for servers....\n");
 unsigned char* stream = OpenStream();
 *stream = 0;
 stream++;
@@ -120,13 +145,17 @@ xmit(&stream);
 msgloop(sock);
 }
 static void findroom() {
+	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
 	TCPConnect("127.0.0.1",1090,onConnected);
 }
 static void getversion() {
+	//This is safe when called from main thread
 	Con_Print("IDWMaster Protocol version 0.1 Alpha\n");
 }
 void lobby_Init() {
+	syncevt = Thread_CreateCond();
+	syncmtx = Thread_CreateMutex();
 
 	idwpool = Mem_AllocPool("IDWMaster",0,NULL);
 	Cmd_AddCommand("dsay",dosay,"Says something");
