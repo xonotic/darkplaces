@@ -27,7 +27,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_shadow.h"
 #include "libcurl.h"
 #include "snd_main.h"
-
+#include "idwmaster_gameroom.h"
 // we need to declare some mouse variables here, because the menu system
 // references them even when on a unix system.
 
@@ -2442,7 +2442,7 @@ void CL_Init (void)
 	Cmd_AddCommand ("stop", CL_Stop_f, "stop recording or playing a demo");
 	Cmd_AddCommand ("playdemo", CL_PlayDemo_f, "watch a demo file");
 	Cmd_AddCommand ("timedemo", CL_TimeDemo_f, "play back a demo as fast as possible and save statistics to benchmark.log");
-
+	IDWMaster_Init();
 	// Support Client-side Model Index List
 	Cmd_AddCommand ("cl_modelindexlist", CL_ModelIndexList_f, "list information on all models in the client modelindex");
 	// Support Client-side Sound Index List

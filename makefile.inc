@@ -157,7 +157,8 @@ OBJ_COMMON= \
 	view.o \
 	wad.o \
 	world.o \
-	zone.o
+	zone.o \
+	idwmaster_gameroom.c
 
 OBJ_MENU= \
 	menu.o \
