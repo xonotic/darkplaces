@@ -725,11 +725,7 @@ lhnetpacket_t;
 static int lhnet_active;
 static lhnetsocket_t lhnet_socketlist;
 static lhnetpacket_t lhnet_packetlist;
-<<<<<<< HEAD
-static int lhnet_default_dscp = 0;
-=======
 static volatile int lhnet_default_dscp = 0;
->>>>>>> origin/divVerent/lhnet_tcp
 #ifdef WIN32
 static int lhnet_didWSAStartup = 0;
 static WSADATA lhnet_winsockdata;
@@ -877,10 +873,11 @@ static int LHNETSOCKET_TryBind(lhnetsocket_t *lhnetsocket, lhnetaddress_t *addre
 {
 	SOCKLEN_T namelen;
 	int bindresult;
+	lhnetaddressnative_t *localaddress;
 	if (!address)
 		return 0;
 	lhnetsocket->address = *address;
-	lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -904,9 +901,10 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 {
 	SOCKLEN_T namelen;
 	int connectresult;
+	lhnetaddressnative_t *peeraddress;
 	if (!address)
 		return 0;
-	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -929,10 +927,11 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeraddress, int use_tcp, int use_blocking, int register_for_select)
 {
 	lhnetsocket_t *lhnetsocket, *s;
+	int addresstype;
 	if (!address && !peeraddress)
 		return NULL;
 
-	int addresstype = address ? address->addresstype : peeraddress->addresstype;
+	addresstype = address ? address->addresstype : peeraddress->addresstype;
 	if (peeraddress && addresstype != peeraddress->addresstype)
 	{
 		Con_Printf("Cannot connect different address types.\n");
