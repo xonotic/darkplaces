@@ -164,6 +164,10 @@ OBJ_MENU= \
 	menu.o \
 	mvm_cmds.o
 
+OBJ_MENU= \
+	menu.o \
+	mvm_cmds.o
+
 # note that builddate.c is very intentionally not compiled to a .o before
 # being linked, because it should be recompiled every time an executable is
 # built to give the executable a proper date string
