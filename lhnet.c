@@ -50,8 +50,10 @@
 #else
 #define Con_Print printf
 #define Con_Printf printf
+#define Con_DPrintf printf
 #define Z_Malloc malloc
 #define Z_Free free
+#define dpsnprintf snprintf
 #endif
 
 #include "lhnet.h"
@@ -435,7 +437,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 		a[2] = d3;
 		a[3] = d4;
 #ifdef STANDALONETEST
-		LHNETADDRESS_ToString(address, string2, sizeof(string2), 1);
+		LHNETADDRESS_ToString((lhnetaddress_t *)address, string2, sizeof(string2), 1);
 		printf("manual parsing of ipv4 dotted decimal address \"%s\" successful: %s\n", string, string2);
 #endif
 		return 1;
@@ -510,7 +512,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 			namecache[namecacheposition].address = *address;
 			namecacheposition = (namecacheposition + 1) % MAX_NAMECACHE;
 #ifdef STANDALONETEST
-			LHNETADDRESS_ToString(address, string2, sizeof(string2), 1);
+			LHNETADDRESS_ToString((lhnetaddress_t *)address, string2, sizeof(string2), 1);
 			printf("gethostbyname(\"%s\") returned ipv4 address %s\n", string, string2);
 #endif
 			return 1;
