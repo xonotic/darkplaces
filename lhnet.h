@@ -40,18 +40,15 @@ lhnetsocket_t;
 
 void LHNET_Init(void); // must be called before any other threads got spawned
 void LHNET_Shutdown(void);
-<<<<<<< HEAD
 int LHNET_DefaultDSCP(int dscp); // < 0: query; >= 0: set (returns previous value)
 void LHNET_SleepUntilPacket_Microseconds(int microseconds);
 lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address);
 void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket);
-=======
 int LHNET_DefaultDSCP(int dscp); // < 0: query; >= 0: set (returns previous value); NOT thread-safe but usually does not matter (lhnet_default_dscp)
 void LHNET_SleepUntilPacket_Microseconds(int microseconds); // must only be used from the main thread
 lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeraddress, int use_tcp, int use_blocking, int register_for_select); // thread-safe ONLY if register_for_select is false (socketlist)
 lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address); // NOT thread-safe! (socketlist)
 void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket); // thread-safe ONLY when the socket was created with register_for_select being false (socketlist)
->>>>>>> origin/divVerent/lhnet_tcp
 lhnetaddress_t *LHNET_AddressFromSocket(lhnetsocket_t *sock);
 int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, lhnetaddress_t *address);
 int LHNET_Write(lhnetsocket_t *lhnetsocket, const void *content, int contentlength, const lhnetaddress_t *address);

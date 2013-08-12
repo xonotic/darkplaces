@@ -2082,7 +2082,6 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
 				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
 				dpsnprintf(desc, sizeof(desc), "BSPHL");
-<<<<<<< HEAD
 			}
 			else if (!memcmp(buf, "BSP2", 4))
 			{
@@ -2094,7 +2093,6 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 			{
 				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
 				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
-=======
 			}
 			else if (!memcmp(buf, "BSP2", 4))
 			{
@@ -2106,7 +2104,6 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 			{
 				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
 				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
->>>>>>> origin/divVerent/lhnet_tcp
 				dpsnprintf(desc, sizeof(desc), "BSP2RMQe");
 			}
 			else
