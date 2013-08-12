@@ -873,11 +873,10 @@ static int LHNETSOCKET_TryBind(lhnetsocket_t *lhnetsocket, lhnetaddress_t *addre
 {
 	SOCKLEN_T namelen;
 	int bindresult;
-	lhnetaddressnative_t *localaddress;
 	if (!address)
 		return 0;
 	lhnetsocket->address = *address;
-	localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -901,10 +900,9 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 {
 	SOCKLEN_T namelen;
 	int connectresult;
-	lhnetaddressnative_t *peeraddress;
 	if (!address)
 		return 0;
-	peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -927,11 +925,10 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeraddress, int use_tcp, int use_blocking, int register_for_select)
 {
 	lhnetsocket_t *lhnetsocket, *s;
-	int addresstype;
 	if (!address && !peeraddress)
 		return NULL;
 
-	addresstype = address ? address->addresstype : peeraddress->addresstype;
+	int addresstype = address ? address->addresstype : peeraddress->addresstype;
 	if (peeraddress && addresstype != peeraddress->addresstype)
 	{
 		Con_Printf("Cannot connect different address types.\n");
@@ -1049,21 +1046,6 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 #if defined(SOL_RFC1149) && defined(RFC1149_1149ONLY)
 							// we got reports of massive lags when this protocol was chosen as transport
 							// so better turn it off
-<<<<<<< HEAD
-							{
-								int rfc1149only = 0;
-								int rfc1149enabled = 0;
-								if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_1149ONLY, &rfc1149only))
-									Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_1149ONLY) returned error: %s\n", LHNETPRIVATE_StrError());
-								if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_ENABLED, &rfc1149enabled))
-									Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_ENABLED) returned error: %s\n", LHNETPRIVATE_StrError());
-							}
-#endif
-
-#ifdef SUPPORTIPV6
-							if (address->addresstype == LHNETADDRESSTYPE_INET6)
-=======
->>>>>>> origin/divVerent/lhnet_tcp
 							{
 								int rfc1149only = 0;
 								int rfc1149enabled = 0;
@@ -1075,29 +1057,6 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 #endif
 							if (LHNETSOCKET_TryBind(lhnetsocket, address) != -1)
 							{
-<<<<<<< HEAD
-								namelen = sizeof(localaddress->addr.in);
-								bindresult = bind(lhnetsocket->inetsocket, &localaddress->addr.sock, namelen);
-								if (bindresult != -1)
-									getsockname(lhnetsocket->inetsocket, &localaddress->addr.sock, &namelen);
-							}
-							if (bindresult != -1)
-							{
-								int i = 1;
-								// enable broadcast on this socket
-								setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
-#ifdef IP_TOS
-								{
-									// enable DSCP for ToS support
-									int tos = lhnet_default_dscp << 2;
-									setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
-								}
-#endif
-								lhnetsocket->next = &lhnet_socketlist;
-								lhnetsocket->prev = lhnetsocket->next->prev;
-								lhnetsocket->next->prev = lhnetsocket;
-								lhnetsocket->prev->next = lhnetsocket;
-=======
 								if (LHNETSOCKET_TryConnect(lhnetsocket, peeraddress) != -1)
 								{
 									int i = 1;
@@ -1114,7 +1073,6 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 									lhnetsocket->prev = lhnetsocket->next->prev;
 									lhnetsocket->next->prev = lhnetsocket;
 									lhnetsocket->prev->next = lhnetsocket;
->>>>>>> origin/divVerent/lhnet_tcp
 #ifdef WIN32
 									if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
 										Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());

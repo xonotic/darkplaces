@@ -606,10 +606,8 @@ static void Con_MessageMode_f (void)
 	chat_mode = 0; // "say"
 	if(Cmd_Argc() > 1)
 	{
-
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
 		chat_bufferlen = strlen(chat_buffer);
-
 	}
 }
 
@@ -2082,17 +2080,6 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
 				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
 				dpsnprintf(desc, sizeof(desc), "BSPHL");
-			}
-			else if (!memcmp(buf, "BSP2", 4))
-			{
-				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
-				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
-				dpsnprintf(desc, sizeof(desc), "BSP2");
-			}
-			else if (!memcmp(buf, "2PSB", 4))
-			{
-				lumpofs = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES);
-				lumplen = BuffLittleLong(buf + 4 + 8 * LUMP_ENTITIES + 4);
 			}
 			else if (!memcmp(buf, "BSP2", 4))
 			{
