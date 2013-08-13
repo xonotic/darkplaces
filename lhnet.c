@@ -1022,7 +1022,7 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 #else
 					char _true = 1;
 #endif
-					if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_true : &_false) != -1)
+					if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
 #endif
 					{
 #ifdef IPV6_V6ONLY
@@ -1125,7 +1125,7 @@ void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket)
 	{
 		// unlink from socket list
 		if (lhnetsocket->next == NULL)
-			return; // invalid!
+			return; // not registered!
 		lhnetsocket->next->prev = lhnetsocket->prev;
 		lhnetsocket->prev->next = lhnetsocket->next;
 		lhnetsocket->next = NULL;
