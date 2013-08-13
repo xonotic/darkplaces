@@ -1125,7 +1125,7 @@ void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket)
 	{
 		// unlink from socket list
 		if (lhnetsocket->next == NULL)
-			return; // invalid!
+			return; // not registered!
 		lhnetsocket->next->prev = lhnetsocket->prev;
 		lhnetsocket->prev->next = lhnetsocket->next;
 		lhnetsocket->next = NULL;
