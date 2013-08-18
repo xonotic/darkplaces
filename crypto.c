@@ -731,9 +731,9 @@ int Crypto_RetrieveLocalKey(int keyid, char *keyfp, size_t keyfplen, char *idfp,
                 *idfp = 0;
 	if(!pubkeys[keyid])
 		return -1;
-	if(keyfplen)
+	if(keyfp)
                 strlcpy(keyfp, pubkeys_fp64[keyid], keyfplen);
-	if(idfplen)
+	if(idfp)
                 if(pubkeys_havepriv[keyid])
                         strlcpy(idfp, pubkeys_priv_fp64[keyid], idfplen);
 	if(issigned)
