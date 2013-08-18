@@ -506,7 +506,7 @@ crypto_data_t;
 
 static crypto_t *Crypto_ServerFindInstance(lhnetaddress_t *peeraddress, qboolean allow_create)
 {
-	crypto_t *crypto; 
+	crypto_t *crypto;
 	int i, best;
 
 	if(!d0_blind_id_dll)
@@ -621,7 +621,7 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 
 	if(!d0_blind_id_dll)
 		return;
-	
+
 	// syntax of keystring:
 	// aeslevel id@key id@key ...
 
@@ -726,16 +726,16 @@ int Crypto_RetrieveLocalKey(int keyid, char *keyfp, size_t keyfplen, char *idfp,
 	if(keyid < 0 || keyid >= MAX_PUBKEYS)
 		return 0;
 	if(keyfp)
-		*keyfp = 0;
+                *keyfp = 0;
 	if(idfp)
-		*idfp = 0;
+                *idfp = 0;
 	if(!pubkeys[keyid])
 		return -1;
-	if(keyfp)
-		strlcpy(keyfp, pubkeys_fp64[keyid], keyfplen);
-	if(idfp)
-		if(pubkeys_havepriv[keyid])
-			strlcpy(idfp, pubkeys_priv_fp64[keyid], keyfplen);
+	if(keyfplen)
+                strlcpy(keyfp, pubkeys_fp64[keyid], keyfplen);
+	if(idfplen)
+                if(pubkeys_havepriv[keyid])
+                        strlcpy(idfp, pubkeys_priv_fp64[keyid], idfplen);
 	if(issigned)
 		*issigned = pubkeys_havesig[keyid];
 	return 1;
