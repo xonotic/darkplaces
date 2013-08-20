@@ -1017,7 +1017,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 			gdevmode = initialdevmode;
 			width = mode->width = gdevmode.dmPelsWidth;
 			height = mode->height = gdevmode.dmPelsHeight;
-			bpp = mode->bpp = gdevmode.dmBitsPerPel;
+			bpp = mode->bitsperpixel = gdevmode.dmBitsPerPel;
 		}
 		else if(vid_forcerefreshrate.integer)
 		{
