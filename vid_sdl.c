@@ -1132,11 +1132,12 @@ void Sys_SendKeyEvents( void )
 			case SDL_VIDEOEXPOSE:
 				break;
 			case SDL_VIDEORESIZE:
-				if(vid_resizable.integer < 2)
+				if(vid_resizable.integer < 2 || vid_isfullscreen)
 				{
 					vid.width = event.resize.w;
 					vid.height = event.resize.h;
-					screen = SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
+					if (!vid_isfullscreen)
+						screen = SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
 					if (vid_softsurface)
 					{
 						SDL_FreeSurface(vid_softsurface);
@@ -2477,7 +2478,10 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 #if SDL_MAJOR_VERSION == 1
 		flags |= SDL_FULLSCREEN;
 #else
-		windowflags |= SDL_WINDOW_FULLSCREEN;
+		if (vid_desktopfullscreen.integer)
+			windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+		else
+			windowflags |= SDL_WINDOW_FULLSCREEN;
 #endif
 		vid_isfullscreen = true;
 	}
@@ -2621,7 +2625,10 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 #if SDL_MAJOR_VERSION == 1
 		flags |= SDL_FULLSCREEN;
 #else
-		windowflags |= SDL_WINDOW_FULLSCREEN;
+		if (vid_desktopfullscreen.integer)
+			windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+		else
+			windowflags |= SDL_WINDOW_FULLSCREEN;
 #endif
 		vid_isfullscreen = true;
 	}
