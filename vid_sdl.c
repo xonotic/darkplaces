@@ -2476,6 +2476,10 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	vid_isfullscreen = false;
 	if (mode->fullscreen) {
 #if SDL_MAJOR_VERSION == 1
+		SDL_VideoInfo *vi = SDL_GetVideoInfo();
+		mode->width = vi->current_w;
+		mode->height = vi->current_h;
+		mode->bitsperpixel = vi->vfmt->BitsPerPixel;
 		flags |= SDL_FULLSCREEN;
 #else
 		if (vid_desktopfullscreen.integer)
@@ -2623,6 +2627,10 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 	vid_isfullscreen = false;
 	if (mode->fullscreen) {
 #if SDL_MAJOR_VERSION == 1
+		SDL_VideoInfo *vi = SDL_GetVideoInfo();
+		mode->width = vi->current_w;
+		mode->height = vi->current_h;
+		mode->bitsperpixel = vi->vfmt->BitsPerPixel;
 		flags |= SDL_FULLSCREEN;
 #else
 		if (vid_desktopfullscreen.integer)
