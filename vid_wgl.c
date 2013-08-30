@@ -1014,6 +1014,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	{
 		if(vid_desktopfullscreen.integer)
 		{
+			foundmode = true;
 			gdevmode = initialdevmode;
 			width = mode->width = gdevmode.dmPelsWidth;
 			height = mode->height = gdevmode.dmPelsHeight;
