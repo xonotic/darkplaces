@@ -235,7 +235,7 @@ static void bindhost() {
 static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
-	TCPConnect("127.0.0.1",1090,onConnected);
+	TCPConnect("50.17.30.158",1090,onConnected);
 }
 static void makeroom() {
 	const char* name = Cmd_Args();
