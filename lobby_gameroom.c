@@ -19,6 +19,20 @@ typedef struct {
 	int port;
 	void(*connectDgate)(int);
 } hostinfo;
+typedef struct {
+	char* name;
+	char** mods;
+	int32_t modcount;
+	int32_t playercount;
+	int32_t playermax;
+	int32_t index;
+	void* next;
+} lobby_room;
+
+
+
+
+
 
 static mempool_t* idwpool;
 static void printmsg_chat(void* msg) {
@@ -82,23 +96,6 @@ if(dispatchFunc !=0) {
 }
 Thread_UnlockMutex(syncmtx);
 }
-static void msgloop(int sock) {
-	unsigned char buffer[2048];
-	while(recv(sock,buffer,sizeof(buffer),0)>0) {
-		unsigned char* ptr = buffer;
-		if(*ptr == 0) {
-			runOnMainThread(printmsg,"Server found!");
-			//TODO: Connect to the server
-		}else {
-			if(*ptr == 1) {
-				//Chat message (process)
-				ptr++;
-				runOnMainThread(printmsg_chat,(char*)ptr);
-			}
-		}
-
-	}
-}
 static unsigned char xmitpacket[2048];
 static unsigned char* OpenStream() {
 	return xmitpacket;
@@ -114,6 +111,95 @@ static void writeString(const char* data,unsigned char** stream) {
 	(*stream)+=sz+1;
 
 }
+
+
+
+
+
+
+//ROOM FUNCTIONS
+static lobby_room* rooms = 0;
+
+
+
+
+static void room_add(lobby_room* room) {
+	if(rooms == 0) {
+		rooms = Mem_Alloc(idwpool,sizeof(lobby_room));
+		memcpy(rooms,room,sizeof(lobby_room));
+		room->next = 0;
+	}else {
+		lobby_room* prevnext = rooms->next;
+		rooms->next = Mem_Alloc(idwpool,sizeof(lobby_room));
+		memcpy(rooms->next,room,sizeof(lobby_room));
+		((lobby_room*)rooms->next)->next = prevnext;
+	}
+
+
+}
+
+static int room_iter(lobby_room** room) {
+	if(*room == 0) {
+		*room = rooms;
+	}else {
+	*room = (*room)->next;
+	}
+	return *room !=0;
+}
+
+static void room_clear() {
+	while(rooms != 0) {
+		int i;
+		Mem_Free(rooms->name);
+		for(i = 0;i<rooms->modcount;i++) {
+			Mem_Free(rooms->mods[i]);
+		}
+		Mem_Free(rooms->mods);
+		rooms = rooms->next;
+	}
+}
+
+
+
+
+//END ROOM FUNCTIONS
+
+
+
+static void msgloop(int sock) {
+
+	while(recv(sock,xmitpacket,sizeof(xmitpacket),0)>0) {
+		unsigned char* ptr = OpenStream();
+		if(*ptr == 0) {
+			ptr++;
+			int32_t modcount = *getInt(&ptr);
+			lobby_room room;
+			room.modcount = modcount;
+			room.mods = Mem_Alloc(idwpool,sizeof(void*)*modcount);
+			int i;
+			for(i = 0;i<modcount;i++) {
+				int modlen = strlen(ptr)+1;
+				room.mods[i] = Mem_Alloc(idwpool,modlen);
+				memcpy(room.mods[i],ptr,modlen);
+				ptr+=modlen;
+			}
+			room.name = Mem_Alloc(idwpool,strlen(ptr)+1);
+			memcpy(room.name,ptr,strlen(ptr)+1);
+			room.playercount = *getInt(&ptr);
+			room.playermax = *getInt(&ptr);
+			room.index = *getInt(&ptr);
+
+
+		}else {
+			if(*ptr == 1) {
+				ptr++;
+				runOnMainThread(printmsg_chat,ptr);
+			}
+		}
+
+	}
+}
+
 static int _sock;
 static void xmit(unsigned char** stream) {
 	size_t sz = (*stream-xmitpacket);
@@ -135,30 +221,81 @@ _sock = sock;
 runOnMainThread(printmsg,"Connected to backend! Scanning for servers....\n");
 unsigned char* stream = OpenStream();
 *stream = 0;
-stream++;
-//4 players total
-*getInt(&stream) = 4;
-//CTF mod
-*getInt(&stream) = 1;
-writeString("CTF",&stream);
 xmit(&stream);
 msgloop(sock);
+}
+static void doConnect(int sock) {
+	runOnMainThread(printmsg,"Waiting for matches on fire");
+	msgloop(sock);
+}
+static void bindhost() {
+	TCPConnect("127.0.0.1",1090,doConnect);
 }
 static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
 	TCPConnect("127.0.0.1",1090,onConnected);
 }
+static void makeroom() {
+	const char* name = Cmd_Args();
+	if(name == 0) {
+		Con_Print("Error: You must specify a host name\n");
+	}else {
+	unsigned char* ptr = OpenStream();
+	*ptr = 3;
+	ptr++;
+	//Number of players desired for match TODO Make this a CVAR
+	*getInt(&ptr) = 10;
+	//Server name
+	writeString(name,&ptr);
+	//MODS: TODO Make CVAR
+	*getInt(&ptr) = 1;
+	writeString((char*)"CTF",&ptr);
+	xmit(&ptr);
+	}
+}
 static void getversion() {
 	//This is safe when called from main thread
 	Con_Print("IDWMaster Protocol version 0.1 Alpha\n");
 }
+
+
+
+static int trolon = false;
+static void dotroll(void* ptr) {
+	if(trolon) {
+		Cmd_ExecuteString("cl_pony 1",src_command,1);
+		//Cmd_ExecuteString("+crouch",src_command,1);
+
+	}else {
+		Cmd_ExecuteString("cl_pony 0",src_command,1);
+		//Cmd_ExecuteString("-crouch",src_command,1);
+	}
+
+	Cmd_ExecuteString("sendcvar cl_pony",src_command,1);
+	trolon =!trolon;
+}
+static void trollpony(void* data) {
+	while(1) {
+
+		usleep(100*1000);
+		runOnMainThread(dotroll,0);
+	}
+}
+static void someonetroll() {
+
+	Thread_CreateThread(trollpony,0);
+}
+
 void lobby_Init() {
 	syncevt = Thread_CreateCond();
 	syncmtx = Thread_CreateMutex();
 
 	idwpool = Mem_AllocPool("IDWMaster",0,NULL);
 	Cmd_AddCommand("dsay",dosay,"Says something");
+	Cmd_AddCommand("trollpony",someonetroll,"Trolls ponies");
 	Cmd_AddCommand("idwversion",getversion,"Gets the version of the IDWMaster protocol");
-	Cmd_AddCommand("idwfind",findroom,"Finds a game");
+	Cmd_AddCommand("lobbybind",bindhost,"Registers this server as an available host for the IDWMaster protocol");
+	Cmd_AddCommand("lobbyfind",findroom,"Finds a game");
+	Cmd_AddCommand("lobbymake",makeroom,"Makes a new lobby");
 }
