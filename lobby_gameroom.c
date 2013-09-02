@@ -231,6 +231,7 @@ static void doConnect(int sock) {
 static void bindhost() {
 	TCPConnect("127.0.0.1",1090,doConnect);
 }
+
 static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
