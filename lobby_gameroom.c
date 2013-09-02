@@ -188,8 +188,10 @@ static void msgloop(int sock) {
 			room.playercount = *getInt(&ptr);
 			room.playermax = *getInt(&ptr);
 			room.index = *getInt(&ptr);
-
-
+			char bigbufferbill[1024*5];
+			memset(bigbufferbill,0,sizeof(bigbufferbill));
+			sprintf(bigbufferbill,"Found room called %s with %i players out of %i available slots, at index %i.\n",room.name,room.playercount,room.playermax,room.index);
+			runOnMainThread(printmsg,bigbufferbill);
 		}else {
 			if(*ptr == 1) {
 				ptr++;
@@ -236,6 +238,19 @@ static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
 	TCPConnect("50.17.30.158",1090,onConnected);
+}
+static void lobbycon() {
+	if(Cmd_Argv(0) !=0) {
+	int val = atoi(Cmd_Argv(0));
+	unsigned char* ptr = OpenStream();
+	*ptr = 4;
+	ptr++;
+	*getInt(&ptr) = val;
+	xmit(&ptr);
+	}else {
+		Con_Print("You must specify a valid index");
+	}
+
 }
 static void makeroom() {
 	const char* name = Cmd_Args();
@@ -298,5 +313,6 @@ void lobby_Init() {
 	Cmd_AddCommand("idwversion",getversion,"Gets the version of the IDWMaster protocol");
 	Cmd_AddCommand("lobbybind",bindhost,"Registers this server as an available host for the IDWMaster protocol");
 	Cmd_AddCommand("lobbyfind",findroom,"Finds a game");
+	Cmd_AddCommand("lobbyconnect",lobbycon,"Connects to a specified lobby based on index");
 	Cmd_AddCommand("lobbymake",makeroom,"Makes a new lobby");
 }
