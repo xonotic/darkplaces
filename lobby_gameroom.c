@@ -185,6 +185,7 @@ static void msgloop(int sock) {
 			}
 			room.name = Mem_Alloc(idwpool,strlen(ptr)+1);
 			memcpy(room.name,ptr,strlen(ptr)+1);
+			ptr+=strlen(ptr)+1;
 			room.playercount = *getInt(&ptr);
 			room.playermax = *getInt(&ptr);
 			room.index = *getInt(&ptr);
@@ -205,7 +206,7 @@ static void msgloop(int sock) {
 static int _sock;
 static void xmit(unsigned char** stream) {
 	size_t sz = (*stream-xmitpacket);
-	send(_sock,xmitpacket,sz,0);
+	send(_sock,xmitpacket,sz+1,0);
 }
 
 static void dosay() {
