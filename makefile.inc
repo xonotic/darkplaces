@@ -158,6 +158,7 @@ OBJ_COMMON= \
 	wad.o \
 	world.o \
 	zone.o \
+
 	lobby_gameroom.c
 
 OBJ_MENU= \

@@ -606,8 +606,10 @@ static void Con_MessageMode_f (void)
 	chat_mode = 0; // "say"
 	if(Cmd_Argc() > 1)
 	{
+
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
 		chat_bufferlen = strlen(chat_buffer);
+
 	}
 }
 
