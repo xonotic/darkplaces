@@ -238,7 +238,7 @@ static void bindhost() {
 static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
-	TCPConnect("50.17.30.158",1090,onConnected);
+	TCPConnect("50.17.215.71",1090,onConnected);
 }
 static void lobbycon() {
 	if(Cmd_Argv(0) !=0) {
