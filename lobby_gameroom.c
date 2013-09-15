@@ -9,23 +9,133 @@
 #include "quakedef.h"
 #include "lhnet.h"
 #include "console.h"
-#include <sys/socket.h>
-#include <sys/types.h>
- #include <arpa/inet.h>
-#include <netinet/in.h>
+//#include <sys/socket.h>
+//#include <sys/types.h>
+// #include <arpa/inet.h>
+//#include <netinet/in.h>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+ * graphitemaster -- Suggested compression functions
+ */
+/*
+// step 1: network buffer management that doesn't suck
+typedef struct {
+    unsigned char *buffer;
+    int            len;
+    int            maxlen;
+} netbuff_t;
+
+netbuff_t *buffer_create(unsigned char *buffer, int maxlen) {
+    netbuff_t *n = Mem_Alloc(pool, sizeof(netbuff_t));
+    n->buffer = buffer;
+    n->maxlen = maxlen;
+    n->len    = 0;
+    return n;
+}
+
+unsigned char buffer_get(netbuff_t *n) {
+    static unsigned char overread = 0;
+    if (n->len < n->maxlen)
+        return n->buffer[n->len++];
+    return overread;
+}
+
+void buffer_put(netbuff_t *n, const unsigned char value) {
+    if (n->len < n->maxlen)
+        n->buffer[n->len++] = value;
+}
+
+// step 2: a simple compression scheme to save on network traffic
+void net_putint(netbuff_t *n, int v) {
+    // only need a byte if we only need a byte
+    if (v < 128 && n > -127) {
+        buffer_put(n, (unsigned char)v);
+    } else if (v < 0x8000 && v >= -0x8000) {
+        // three bytes is better than 4
+        buffer_put(n, 0x80);
+        buffer_put(n, (unsigned char)(v));
+        buffer_put(n, (unsigned char)(v >> 8));
+    } else {
+        buffer_put(n, 0x81);
+        buffer_put(n, (unsigned char)(v));
+        buffer_put(n, (unsigned char)(v>>8));
+        buffer_put(n, (unsigned char)(v>>16));
+        buffer_put(n, (unsigned char)(v>>24));
+    }
+}
+
+// get int is even easier
+int net_getint(netbuff_t *n) {
+    int v = (char)buffer_get(n);
+    int p = 0;
+    if (v == -128) {
+        p  = buffer_get(n);
+        p |= ((char)buffer_get(n)) << 8;
+        return p;
+    } else if (c == -127) {
+        p  = buffer_get(n);
+        p |= buffer_get(n) << 8;
+        p |= buffer_get(n) << 16;
+        p |= buffer_get(n) << 24;
+
+        return p;
+    }
+    return c;
+}
+
+*/
+
+
+/*
+ * End compression
+ */
+
+
+
+
+
+
+
+
+
+
+
+
 #include "thread.h"
 typedef struct {
 	char* hostname;
 	int port;
-	void(*connectDgate)(int);
+	void(*connectDgate)(lhnetsocket_t*);
 } hostinfo;
 typedef struct {
 	char* name;
 	char** mods;
-	int32_t modcount;
-	int32_t playercount;
-	int32_t playermax;
-	int32_t index;
+	unsigned int modcount;
+	unsigned int playercount;
+	unsigned int playermax;
+	unsigned int index;
 	void* next;
 } lobby_room;
 
@@ -55,32 +165,25 @@ static void runOnMainThread(void(*func)(void*),void* message) {
 	Thread_UnlockMutex(syncmtx);
 }
 static int callback(void* ptr) {
+
 	hostinfo* ifo = (hostinfo*)ptr;
-	struct sockaddr_in client;
-
-	memset(&client,0,sizeof(client));
-	client.sin_addr.s_addr = inet_addr(ifo->hostname);
-	client.sin_port = htons(ifo->port);
-	client.sin_family = AF_INET;
-	int sock = socket(AF_INET,SOCK_STREAM,0);
-	int status;
-	if((status = connect(sock,(struct sockaddr_t*)&client,sizeof(client))) <0) {
-		//Con_Printf("Connect failed (code %i).\n",status);
-		runOnMainThread(printmsg,"Connect failed.");
-	}else {
-		ifo->connectDgate(sock);
-	}
-
+	lhnetaddress_t vh;
+	LHNETADDRESS_FromString(&vh,ifo->hostname,1090);
+	lhnetsocket_t* s = LHNET_OpenSocket(&vh,&vh,1,1,1);
+if(s !=0) {
+		ifo->connectDgate(s);
+}
 	Mem_Free(ifo->hostname);
 	Mem_Free(ifo);
 	return 0;
 }
-static void TCPConnect(const char* hostname, int port, void(*connectDgate)(int)) {
+static void TCPConnect(const char* host, void(*connectDgate)(lhnetsocket_t*)) {
+
 	hostinfo* ptr = (hostinfo*)Mem_Alloc(idwpool,sizeof(hostinfo));
+
+
 	ptr->connectDgate = connectDgate;
-	ptr->hostname = Mem_Alloc(idwpool,strlen(hostname)+1);
-	ptr->port = port;
-	memcpy(ptr->hostname,hostname,strlen(hostname)+1);
+	ptr->hostname = strdup(host);
 	Thread_CreateThread(callback,ptr);
 }
 
@@ -100,9 +203,9 @@ static unsigned char xmitpacket[2048];
 static unsigned char* OpenStream() {
 	return xmitpacket;
 }
-static int32_t* getInt(unsigned char** stream) {
-	int32_t* retval = (int32_t*)*stream;
-	(*stream)+=sizeof(int32_t);
+static unsigned int* getInt(unsigned char** stream) {
+	unsigned int* retval = (unsigned int*)*stream;
+	(*stream)+=sizeof(unsigned int);
 	return retval;
 }
 static void writeString(const char* data,unsigned char** stream) {
@@ -166,13 +269,13 @@ static void room_clear() {
 
 
 
-static void msgloop(int sock) {
-
-	while(recv(sock,xmitpacket,sizeof(xmitpacket),0)>0) {
+static void msgloop(lhnetsocket_t* sock) {
+	lhnetaddress_t addr;
+	while(LHNET_Read(sock,xmitpacket,sizeof(xmitpacket),&addr)) {
 		unsigned char* ptr = OpenStream();
 		if(*ptr == 0) {
 			ptr++;
-			int32_t modcount = *getInt(&ptr);
+			unsigned int modcount = *getInt(&ptr);
 			lobby_room room;
 			room.modcount = modcount;
 			room.mods = Mem_Alloc(idwpool,sizeof(void*)*modcount);
@@ -203,10 +306,10 @@ static void msgloop(int sock) {
 	}
 }
 
-static int _sock;
+static lhnetsocket_t* _sock;
 static void xmit(unsigned char** stream) {
 	size_t sz = (*stream-xmitpacket);
-	send(_sock,xmitpacket,sz+1,0);
+	LHNET_Write(_sock,xmitpacket,sz+1,0);
 }
 
 static void dosay() {
@@ -219,7 +322,7 @@ static void dosay() {
 	}
 }
 //TODO: Also reference mvm_cmds.c to see how builtins work
-static void onConnected(int sock) {
+static void onConnected(lhnetsocket_t* sock) {
 _sock = sock;
 runOnMainThread(printmsg,"Connected to backend! Scanning for servers....\n");
 unsigned char* stream = OpenStream();
@@ -227,18 +330,18 @@ unsigned char* stream = OpenStream();
 xmit(&stream);
 msgloop(sock);
 }
-static void doConnect(int sock) {
+static void doConnect(lhnetsocket_t* sock) {
 	runOnMainThread(printmsg,"Waiting for matches on fire");
 	msgloop(sock);
 }
 static void bindhost() {
-	TCPConnect("127.0.0.1",1090,doConnect);
+	TCPConnect("127.0.0.1",doConnect);
 }
 
 static void findroom() {
 	//This is safe when called from main thread
 	Con_Print("Contacting server...\n");
-	TCPConnect("50.17.215.71",1090,onConnected);
+	TCPConnect("50.17.215.71",onConnected);
 }
 static void lobbycon() {
 	if(Cmd_Argv(0) !=0) {
@@ -267,7 +370,7 @@ static void makeroom() {
 	writeString(name,&ptr);
 	//MODS: TODO Make CVAR
 	*getInt(&ptr) = 1;
-	writeString((char*)"CTF",&ptr);
+	writeString("CTF",&ptr);
 	xmit(&ptr);
 	}
 }
@@ -278,7 +381,7 @@ static void getversion() {
 
 
 
-static int trolon = false;
+static int trolon = 0;
 static void dotroll(void* ptr) {
 	if(trolon) {
 		Cmd_ExecuteString("cl_pony 1",src_command,1);
@@ -298,12 +401,13 @@ static void trollpony(void* data) {
 		usleep(100*1000);
 		runOnMainThread(dotroll,0);
 	}
+
+
 }
 static void someonetroll() {
 
 	Thread_CreateThread(trollpony,0);
 }
-
 void lobby_Init() {
 	syncevt = Thread_CreateCond();
 	syncmtx = Thread_CreateMutex();
