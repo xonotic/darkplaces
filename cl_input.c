@@ -1072,7 +1072,7 @@ static void CL_ClientMovement_Physics_Swim(cl_clientmovement_state_t *s)
 				s->velocity[2] =  80;
 			else
 			{
-				if (gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+				if (IS_NEXUIZ_DERIVED(gamemode))
 					s->velocity[2] = 200;
 				else
 					s->velocity[2] = 100;
@@ -1546,7 +1546,7 @@ void CL_UpdateMoveVars(void)
 
 	if(!(cl.moveflags & MOVEFLAG_VALID))
 	{
-		if(gamemode == GAME_NEXUIZ)
+		if(gamemode == GAME_NEXUIZ)  // Legacy hack to work with old servers of Nexuiz.
 			cl.moveflags = MOVEFLAG_Q2AIRACCELERATE;
 	}
 
@@ -2091,7 +2091,7 @@ void CL_SendMove(void)
 
 	// send the reliable message (forwarded commands) if there is one
 	if (buf.cursize || cls.netcon->message.cursize)
-		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, max(20*(buf.cursize+40), cl_rate.integer), false);
+		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, max(20*(buf.cursize+40), cl_rate.integer), cl_rate_burstsize.integer, false);
 
 	if (quemove)
 	{

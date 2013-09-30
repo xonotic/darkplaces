@@ -23,10 +23,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "snd_main.h"
 #include "snd_ogg.h"
-#include "snd_modplug.h"
 #include "csprogs.h"
 #include "cl_collision.h"
+#ifdef CONFIG_CD
 #include "cdaudio.h"
+#endif
 
 
 #define SND_MIN_SPEED 8000
@@ -915,7 +916,6 @@ void S_Init(void)
 	memset(channels, 0, MAX_CHANNELS * sizeof(channel_t));
 
 	OGG_OpenLibrary ();
-	ModPlug_OpenLibrary ();
 }
 
 
@@ -929,7 +929,6 @@ Shutdown and free all resources
 void S_Terminate (void)
 {
 	S_Shutdown ();
-	ModPlug_CloseLibrary ();
 	OGG_CloseLibrary ();
 
 	// Free all SFXs
@@ -1677,7 +1676,7 @@ static void S_PlaySfxOnChannel (sfx_t *sfx, channel_t *target_chan, unsigned int
 int S_StartSound_StartPosition_Flags (int entnum, int entchannel, sfx_t *sfx, vec3_t origin, float fvol, float attenuation, float startposition, int flags, float fspeed)
 {
 	channel_t *target_chan, *check, *ch;
-	int		ch_idx, startpos;
+	int		ch_idx, startpos, i;
 
 	if (snd_renderbuffer == NULL || sfx == NULL || nosound.integer)
 		return -1;
@@ -1693,6 +1692,9 @@ int S_StartSound_StartPosition_Flags (int entnum, int entchannel, sfx_t *sfx, ve
 			{
 				S_SetChannelVolume(ch_idx, fvol);
 				S_SetChannelSpeed(ch_idx, fspeed);
+				for(i = 1; i > 0 && (i <= flags || i <= (int) channels[ch_idx].flags); i <<= 1)
+					if((flags ^ channels[ch_idx].flags) & i)
+						S_SetChannelFlag(ch_idx, i, (flags & i) != 0);
 				ch->distfade = attenuation / snd_soundradius.value;
 				SND_Spatialize(ch, false);
 				return ch_idx;
@@ -1818,8 +1820,10 @@ void S_StopAllSounds (void)
 	if (snd_renderbuffer == NULL)
 		return;
 
+#ifdef CONFIG_CD
 	// stop CD audio because it may be using a faketrack
 	CDAudio_Stop();
+#endif
 
 	if (simsound || SndSys_LockRenderBuffer ())
 	{

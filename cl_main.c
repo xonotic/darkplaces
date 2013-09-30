@@ -171,7 +171,7 @@ void CL_ClearState(void)
 		cl.entities[i].state_current = defaultstate;
 	}
 
-	if (gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+	if (IS_NEXUIZ_DERIVED(gamemode))
 	{
 		VectorSet(cl.playerstandmins, -16, -16, -24);
 		VectorSet(cl.playerstandmaxs, 16, 16, 45);
@@ -267,6 +267,11 @@ void CL_SetInfo(const char *key, const char *value, qboolean send, qboolean allo
 		{
 			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
 			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate \"%s\"", value));
+		}
+		else if (!strcasecmp(key, "rate_burstsize"))
+		{
+			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate_burstsize \"%s\"", value));
 		}
 	}
 }
@@ -383,9 +388,9 @@ void CL_Disconnect(void)
 			Con_DPrint("Sending clc_disconnect\n");
 			MSG_WriteByte(&buf, clc_disconnect);
 		}
-		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, false);
-		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, false);
-		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, false);
+		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, 0, false);
+		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, 0, false);
+		NetConn_SendUnreliableMessage(cls.netcon, &buf, cls.protocol, 10000, 0, false);
 		NetConn_Close(cls.netcon);
 		cls.netcon = NULL;
 	}
@@ -423,7 +428,9 @@ void CL_EstablishConnection(const char *host, int firstarg)
 		return;
 
 	// clear menu's connect error message
+#ifdef CONFIG_MENU
 	M_Update_Return_Reason("");
+#endif
 	cls.demonum = -1;
 
 	// stop demo loop in case this fails
@@ -457,12 +464,16 @@ void CL_EstablishConnection(const char *host, int firstarg)
 			*cls.connect_userinfo = 0;
 		}
 
+#ifdef CONFIG_MENU
 		M_Update_Return_Reason("Trying to connect...");
+#endif
 	}
 	else
 	{
 		Con_Print("Unable to find a suitable network socket to connect to server.\n");
+#ifdef CONFIG_MENU
 		M_Update_Return_Reason("No network");
+#endif
 	}
 }
 
@@ -1207,15 +1218,15 @@ static void CL_UpdateNetworkEntityTrail(entity_t *e)
 	{
 		if (e->render.effects & EF_BRIGHTFIELD)
 		{
-			if (gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+			if (IS_NEXUIZ_DERIVED(gamemode))
 				trailtype = EFFECT_TR_NEXUIZPLASMA;
 			else
 				CL_EntityParticles(e);
 		}
 		if (e->render.effects & EF_FLAME)
-			CL_ParticleTrail(EFFECT_EF_FLAME, bound(0, cl.time - cl.oldtime, 0.1), origin, origin, vec3_origin, vec3_origin, NULL, 0, false, true, NULL, NULL);
+			CL_ParticleTrail(EFFECT_EF_FLAME, bound(0, cl.time - cl.oldtime, 0.1), origin, origin, vec3_origin, vec3_origin, NULL, 0, false, true, NULL, NULL, 1);
 		if (e->render.effects & EF_STARDUST)
-			CL_ParticleTrail(EFFECT_EF_STARDUST, bound(0, cl.time - cl.oldtime, 0.1), origin, origin, vec3_origin, vec3_origin, NULL, 0, false, true, NULL, NULL);
+			CL_ParticleTrail(EFFECT_EF_STARDUST, bound(0, cl.time - cl.oldtime, 0.1), origin, origin, vec3_origin, vec3_origin, NULL, 0, false, true, NULL, NULL, 1);
 	}
 	if (e->render.internaleffects & (INTEF_FLAG1QW | INTEF_FLAG2QW))
 	{
@@ -1262,7 +1273,7 @@ static void CL_UpdateNetworkEntityTrail(entity_t *e)
 			len = 1.0f / len;
 		VectorScale(vel, len, vel);
 		// pass time as count so that trails that are time based (such as an emitter) will emit properly as long as they don't use trailspacing
-		CL_ParticleTrail(trailtype, bound(0, cl.time - cl.oldtime, 0.1), e->persistent.trail_origin, origin, vel, vel, e, e->state_current.glowcolor, false, true, NULL, NULL);
+		CL_ParticleTrail(trailtype, bound(0, cl.time - cl.oldtime, 0.1), e->persistent.trail_origin, origin, vel, vel, e, e->state_current.glowcolor, false, true, NULL, NULL, 1);
 	}
 	// now that the entity has survived one trail update it is allowed to
 	// leave a real trail on later frames
@@ -1434,7 +1445,7 @@ static void CL_LinkNetworkEntity(entity_t *e)
 	{
 		if (e->render.effects & EF_BRIGHTFIELD)
 		{
-			if (gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+			if (IS_NEXUIZ_DERIVED(gamemode))
 				trailtype = EFFECT_TR_NEXUIZPLASMA;
 		}
 		if (e->render.effects & EF_DIMLIGHT)
@@ -1467,9 +1478,9 @@ static void CL_LinkNetworkEntity(entity_t *e)
 			dlightcolor[2] += 1.50f;
 		}
 		if (e->render.effects & EF_FLAME)
-			CL_ParticleTrail(EFFECT_EF_FLAME, 1, origin, origin, vec3_origin, vec3_origin, NULL, 0, true, false, NULL, NULL);
+			CL_ParticleTrail(EFFECT_EF_FLAME, 1, origin, origin, vec3_origin, vec3_origin, NULL, 0, true, false, NULL, NULL, 1);
 		if (e->render.effects & EF_STARDUST)
-			CL_ParticleTrail(EFFECT_EF_STARDUST, 1, origin, origin, vec3_origin, vec3_origin, NULL, 0, true, false, NULL, NULL);
+			CL_ParticleTrail(EFFECT_EF_STARDUST, 1, origin, origin, vec3_origin, vec3_origin, NULL, 0, true, false, NULL, NULL, 1);
 	}
 	// muzzleflash fades over time, and is offset a bit
 	if (e->persistent.muzzleflash > 0 && r_refdef.scene.numlights < MAX_DLIGHTS)
@@ -1551,7 +1562,7 @@ static void CL_LinkNetworkEntity(entity_t *e)
 	if (e->state_current.traileffectnum)
 		trailtype = (effectnameindex_t)e->state_current.traileffectnum;
 	if (trailtype)
-		CL_ParticleTrail(trailtype, 1, origin, origin, vec3_origin, vec3_origin, NULL, e->state_current.glowcolor, true, false, NULL, NULL);
+		CL_ParticleTrail(trailtype, 1, origin, origin, vec3_origin, vec3_origin, NULL, e->state_current.glowcolor, true, false, NULL, NULL, 1);
 
 	// don't show entities with no modelindex (note: this still shows
 	// entities which have a modelindex that resolved to a NULL model)

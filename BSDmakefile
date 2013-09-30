@@ -7,8 +7,13 @@ DP_MAKE_TARGET=bsd
 .endif
 DP_ARCH != uname
 
-# Command used to delete files
+# Makefile name
+MAKEFILE=BSDmakefile
+
+# Commands
 CMD_RM=$(CMD_UNIXRM)
+CMD_CP=$(CMD_UNIXCP)
+CMD_MKDIR=$(CMD_UNIXMKDIR)
 
 # default targets
 TARGETS_DEBUG=sv-debug cl-debug sdl-debug
@@ -16,6 +21,25 @@ TARGETS_PROFILE=sv-profile cl-profile sdl-profile
 TARGETS_RELEASE=sv-release cl-release sdl-release
 TARGETS_RELEASE_PROFILE=sv-release-profile cl-release-profile sdl-release-profile
 TARGETS_NEXUIZ=sv-nexuiz cl-nexuiz sdl-nexuiz
+
+###### Optional features #####
+DP_CDDA?=enabled
+.if $(DP_CDDA) == "enabled"
+	OBJ_SDLCD=$(OBJ_CD_COMMON) cd_sdl.o
+	OBJ_BSDCD=$(OBJ_CD_COMMON) cd_bsd.o
+.else
+	OBJ_SDLCD=$(OBJ_CD_COMMON) $(OBJ_NOCD)
+	OBJ_BSDCD=$(OBJ_CD_COMMON) $(OBJ_NOCD)
+.endif
+
+DP_VIDEO_CAPTURE?=enabled
+.if $(DP_VIDEO_CAPTURE == "enabled"
+	CFLAGS_VIDEO_CAPTURE=-DCONFIG_VIDEO_CAPTURE
+	OBJ_VIDEO_CAPTURE= cap_avi.o cap_ogg.o
+.else
+	CFLAGS_VIDEO_CAPTURE=
+	OBJ_VIDEO_CAPTURE=
+.endif
 
 # X11 libs
 UNIX_X11LIBPATH=/usr/X11R6/lib
@@ -50,9 +74,30 @@ EXE_CLNEXUIZ=$(EXE_UNIXCLNEXUIZ)
 EXE_SVNEXUIZ=$(EXE_UNIXSVNEXUIZ)
 EXE_SDLNEXUIZ=$(EXE_UNIXSDLNEXUIZ)
 
-# libjpeg dependency (set these to "" if you want to use dynamic loading instead)
+# set these to "" if you want to use dynamic loading instead
+# zlib
+CFLAGS_LIBZ=-DLINK_TO_ZLIB
+LIB_Z=-lz
+
+# jpeg
 CFLAGS_LIBJPEG=-DLINK_TO_LIBJPEG
 LIB_JPEG=-ljpeg
+
+# ode
+ODE_CONFIG?=ode-config
+LIB_ODE=`$(ODE_CONFIG) --libs`
+CFLAGS_ODE=`$(ODE_CONFIG) --cflags` -DUSEODE -DLINK_TO_LIBODE
+
+# d0_blind_id
+# most distros do not have d0_blind_id package, dlopen will used by default
+# LIB_CRYPTO=-ld0_blind_id
+# CFLAGS_CRYPTO=-DLINK_TO_CRYPTO
+# LIB_CRYPTO_RIJNDAEL=-ld0_rijndael
+# CFLAGS_CRYPTO_RIJNDAEL=-DLINK_TO_CRYPTO_RIJNDAEL
+LIB_CRYPTO=
+CFLAGS_CRYPTO=
+LIB_CRYPTO_RIJNDAEL=
+CFLAGS_CRYPTO_RIJNDAEL=
 
 .endif
 
@@ -104,7 +149,7 @@ CFLAGS_PRELOAD=$(CFLAGS_UNIX_PRELOAD)
 
 MAKE:=$(MAKE) -f BSDmakefile
 
-DO_LD=$(CC) -o $@ $> $(LDFLAGS)
+DO_LD=$(CC) -o ../../../$@ $> $(LDFLAGS)
 
 
 ##### Definitions shared by all makefiles #####

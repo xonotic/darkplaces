@@ -20,12 +20,16 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // cl_parse.c  -- parse a message received from the server
 
 #include "quakedef.h"
+#ifdef CONFIG_CD
 #include "cdaudio.h"
+#endif
 #include "cl_collision.h"
 #include "csprogs.h"
 #include "libcurl.h"
 #include "utf8lib.h"
+#ifdef CONFIG_MENU
 #include "menu.h"
+#endif
 #include "cl_video.h"
 
 const char *svc_strings[128] =
@@ -368,7 +372,7 @@ void CL_KeepaliveMessage (qboolean readmessages)
 		msg.data = buf;
 		msg.maxsize = sizeof(buf);
 		MSG_WriteChar(&msg, clc_nop);
-		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, false);
+		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, 0, false);
 	}
 
 	recursive = thisrecursive;
@@ -502,8 +506,10 @@ static void CL_SetupWorldModel(void)
 	// check memory integrity
 	Mem_CheckSentinelsGlobal();
 
+#ifdef CONFIG_MENU
 	// make menu know
 	MR_NewMap();
+#endif
 
 	// load the csqc now
 	if (cl.loadcsqc)
@@ -1214,7 +1220,7 @@ static void CL_BeginDownloads(qboolean aborteddownload)
 		// finished loading sounds
 	}
 
-	if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+	if(IS_NEXUIZ_DERIVED(gamemode))
 		Cvar_SetValueQuick(&cl_serverextension_download, false);
 		// in Nexuiz/Xonotic, the built in download protocol is kinda broken (misses lots
 		// of dependencies) anyway, and can mess around with the game directory;
@@ -1393,7 +1399,7 @@ static void CL_StopDownload(int size, int crc)
 			// save to disk only if we don't already have it
 			// (this is mainly for playing back demos)
 			existingcrc = FS_CRCFile(cls.qw_downloadname, &existingsize);
-			if (existingsize || gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC || !strcmp(cls.qw_downloadname, csqc_progname.string))
+			if (existingsize || IS_NEXUIZ_DERIVED(gamemode) || !strcmp(cls.qw_downloadname, csqc_progname.string))
 				// let csprogs ALWAYS go to dlcache, to prevent "viral csprogs"; also, never put files outside dlcache for Nexuiz/Xonotic
 			{
 				if ((int)existingsize != size || existingcrc != crc)
@@ -1552,6 +1558,9 @@ static void CL_SendPlayerInfo(void)
 
 	MSG_WriteByte (&cls.netcon->message, clc_stringcmd);
 	MSG_WriteString (&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate %i", cl_rate.integer));
+
+	MSG_WriteByte (&cls.netcon->message, clc_stringcmd);
+	MSG_WriteString (&cls.netcon->message, va(vabuf, sizeof(vabuf), "rate_burstsize %i", cl_rate_burstsize.integer));
 
 	if (cl_pmodel.integer)
 	{
@@ -2210,7 +2219,7 @@ static void CL_ParseClientdata (void)
 		cl.stats[STAT_NAILS] = MSG_ReadByte(&cl_message);
 		cl.stats[STAT_ROCKETS] = MSG_ReadByte(&cl_message);
 		cl.stats[STAT_CELLS] = MSG_ReadByte(&cl_message);
-		if (gamemode == GAME_HIPNOTIC || gamemode == GAME_ROGUE || gamemode == GAME_NEXUIZ)
+		if (gamemode == GAME_HIPNOTIC || gamemode == GAME_ROGUE || gamemode == GAME_QUOTH || IS_OLDNEXUIZ_DERIVED(gamemode))
 			cl.stats[STAT_ACTIVEWEAPON] = (1<<MSG_ReadByte(&cl_message));
 		else
 			cl.stats[STAT_ACTIVEWEAPON] = MSG_ReadByte(&cl_message);
@@ -2872,7 +2881,7 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			MSG_ReadVector(&cl_message, pos2, cls.protocol);
 			MSG_ReadVector(&cl_message, dir, cls.protocol);
-			CL_ParticleEffect(EFFECT_TE_TEI_G3, 1, pos, pos2, dir, dir, NULL, 0);
+			CL_ParticleTrail(EFFECT_TE_TEI_G3, 1, pos, pos2, dir, dir, NULL, 0, true, true, NULL, NULL, 1);
 			break;
 
 		case TE_TEI_SMOKE:
@@ -2917,7 +2926,7 @@ static void CL_ParseTrailParticles(void)
 	effectindex = (unsigned short)MSG_ReadShort(&cl_message);
 	MSG_ReadVector(&cl_message, start, cls.protocol);
 	MSG_ReadVector(&cl_message, end, cls.protocol);
-	CL_ParticleEffect(effectindex, 1, start, end, vec3_origin, vec3_origin, entityindex > 0 ? cl.entities + entityindex : NULL, 0);
+	CL_ParticleTrail(effectindex, 1, start, end, vec3_origin, vec3_origin, entityindex > 0 ? cl.entities + entityindex : NULL, 0, true, true, NULL, NULL, 1);
 }
 
 static void CL_ParsePointParticles(void)
@@ -3003,9 +3012,12 @@ static void CL_IPLog_Add(const char *address, const char *name, qboolean checkex
 		// add it to the iplog.txt file
 		// TODO: this ought to open the one in the userpath version of the base
 		// gamedir, not the current gamedir
+// not necessary for mobile
+#ifndef DP_MOBILETOUCH
 		Log_Printf(cl_iplog_name.string, "%s %s\n", address, name);
 		if (developer_extra.integer)
 			Con_DPrintf("CL_IPLog_Add: appending this line to %s: %s %s\n", cl_iplog_name.string, address, name);
+#endif
 	}
 }
 
@@ -3020,7 +3032,12 @@ static void CL_IPLog_Load(void)
 	cl_iplog_loaded = true;
 	// TODO: this ought to open the one in the userpath version of the base
 	// gamedir, not the current gamedir
+// not necessary for mobile
+#ifndef DP_MOBILETOUCH
 	filedata = FS_LoadFile(cl_iplog_name.string, tempmempool, true, &filesize);
+#else
+	filedata = NULL;
+#endif
 	if (!filedata)
 		return;
 	text = (char *)filedata;
@@ -3597,10 +3614,12 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_cdtrack:
 				cl.cdtrack = cl.looptrack = MSG_ReadByte(&cl_message);
+#ifdef CONFIG_CD
 				if ( (cls.demoplayback || cls.demorecording) && (cls.forcetrack != -1) )
 					CDAudio_Play ((unsigned char)cls.forcetrack, true);
 				else
 					CDAudio_Play ((unsigned char)cl.cdtrack, true);
+#endif
 				break;
 
 			case qw_svc_intermission:
@@ -3719,10 +3738,12 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_setpause:
 				cl.paused = MSG_ReadByte(&cl_message) != 0;
+#ifdef CONFIG_CD
 				if (cl.paused)
 					CDAudio_Pause ();
 				else
 					CDAudio_Resume ();
+#endif
 				S_PauseGameSounds (cl.paused);
 				break;
 			}
@@ -4046,10 +4067,12 @@ void CL_ParseServerMessage(void)
 
 			case svc_setpause:
 				cl.paused = MSG_ReadByte(&cl_message) != 0;
+#ifdef CONFIG_CD
 				if (cl.paused)
 					CDAudio_Pause ();
 				else
 					CDAudio_Resume ();
+#endif
 				S_PauseGameSounds (cl.paused);
 				break;
 
@@ -4096,10 +4119,12 @@ void CL_ParseServerMessage(void)
 			case svc_cdtrack:
 				cl.cdtrack = MSG_ReadByte(&cl_message);
 				cl.looptrack = MSG_ReadByte(&cl_message);
+#ifdef CONFIG_CD
 				if ( (cls.demoplayback || cls.demorecording) && (cls.forcetrack != -1) )
 					CDAudio_Play ((unsigned char)cls.forcetrack, true);
 				else
 					CDAudio_Play ((unsigned char)cl.cdtrack, true);
+#endif
 				break;
 
 			case svc_intermission:

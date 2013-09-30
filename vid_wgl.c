@@ -126,6 +126,7 @@ static dllfunction_t wglpixelformatfuncs[] =
 };
 
 static DEVMODE gdevmode, initialdevmode;
+static vid_mode_t desktop_mode;
 static qboolean vid_initialized = false;
 static qboolean vid_wassuspended = false;
 static qboolean vid_usingmouse = false;
@@ -511,7 +512,9 @@ void Sys_SendKeyEvents (void)
 	}
 }
 
+#ifdef CONFIG_CD
 LONG CDAudio_MessageHandler(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+#endif
 
 static keynum_t buttonremap[16] =
 {
@@ -688,7 +691,9 @@ LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam)
 		//	break;
 
 		case MM_MCINOTIFY:
+#ifdef CONFIG_CD
 			lRet = CDAudio_MessageHandler (hWnd, uMsg, wParam, lParam);
+#endif
 			break;
 
 		default:
@@ -862,6 +867,13 @@ void VID_Init(void)
 	memset(&initialdevmode, 0, sizeof(initialdevmode));
 	EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &initialdevmode);
 
+	desktop_mode.width = initialdevmode.dmPelsWidth;
+	desktop_mode.height = initialdevmode.dmPelsHeight;
+	desktop_mode.bpp = initialdevmode.dmBitsPerPel;
+	desktop_mode.refreshrate = initialdevmode.dmDisplayFrequency;
+	desktop_mode.pixelheight_num = 1;
+	desktop_mode.pixelheight_denom = 1; // Win32 apparently does not provide this (FIXME)
+
 	IN_Init();
 }
 
@@ -1008,7 +1020,15 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	vid_isfullscreen = false;
 	if (fullscreen)
 	{
-		if(vid_forcerefreshrate.integer)
+		if(vid_desktopfullscreen.integer)
+		{
+			foundmode = true;
+			gdevmode = initialdevmode;
+			width = mode->width = gdevmode.dmPelsWidth;
+			height = mode->height = gdevmode.dmPelsHeight;
+			bpp = mode->bitsperpixel = gdevmode.dmBitsPerPel;
+		}
+		else if(vid_forcerefreshrate.integer)
 		{
 			foundmode = true;
 			gdevmode.dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT;
@@ -1508,13 +1528,6 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	vid.support.ext_blend_subtract = true;
 	vid.support.ext_draw_range_elements = true;
 	vid.support.ext_framebuffer_object = true;
-
-	// FIXME remove this workaround once FBO + npot texture mapping is fixed
-	if(!vid.support.arb_texture_non_power_of_two)
-	{
-		vid.support.arb_framebuffer_object = false;
-		vid.support.ext_framebuffer_object = false;
-	}
 
 	vid.support.ext_texture_3d = true;
 	vid.support.ext_texture_compression_s3tc = true;
@@ -2286,6 +2299,11 @@ static void IN_Shutdown(void)
 		IDirectInput_Release(g_pdi);
 	g_pdi = NULL;
 #endif
+}
+
+vid_mode_t *VID_GetDesktopMode(void)
+{
+	return &desktop_mode;
 }
 
 size_t VID_ListModes(vid_mode_t *modes, size_t maxcount)

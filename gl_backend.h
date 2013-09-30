@@ -12,6 +12,9 @@ extern float gl_modelview16f[16];
 extern float gl_modelviewprojection16f[16];
 extern qboolean gl_modelmatrixchanged;
 
+extern cvar_t gl_vbo_dynamicvertex;
+extern cvar_t gl_vbo_dynamicindex;
+
 #define POLYGONELEMENTS_MAXPOINTS 258
 extern int polygonelement3i[(POLYGONELEMENTS_MAXPOINTS-2)*3];
 extern unsigned short polygonelement3s[(POLYGONELEMENTS_MAXPOINTS-2)*3];
@@ -72,22 +75,22 @@ void R_Mesh_Finish(void);
 
 
 // vertex buffer and index buffer creation/updating/freeing
-r_meshbuffer_t *R_Mesh_CreateMeshBuffer(const void *data, size_t size, const char *name, qboolean isindexbuffer, qboolean isdynamic, qboolean isindex16);
-void R_Mesh_UpdateMeshBuffer(r_meshbuffer_t *buffer, const void *data, size_t size);
+r_meshbuffer_t *R_Mesh_CreateMeshBuffer(const void *data, size_t size, const char *name, qboolean isindexbuffer, qboolean isuniformbuffer, qboolean isdynamic, qboolean isindex16);
+void R_Mesh_UpdateMeshBuffer(r_meshbuffer_t *buffer, const void *data, size_t size, qboolean subdata, size_t offset);
 void R_Mesh_DestroyMeshBuffer(r_meshbuffer_t *buffer);
 void GL_Mesh_ListVBOs(qboolean printeach);
 
-void R_Mesh_PrepareVertices_Vertex3f(int numvertices, const float *vertex3f, const r_meshbuffer_t *buffer);
+void R_Mesh_PrepareVertices_Vertex3f(int numvertices, const float *vertex3f, const r_meshbuffer_t *buffer, int bufferoffset);
 
 r_vertexgeneric_t *R_Mesh_PrepareVertices_Generic_Lock(int numvertices);
 qboolean R_Mesh_PrepareVertices_Generic_Unlock(void);
 void R_Mesh_PrepareVertices_Generic_Arrays(int numvertices, const float *vertex3f, const float *color4f, const float *texcoord2f);
-void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *vertex, const r_meshbuffer_t *vertexbuffer);
+void R_Mesh_PrepareVertices_Generic(int numvertices, const r_vertexgeneric_t *vertex, const r_meshbuffer_t *vertexbuffer, int bufferoffset);
 
 r_vertexmesh_t *R_Mesh_PrepareVertices_Mesh_Lock(int numvertices);
 qboolean R_Mesh_PrepareVertices_Mesh_Unlock(void); // if this returns false, you need to prepare the mesh again!
 void R_Mesh_PrepareVertices_Mesh_Arrays(int numvertices, const float *vertex3f, const float *svector3f, const float *tvector3f, const float *normal3f, const float *color4f, const float *texcoordtexture2f, const float *texcoordlightmap2f);
-void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, const r_meshbuffer_t *buffer);
+void R_Mesh_PrepareVertices_Mesh(int numvertices, const r_vertexmesh_t *vertex, const r_meshbuffer_t *buffer, int bufferoffset);
 
 // sets up the requested vertex transform matrix
 void R_EntityMatrix(const matrix4x4_t *matrix);
@@ -95,7 +98,7 @@ void R_EntityMatrix(const matrix4x4_t *matrix);
 void R_Mesh_VertexPointer(int components, int gltype, size_t stride, const void *pointer, const r_meshbuffer_t *vertexbuffer, size_t bufferoffset);
 // sets the color array pointer (GL_Color only works when this is NULL)
 void R_Mesh_ColorPointer(int components, int gltype, size_t stride, const void *pointer, const r_meshbuffer_t *vertexbuffer, size_t bufferoffset);
-// sets the texcoord array pointer for an array unit
+// sets the texcoord array pointer for an array unit, if GL_UNSIGNED_BYTE | 0x80000000 is specified it will be an unnormalized type (integer values)
 void R_Mesh_TexCoordPointer(unsigned int unitnum, int components, int gltype, size_t stride, const void *pointer, const r_meshbuffer_t *vertexbuffer, size_t bufferoffset);
 // returns current texture bound to this identifier
 int R_Mesh_TexBound(unsigned int unitnum, int id);
@@ -113,7 +116,7 @@ void R_Mesh_ResetTextureState(void);
 void R_Mesh_ClearBindingsForTexture(int texnum);
 
 // renders a mesh
-void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtriangles, const int *element3i, const r_meshbuffer_t *element3i_indexbuffer, size_t element3i_bufferoffset, const unsigned short *element3s, const r_meshbuffer_t *element3s_indexbuffer, size_t element3s_bufferoffset);
+void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtriangles, const int *element3i, const r_meshbuffer_t *element3i_indexbuffer, int element3i_bufferoffset, const unsigned short *element3s, const r_meshbuffer_t *element3s_indexbuffer, int element3s_bufferoffset);
 
 // saves a section of the rendered frame to a .tga or .jpg file
 qboolean SCR_ScreenShot(char *filename, unsigned char *buffer1, unsigned char *buffer2, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha);

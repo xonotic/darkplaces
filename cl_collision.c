@@ -265,7 +265,7 @@ trace_t CL_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int
 
 	// clip to world
 	Collision_ClipPointToWorld(&cliptrace, cl.worldmodel, clipstart, hitsupercontentsmask);
-	cliptrace.bmodelstartsolid = cliptrace.startsolid;
+	cliptrace.worldstartsolid = cliptrace.bmodelstartsolid = cliptrace.startsolid;
 	if (cliptrace.startsolid || cliptrace.fraction < 1)
 		cliptrace.ent = prog ? prog->edicts : NULL;
 	if (type == MOVE_WORLDONLY)
@@ -326,7 +326,7 @@ trace_t CL_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int
 		vec3_t origin, entmins, entmaxs;
 		matrix4x4_t entmatrix, entinversematrix;
 
-		if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+		if(IS_OLDNEXUIZ_DERIVED(gamemode))
 		{
 			// don't hit network players, if we are a nonsolid player
 			if(cl.scores[cl.playerentity-1].frags == -666 || cl.scores[cl.playerentity-1].frags == -616)
@@ -345,7 +345,7 @@ trace_t CL_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int
 			if (!cl.scores[i-1].name[0])
 				continue;
 
-			if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+			if(IS_OLDNEXUIZ_DERIVED(gamemode))
 			{
 				// don't hit spectators or nonsolid players
 				if(cl.scores[i-1].frags == -666 || cl.scores[i-1].frags == -616)
@@ -503,7 +503,7 @@ trace_t CL_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 
 	// clip to world
 	Collision_ClipLineToWorld(&cliptrace, cl.worldmodel, clipstart, clipend, hitsupercontentsmask, hitsurfaces);
-	cliptrace.bmodelstartsolid = cliptrace.startsolid;
+	cliptrace.worldstartsolid = cliptrace.bmodelstartsolid = cliptrace.startsolid;
 	if (cliptrace.startsolid || cliptrace.fraction < 1)
 		cliptrace.ent = prog ? prog->edicts : NULL;
 	if (type == MOVE_WORLDONLY)
@@ -564,7 +564,7 @@ trace_t CL_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 		vec3_t origin, entmins, entmaxs;
 		matrix4x4_t entmatrix, entinversematrix;
 
-		if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+		if(IS_OLDNEXUIZ_DERIVED(gamemode))
 		{
 			// don't hit network players, if we are a nonsolid player
 			if(cl.scores[cl.playerentity-1].frags == -666 || cl.scores[cl.playerentity-1].frags == -616)
@@ -583,7 +583,7 @@ trace_t CL_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 			if (!cl.scores[i-1].name[0])
 				continue;
 
-			if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+			if(IS_OLDNEXUIZ_DERIVED(gamemode))
 			{
 				// don't hit spectators or nonsolid players
 				if(cl.scores[i-1].frags == -666 || cl.scores[i-1].frags == -616)
@@ -771,7 +771,7 @@ trace_t CL_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, co
 
 	// clip to world
 	Collision_ClipToWorld(&cliptrace, cl.worldmodel, clipstart, clipmins, clipmaxs, clipend, hitsupercontentsmask);
-	cliptrace.bmodelstartsolid = cliptrace.startsolid;
+	cliptrace.worldstartsolid = cliptrace.bmodelstartsolid = cliptrace.startsolid;
 	if (cliptrace.startsolid || cliptrace.fraction < 1)
 		cliptrace.ent = prog ? prog->edicts : NULL;
 	if (type == MOVE_WORLDONLY)
@@ -843,7 +843,7 @@ trace_t CL_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, co
 		vec3_t origin, entmins, entmaxs;
 		matrix4x4_t entmatrix, entinversematrix;
 
-		if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+		if(IS_OLDNEXUIZ_DERIVED(gamemode))
 		{
 			// don't hit network players, if we are a nonsolid player
 			if(cl.scores[cl.playerentity-1].frags == -666 || cl.scores[cl.playerentity-1].frags == -616)
@@ -862,7 +862,7 @@ trace_t CL_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, co
 			if (!cl.scores[i-1].name[0])
 				continue;
 
-			if(gamemode == GAME_NEXUIZ || gamemode == GAME_XONOTIC)
+			if(IS_OLDNEXUIZ_DERIVED(gamemode))
 			{
 				// don't hit spectators or nonsolid players
 				if(cl.scores[i-1].frags == -666 || cl.scores[i-1].frags == -616)
@@ -1008,7 +1008,7 @@ trace_t CL_Cache_TraceLineSurfaces(const vec3_t start, const vec3_t end, int typ
 
 	// clip to world
 	Collision_Cache_ClipLineToWorldSurfaces(&cliptrace, cl.worldmodel, clipstart, clipend, hitsupercontentsmask);
-	cliptrace.bmodelstartsolid = cliptrace.startsolid;
+	cliptrace.worldstartsolid = cliptrace.bmodelstartsolid = cliptrace.startsolid;
 	if (cliptrace.startsolid || cliptrace.fraction < 1)
 		cliptrace.ent = prog ? prog->edicts : NULL;
 	if (type == MOVE_WORLDONLY)
