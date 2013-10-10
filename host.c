@@ -1049,6 +1049,10 @@ void Host_Main(void)
 							pass1+pass2+pass3, pass1, pass2, pass3);
 			}
 		}
+		else if (cls.state != ca_dedicated)
+		{
+			NetConn_ClientFrame();
+		}
 
 #if MEMPARANOIA
 		Mem_CheckSentinelsGlobal();
