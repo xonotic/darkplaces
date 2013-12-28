@@ -881,9 +881,10 @@ enum
 	SHADERSTATICPARM_SHADOWSAMPLER = 10, ///< sampler
 	SHADERSTATICPARM_CELSHADING = 11, ///< celshading (alternative diffuse and specular math)
 	SHADERSTATICPARM_CELOUTLINES = 12, ///< celoutline (depth buffer analysis to produce outlines)
-	SHADERSTATICPARM_FXAA = 13 ///< fast approximate anti aliasing
+	SHADERSTATICPARM_FXAA = 13, ///< fast approximate anti aliasing
+	SHADERSTATICPARM_BORDERSHADING = 14 ///< darken edges of screen with shaded gradient
 };
-#define SHADERSTATICPARMS_COUNT 14
+#define SHADERSTATICPARMS_COUNT 15
 
 static const char *shaderstaticparmstrings_list[SHADERSTATICPARMS_COUNT];
 static int shaderstaticparms_count = 0;
@@ -933,6 +934,8 @@ qboolean R_CompileShader_CheckStaticParms(void)
 	if (r_celoutlines.integer)
 		R_COMPILESHADER_STATICPARM_ENABLE(SHADERSTATICPARM_CELOUTLINES);
 
+	R_COMPILESHADER_STATICPARM_ENABLE(SHADERSTATICPARM_BORDERSHADING);
+
 	return memcmp(r_compileshader_staticparms, r_compileshader_staticparms_save, sizeof(r_compileshader_staticparms)) != 0;
 }
 
@@ -960,6 +963,7 @@ static void R_CompileShader_AddStaticParms(unsigned int mode, unsigned int permu
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_CELSHADING, "USECELSHADING");
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_CELOUTLINES, "USECELOUTLINES");
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_FXAA, "USEFXAA");
+	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_BORDERSHADING, "USEBORDERSHADING");
 }
 
 /// information about each possible shader permutation
