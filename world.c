@@ -263,6 +263,116 @@ int World_EntitiesInBox(world_t *world, const vec3_t requestmins, const vec3_t r
 	return numlist;
 }
 
+qboolean IsNearLine(vec3_t mins, vec3_t maxs, vec3_t linestart, vec3_t lineend, vec_t distance)
+{
+	// This tests only the infinite length line - linestart and lineend
+	// themselves don't matter as long as they are on the line.
+	// Also, we approximate even more:
+	// we just test whether distance between center of mins, maxs is and
+	// the line is smaller or equal the distance + the radius of the mins,
+	// maxs.
+	return true;
+}
+
+int World_EntitiesInBoxNearLine(world_t *world, const vec3_t requestmins, const vec3_t requestmaxs, const vec3_t requeststart, const vec3_t requestend, vec_t requestdistance, int maxlist, prvm_edict_t **list)
+{
+	prvm_prog_t *prog = world->prog;
+	int numlist;
+	link_t *grid;
+	link_t *l;
+	prvm_edict_t *ent;
+	vec3_t paddedmins, paddedmaxs;
+	int igrid[3], igridmins[3], igridmaxs[3];
+
+	// LordHavoc: discovered this actually causes its own bugs (dm6 teleporters being too close to info_teleport_destination)
+	//VectorSet(paddedmins, requestmins[0] - 1.0f, requestmins[1] - 1.0f, requestmins[2] - 1.0f);
+	//VectorSet(paddedmaxs, requestmaxs[0] + 1.0f, requestmaxs[1] + 1.0f, requestmaxs[2] + 1.0f);
+	VectorCopy(requestmins, paddedmins);
+	VectorCopy(requestmaxs, paddedmaxs);
+
+	// FIXME: if areagrid_marknumber wraps, all entities need their
+	// ent->priv.server->areagridmarknumber reset
+	world->areagrid_stats_calls++;
+	world->areagrid_marknumber++;
+	igridmins[0] = (int) floor((paddedmins[0] + world->areagrid_bias[0]) * world->areagrid_scale[0]);
+	igridmins[1] = (int) floor((paddedmins[1] + world->areagrid_bias[1]) * world->areagrid_scale[1]);
+	//igridmins[2] = (int) ((paddedmins[2] + world->areagrid_bias[2]) * world->areagrid_scale[2]);
+	igridmaxs[0] = (int) floor((paddedmaxs[0] + world->areagrid_bias[0]) * world->areagrid_scale[0]) + 1;
+	igridmaxs[1] = (int) floor((paddedmaxs[1] + world->areagrid_bias[1]) * world->areagrid_scale[1]) + 1;
+	//igridmaxs[2] = (int) ((paddedmaxs[2] + world->areagrid_bias[2]) * world->areagrid_scale[2]) + 1;
+	igridmins[0] = max(0, igridmins[0]);
+	igridmins[1] = max(0, igridmins[1]);
+	//igridmins[2] = max(0, igridmins[2]);
+	igridmaxs[0] = min(AREA_GRID, igridmaxs[0]);
+	igridmaxs[1] = min(AREA_GRID, igridmaxs[1]);
+	//igridmaxs[2] = min(AREA_GRID, igridmaxs[2]);
+
+	// paranoid debugging
+	//VectorSet(igridmins, 0, 0, 0);VectorSet(igridmaxs, AREA_GRID, AREA_GRID, AREA_GRID);
+
+	numlist = 0;
+	// add entities not linked into areagrid because they are too big or
+	// outside the grid bounds
+	if (world->areagrid_outside.next)
+	{
+		grid = &world->areagrid_outside;
+		for (l = grid->next;l != grid;l = l->next)
+		{
+			ent = PRVM_EDICT_NUM(l->entitynumber);
+			if (ent->priv.server->areagridmarknumber != world->areagrid_marknumber)
+			{
+				ent->priv.server->areagridmarknumber = world->areagrid_marknumber;
+				if (!ent->priv.server->free && BoxesOverlap(paddedmins, paddedmaxs, ent->priv.server->areamins, ent->priv.server->areamaxs) && IsNearLine(ent->priv.server->areamins, ent->priv.server->areamaxs, requeststart, requestend, requestdistance))
+				{
+					if (numlist < maxlist)
+						list[numlist] = ent;
+					numlist++;
+				}
+				world->areagrid_stats_entitychecks++;
+			}
+		}
+	}
+	// add grid linked entities
+	for (igrid[1] = igridmins[1];igrid[1] < igridmaxs[1];igrid[1]++)
+	{
+		grid = world->areagrid + igrid[1] * AREA_GRID + igridmins[0];
+		for (igrid[0] = igridmins[0];igrid[0] < igridmaxs[0];igrid[0]++, grid++)
+		{
+			if (grid->next)
+			{
+				vec3_t mins, maxs;
+				mins[0] = igrid[0] / world->areagrid_scale[0] - world->areagrid_bias[0];
+				mins[1] = igrid[1] / world->areagrid_scale[1] - world->areagrid_bias[1];
+				//mins[2] = igrid[2] / world->areagrid_scale[2] - world->areagrid_bias[2];
+				mins[2] = world->areagrid_mins[2];
+				maxs[0] = mins[0] + 1.0 / world->areagrid_scale[0];
+				maxs[1] = mins[1] + 1.0 / world->areagrid_scale[1];
+				//maxs[2] = mins[2] + 1.0 / world->areagrid_scale[2];
+				maxs[2] = world->areagrid_maxs[2];
+				if (IsNearLine(mins, maxs, requeststart, requestend, requestdistance))
+					continue;
+				for (l = grid->next;l != grid;l = l->next)
+				{
+					ent = PRVM_EDICT_NUM(l->entitynumber);
+					if (ent->priv.server->areagridmarknumber != world->areagrid_marknumber)
+					{
+						ent->priv.server->areagridmarknumber = world->areagrid_marknumber;
+						if (!ent->priv.server->free && BoxesOverlap(paddedmins, paddedmaxs, ent->priv.server->areamins, ent->priv.server->areamaxs) && IsNearLine(ent->priv.server->areamins, ent->priv.server->areamaxs, requeststart, requestend, requestdistance))
+						{
+							if (numlist < maxlist)
+								list[numlist] = ent;
+							numlist++;
+						}
+						//Con_Printf("%d %f %f %f %f %f %f : %d : %f %f %f %f %f %f\n", BoxesOverlap(mins, maxs, ent->priv.server->areamins, ent->priv.server->areamaxs), ent->priv.server->areamins[0], ent->priv.server->areamins[1], ent->priv.server->areamins[2], ent->priv.server->areamaxs[0], ent->priv.server->areamaxs[1], ent->priv.server->areamaxs[2], PRVM_NUM_FOR_EDICT(ent), mins[0], mins[1], mins[2], maxs[0], maxs[1], maxs[2]);
+					}
+					world->areagrid_stats_entitychecks++;
+				}
+			}
+		}
+	}
+	return numlist;
+}
+
 static void World_LinkEdict_AreaGrid(world_t *world, prvm_edict_t *ent)
 {
 	prvm_prog_t *prog = world->prog;
