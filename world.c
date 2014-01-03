@@ -366,7 +366,7 @@ int World_EntitiesInBoxNearLine(world_t *world, const vec3_t requestmins, const 
 				maxs[1] = mins[1] + 1.0 / world->areagrid_scale[1];
 				//maxs[2] = mins[2] + 1.0 / world->areagrid_scale[2];
 				maxs[2] = world->areagrid_maxs[2];
-				if (IsNearLine(mins, maxs, requeststart, requestend, requestdistance))
+				if (!IsNearLine(mins, maxs, requeststart, requestend, requestdistance))
 					continue;
 				for (l = grid->next;l != grid;l = l->next)
 				{

@@ -751,7 +751,6 @@ int SV_EntitiesInBox(const vec3_t mins, const vec3_t maxs, int maxedicts, prvm_e
 
 int SV_EntitiesInBoxNearLine(const vec3_t mins, const vec3_t maxs, const vec3_t start, const vec3_t end, vec_t distance, int maxedicts, prvm_edict_t **resultedicts)
 {
-	prvm_prog_t *prog = SVVM_prog;
 	vec3_t paddedmins, paddedmaxs;
 	if (sv_areadebug.integer)
 		return SV_EntitiesInBox(mins, maxs, maxedicts, resultedicts);
