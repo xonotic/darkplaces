@@ -115,6 +115,7 @@ void World_LinkEdict(world_t *world, struct prvm_edict_s *ent, const vec3_t mins
 
 /// \returns list of entities touching a box
 int World_EntitiesInBox(world_t *world, const vec3_t mins, const vec3_t maxs, int maxlist, struct prvm_edict_s **list);
+int World_EntitiesInBoxNearLine(world_t *world, const vec3_t mins, const vec3_t maxs, const vec3_t start, const vec3_t end, vec_t distance, int maxlist, struct prvm_edict_s **list);
 
 void World_Start(world_t *world);
 void World_End(world_t *world);

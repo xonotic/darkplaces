@@ -350,7 +350,7 @@ trace_t SV_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_
 	// clip to entities
 	// because this uses World_EntitiestoBox, we know all entity boxes overlap
 	// the clip region, so we can skip culling checks in the loop below
-	numtouchedicts = SV_EntitiesInBox(clipboxmins, clipboxmaxs, MAX_EDICTS, touchedicts);
+	numtouchedicts = SV_EntitiesInBoxNearLine(clipboxmins, clipboxmaxs, clipstart, clipend, 0, MAX_EDICTS, touchedicts);
 	if (numtouchedicts > MAX_EDICTS)
 	{
 		// this never happens
@@ -747,6 +747,22 @@ int SV_EntitiesInBox(const vec3_t mins, const vec3_t maxs, int maxedicts, prvm_e
 	}
 	else
 		return World_EntitiesInBox(&sv.world, paddedmins, paddedmaxs, maxedicts, resultedicts);
+}
+
+int SV_EntitiesInBoxNearLine(const vec3_t mins, const vec3_t maxs, const vec3_t start, const vec3_t end, vec_t distance, int maxedicts, prvm_edict_t **resultedicts)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	vec3_t paddedmins, paddedmaxs;
+	if (sv_areadebug.integer)
+		return SV_EntitiesInBox(mins, maxs, maxedicts, resultedicts);
+	if (maxedicts < 1 || resultedicts == NULL)
+		return 0;
+	// LordHavoc: discovered this actually causes its own bugs (dm6 teleporters being too close to info_teleport_destination)
+	//VectorSet(paddedmins, mins[0] - 10, mins[1] - 10, mins[2] - 1);
+	//VectorSet(paddedmaxs, maxs[0] + 10, maxs[1] + 10, maxs[2] + 1);
+	VectorCopy(mins, paddedmins);
+	VectorCopy(maxs, paddedmaxs);
+	return World_EntitiesInBoxNearLine(&sv.world, paddedmins, paddedmaxs, start, end, distance, maxedicts, resultedicts);
 }
 
 void SV_LinkEdict_TouchAreaGrid_Call(prvm_edict_t *touch, prvm_edict_t *ent)

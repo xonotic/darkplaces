@@ -263,15 +263,32 @@ int World_EntitiesInBox(world_t *world, const vec3_t requestmins, const vec3_t r
 	return numlist;
 }
 
-qboolean IsNearLine(vec3_t mins, vec3_t maxs, vec3_t linestart, vec3_t lineend, vec_t distance)
+static qboolean IsNearLine(const vec3_t mins, const vec3_t maxs, const vec3_t linestart, const vec3_t lineend, vec_t distance)
 {
+	vec3_t center, linedirection, center_to_start, center_to_start_projection;
+	vec_t radius, center_to_start_projection_length, line_center_distance;
 	// This tests only the infinite length line - linestart and lineend
 	// themselves don't matter as long as they are on the line.
 	// Also, we approximate even more:
 	// we just test whether distance between center of mins, maxs is and
 	// the line is smaller or equal the distance + the radius of the mins,
 	// maxs.
-	return true;
+	VectorMAM(0.5, mins, 0.5, maxs, center);
+
+	radius = VectorDistance(center, mins) + distance;
+
+	VectorSubtract(lineend, linestart, linedirection);
+	VectorNormalize(linedirection);
+
+	VectorSubtract(linestart, center, center_to_start);
+
+	center_to_start_projection_length = DotProduct(center_to_start, linedirection);
+
+	VectorScale(linedirection, center_to_start_projection_length, center_to_start_projection);
+
+	line_center_distance = VectorDistance(center_to_start_projection, center_to_start);
+
+	return line_center_distance <= radius;
 }
 
 int World_EntitiesInBoxNearLine(world_t *world, const vec3_t requestmins, const vec3_t requestmaxs, const vec3_t requeststart, const vec3_t requestend, vec_t requestdistance, int maxlist, prvm_edict_t **list)
