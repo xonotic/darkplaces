@@ -153,7 +153,7 @@ static char qfont_table[256] = {
 	SanitizeString strips color tags from the string in
 	and writes the result on string out
 */
-static void SanitizeString(char *in, char *out)
+void SanitizeString(char *in, char *out)
 {
 	while(*in)
 	{

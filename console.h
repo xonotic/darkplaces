@@ -147,5 +147,7 @@ int ConBuffer_FindPrevLine(conbuffer_t *buf, int mask_must, int mask_mustnot, in
 int ConBuffer_FindNextLine(conbuffer_t *buf, int mask_must, int mask_mustnot, int start);
 const char *ConBuffer_GetLine(conbuffer_t *buf, int i);
 
+void SanitizeString(char *in, char *out);
+
 #endif
 
