@@ -50,8 +50,10 @@
 #else
 #define Con_Print printf
 #define Con_Printf printf
+#define Con_DPrintf printf
 #define Z_Malloc malloc
 #define Z_Free free
+#define dpsnprintf snprintf
 #endif
 
 #include "lhnet.h"
@@ -435,7 +437,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 		a[2] = d3;
 		a[3] = d4;
 #ifdef STANDALONETEST
-		LHNETADDRESS_ToString(address, string2, sizeof(string2), 1);
+		LHNETADDRESS_ToString((lhnetaddress_t *)address, string2, sizeof(string2), 1);
 		printf("manual parsing of ipv4 dotted decimal address \"%s\" successful: %s\n", string, string2);
 #endif
 		return 1;
@@ -510,7 +512,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 			namecache[namecacheposition].address = *address;
 			namecacheposition = (namecacheposition + 1) % MAX_NAMECACHE;
 #ifdef STANDALONETEST
-			LHNETADDRESS_ToString(address, string2, sizeof(string2), 1);
+			LHNETADDRESS_ToString((lhnetaddress_t *)address, string2, sizeof(string2), 1);
 			printf("gethostbyname(\"%s\") returned ipv4 address %s\n", string, string2);
 #endif
 			return 1;
@@ -723,7 +725,7 @@ lhnetpacket_t;
 static int lhnet_active;
 static lhnetsocket_t lhnet_socketlist;
 static lhnetpacket_t lhnet_packetlist;
-static int lhnet_default_dscp = 0;
+static volatile int lhnet_default_dscp = 0;
 #ifdef WIN32
 static int lhnet_didWSAStartup = 0;
 static WSADATA lhnet_winsockdata;
@@ -867,19 +869,101 @@ void LHNET_SleepUntilPacket_Microseconds(int microseconds)
 #endif
 }
 
-lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
+static int LHNETSOCKET_TryBind(lhnetsocket_t *lhnetsocket, lhnetaddress_t *address)
+{
+	SOCKLEN_T namelen;
+	int bindresult;
+	if (!address)
+		return 0;
+	lhnetsocket->address = *address;
+	lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+#ifdef SUPPORTIPV6
+	if (address->addresstype == LHNETADDRESSTYPE_INET6)
+	{
+		namelen = sizeof(localaddress->addr.in6);
+		bindresult = bind(lhnetsocket->inetsocket, &localaddress->addr.sock, namelen);
+		if (bindresult != -1)
+			getsockname(lhnetsocket->inetsocket, &localaddress->addr.sock, &namelen);
+	}
+	else
+#endif
+	{
+		namelen = sizeof(localaddress->addr.in);
+		bindresult = bind(lhnetsocket->inetsocket, &localaddress->addr.sock, namelen);
+		if (bindresult != -1)
+			getsockname(lhnetsocket->inetsocket, &localaddress->addr.sock, &namelen);
+	}
+	return bindresult;
+}
+
+static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *address)
+{
+	SOCKLEN_T namelen;
+	int connectresult;
+	if (!address)
+		return 0;
+	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+#ifdef SUPPORTIPV6
+	if (address->addresstype == LHNETADDRESSTYPE_INET6)
+	{
+		namelen = sizeof(peeraddress->addr.in6);
+		connectresult = connect(lhnetsocket->inetsocket, &peeraddress->addr.sock, namelen);
+		if (connectresult != -1)
+			getsockname(lhnetsocket->inetsocket, &peeraddress->addr.sock, &namelen);
+	}
+	else
+#endif
+	{
+		namelen = sizeof(peeraddress->addr.in);
+		connectresult = connect(lhnetsocket->inetsocket, &peeraddress->addr.sock, namelen);
+		if (connectresult != -1)
+			getsockname(lhnetsocket->inetsocket, &peeraddress->addr.sock, &namelen);
+	}
+	return connectresult;
+}
+
+lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeraddress, int use_tcp, int use_blocking, int register_for_select)
 {
 	lhnetsocket_t *lhnetsocket, *s;
-	if (!address)
+	if (!address && !peeraddress)
 		return NULL;
+
+	int addresstype = address ? address->addresstype : peeraddress->addresstype;
+	if (peeraddress && addresstype != peeraddress->addresstype)
+	{
+		Con_Printf("Cannot connect different address types.\n");
+		return NULL;
+	}
+	if (addresstype == LHNETADDRESSTYPE_LOOP && peeraddress)
+	{
+		Con_Printf("LHNETADDRESSTYPE_LOOP does not support peeraddress.\n");
+		return NULL;
+	}
+	if (addresstype == LHNETADDRESSTYPE_LOOP && use_tcp)
+	{
+		Con_Printf("LHNETADDRESSTYPE_LOOP does not support TCP.\n");
+		return NULL;
+	}
+	if (addresstype == LHNETADDRESSTYPE_LOOP && use_blocking)
+	{
+		Con_Printf("LHNETADDRESSTYPE_LOOP does not support blocking mode.\n");
+		return NULL;
+	}
+	if (addresstype == LHNETADDRESSTYPE_LOOP && !register_for_select)
+	{
+		Con_Printf("LHNETADDRESSTYPE_LOOP must always be registered for select.\n");
+		return NULL;
+	}
+
 	lhnetsocket = (lhnetsocket_t *)Z_Malloc(sizeof(*lhnetsocket));
 	if (lhnetsocket)
 	{
 		memset(lhnetsocket, 0, sizeof(*lhnetsocket));
-		lhnetsocket->address = *address;
-		switch(lhnetsocket->address.addresstype)
+		switch(addresstype)
 		{
 		case LHNETADDRESSTYPE_LOOP:
+			// NOTE: here, the address is always set
+			lhnetsocket->address = *address;
 			if (lhnetsocket->address.port == 0)
 			{
 				// allocate a port dynamically
@@ -917,12 +1001,14 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 #endif
 #ifdef WIN32
 			if (lhnet_didWSAStartup)
-			{
 #endif
+			{
+				int socktype = use_tcp ? SOCK_STREAM : SOCK_DGRAM;
+				int proto = use_tcp ? IPPROTO_TCP : IPPROTO_UDP;
 #ifdef SUPPORTIPV6
-				if ((lhnetsocket->inetsocket = socket(address->addresstype == LHNETADDRESSTYPE_INET6 ? PF_INET6 : PF_INET, SOCK_DGRAM, IPPROTO_UDP)) != -1)
+				if ((lhnetsocket->inetsocket = socket(addresstype == LHNETADDRESSTYPE_INET6 ? PF_INET6 : PF_INET, socktype, proto)) != -1)
 #else
-				if ((lhnetsocket->inetsocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) != -1)
+				if ((lhnetsocket->inetsocket = socket(AF_INET, socktype, proto)) != -1)
 #endif
 				{
 #ifdef WIN32
@@ -936,7 +1022,7 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 #else
 					char _true = 1;
 #endif
-					if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, &_true) != -1)
+					if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
 #endif
 					{
 #ifdef IPV6_V6ONLY
@@ -944,7 +1030,7 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 						// most OSes will create a dual-protocol socket that also listens on IPv4. In this case
 						// if an IPv4 socket is already bound to the port we want, our bind() call will fail.
 						int ipv6_only = 1;
-						if (address->addresstype != LHNETADDRESSTYPE_INET6
+						if (addresstype != LHNETADDRESSTYPE_INET6
 							|| setsockopt (lhnetsocket->inetsocket, IPPROTO_IPV6, IPV6_V6ONLY,
 										   (const char *)&ipv6_only, sizeof(ipv6_only)) == 0
 #ifdef WIN32
@@ -955,8 +1041,6 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 							)
 #endif
 						{
-							lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
-							SOCKLEN_T namelen;
 							int bindresult;
 
 #if defined(SOL_RFC1149) && defined(RFC1149_1149ONLY)
@@ -971,47 +1055,39 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 									Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_ENABLED) returned error: %s\n", LHNETPRIVATE_StrError());
 							}
 #endif
-
-#ifdef SUPPORTIPV6
-							if (address->addresstype == LHNETADDRESSTYPE_INET6)
+							if (LHNETSOCKET_TryBind(lhnetsocket, address) != -1)
 							{
-								namelen = sizeof(localaddress->addr.in6);
-								bindresult = bind(lhnetsocket->inetsocket, &localaddress->addr.sock, namelen);
-								if (bindresult != -1)
-									getsockname(lhnetsocket->inetsocket, &localaddress->addr.sock, &namelen);
-							}
-							else
-#endif
-							{
-								namelen = sizeof(localaddress->addr.in);
-								bindresult = bind(lhnetsocket->inetsocket, &localaddress->addr.sock, namelen);
-								if (bindresult != -1)
-									getsockname(lhnetsocket->inetsocket, &localaddress->addr.sock, &namelen);
-							}
-							if (bindresult != -1)
-							{
-								int i = 1;
-								// enable broadcast on this socket
-								setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
-#ifdef IP_TOS
+								if (LHNETSOCKET_TryConnect(lhnetsocket, peeraddress) != -1)
 								{
-									// enable DSCP for ToS support
-									int tos = lhnet_default_dscp << 2;
-									setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
-								}
+									int i = 1;
+									// enable broadcast on this socket
+									setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
+#ifdef IP_TOS
+									{
+										// enable DSCP for ToS support
+										int tos = lhnet_default_dscp << 2;
+										setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
+									}
 #endif
-								lhnetsocket->next = &lhnet_socketlist;
-								lhnetsocket->prev = lhnetsocket->next->prev;
-								lhnetsocket->next->prev = lhnetsocket;
-								lhnetsocket->prev->next = lhnetsocket;
+									lhnetsocket->next = &lhnet_socketlist;
+									lhnetsocket->prev = lhnetsocket->next->prev;
+									lhnetsocket->next->prev = lhnetsocket;
+									lhnetsocket->prev->next = lhnetsocket;
 #ifdef WIN32
-								if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
-									Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
+									if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
+										Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
 #endif
-								return lhnetsocket;
+									return lhnetsocket;
+								}
+								else
+								{
+									Con_Printf("LHNET_OpenSocket_Connectionless: connect returned error: %s\n", LHNETPRIVATE_StrError());
+								}
 							}
 							else
+							{
 								Con_Printf("LHNET_OpenSocket_Connectionless: bind returned error: %s\n", LHNETPRIVATE_StrError());
+							}
 						}
 #ifdef IPV6_V6ONLY
 						else
@@ -1024,8 +1100,8 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 				}
 				else
 					Con_Printf("LHNET_OpenSocket_Connectionless: socket returned error: %s\n", LHNETPRIVATE_StrError());
-#ifdef WIN32
 			}
+#ifdef WIN32
 			else
 				Con_Print("LHNET_OpenSocket_Connectionless: can't open a socket (WSAStartup failed during LHNET_Init)\n");
 #endif
@@ -1038,13 +1114,18 @@ lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
 	return NULL;
 }
 
+lhnetsocket_t *LHNET_OpenSocket_Connectionless(lhnetaddress_t *address)
+{
+	return LHNET_OpenSocket(address, NULL, 0, 0, 1);
+}
+
 void LHNET_CloseSocket(lhnetsocket_t *lhnetsocket)
 {
 	if (lhnetsocket)
 	{
 		// unlink from socket list
 		if (lhnetsocket->next == NULL)
-			return; // invalid!
+			return; // not registered!
 		lhnetsocket->next->prev = lhnetsocket->prev;
 		lhnetsocket->prev->next = lhnetsocket->next;
 		lhnetsocket->next = NULL;
@@ -1071,7 +1152,7 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 {
 	lhnetaddressnative_t *address = (lhnetaddressnative_t *)vaddress;
 	int value = 0;
-	if (!lhnetsocket || !address || !content || maxcontentlength < 1)
+	if (!lhnetsocket || !content || maxcontentlength < 1)
 		return -1;
 	if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_LOOP)
 	{
@@ -1100,8 +1181,11 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 				if (p->length <= maxcontentlength)
 				{
 					lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
-					*address = *localaddress;
-					address->port = p->sourceport;
+					if (address)
+					{
+						*address = *localaddress;
+						address->port = p->sourceport;
+					}
 					memcpy(content, p->data, p->length);
 					value = p->length;
 				}
@@ -1118,12 +1202,15 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 	{
 		SOCKLEN_T inetaddresslength;
 		address->addresstype = LHNETADDRESSTYPE_NONE;
-		inetaddresslength = sizeof(address->addr.in);
-		value = recvfrom(lhnetsocket->inetsocket, (char *)content, maxcontentlength, LHNET_RECVFROM_FLAGS, &address->addr.sock, &inetaddresslength);
+		inetaddresslength = sizeof(address->addr.in); // is OK if address is NULL
+		value = recvfrom(lhnetsocket->inetsocket, (char *)content, maxcontentlength, LHNET_RECVFROM_FLAGS, address ? &address->addr.sock : NULL, address ? &inetaddresslength : NULL);
 		if (value > 0)
 		{
-			address->addresstype = LHNETADDRESSTYPE_INET4;
-			address->port = ntohs(address->addr.in.sin_port);
+			if (address)
+			{
+				address->addresstype = LHNETADDRESSTYPE_INET4;
+				address->port = ntohs(address->addr.in.sin_port);
+			}
 			return value;
 		}
 		else if (value < 0)
@@ -1145,12 +1232,15 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 	{
 		SOCKLEN_T inetaddresslength;
 		address->addresstype = LHNETADDRESSTYPE_NONE;
-		inetaddresslength = sizeof(address->addr.in6);
-		value = recvfrom(lhnetsocket->inetsocket, (char *)content, maxcontentlength, LHNET_RECVFROM_FLAGS, &address->addr.sock, &inetaddresslength);
+		inetaddresslength = sizeof(address->addr.in6); // is OK if address is NULL
+		value = recvfrom(lhnetsocket->inetsocket, (char *)content, maxcontentlength, LHNET_RECVFROM_FLAGS, address ? &address->addr.sock : NULL, address ? &inetaddresslength : NULL);
 		if (value > 0)
 		{
-			address->addresstype = LHNETADDRESSTYPE_INET6;
-			address->port = ntohs(address->addr.in6.sin6_port);
+			if (address)
+			{
+				address->addresstype = LHNETADDRESSTYPE_INET6;
+				address->port = ntohs(address->addr.in6.sin6_port);
+			}
 			return value;
 		}
 		else if (value == -1)
@@ -1175,12 +1265,17 @@ int LHNET_Write(lhnetsocket_t *lhnetsocket, const void *content, int contentleng
 {
 	lhnetaddressnative_t *address = (lhnetaddressnative_t *)vaddress;
 	int value = -1;
-	if (!lhnetsocket || !address || !content || contentlength < 1)
+	if (!lhnetsocket || !content || contentlength < 1)
 		return -1;
 	if (lhnetsocket->address.addresstype != address->addresstype)
 		return -1;
 	if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_LOOP)
 	{
+		if (!address)
+		{
+			Con_DPrintf("LHNET_Write: destination address required on LHNETADDRESSTYPE_LOOP\n", LHNETPRIVATE_StrError());
+			return -1;
+		}
 		lhnetpacket_t *p;
 		p = (lhnetpacket_t *)Z_Malloc(sizeof(*p) + contentlength);
 		p->data = (void *)(p + 1);
@@ -1200,7 +1295,7 @@ int LHNET_Write(lhnetsocket_t *lhnetsocket, const void *content, int contentleng
 	}
 	else if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_INET4)
 	{
-		value = sendto(lhnetsocket->inetsocket, (char *)content, contentlength, LHNET_SENDTO_FLAGS, (struct sockaddr *)&address->addr.in, sizeof(struct sockaddr_in));
+		value = sendto(lhnetsocket->inetsocket, (char *)content, contentlength, LHNET_SENDTO_FLAGS, address ? (struct sockaddr *)&address->addr.in : NULL, sizeof(struct sockaddr_in));
 		if (value == -1)
 		{
 			if (SOCKETERRNO == EWOULDBLOCK)
@@ -1211,7 +1306,7 @@ int LHNET_Write(lhnetsocket_t *lhnetsocket, const void *content, int contentleng
 #ifdef SUPPORTIPV6
 	else if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_INET6)
 	{
-		value = sendto(lhnetsocket->inetsocket, (char *)content, contentlength, 0, (struct sockaddr *)&address->addr.in6, sizeof(struct sockaddr_in6));
+		value = sendto(lhnetsocket->inetsocket, (char *)content, contentlength, 0, address ? (struct sockaddr *)&address->addr.in6 : NULL, sizeof(struct sockaddr_in6));
 		if (value == -1)
 		{
 			if (SOCKETERRNO == EWOULDBLOCK)
