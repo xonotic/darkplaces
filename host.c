@@ -768,6 +768,9 @@ void Host_Main(void)
 
 		Curl_Run();
 
+		// update IRC.
+		IRC_Frame();
+
 		// check for commands typed to the host
 		Host_GetConsoleCommands();
 
@@ -1263,6 +1266,7 @@ static void Host_Init (void)
 	Crypto_Init_Commands();
 
 	NetConn_Init();
+	IRC_Init();
 	Curl_Init();
 	//PR_Init();
 	//PR_Cmd_Init();

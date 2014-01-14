@@ -27,10 +27,12 @@ static ircnetbuffer_t irc_incoming;
 static ircnetbuffer_t irc_outgoing;
 
 static qboolean irc_registered;
+static qboolean irc_connected;
 
 static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "", "nickname to use when connecting to IRC" };
 
 static mempool_t *irc_mempool;
+
 
 static void IRC_Disconnect(void)
 {
@@ -45,36 +47,38 @@ static void IRC_Disconnect(void)
 	memset(&irc_outgoing, 0, offsetof(ircnetbuffer_t, data));
 
 	irc_registered = false;
+	irc_connected = false;
 }
 
 static int IRC_Connect(const char *addr)
 {
 	lhnetaddress_t address;
-
+	lhnetaddress_t peeraddress;
+	
 	IRC_Disconnect();
+	
+	// this is most likely not correct.
+	if (!LHNETADDRESS_FromString(&address, "127.0.0.1", 0))
+	{
+		Con_Printf("[IRC] wat.\n");
+		return 0;
+	}
 
-	if (!LHNETADDRESS_FromString(&address, addr, 6667))
+	if (!LHNETADDRESS_FromString(&peeraddress, addr, 6667))
 	{
 		Con_Printf("[IRC] Bad server address: %s.\n", addr);
 		return 0;
 	}
 
-	if (!(irc_socket = LHNET_AllocSocket(&address)))
+	// this should really be non-blocking, but it does not work.
+	if(!(irc_socket = LHNET_OpenSocket(&address, &peeraddress, 1, 1, 0)))
 	{
-		Con_Printf("[IRC] Couldn't allocate a socket.\n");
+		Con_Printf("[IRC] Failed to open a socket.\n");
 		return 0;
 	}
-
-	LHNET_OpenSocket_Connected(irc_socket);
-
-	if (irc_socket->constatus == LHNETCONSTATUS_ERROR)
-	{
-		/* LHNET prints an error, so we don't have to. */
-		Mem_Free((void *) irc_socket);
-		return 0;
-	}
-
+	
 	Con_Printf("[IRC] Connecting to %s...\n", addr);
+	irc_connected = true;
 	return 1;
 }
 
@@ -100,7 +104,7 @@ static ircmessage_t *IRC_AllocMessage(void)
 {
 	ircmessage_t *msg;
 
-	if ((msg = Mem_Alloc(irc_mempool, sizeof (*msg))))
+	if ((msg = (ircmessage_t*)Mem_Alloc(irc_mempool, sizeof (*msg))))
 		memset(msg, 0, sizeof (*msg));
 
 	return msg;
@@ -135,7 +139,7 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 		{
 			len = strlen(args + 1);
 
-			*arg = Mem_Alloc(irc_mempool, len + 1);
+			*arg = (char*)Mem_Alloc(irc_mempool, len + 1);
 			memcpy(*arg, args + 1, len);
 			(*arg)[len] = 0;
 
@@ -146,7 +150,7 @@ static void IRC_ParseArgs(ircmessage_t *msg, const char *args)
 		{
 			len = strcspn(args, " ");
 
-			*arg = Mem_Alloc(irc_mempool, len + 1);
+			*arg = (char*)Mem_Alloc(irc_mempool, len + 1);
 			memcpy(*arg, args, len);
 			(*arg)[len] = 0;
 
@@ -176,7 +180,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 
 		len = strcspn(line, " ");
 
-		msg->prefix = Mem_Alloc(irc_mempool, len + 1);
+		msg->prefix = (char*)Mem_Alloc(irc_mempool, len + 1);
 		memcpy(msg->prefix, line, len);
 		msg->prefix[len] = 0;
 
@@ -194,7 +198,7 @@ static ircmessage_t *IRC_ParseMessage(const char *line)
 
 	len = strcspn(line, " ");
 
-	msg->command = Mem_Alloc(irc_mempool, len + 1);
+	msg->command = (char*)Mem_Alloc(irc_mempool, len + 1);
 	memcpy(msg->command, line, len);
 	msg->command[len] = 0;
 
@@ -298,7 +302,8 @@ static void IRC_ProcessMessage(const char *line)
 		}
 		else if (strcmp("PING", msg->command) == 0)
 		{
-			IRC_AddMessage(va("PONG :%s", msg->args[0]));
+			char vabuf[256];
+			IRC_AddMessage(va(vabuf, sizeof(vabuf), "PONG :%s", msg->args[0]));
 		}
 
 		IRC_DumpMessage(msg);
@@ -316,7 +321,7 @@ static void IRC_ProcessAllMessages(void)
 		char *nl;
 		size_t len;
 
-		nl = memchr(remaining, '\n', remaining_len);
+		nl = (char*)memchr(remaining, '\n', remaining_len);
 
 		if (!nl)
 		{
@@ -382,27 +387,10 @@ void IRC_Frame(void)
 {
 	if (irc_socket)
 	{
-		if (irc_socket->constatus == LHNETCONSTATUS_INPROGRESS)
-			LHNET_OpenSocket_Connected(irc_socket);
-
-		switch (irc_socket->constatus)
+		if(irc_connected)
 		{
-			case LHNETCONSTATUS_INPROGRESS:
-				break;
-
-			case LHNETCONSTATUS_DISCONNECTED:
-				IRC_Disconnect();
-				break;
-
-			case LHNETCONSTATUS_ERROR:
-				Con_Print("[IRC] Connection error.\n");
-				IRC_Disconnect();
-				break;
-
-			case LHNETCONSTATUS_CONNECTED:
-				IRC_WriteMessages();
-				IRC_ReadMessages();
-				break;
+			IRC_WriteMessages();
+			IRC_ReadMessages();
 		}
 	}
 }
@@ -410,20 +398,24 @@ void IRC_Frame(void)
 static char *IRC_NickFromPlayerName(void)
 {
 	char *nick;
-	nick = Mem_Alloc(irc_mempool, strlen(cl_name.string) + 1);
-	SanitizeString(cl_name.string, nick);
+	int len;
+	len = strlen(cl_name.string);
+	nick = (char*)Mem_Alloc(irc_mempool, len + 1);
+	memcpy(nick, cl_name.string, len); 
+	SanitizeString(nick, nick);
 	return nick;
 }
 
 static void IRC_Register(void)
 {
 	char *nick = IRC_NickFromPlayerName();
+	char vabuf[256];
 
 	if (!irc_nickname.string[0])
 		Cvar_SetQuick(&irc_nickname, nick);
-
-	IRC_AddMessage(va("NICK %s", irc_nickname.string));
-	IRC_AddMessage(va("USER %s optional optional :%s", irc_nickname.string, nick));
+	
+	IRC_AddMessage(va(vabuf, sizeof(vabuf), "NICK %s", irc_nickname.string));
+	IRC_AddMessage(va(vabuf, sizeof(vabuf), "USER %s optional optional :%s", irc_nickname.string, nick));
 
 	Mem_Free(nick);
 }
@@ -462,12 +454,14 @@ static void IRC_IRC_f(void)
 void IRC_Init(void)
 {
 	irc_mempool = Mem_AllocPool("IRC", 0, NULL);
-
+	
 	Cvar_RegisterVariable(&irc_nickname);
 
 	Cmd_AddCommand("ircconnect", IRC_Connect_f, "connect to an IRC server");
 	Cmd_AddCommand("ircdisconnect", IRC_Disconnect_f, "disconnect from an IRC server");
 	Cmd_AddCommand("irc", IRC_IRC_f, "send raw messages to a connected IRC server");
+
+	irc_connected = false;
 }
 
 void IRC_Shutdown(void)
