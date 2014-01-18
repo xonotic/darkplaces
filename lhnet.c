@@ -1022,7 +1022,8 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 #else
 					char _true = 1;
 #endif
-					if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
+					if (1)
+					// if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
 #endif
 					{
 #ifdef IPV6_V6ONLY
@@ -1059,25 +1060,34 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 							{
 								if (LHNETSOCKET_TryConnect(lhnetsocket, peeraddress) != -1)
 								{
-									int i = 1;
-									// enable broadcast on this socket
-									setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
-#ifdef IP_TOS
+#ifdef MSG_DONTWAIT
+									if (1)
+#else
+									if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
+#endif
 									{
-										// enable DSCP for ToS support
-										int tos = lhnet_default_dscp << 2;
-										setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
-									}
+										int i = 1;
+										// enable broadcast on this socket
+										setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
+#ifdef IP_TOS
+										{
+											// enable DSCP for ToS support
+											int tos = lhnet_default_dscp << 2;
+											setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
+										}
 #endif
-									lhnetsocket->next = &lhnet_socketlist;
-									lhnetsocket->prev = lhnetsocket->next->prev;
-									lhnetsocket->next->prev = lhnetsocket;
-									lhnetsocket->prev->next = lhnetsocket;
+										lhnetsocket->next = &lhnet_socketlist;
+										lhnetsocket->prev = lhnetsocket->next->prev;
+										lhnetsocket->next->prev = lhnetsocket;
+										lhnetsocket->prev->next = lhnetsocket;
 #ifdef WIN32
-									if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
-										Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
+										if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
+											Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
 #endif
-									return lhnetsocket;
+										return lhnetsocket;
+									}
+									else
+										Con_Printf("LHNET_OpenSocket_Connectionless: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
 								}
 								else
 								{

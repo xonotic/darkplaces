@@ -64,14 +64,22 @@ static int IRC_Connect(const char *addr)
 		return 0;
 	}
 
+#ifdef SUPPORTIPV6
+	if (!LHNETADDRESS_Resolve(&peeraddress, addr, 6667))
+	{
+		Con_Printf("[IRC] Bad server address: %s.\n", addr);
+		return 0;
+	}
+#else
 	if (!LHNETADDRESS_FromString(&peeraddress, addr, 6667))
 	{
 		Con_Printf("[IRC] Bad server address: %s.\n", addr);
 		return 0;
 	}
+#endif
 
 	// this should really be non-blocking, but it does not work.
-	if(!(irc_socket = LHNET_OpenSocket(&address, &peeraddress, 1, 1, 0)))
+	if(!(irc_socket = LHNET_OpenSocket(&address, &peeraddress, 1, 0, 0)))
 	{
 		Con_Printf("[IRC] Failed to open a socket.\n");
 		return 0;
