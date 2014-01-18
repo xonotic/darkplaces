@@ -1,6 +1,7 @@
 #include "quakedef.h"
 #include "lhnet.h"
 #include "console.h"
+#include "irc.h"
 
 #define IRC_MAX_ARGS 15
 #define IRC_NET_BUFFER_LEN 1024
@@ -29,7 +30,9 @@ static ircnetbuffer_t irc_outgoing;
 static qboolean irc_registered;
 static qboolean irc_connected;
 
-static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "", "nickname to use when connecting to IRC" };
+static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "darkplaces", "nickname to use when connecting to IRC" };
+static cvar_t irc_username = { CVAR_SAVE, "irc_username", "darkplaces", "username/ident to use when connecting to IRC" };
+static cvar_t irc_realname = { CVAR_SAVE, "irc_realname", "darkplaces", "realname to use when connecting to IRC" };
 
 static mempool_t *irc_mempool;
 
@@ -64,19 +67,11 @@ static int IRC_Connect(const char *addr)
 		return 0;
 	}
 
-#ifdef SUPPORTIPV6
-	if (!LHNETADDRESS_Resolve(&peeraddress, addr, 6667))
-	{
-		Con_Printf("[IRC] Bad server address: %s.\n", addr);
-		return 0;
-	}
-#else
 	if (!LHNETADDRESS_FromString(&peeraddress, addr, 6667))
 	{
 		Con_Printf("[IRC] Bad server address: %s.\n", addr);
 		return 0;
 	}
-#endif
 
 	// this should really be non-blocking, but it does not work.
 	if(!(irc_socket = LHNET_OpenSocket(&address, &peeraddress, 1, 0, 0)))
@@ -361,7 +356,7 @@ static void IRC_ProcessAllMessages(void)
 	irc_incoming.len = remaining_len;
 }
 
-static void IRC_ReadMessages(void)
+static int IRC_ReadMessages(void)
 {
 	lhnetaddress_t dummyaddress;
 	int read;
@@ -374,6 +369,13 @@ static void IRC_ReadMessages(void)
 		irc_incoming.len += read;
 		IRC_ProcessAllMessages();
 	}
+	else if (read == 0) 
+	{
+		IRC_Disconnect();
+		return 0;
+	}
+
+	return -1;
 }
 
 static void IRC_WriteMessages(void)
@@ -423,7 +425,7 @@ static void IRC_Register(void)
 		Cvar_SetQuick(&irc_nickname, nick);
 	
 	IRC_AddMessage(va(vabuf, sizeof(vabuf), "NICK %s", irc_nickname.string));
-	IRC_AddMessage(va(vabuf, sizeof(vabuf), "USER %s optional optional :%s", irc_nickname.string, nick));
+	IRC_AddMessage(va(vabuf, sizeof(vabuf), "USER %s optional optional :%s", irc_username.string, irc_realname.string));
 
 	Mem_Free(nick);
 }
@@ -464,6 +466,8 @@ void IRC_Init(void)
 	irc_mempool = Mem_AllocPool("IRC", 0, NULL);
 	
 	Cvar_RegisterVariable(&irc_nickname);
+	Cvar_RegisterVariable(&irc_username);
+	Cvar_RegisterVariable(&irc_realname);
 
 	Cmd_AddCommand("ircconnect", IRC_Connect_f, "connect to an IRC server");
 	Cmd_AddCommand("ircdisconnect", IRC_Disconnect_f, "disconnect from an IRC server");

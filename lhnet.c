@@ -1214,7 +1214,7 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 		{
 			int e = SOCKETERRNO;
 			if (e == EWOULDBLOCK)
-				return 0;
+				return -1;
 			switch (e)
 			{
 				case ECONNREFUSED:
@@ -1244,7 +1244,7 @@ int LHNET_Read(lhnetsocket_t *lhnetsocket, void *content, int maxcontentlength, 
 		{
 			int e = SOCKETERRNO;
 			if (e == EWOULDBLOCK)
-				return 0;
+				return -1;
 			switch (e)
 			{
 				case ECONNREFUSED:
