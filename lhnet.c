@@ -902,7 +902,7 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 	int connectresult;
 	if (!address)
 		return 0;
-	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -1013,19 +1013,9 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 				{
 #ifdef WIN32
 					u_long _false = 0;
-#endif
-#ifdef MSG_DONTWAIT
-					if (1)
-#else
-#ifdef WIN32
 					u_long _true = 1;
-#else
-					char _true = 1;
 #endif
-					if (1)
-					// if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
-#endif
-					{
+
 #ifdef IPV6_V6ONLY
 						// We need to set this flag to tell the OS that we only listen on IPv6. If we don't
 						// most OSes will create a dual-protocol socket that also listens on IPv4. In this case
@@ -1041,75 +1031,72 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 #endif
 							)
 #endif
-						{
-							int bindresult;
+					{
+						int bindresult;
 
 #if defined(SOL_RFC1149) && defined(RFC1149_1149ONLY)
-							// we got reports of massive lags when this protocol was chosen as transport
-							// so better turn it off
-							{
-								int rfc1149only = 0;
-								int rfc1149enabled = 0;
-								if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_1149ONLY, &rfc1149only))
-									Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_1149ONLY) returned error: %s\n", LHNETPRIVATE_StrError());
-								if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_ENABLED, &rfc1149enabled))
-									Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_ENABLED) returned error: %s\n", LHNETPRIVATE_StrError());
-							}
+						// we got reports of massive lags when this protocol was chosen as transport
+						// so better turn it off
+						{
+							int rfc1149only = 0;
+							int rfc1149enabled = 0;
+							if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_1149ONLY, &rfc1149only))
+								Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_1149ONLY) returned error: %s\n", LHNETPRIVATE_StrError());
+							if(setsockopt(lhnetsocket->inetsocket, SOL_RFC1149, RFC1149_ENABLED, &rfc1149enabled))
+								Con_Printf("LHNET_OpenSocket_Connectionless: warning: setsockopt(RFC1149_ENABLED) returned error: %s\n", LHNETPRIVATE_StrError());
+						}
 #endif
-							if (LHNETSOCKET_TryBind(lhnetsocket, address) != -1)
+						if (LHNETSOCKET_TryBind(lhnetsocket, address) != -1)
+						{
+							if (LHNETSOCKET_TryConnect(lhnetsocket, peeraddress) != -1)
 							{
-								if (LHNETSOCKET_TryConnect(lhnetsocket, peeraddress) != -1)
-								{
 #ifdef MSG_DONTWAIT
-									if (1)
+								if (1)
 #else
-									if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
+								if (ioctlsocket(lhnetsocket->inetsocket, FIONBIO, use_blocking ? &_false : &_true) != -1)
 #endif
-									{
-										int i = 1;
-										// enable broadcast on this socket
-										setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
+								{
+									int i = 1;
+									// enable broadcast on this socket
+									setsockopt(lhnetsocket->inetsocket, SOL_SOCKET, SO_BROADCAST, (char *)&i, sizeof(i));
 #ifdef IP_TOS
-										{
-											// enable DSCP for ToS support
-											int tos = lhnet_default_dscp << 2;
-											setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
-										}
-#endif
-										lhnetsocket->next = &lhnet_socketlist;
-										lhnetsocket->prev = lhnetsocket->next->prev;
-										lhnetsocket->next->prev = lhnetsocket;
-										lhnetsocket->prev->next = lhnetsocket;
-#ifdef WIN32
-										if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
-											Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
-#endif
-										return lhnetsocket;
+									{
+										// enable DSCP for ToS support
+										int tos = lhnet_default_dscp << 2;
+										setsockopt(lhnetsocket->inetsocket, IPPROTO_IP, IP_TOS, (char *) &tos, sizeof(tos));
 									}
-									else
-										Con_Printf("LHNET_OpenSocket_Connectionless: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
+#endif
+									lhnetsocket->next = &lhnet_socketlist;
+									lhnetsocket->prev = lhnetsocket->next->prev;
+									lhnetsocket->next->prev = lhnetsocket;
+									lhnetsocket->prev->next = lhnetsocket;
+#ifdef WIN32
+									if (ioctlsocket(lhnetsocket->inetsocket, SIO_UDP_CONNRESET, &_false) == -1)
+										Con_DPrintf("LHNET_OpenSocket_Connectionless: ioctlsocket SIO_UDP_CONNRESET returned error: %s\n", LHNETPRIVATE_StrError());
+#endif
+									return lhnetsocket;
 								}
 								else
-								{
-									Con_Printf("LHNET_OpenSocket_Connectionless: connect returned error: %s\n", LHNETPRIVATE_StrError());
-								}
+									Con_Printf("LHNET_OpenSocket_Connectionless: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
 							}
 							else
 							{
-								Con_Printf("LHNET_OpenSocket_Connectionless: bind returned error: %s\n", LHNETPRIVATE_StrError());
+								Con_Printf("LHNET_OpenSocket_Connectionless: connect returned error: %s\n", LHNETPRIVATE_StrError());
 							}
 						}
-#ifdef IPV6_V6ONLY
 						else
-							Con_Printf("LHNET_OpenSocket_Connectionless: setsockopt(IPV6_V6ONLY) returned error: %s\n", LHNETPRIVATE_StrError());
-#endif
+						{
+							Con_Printf("LHNET_OpenSocket_Connectionless: bind returned error: %s\n", LHNETPRIVATE_StrError());
+						}
 					}
+#ifdef IPV6_V6ONLY
 					else
-						Con_Printf("LHNET_OpenSocket_Connectionless: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
-					closesocket(lhnetsocket->inetsocket);
+						Con_Printf("LHNET_OpenSocket_Connectionless: setsockopt(IPV6_V6ONLY) returned error: %s\n", LHNETPRIVATE_StrError());
+#endif
 				}
 				else
-					Con_Printf("LHNET_OpenSocket_Connectionless: socket returned error: %s\n", LHNETPRIVATE_StrError());
+					Con_Printf("LHNET_OpenSocket_Connectionless: ioctlsocket returned error: %s\n", LHNETPRIVATE_StrError());
+				closesocket(lhnetsocket->inetsocket);
 			}
 #ifdef WIN32
 			else

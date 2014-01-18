@@ -58,7 +58,7 @@ static int IRC_Connect(const char *addr)
 	IRC_Disconnect();
 	
 	// this is most likely not correct.
-	if (!LHNETADDRESS_FromString(&address, "127.0.0.1", 0))
+	if (!LHNETADDRESS_FromString(&address, "0.0.0.0", 0))
 	{
 		Con_Printf("[IRC] wat.\n");
 		return 0;
