@@ -1201,63 +1201,277 @@ Key_Console (int key, int unicode)
 
 //============================================================================
 
-int chat_mode;
+dp_chat_mode_t chat_mode;
 char		chat_buffer[MAX_INPUTLINE];
 unsigned int	chat_bufferlen = 0;
+unsigned int	chat_cursor = 0;
+dp_chat_modifiers_t chat_modifiers = DP_CHAT_MODIFIERS_OFF;
 
 static void
-Key_Message (int key, int ascii)
+dp_chat_modifiers_cloning_tool(dp_chat_modifiers_t *dest, const dp_chat_modifiers_t *src)
+{
+    *dest = *src;
+}
+
+static void
+Key_Message_Reset_All_Modifiers (void) // Added by Izy (izy from izysoftware.com)
+{
+    const dp_chat_modifiers_t off = DP_CHAT_MODIFIERS_OFF;
+    chat_modifiers = off;
+}
+
+static qboolean
+Key_Message_Modifiers_Enabled (void) // Added by Izy (izy from izysoftware.com)
+{
+    const dp_chat_modifiers_t off = DP_CHAT_MODIFIERS_OFF;
+    return memcmp(&chat_modifiers, &off, sizeof(off)) != 0;
+}
+
+typedef struct
+{
+    int key;
+    int ascii;
+    qboolean down;
+} dp_chat_fakekey_t;
+
+static void Key_Message_SendFakeKeys(const dp_chat_fakekey_t *fakekeys, const size_t count);
+
+static void
+Key_Message (int key, int ascii, qboolean down)
 {
 	char vabuf[1024];
+    unsigned int inc; /* Added by Izy (izy from izysoftware.com) - uint */
+    size_t dec; /* Added by Izy (izy from izysoftware.com) - size_t */
+    unsigned charscounter;
+    size_t sizeofchar_to_replace;
+    const dp_chat_fakekey_t fake_backspace[] = {{K_LEFTARROW, 0, true}, {K_DEL, 0, true}};
+    const dp_chat_fakekey_t fake_del[] = {{K_DEL, 0, true}};
+
+    if(key == 133 && ascii == 0) // Added by Izy (izy from izysoftware.com)
+        chat_modifiers.ctrl = down;
+    if(key == 147 && ascii == 0 && down) // Added by Izy (izy from izysoftware.com)
+        chat_modifiers.ins = chat_modifiers.ins == false;
+
+    if(down == false) // Izy's Patch
+        return;
+
 	if (key == K_ENTER || ascii == 10 || ascii == 13)
 	{
-		if(chat_mode < 0)
-			Cmd_ExecuteString(chat_buffer, src_command, true); // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
-		else
-			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", chat_mode ? "say_team" : "say ", chat_buffer));
+        
+        switch(chat_mode)
+        {
+            case DP_CHAT_MODE_COMMAND:
+                // not Cbuf_AddText to allow semiclons in args; however, this allows no variables then. Use aliases!
+    			Cmd_ExecuteString(chat_buffer, src_command, true);
+                break;
+            case DP_CHAT_MODE_SAY:
+			    Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", "say", chat_buffer));
+                break;
+            case DP_CHAT_MODE_SAYTEAM:
+			    Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "%s %s", "say_team", chat_buffer));
+                break;
+        }
 
 		key_dest = key_game;
-		chat_bufferlen = 0;
+		chat_bufferlen = chat_cursor = 0;
 		chat_buffer[0] = 0;
+        Key_Message_Reset_All_Modifiers(); // Izy
 		return;
 	}
-
-	// TODO add support for arrow keys and simple editing
 
 	if (key == K_ESCAPE) {
 		key_dest = key_game;
-		chat_bufferlen = 0;
+		chat_bufferlen = chat_cursor = 0;
 		chat_buffer[0] = 0;
+        Key_Message_Reset_All_Modifiers(); // Izy
 		return;
 	}
 
-	if (key == K_BACKSPACE) {
-		if (chat_bufferlen) {
-			chat_bufferlen = u8_prevbyte(chat_buffer, chat_bufferlen);
-			chat_buffer[chat_bufferlen] = 0;
+	// delete char before cursor
+	if (key == K_BACKSPACE) // Added by Izy (izy from izysoftware.com)
+    {
+		if(chat_cursor > 0)
+        {
+            // Backspace is always equivalent to K_LEFTARROW + K_DEL
+            #if 1 // ok, allow the quick fast case
+            if(chat_cursor == chat_bufferlen)
+            {
+			    chat_bufferlen = chat_cursor = u8_prevbyte(chat_buffer, chat_bufferlen);
+			    chat_buffer[chat_bufferlen] = 0;
+		        return;
+            }
+            #endif
+            Key_Message_SendFakeKeys(fake_backspace, sizeof(fake_backspace)/sizeof(fake_backspace[0]));
 		}
 		return;
 	}
 
-	if(key == K_TAB) {
-		chat_bufferlen = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferlen);
+	// delete char on cursor
+	if (key == K_DEL) // Added by Izy (izy from izysoftware.com)
+	{
+		if(chat_cursor < chat_bufferlen)
+        {
+            dec = u8_bytelen(&chat_buffer[chat_cursor], 1);
+            memmove(&chat_buffer[chat_cursor], &chat_buffer[chat_cursor+dec], chat_bufferlen - (chat_cursor + dec) + 1);
+            chat_bufferlen -= dec;
+        }
 		return;
 	}
 
-	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
-	if (ascii > 0 && ascii < 32 && utf8_enable.integer)
-		ascii = 0xE000 + ascii;
+    // move cursor to the previous character
+    if (key == K_LEFTARROW) // Added by Izy (izy from izysoftware.com)
+    {
+        if (chat_cursor > 0)
+        {
+            if(chat_modifiers.ctrl) // move cursor to the previous word
+            {
+                chat_cursor = u8_prevbyte(chat_buffer, chat_cursor);
+                while(chat_cursor > 0 && isspace(chat_buffer[chat_cursor]))
+                    chat_cursor = u8_prevbyte(chat_buffer, chat_cursor);
+                charscounter = 0;
+                if(chat_cursor > 0)
+                    do
+                    {
+                        chat_cursor = u8_prevbyte(chat_buffer, chat_cursor);
+                        charscounter++;
+                    } while(chat_cursor > 0 && !isspace(chat_buffer[chat_cursor]));
+                if(charscounter && chat_cursor)
+                    chat_cursor += u8_bytelen(&chat_buffer[chat_cursor], 1);
+                return;
+            }
+            chat_cursor = u8_prevbyte(chat_buffer, chat_cursor);
+        }
+        return;
+    }
+
+    // move cursor to the next character
+    if (key == K_RIGHTARROW) // Added by Izy (izy from izysoftware.com)
+    {
+        if (chat_cursor < chat_bufferlen)
+        {
+            if(chat_modifiers.ctrl) // move cursor to the next word
+            {
+                chat_cursor += u8_bytelen(&chat_buffer[chat_cursor], 1);
+                while(chat_cursor < chat_bufferlen && isspace(chat_buffer[chat_cursor]))
+                    chat_cursor += u8_bytelen(&chat_buffer[chat_cursor], 1);
+                if(chat_cursor < chat_bufferlen)
+                    do
+                    {
+                        chat_cursor += u8_bytelen(&chat_buffer[chat_cursor], 1);
+                    } while(chat_cursor < chat_bufferlen && !isspace(chat_buffer[chat_cursor]));
+                return;
+            }
+            chat_cursor += u8_bytelen(&chat_buffer[chat_cursor], 1);
+        }
+        return;
+    }
+
+    // move cursor to the first character
+    if (key == 151 /* HOME */) // Added by Izy (izy from izysoftware.com)
+    {
+        chat_cursor = 0;
+        return;
+    }
+
+    // move cursor to the last character
+    if (key == 152 /* END */) // Added by Izy (izy from izysoftware.com)
+    {
+        chat_cursor = chat_bufferlen;
+        return;
+    }
+
+	if(key == K_TAB)
+    {
+        if(chat_cursor == chat_bufferlen) // Added by Izy (izy from izysoftware.com)
+    		chat_cursor = chat_bufferlen = Nicks_CompleteChatLine(chat_buffer, sizeof(chat_buffer), chat_bufferlen);
+        else
+            if(chat_cursor > 0) // Added by Izy (izy from izysoftware.com)
+            {
+                int nicks;
+                char nick[sizeof(chat_buffer)];
+                memcpy(nick, chat_buffer, chat_cursor);
+                nick[chat_cursor] = 0;
+                nicks = Nicks_CompleteChatLine(nick, sizeof(nick), chat_cursor);
+                if(nicks > 0 && (unsigned)nicks > chat_cursor)
+                {
+                    inc = nicks - chat_cursor;
+                    if(sizeof(chat_buffer) > chat_bufferlen + inc)
+                    {
+                        memmove(&chat_buffer[chat_cursor+inc], &chat_buffer[chat_cursor], chat_bufferlen - chat_cursor + 1);
+                        memcpy(chat_buffer, nick, nicks);
+                        chat_bufferlen += inc;
+                        chat_cursor += inc;
+                        if(isspace(chat_buffer[chat_cursor])) /* remove the double space */
+                            Key_Message_SendFakeKeys(fake_del, sizeof(fake_del)/sizeof(fake_del[0]));
+                    }
+                }
+            }
+		return;
+	}
 
 	if (chat_bufferlen == sizeof (chat_buffer) - 1)
 		return;							// all full
 
-	if (!ascii)
+	if (ascii <= 0)
 		return;							// non printable
 
-	chat_bufferlen += u8_fromchar(ascii, chat_buffer+chat_bufferlen, sizeof(chat_buffer) - chat_bufferlen - 1);
+	// ctrl+key generates an ascii value < 32 and shows a char from the charmap
+	if (ascii < 32 && utf8_enable.integer)
+		ascii = 0xE000 + ascii;
 
-	//chat_buffer[chat_bufferlen++] = ascii;
-	//chat_buffer[chat_bufferlen] = 0;
+    // Added by Izy (izy from izysoftware.com)
+    if(chat_cursor == chat_bufferlen)
+    {
+        inc = u8_fromchar(ascii, chat_buffer+chat_bufferlen, sizeof(chat_buffer) - chat_bufferlen - 1);
+        chat_bufferlen += inc;
+        chat_cursor += inc;
+    }
+    else
+    {
+        char utf8buffer[16];
+        inc = u8_fromchar(ascii, utf8buffer, sizeof(utf8buffer));
+        if(chat_modifiers.ins)
+        {
+            sizeofchar_to_replace = u8_bytelen(&chat_buffer[chat_cursor], 1);
+            if(sizeofchar_to_replace != inc)
+                memmove(&chat_buffer[chat_cursor+inc], 
+                        &chat_buffer[chat_cursor+sizeofchar_to_replace], 
+                        chat_bufferlen - (chat_cursor + sizeofchar_to_replace) + 1);
+            memcpy(&chat_buffer[chat_cursor], utf8buffer, inc);
+            chat_bufferlen = chat_bufferlen - sizeofchar_to_replace + inc;
+            chat_cursor += inc;
+        }
+        else
+            if(sizeof(chat_buffer) > chat_bufferlen + inc)
+            {
+                memmove(&chat_buffer[chat_cursor+inc], &chat_buffer[chat_cursor], chat_bufferlen - chat_cursor + 1);
+                memcpy(&chat_buffer[chat_cursor], utf8buffer, inc);
+                chat_bufferlen += inc;
+                chat_cursor += inc;
+            }
+    }
+}
+
+
+static void
+Key_Message_SendFakeKeys(const dp_chat_fakekey_t *fakekeys, const size_t count) // Added by Izy (izy from izysoftware.com)
+{
+    dp_chat_modifiers_t modbackup;
+    unsigned modifiers_enabled;
+    size_t i;
+    modifiers_enabled = Key_Message_Modifiers_Enabled();
+    if(modifiers_enabled)
+    {
+        dp_chat_modifiers_cloning_tool(&modbackup, &chat_modifiers);
+        Key_Message_Reset_All_Modifiers();
+    }
+    for(i = 0; i < count; i++)
+        Key_Message(fakekeys[i].key, fakekeys[i].ascii, fakekeys[i].down);
+    if(modifiers_enabled)
+    {
+        dp_chat_modifiers_cloning_tool(&chat_modifiers, &modbackup);
+    }
+        
 }
 
 //============================================================================
@@ -1858,8 +2072,7 @@ Key_Event (int key, int ascii, qboolean down)
 				break;
 
 			case key_message:
-				if (down)
-					Key_Message (key, ascii); // that'll close the message input
+				Key_Message (key, ascii, down); // that'll close the message input
 				break;
 
 			case key_menu:
@@ -1958,8 +2171,7 @@ Key_Event (int key, int ascii, qboolean down)
 	switch (keydest)
 	{
 		case key_message:
-			if (down)
-				Key_Message (key, ascii);
+			Key_Message (key, ascii, down);
 			break;
 		case key_menu:
 		case key_menu_grabbed:

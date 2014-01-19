@@ -710,11 +710,11 @@ Con_MessageMode_f
 static void Con_MessageMode_f (void)
 {
 	key_dest = key_message;
-	chat_mode = 0; // "say"
+	chat_mode = DP_CHAT_MODE_SAY; // "say"
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
 	}
 }
 
@@ -727,11 +727,11 @@ Con_MessageMode2_f
 static void Con_MessageMode2_f (void)
 {
 	key_dest = key_message;
-	chat_mode = 1; // "say_team"
+	chat_mode = DP_CHAT_MODE_SAYTEAM; // "say_team"
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
 	}
 }
 
@@ -746,9 +746,9 @@ static void Con_CommandMode_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = strlen(chat_buffer);
+		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
 	}
-	chat_mode = -1; // command
+	chat_mode = DP_CHAT_MODE_COMMAND; // command
 }
 
 /*
@@ -1830,17 +1830,49 @@ void Con_DrawNotify (void)
 	{
 		//static char *cursor[2] = { "\xee\x80\x8a", "\xee\x80\x8b" }; // { off, on }
 		int colorindex = -1;
+        // Added by Izy (izy from izysoftware.com)
+        size_t  skiptext; 
+        const char *prefix = "";
 		const char *cursor;
 		char charbuf16[16];
-		cursor = u8_encodech(0xE00A + ((int)(realtime * con_cursorspeed)&1), NULL, charbuf16);
+        unsigned onoff;
+        size_t cursor_size;
+        size_t sizeofchar_to_replace;
+        const unsigned magic_numbers[2][2] = { {0xE00A, 0xE00B}, {0xE00A, 0xE08D} };
+        onoff = (unsigned)(realtime * con_cursorspeed) & 1;
+        cursor_size = u8_fromchar(magic_numbers[chat_modifiers.ins ? 0 : 1][onoff], charbuf16, sizeof(charbuf16));
+        cursor = charbuf16;
 
-		// LordHavoc: speedup, and other improvements
-		if (chat_mode < 0)
-			dpsnprintf(temptext, sizeof(temptext), "]%s%s", chat_buffer, cursor);
-		else if(chat_mode)
-			dpsnprintf(temptext, sizeof(temptext), "say_team:%s%s", chat_buffer, cursor);
-		else
-			dpsnprintf(temptext, sizeof(temptext), "say:%s%s", chat_buffer, cursor);
+        // Added by Izy (izy from izysoftware.com)
+        switch(chat_mode)
+        {
+            case DP_CHAT_MODE_COMMAND:
+                prefix = "]";
+                break;
+            case DP_CHAT_MODE_SAY:
+                prefix = "say:";
+                break;
+            case DP_CHAT_MODE_SAYTEAM:
+                prefix = "say_team:";
+                break;
+        }
+        // Added by Izy (izy from izysoftware.com)
+        if(chat_bufferlen == chat_cursor)
+	        dpsnprintf(temptext, sizeof(temptext), "%s%s%s", prefix, chat_buffer, cursor);
+        else
+        {
+	        dpsnprintf(temptext, sizeof(temptext), "%s%s", prefix, chat_buffer);
+            if(onoff)
+            {
+                skiptext = strlen(prefix);
+                sizeofchar_to_replace = u8_bytelen(&temptext[chat_cursor+skiptext], 1);
+                if(sizeofchar_to_replace != cursor_size)
+                    memmove(&temptext[chat_cursor+skiptext+cursor_size], 
+                            &temptext[chat_cursor+skiptext+sizeofchar_to_replace], 
+                            chat_bufferlen - (chat_cursor + sizeofchar_to_replace) + 1);
+                memcpy(&temptext[chat_cursor+skiptext], cursor, cursor_size);
+            }
+        }
 
 		// FIXME word wrap
 		inputsize = (numChatlines ? con_chatsize : con_notifysize).value;
