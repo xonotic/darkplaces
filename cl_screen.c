@@ -81,6 +81,7 @@ cvar_t r_stereo_vertical = {0, "r_stereo_vertical", "0", "aspect skewed top and 
 cvar_t r_stereo_redblue = {0, "r_stereo_redblue", "0", "red/blue anaglyph stereo glasses (note: most of these glasses are actually red/cyan, try that one too)"};
 cvar_t r_stereo_redcyan = {0, "r_stereo_redcyan", "0", "red/cyan anaglyph stereo glasses, the kind given away at drive-in movies like Creature From The Black Lagoon In 3D"};
 cvar_t r_stereo_redgreen = {0, "r_stereo_redgreen", "0", "red/green anaglyph stereo glasses (for those who don't mind yellow)"};
+cvar_t r_stereo_desaturate = {0, "r_stereo_desaturate", "0", "when using anaglyph stereo glasses, desaturate the image for less irritation by the given factor"};
 cvar_t r_stereo_angle = {0, "r_stereo_angle", "0", "separation angle of eyes (makes the views look different directions, as an example, 90 gives a 90 degree separation where the views are 45 degrees left and 45 degrees right)"};
 cvar_t scr_stipple = {0, "scr_stipple", "0", "interlacing-like stippling of the display"};
 cvar_t scr_refresh = {0, "scr_refresh", "1", "allows you to completely shut off rendering for benchmarking purposes"};
@@ -1385,6 +1386,7 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable(&r_stereo_redblue);
 	Cvar_RegisterVariable(&r_stereo_redcyan);
 	Cvar_RegisterVariable(&r_stereo_redgreen);
+	Cvar_RegisterVariable(&r_stereo_desaturate);
 	Cvar_RegisterVariable(&r_stereo_angle);
 	Cvar_RegisterVariable(&scr_stipple);
 	Cvar_RegisterVariable(&scr_refresh);

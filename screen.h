@@ -68,6 +68,10 @@ extern cvar_t scr_stipple;
 
 extern cvar_t r_stereo_separation;
 extern cvar_t r_stereo_angle;
+extern cvar_t r_stereo_redblue;
+extern cvar_t r_stereo_redcyan;
+extern cvar_t r_stereo_redgreen;
+extern cvar_t r_stereo_desaturate;
 qboolean R_Stereo_Active(void);
 extern int r_stereo_side;
 

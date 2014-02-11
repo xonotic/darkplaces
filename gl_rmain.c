@@ -852,6 +852,7 @@ typedef struct r_glsl_permutation_s
 	int loc_ShadowMapMatrix;
 	int loc_BloomColorSubtract;
 	int loc_NormalmapScrollBlend;
+	int loc_StereoDesaturate;
 	int loc_BounceGridMatrix;
 	int loc_BounceGridIntensity;
 	/// uniform block bindings
@@ -881,9 +882,11 @@ enum
 	SHADERSTATICPARM_SHADOWSAMPLER = 10, ///< sampler
 	SHADERSTATICPARM_CELSHADING = 11, ///< celshading (alternative diffuse and specular math)
 	SHADERSTATICPARM_CELOUTLINES = 12, ///< celoutline (depth buffer analysis to produce outlines)
-	SHADERSTATICPARM_FXAA = 13 ///< fast approximate anti aliasing
+	SHADERSTATICPARM_FXAA = 13, ///< fast approximate anti aliasing
+	SHADERSTATICPARM_STEREODESATURATE = 14, ///< stereo desaturation
+	SHADERSTATICPARM_STEREODESATURATE_REDCYAN = 15 ///< red/cyan stereo desaturation (set in addition to the previous one)
 };
-#define SHADERSTATICPARMS_COUNT 14
+#define SHADERSTATICPARMS_COUNT 16
 
 static const char *shaderstaticparmstrings_list[SHADERSTATICPARMS_COUNT];
 static int shaderstaticparms_count = 0;
@@ -933,6 +936,14 @@ qboolean R_CompileShader_CheckStaticParms(void)
 	if (r_celoutlines.integer)
 		R_COMPILESHADER_STATICPARM_ENABLE(SHADERSTATICPARM_CELOUTLINES);
 
+	if (r_stereo_desaturate.value != 0)
+		if (r_stereo_redblue.integer || r_stereo_redcyan.integer || r_stereo_redgreen.integer)
+		{
+			R_COMPILESHADER_STATICPARM_ENABLE(SHADERSTATICPARM_STEREODESATURATE);
+			if (r_stereo_redcyan.integer)
+				R_COMPILESHADER_STATICPARM_ENABLE(SHADERSTATICPARM_STEREODESATURATE_REDCYAN);
+		}
+
 	return memcmp(r_compileshader_staticparms, r_compileshader_staticparms_save, sizeof(r_compileshader_staticparms)) != 0;
 }
 
@@ -960,6 +971,8 @@ static void R_CompileShader_AddStaticParms(unsigned int mode, unsigned int permu
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_CELSHADING, "USECELSHADING");
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_CELOUTLINES, "USECELOUTLINES");
 	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_FXAA, "USEFXAA");
+	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_STEREODESATURATE, "USESTEREODESATURATE");
+	R_COMPILESHADER_STATICPARM_EMIT(SHADERSTATICPARM_STEREODESATURATE_REDCYAN, "USESTEREODESATURATE_REDCYAN");
 }
 
 /// information about each possible shader permutation
@@ -1271,6 +1284,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_ShadowMapMatrix            = qglGetUniformLocation(p->program, "ShadowMapMatrix");
 		p->loc_BloomColorSubtract         = qglGetUniformLocation(p->program, "BloomColorSubtract");
 		p->loc_NormalmapScrollBlend       = qglGetUniformLocation(p->program, "NormalmapScrollBlend");
+		p->loc_StereoDesaturate           = qglGetUniformLocation(p->program, "StereoDesaturate");
 		p->loc_BounceGridMatrix           = qglGetUniformLocation(p->program, "BounceGridMatrix");
 		p->loc_BounceGridIntensity        = qglGetUniformLocation(p->program, "BounceGridIntensity");
 		// initialize the samplers to refer to the texture units we use
@@ -1498,7 +1512,8 @@ typedef enum D3DPSREGISTER_e
 	D3DPSREGISTER_NormalmapScrollBlend = 52,
 	D3DPSREGISTER_OffsetMapping_LodDistance = 53,
 	D3DPSREGISTER_OffsetMapping_Bias = 54,
-	// next at 54
+	D3DPSREGISTER_StereoDesaturate = 55,
+	// next at 56
 }
 D3DPSREGISTER_t;
 
@@ -2659,6 +2674,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			if (mode == SHADERMODE_WATER)
 				hlslPSSetParameter2f(D3DPSREGISTER_NormalmapScrollBlend, rsurface.texture->r_water_waterscroll[0], rsurface.texture->r_water_waterscroll[1]);
 		}
+		hlslPSSetParameter1f(D3DPSREGISTER_StereoDesaturate, r_stereo_desaturate.value);
 		hlslPSSetParameter2f(D3DPSREGISTER_ShadowMap_TextureScale, r_shadow_shadowmap_texturescale[0], r_shadow_shadowmap_texturescale[1]);
 		hlslPSSetParameter4f(D3DPSREGISTER_ShadowMap_Parameters, r_shadow_shadowmap_parameters[0], r_shadow_shadowmap_parameters[1], r_shadow_shadowmap_parameters[2], r_shadow_shadowmap_parameters[3]);
 		hlslPSSetParameter3f(D3DPSREGISTER_Color_Glow, rsurface.glowmod[0], rsurface.glowmod[1], rsurface.glowmod[2]);
@@ -2819,6 +2835,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			if (r_glsl_permutation->loc_SpecularPower >= 0) qglUniform1f(r_glsl_permutation->loc_SpecularPower, rsurface.texture->specularpower * (r_shadow_glossexact.integer ? 0.25f : 1.0f) - 1.0f);
 			if (r_glsl_permutation->loc_NormalmapScrollBlend >= 0) qglUniform2f(r_glsl_permutation->loc_NormalmapScrollBlend, rsurface.texture->r_water_waterscroll[0], rsurface.texture->r_water_waterscroll[1]);
 		}
+		if (r_glsl_permutation->loc_StereoDesaturate >= 0) qglUniform1f(r_glsl_permutation->loc_StereoDesaturate, r_stereo_desaturate.value);
 		if (r_glsl_permutation->loc_TexMatrix >= 0) {Matrix4x4_ToArrayFloatGL(&rsurface.texture->currenttexmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_TexMatrix, 1, false, m16f);}
 		if (r_glsl_permutation->loc_BackgroundTexMatrix >= 0) {Matrix4x4_ToArrayFloatGL(&rsurface.texture->currentbackgroundtexmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_BackgroundTexMatrix, 1, false, m16f);}
 		if (r_glsl_permutation->loc_ShadowMapMatrix >= 0) {Matrix4x4_ToArrayFloatGL(&r_shadow_shadowmapmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_ShadowMapMatrix, 1, false, m16f);}
@@ -2965,6 +2982,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_SpecularPower, rsurface.texture->specularpower * (r_shadow_glossexact.integer ? 0.25f : 1.0f) - 1.0f);
 			DPSOFTRAST_Uniform2f(DPSOFTRAST_UNIFORM_NormalmapScrollBlend, rsurface.texture->r_water_waterscroll[0], rsurface.texture->r_water_waterscroll[1]);
 		}
+		DPSOFTRAST_Uniform1f(DPSOFTRAST_UNIFORM_StereoDesaturate, r_stereo_desaturate.value);
 		{Matrix4x4_ToArrayFloatGL(&rsurface.texture->currenttexmatrix, m16f);DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_TexMatrixM1, 1, false, m16f);}
 		{Matrix4x4_ToArrayFloatGL(&rsurface.texture->currentbackgroundtexmatrix, m16f);DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_BackgroundTexMatrixM1, 1, false, m16f);}
 		{Matrix4x4_ToArrayFloatGL(&r_shadow_shadowmapmatrix, m16f);DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ShadowMapMatrixM1, 1, false, m16f);}
