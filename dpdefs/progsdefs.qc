@@ -504,4 +504,9 @@ void(entity e) setspawnparms		= #78;		// set parm1... to the
 												// values at level start
 												// for coop respawn
 
+//IRC
+void irc_connect() = #550;
+void irc_disconnect() = #551;
+void irc_write(string line) = #552;
+												
 //============================================================================

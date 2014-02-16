@@ -15,6 +15,7 @@
 #include "csprogs.h"
 #include "ft2.h"
 #include "mdfour.h"
+#include "irc.h"
 
 extern cvar_t prvm_backtraceforwarnings;
 #ifdef USEODE
@@ -7339,4 +7340,23 @@ void VM_physics_addtorque(prvm_prog_t *prog)
 	f.type = ODEFUNC_TORQUE;
 	VectorCopy(PRVM_G_VECTOR(OFS_PARM1), f.v1);
 	VM_physics_ApplyCmd(ed, &f);
+}
+
+
+void VM_irc_connect(prvm_prog_t *prog)
+{
+	IRC_Connect();
+}
+
+void VM_irc_disconnect(prvm_prog_t *prog)
+{
+	IRC_Disconnect();
+}
+
+void VM_irc_write(prvm_prog_t *prog)
+{
+	char string[VM_STRINGTEMP_LENGTH];
+
+	VM_VarString(prog, 0, string, sizeof(string));
+	IRC_AddMessage(string);
 }

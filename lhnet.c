@@ -873,10 +873,11 @@ static int LHNETSOCKET_TryBind(lhnetsocket_t *lhnetsocket, lhnetaddress_t *addre
 {
 	SOCKLEN_T namelen;
 	int bindresult;
+	lhnetaddressnative_t *localaddress;
 	if (!address)
 		return 0;
 	lhnetsocket->address = *address;
-	lhnetaddressnative_t *localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
+	localaddress = (lhnetaddressnative_t *)&lhnetsocket->address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -900,9 +901,10 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 {
 	SOCKLEN_T namelen;
 	int connectresult;
+	lhnetaddressnative_t *peeraddress;
 	if (!address)
 		return 0;
-	lhnetaddressnative_t *peeraddress = (lhnetaddressnative_t *)address;
+	peeraddress = (lhnetaddressnative_t *)address;
 #ifdef SUPPORTIPV6
 	if (address->addresstype == LHNETADDRESSTYPE_INET6)
 	{
@@ -925,10 +927,11 @@ static int LHNETSOCKET_TryConnect(lhnetsocket_t *lhnetsocket, lhnetaddress_t *ad
 lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeraddress, int use_tcp, int use_blocking, int register_for_select)
 {
 	lhnetsocket_t *lhnetsocket, *s;
+	int addresstype;
 	if (!address && !peeraddress)
 		return NULL;
 
-	int addresstype = address ? address->addresstype : peeraddress->addresstype;
+	addresstype = address ? address->addresstype : peeraddress->addresstype;
 	if (peeraddress && addresstype != peeraddress->addresstype)
 	{
 		Con_Printf("Cannot connect different address types.\n");
@@ -1032,8 +1035,7 @@ lhnetsocket_t *LHNET_OpenSocket(lhnetaddress_t *address, lhnetaddress_t *peeradd
 							)
 #endif
 					{
-						int bindresult;
-
+						
 #if defined(SOL_RFC1149) && defined(RFC1149_1149ONLY)
 						// we got reports of massive lags when this protocol was chosen as transport
 						// so better turn it off
@@ -1268,12 +1270,12 @@ int LHNET_Write(lhnetsocket_t *lhnetsocket, const void *content, int contentleng
 		return -1;
 	if (lhnetsocket->address.addresstype == LHNETADDRESSTYPE_LOOP)
 	{
+		lhnetpacket_t *p;
 		if (!address)
 		{
 			Con_DPrintf("LHNET_Write: destination address required on LHNETADDRESSTYPE_LOOP\n", LHNETPRIVATE_StrError());
 			return -1;
 		}
-		lhnetpacket_t *p;
 		p = (lhnetpacket_t *)Z_Malloc(sizeof(*p) + contentlength);
 		p->data = (void *)(p + 1);
 		memcpy(p->data, content, contentlength);

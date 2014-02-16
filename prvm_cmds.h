@@ -484,4 +484,8 @@ void VM_physics_enable(prvm_prog_t *prog);
 void VM_physics_addforce(prvm_prog_t *prog);
 void VM_physics_addtorque(prvm_prog_t *prog);
 
+// irc
+void VM_irc_connect(prvm_prog_t *prog);
+void VM_irc_disconnect(prvm_prog_t *prog);
+void VM_irc_write(prvm_prog_t *prog);
 #endif

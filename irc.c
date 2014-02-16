@@ -30,14 +30,14 @@ static ircnetbuffer_t irc_outgoing;
 static qboolean irc_registered;
 static qboolean irc_connected;
 
+static cvar_t irc_server = { CVAR_SAVE, "irc_server", "", "the address of the IRC server to connect to." };
 static cvar_t irc_nickname = { CVAR_SAVE, "irc_nickname", "darkplaces", "nickname to use when connecting to IRC" };
 static cvar_t irc_username = { CVAR_SAVE, "irc_username", "darkplaces", "username/ident to use when connecting to IRC" };
 static cvar_t irc_realname = { CVAR_SAVE, "irc_realname", "darkplaces", "realname to use when connecting to IRC" };
 
 static mempool_t *irc_mempool;
 
-
-static void IRC_Disconnect(void)
+void IRC_Disconnect(void)
 {
 	if (irc_socket)
 	{
@@ -53,7 +53,7 @@ static void IRC_Disconnect(void)
 	irc_connected = false;
 }
 
-static int IRC_Connect(const char *addr)
+int IRC_Connect(void)
 {
 	lhnetaddress_t address;
 	lhnetaddress_t peeraddress;
@@ -67,9 +67,9 @@ static int IRC_Connect(const char *addr)
 		return 0;
 	}
 
-	if (!LHNETADDRESS_FromString(&peeraddress, addr, 6667))
+	if (!LHNETADDRESS_FromString(&peeraddress, irc_server.string, 6667))
 	{
-		Con_Printf("[IRC] Bad server address: %s.\n", addr);
+		Con_Printf("[IRC] Bad server address: %s.\n", irc_server.string);
 		return 0;
 	}
 
@@ -80,12 +80,12 @@ static int IRC_Connect(const char *addr)
 		return 0;
 	}
 	
-	Con_Printf("[IRC] Connecting to %s...\n", addr);
+	Con_Printf("[IRC] Connecting to %s...\n", irc_server.string);
 	irc_connected = true;
 	return 1;
 }
 
-static void IRC_AddMessage(const char *message)
+void IRC_AddMessage(const char *message)
 {
 	size_t len = strlen(message);
 
@@ -231,6 +231,7 @@ static void IRC_DumpMessage(const ircmessage_t *msg)
 static void IRC_ProcessMessage(const char *line)
 {
 	ircmessage_t *msg;
+	prvm_prog_t *prog;
 
 	if ((msg = IRC_ParseMessage(line)))
 	{
@@ -309,8 +310,20 @@ static void IRC_ProcessMessage(const char *line)
 			IRC_AddMessage(va(vabuf, sizeof(vabuf), "PONG :%s", msg->args[0]));
 		}
 
-		IRC_DumpMessage(msg);
+		//IRC_DumpMessage(msg);
 		IRC_FreeMessage(msg);
+	}
+
+	prog = SVVM_prog;
+	if (PRVM_serverfunction(IRC_Parse))
+	{
+		int restorevm_tempstringsbuf_cursize;
+		restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
+		PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, line);
+		PRVM_serverglobalfloat(time) = sv.time;
+		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		prog->ExecuteProgram(prog, PRVM_serverfunction(IRC_Parse), "QC function IRC_Parse is missing");
+		prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 	}
 }
 
@@ -432,13 +445,7 @@ static void IRC_Register(void)
 
 static void IRC_Connect_f(void)
 {
-	if (Cmd_Argc() != 2)
-	{
-		Con_Print("ircconnect <address> : connect to an IRC server\n");
-		return;
-	}
-
-	if (IRC_Connect(Cmd_Argv(1)))
+	if (IRC_Connect())
 		IRC_Register();
 }
 
@@ -447,7 +454,7 @@ static void IRC_Disconnect_f(void)
 	IRC_Disconnect();
 }
 
-static void IRC_IRC_f(void)
+static void IRC_Write_f(void)
 {
 	if (Cmd_Argc() < 2)
 	{
@@ -465,13 +472,14 @@ void IRC_Init(void)
 {
 	irc_mempool = Mem_AllocPool("IRC", 0, NULL);
 	
+	Cvar_RegisterVariable(&irc_server);
 	Cvar_RegisterVariable(&irc_nickname);
 	Cvar_RegisterVariable(&irc_username);
 	Cvar_RegisterVariable(&irc_realname);
 
 	Cmd_AddCommand("ircconnect", IRC_Connect_f, "connect to an IRC server");
 	Cmd_AddCommand("ircdisconnect", IRC_Disconnect_f, "disconnect from an IRC server");
-	Cmd_AddCommand("irc", IRC_IRC_f, "send raw messages to a connected IRC server");
+	Cmd_AddCommand("irc", IRC_Write_f, "send raw messages to a connected IRC server");
 
 	irc_connected = false;
 }

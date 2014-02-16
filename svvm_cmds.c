@@ -3732,9 +3732,9 @@ NULL,							// #546
 NULL,							// #547
 NULL,							// #548
 NULL,							// #549
-NULL,							// #550
-NULL,							// #551
-NULL,							// #552
+VM_irc_connect,					// #550
+VM_irc_disconnect,				// #551
+VM_irc_write,					// #552
 NULL,							// #553
 NULL,							// #554
 NULL,							// #555

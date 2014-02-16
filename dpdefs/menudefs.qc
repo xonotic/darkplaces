@@ -530,6 +530,11 @@ float FIELD_FUNCTION = 6;
 //getentityfieldstring returns data as would be written to a savegame, eg... "0.05" (float), "0 0 1" (vector), or "Hello World!" (string). Function names can also be returned.
 //putentityfieldstring puts the data returned by getentityfieldstring back into the entity.
 
+//IRC
+void irc_connect() = #550;
+void irc_disconnect() = #551;
+void irc_write(string line) = #552;
+
 // assorted undocumented extensions
 string(string, float) netaddress_resolve = #625;
 string(string search, string replace, string subject) strreplace = #484;
