@@ -112,6 +112,7 @@ ifeq ($(DP_MAKE_TARGET), linux)
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+	DP_LINK_XMP?=dlopen
 endif
 
 # Mac OS X configuration
@@ -147,6 +148,7 @@ ifeq ($(DP_MAKE_TARGET), macosx)
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+	DP_LINK_XMP?=dlopen
 
 	# on OS X, we don't build the CL by default because it uses deprecated
 	# and not-implemented-in-64bit Carbon
@@ -188,6 +190,7 @@ ifeq ($(DP_MAKE_TARGET), sunos)
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+	DP_LINK_XMP?=dlopen
 endif
 
 # BSD configuration
@@ -223,6 +226,7 @@ endif
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+	DP_LINK_XMP?=dlopen
 endif
 
 # Win32 configuration
@@ -282,6 +286,7 @@ ifeq ($(DP_MAKE_TARGET), mingw)
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+	DP_LINK_XMP?=dlopen
 endif
 
 # set these to "" if you want to use dynamic loading instead
@@ -332,6 +337,16 @@ endif
 ifeq ($(DP_LINK_CRYPTO_RIJNDAEL), dlopen)
 	LIB_CRYPTO_RIJNDAEL=
 	CFLAGS_CRYPTO_RIJNDAEL=
+endif
+
+# xmp
+ifeq ($(DP_LINK_XMP), shared)
+	CFLAGS_SND_XMP=-DLINK_TO_LIBXMP
+	LIB_SND_XMP=-lxmp
+endif
+ifeq ($(DP_LINK_XMP), dlopen)
+	CFLAGS_SND_XMP=
+	LIB_SND_XMP=
 endif
 
 ##### Sound configuration #####

@@ -429,6 +429,7 @@ extern cvar_t sessionid;
 # define USE_GLES2		1
 # define LINK_TO_ZLIB	1
 # define LINK_TO_LIBVORBIS 1
+//# define LINK_TO_LIBXMP 1 // nyov: if someone can test with the android NDK compiled libxmp?
 # define DP_MOBILETOUCH	1
 # define DP_FREETYPE_STATIC 1
 #elif TARGET_OS_IPHONE /* must come first because it also defines MACOSX */

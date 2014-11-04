@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_main.h"
 #include "snd_ogg.h"
 #include "snd_wav.h"
+#include "snd_xmp.h"
 
 
 /*
@@ -343,6 +344,11 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 			if (OGG_LoadVorbisFile (namebuffer, sfx))
 				goto loaded;
 		}
+		else if (len >= 1)
+		{
+			if (XMP_LoadModFile (namebuffer, sfx))
+				goto loaded;
+		}
 	}
 
 	// LordHavoc: then try without the added sound/ as wav and ogg
@@ -360,6 +366,11 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 	if (len >= 4 && !strcasecmp (namebuffer + len - 4, ".ogg"))
 	{
 		if (OGG_LoadVorbisFile (namebuffer, sfx))
+			goto loaded;
+	}
+	else if (len >= 1)
+	{
+		if (XMP_LoadModFile (namebuffer, sfx))
 			goto loaded;
 	}
 
