@@ -41,7 +41,7 @@ STRIP?=strip
 
 ###### Sound and audio CD #####
 
-OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o
+OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o snd_modplug.o
 
 # No sound
 OBJ_SND_NULL=snd_null.o
@@ -49,23 +49,23 @@ LIB_SND_NULL=
 
 # Open Sound System (Linux, FreeBSD and Solaris)
 OBJ_SND_OSS=$(OBJ_SND_COMMON) snd_oss.o
-LIB_SND_OSS=
+LIB_SND_OSS=$(LIB_SND_MODPLUG)
 
 # Advanced Linux Sound Architecture (Linux)
 OBJ_SND_ALSA=$(OBJ_SND_COMMON) snd_alsa.o
-LIB_SND_ALSA=-lasound
+LIB_SND_ALSA=-lasound $(LIB_SND_MODPLUG)
 
 # Core Audio (Mac OS X)
 OBJ_SND_COREAUDIO=$(OBJ_SND_COMMON) snd_coreaudio.o
-LIB_SND_COREAUDIO=-framework CoreAudio
+LIB_SND_COREAUDIO=-framework CoreAudio $(LIB_SND_MODPLUG)
 
 # BSD / Sun audio API (NetBSD and OpenBSD)
 OBJ_SND_BSD=$(OBJ_SND_COMMON) snd_bsd.o
-LIB_SND_BSD=
+LIB_SND_BSD=$(LIB_SND_MODPLUG)
 
 # DirectX and Win32 WAVE output (Win32)
 OBJ_SND_WIN=$(OBJ_SND_COMMON) snd_win.o
-LIB_SND_WIN=
+LIB_SND_WIN=$(LIB_SND_MODPLUG)
 
 # Qantourisc's 3D Realtime Acoustic Lib (3D RAS)
 OBJ_SND_3DRAS=snd_3dras.o
@@ -207,12 +207,12 @@ OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_M
 
 LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL)
 LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86vm -pthread $(LIB_SOUND)
-LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl
+LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
 LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
-LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl
+LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lmodplug
 CFLAGS_UNIX_PRELOAD=-DPREFER_PRELOAD
 
-LDFLAGS_UNIXSDL=$(SDLCONFIG_LIBS)
+LDFLAGS_UNIXSDL=$(SDLCONFIG_LIBS) $(LIB_SND_MODPLUG)
 EXE_UNIXCL=darkplaces-glx
 EXE_UNIXSV=darkplaces-dedicated
 EXE_UNIXSDL=darkplaces-sdl
@@ -280,7 +280,7 @@ OBJ_WGL= builddate.c sys_win.o vid_wgl.o thread_null.o $(OBJ_MENU) $(OBJ_SND_WIN
 # see LDFLAGS_WINCOMMON in makefile
 LDFLAGS_WINCL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) -mwindows -lwinmm -luser32 -lgdi32 -ldxguid -ldinput -lcomctl32 -lws2_32 $(LDFLAGS_D3D) $(LIB_Z) $(LIB_JPEG)
 LDFLAGS_WINSV=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) -mconsole -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
-LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
+LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) $(LIB_SND_MODPLUG) -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
 EXE_WINCL=darkplaces.exe
 EXE_WINSV=darkplaces-dedicated.exe
 EXE_WINSDL=darkplaces-sdl.exe
@@ -489,6 +489,10 @@ prepare :
 	$(CMD_MKDIR) $(BUILD_DIR)
 	$(CMD_CP) makefile.inc $(BUILD_DIR)/
 	$(CMD_CP) $(MAKEFILE) $(BUILD_DIR)/
+
+snd_modplug.o: snd_modplug.c
+	$(CHECKLEVEL2)
+	$(DO_CC) $(CFLAGS_SND_MODPLUG)
 
 #this checks USEODE when compiling so it needs the ODE flags as well
 prvm_cmds.o: prvm_cmds.c
