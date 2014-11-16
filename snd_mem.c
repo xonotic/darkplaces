@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_ogg.h"
 #include "snd_wav.h"
 #include "snd_xmp.h"
+#include "snd_modplug.h"
 
 
 /*
@@ -348,6 +349,9 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 		{
 			if (XMP_LoadModFile (namebuffer, sfx))
 				goto loaded;
+
+			if (ModPlug_LoadModPlugFile (namebuffer, sfx))
+				goto loaded;
 		}
 	}
 
@@ -371,6 +375,9 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 	else if (len >= 1)
 	{
 		if (XMP_LoadModFile (namebuffer, sfx))
+			goto loaded;
+
+		if (ModPlug_LoadModPlugFile (namebuffer, sfx))
 			goto loaded;
 	}
 

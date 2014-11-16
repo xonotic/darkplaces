@@ -29,6 +29,7 @@ DP_LINK_ODE?=dlopen
 DP_LINK_CRYPTO?=dlopen
 DP_LINK_CRYPTO_RIJNDAEL?=dlopen
 DP_LINK_XMP?=dlopen
+DP_LINK_MODPLUG?=dlopen
 
 ###### Optional features #####
 DP_CDDA?=enabled
@@ -134,6 +135,15 @@ LIB_SND_XMP=-lxmp
 .else
 CFLAGS_SND_XMP=
 LIB_SND_XMP=
+.endif
+
+# modplug
+.if $(DP_LINK_MODPLUG) == "shared"
+CFLAGS_SND_MODPLUG=-DLINK_TO_LIBMODPLUG
+LIB_SND_MODPLUG=-lmodplug
+.else
+CFLAGS_SND_MODPLUG=
+LIB_SND_MODPLUG=
 .endif
 
 .endif

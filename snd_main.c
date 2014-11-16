@@ -24,6 +24,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_main.h"
 #include "snd_ogg.h"
 #include "snd_xmp.h"
+#include "snd_modplug.h"
 #include "csprogs.h"
 #include "cl_collision.h"
 #ifdef CONFIG_CD
@@ -918,6 +919,7 @@ void S_Init(void)
 
 	OGG_OpenLibrary ();
 	XMP_OpenLibrary ();
+	ModPlug_OpenLibrary ();
 }
 
 
@@ -931,6 +933,7 @@ Shutdown and free all resources
 void S_Terminate (void)
 {
 	S_Shutdown ();
+	ModPlug_CloseLibrary ();
 	XMP_CloseLibrary ();
 	OGG_CloseLibrary ();
 

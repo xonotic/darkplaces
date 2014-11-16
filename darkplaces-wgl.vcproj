@@ -629,6 +629,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\snd_modplug.c"
+				>
+			</File>
+			<File
 				RelativePath=".\snd_ogg.c"
 				>
 			</File>
@@ -1044,6 +1048,10 @@
 			</File>
 			<File
 				RelativePath=".\snd_main.h"
+				>
+			</File>
+			<File
+				RelativePath=".\snd_modplug.h"
 				>
 			</File>
 			<File
