@@ -535,6 +535,12 @@ void irc_connect() = #550;
 void irc_disconnect() = #551;
 void irc_write(string line) = #552;
 
+//DP_COVERAGE
+//idea: divVerent
+//darkplaces implementation: divVerent
+//function definitions:
+void coverage() = #642;  // Reports a coverage event. The engine counts for each of the calls to this builtin whether it has been called.
+
 // assorted undocumented extensions
 string(string, float) netaddress_resolve = #625;
 string(string search, string replace, string subject) strreplace = #484;

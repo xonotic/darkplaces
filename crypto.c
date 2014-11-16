@@ -1,4 +1,3 @@
-// TODO key loading, generating, saving
 #include "quakedef.h"
 #include "crypto.h"
 #include "common.h"
@@ -91,7 +90,7 @@ static size_t Crypto_UnParsePack(char *buf, size_t len, unsigned long header, co
 	{
 		if(pos + 4 + lumpsize[i] > len)
 			return 0;
-		Crypto_UnLittleLong(&buf[pos], lumpsize[i]);
+		Crypto_UnLittleLong(&buf[pos], (unsigned long)lumpsize[i]);
 		pos += 4;
 		memcpy(&buf[pos], lumps[i], lumpsize[i]);
 		pos += lumpsize[i];
@@ -534,7 +533,7 @@ static crypto_t *Crypto_ServerFindInstance(lhnetaddress_t *peeraddress, qboolean
 	return crypto;
 }
 
-qboolean Crypto_ServerFinishInstance(crypto_t *out, crypto_t *crypto)
+qboolean Crypto_FinishInstance(crypto_t *out, crypto_t *crypto)
 {
 	// no check needed here (returned pointers are only used in prefilled fields)
 	if(!crypto || !crypto->authenticated)
@@ -651,7 +650,7 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 
 		if(idend - idstart == FP64_SIZE && keyend - keystart == FP64_SIZE)
 		{
-			for(keyid = 0; keyid < MAX_PUBKEYS; ++keyid)
+			for(keyid = MAX_PUBKEYS - 1; keyid >= 0; --keyid)
 				if(pubkeys[keyid])
 					if(!memcmp(pubkeys_fp64[keyid], keystart, FP64_SIZE))
 					{
@@ -659,8 +658,7 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 						idfp[FP64_SIZE] = 0;
 						break;
 					}
-			if(keyid >= MAX_PUBKEYS)
-				keyid = -1;
+			// If this failed, keyid will be -1.
 		}
 	}
 
@@ -1085,7 +1083,7 @@ static void Crypto_KeyGen_Finished(int code, size_t length_received, unsigned ch
 	if(keygen_i < 0)
 	{
 		Con_Printf("Unexpected response from keygen server:\n");
-		Com_HexDumpToConsole(buffer, length_received);
+		Com_HexDumpToConsole(buffer, (int)length_received);
 		SV_UnlockThreadMutex();
 		return;
 	}
@@ -1098,7 +1096,7 @@ static void Crypto_KeyGen_Finished(int code, size_t length_received, unsigned ch
 		else
 		{
 			Con_Printf("Invalid response from keygen server:\n");
-			Com_HexDumpToConsole(buffer, length_received);
+			Com_HexDumpToConsole(buffer, (int)length_received);
 		}
 		keygen_i = -1;
 		SV_UnlockThreadMutex();
@@ -1487,15 +1485,15 @@ const void *Crypto_EncryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			if(developer_networking.integer)
 			{
 				Con_Print("To be encrypted:\n");
-				Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+				Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 			}
-			if(len_src + 32 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, len_src, crypto->dhkey, DHKEY_SIZE))
+			if(len_src + 32 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, (int)len_src, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("Crypto_EncryptPacket failed (not enough space: %d bytes in, %d bytes out)\n", (int) len_src, (int) len);
 				return NULL;
 			}
 			*len_dst = ((len_src + 15) / 16) * 16 + 16; // add 16 for HMAC, then round to 16-size for AES
-			((unsigned char *) data_dst)[0] = *len_dst - len_src;
+			((unsigned char *) data_dst)[0] = (unsigned char)(*len_dst - len_src);
 			memcpy(((unsigned char *) data_dst)+1, h, 15);
 			aescpy(crypto->dhkey, (const unsigned char *) data_dst, ((unsigned char *) data_dst) + 16, (const unsigned char *) data_src, len_src);
 			//                    IV                                dst                                src                               len
@@ -1503,7 +1501,7 @@ const void *Crypto_EncryptPacket(crypto_t *crypto, const void *data_src, size_t 
 		else
 		{
 			// HMAC packet = 16 bytes HMAC-SHA-256 (truncated to 128 bits), data
-			if(len_src + 16 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, len_src, crypto->dhkey, DHKEY_SIZE))
+			if(len_src + 16 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, (int)len_src, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("Crypto_EncryptPacket failed (not enough space: %d bytes in, %d bytes out)\n", (int) len_src, (int) len);
 				return NULL;
@@ -1561,7 +1559,7 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			}
 			seacpy(crypto->dhkey, (unsigned char *) data_src, (unsigned char *) data_dst, ((const unsigned char *) data_src) + 16, *len_dst);
 			//                    IV                          dst                         src                                      len
-			if(!HMAC_SHA256_32BYTES(h, (const unsigned char *) data_dst, *len_dst, crypto->dhkey, DHKEY_SIZE))
+			if(!HMAC_SHA256_32BYTES(h, (const unsigned char *) data_dst, (int)*len_dst, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("HMAC fail\n");
 				return NULL;
@@ -1574,7 +1572,7 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			if(developer_networking.integer)
 			{
 				Con_Print("Decrypted:\n");
-				Com_HexDumpToConsole((const unsigned char *) data_dst, *len_dst);
+				Com_HexDumpToConsole((const unsigned char *) data_dst, (int)*len_dst);
 			}
 			return data_dst; // no need to copy
 		}
@@ -1592,10 +1590,10 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 				return NULL;
 			}
 			//memcpy(data_dst, data_src + 16, *len_dst);
-			if(!HMAC_SHA256_32BYTES(h, ((const unsigned char *) data_src) + 16, *len_dst, crypto->dhkey, DHKEY_SIZE))
+			if(!HMAC_SHA256_32BYTES(h, ((const unsigned char *) data_src) + 16, (int)*len_dst, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("HMAC fail\n");
-				Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+				Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 				return NULL;
 			}
 
@@ -1613,14 +1611,14 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 					if(memcmp((const unsigned char *) data_src, h, 16)) // ignore first byte, used for length
 					{
 						Con_Printf("HMAC mismatch\n");
-						Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+						Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 						return NULL;
 					}
 				}
 				else
 				{
 					Con_Printf("HMAC mismatch\n");
-					Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+					Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 					return NULL;
 				}
 			}
@@ -1764,13 +1762,13 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 			p = GetUntilNul(&data_in, &len_in);
 			if(p && *p)
 			{
+				// Find the highest numbered matching key for p.
 				for(i = 0; i < MAX_PUBKEYS; ++i)
 				{
 					if(pubkeys[i])
 						if(!strcmp(p, pubkeys_fp64[i]))
 							if(pubkeys_havepriv[i])
-								if(serverid < 0)
-									serverid = i;
+								serverid = i;
 				}
 				if(serverid < 0)
 					return Crypto_ServerError(data_out, len_out, "Invalid server key", NULL);
@@ -1778,12 +1776,12 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 			p = GetUntilNul(&data_in, &len_in);
 			if(p && *p)
 			{
+				// Find the highest numbered matching key for p.
 				for(i = 0; i < MAX_PUBKEYS; ++i)
 				{
 					if(pubkeys[i])
 						if(!strcmp(p, pubkeys_fp64[i]))
-							if(clientid < 0)
-								clientid = i;
+							clientid = i;
 				}
 				if(clientid < 0)
 					return Crypto_ServerError(data_out, len_out, "Invalid client key", NULL);
@@ -2236,22 +2234,20 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 					break;
 				continue;
 			}
+			// Find the highest numbered matching key for p.
 			for(i = 0; i < MAX_PUBKEYS; ++i)
 			{
 				if(pubkeys[i])
 				if(!strcmp(p, pubkeys_fp64[i]))
 				{
 					if(pubkeys_havepriv[i])
-						if(clientid < 0)
-							clientid = i;
+						clientid = i;
 					if(server_can_auth)
-						if(serverid < 0)
-							if(wantserverid < 0 || i == wantserverid)
-								serverid = i;
+						if(wantserverid < 0 || i == wantserverid)
+							serverid = i;
 				}
 			}
-			if(clientid >= 0 && serverid >= 0)
-				break;
+			// Not breaking, as higher keys in the list always have priority.
 		}
 
 		// if stored host key is not found:
@@ -2260,7 +2256,6 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 
 		if(serverid >= 0 || clientid >= 0)
 		{
-			// TODO at this point, fill clientside crypto struct!
 			MAKE_CDATA;
 			CDATA->cdata_id = ++cdata_id;
 			CDATA->s = serverid;

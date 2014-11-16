@@ -41,7 +41,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #pragma warning(disable : 4310) // LordHavoc: MSVC++ 2008 x86: cast truncates constant value
 #pragma warning(disable : 4245) // LordHavoc: MSVC++ 2008 x86: 'initializing' : conversion from 'int' to 'unsigned char', signed/unsigned mismatch
 #pragma warning(disable : 4204) // LordHavoc: MSVC++ 2008 x86: nonstandard extension used : non-constant aggregate initializer
-#pragma warning(disable : 4267) // LordHavoc: MSVC++ 2008 x64, conversion from 'size_t' to 'int', possible loss of data
+//#pragma warning(disable : 4267) // LordHavoc: MSVC++ 2008 x64, conversion from 'size_t' to 'int', possible loss of data
 //#pragma warning(disable : 4244)     // LordHavoc: MSVC++ 4 x86, double/float
 //#pragma warning(disable : 4305)		// LordHavoc: MSVC++ 6 x86, double/float
 //#pragma warning(disable : 4706)		// LordHavoc: MSVC++ 2008 x86, assignment within conditional expression
@@ -1069,6 +1069,14 @@ extern void (GLAPIENTRY *qglGetQueryObjectuivARB)(GLuint qid, GLenum pname, GLui
 #define GL_CURRENT_QUERY_ARB                              0x8865
 #define GL_QUERY_RESULT_ARB                               0x8866
 #define GL_QUERY_RESULT_AVAILABLE_ARB                     0x8867
+#endif
+
+// GL_ARB_query_buffer_object
+#ifndef GL_QUERY_BUFFER_ARB
+#define GL_QUERY_BUFFER_ARB                               0x9192
+#define GL_QUERY_BUFFER_BINDING_ARB                       0x9193
+#define GL_QUERY_RESULT_NO_WAIT_ARB                       0x9194
+#define GL_QUERY_BUFFER_BARRIER_BIT_ARB                   0x00008000
 #endif
 
 // GL_EXT_bgr

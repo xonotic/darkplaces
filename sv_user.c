@@ -59,7 +59,7 @@ void SV_SetIdealPitch (void)
 		bottom[1] = top[1];
 		bottom[2] = top[2] - 160;
 
-		tr = SV_TraceLine(top, bottom, MOVE_NOMONSTERS, host_client->edict, SUPERCONTENTS_SOLID);
+		tr = SV_TraceLine(top, bottom, MOVE_NOMONSTERS, host_client->edict, SUPERCONTENTS_SOLID, collision_extendmovelength.value);
 		// if looking at a wall, leave ideal the way is was
 		if (tr.startsolid)
 			return;
@@ -126,7 +126,7 @@ static void SV_UserFriction (void)
 	start[2] = PRVM_serveredictvector(host_client->edict, origin)[2] + PRVM_serveredictvector(host_client->edict, mins)[2];
 	stop[2] = start[2] - 34;
 
-	trace = SV_TraceLine(start, stop, MOVE_NOMONSTERS, host_client->edict, SV_GenericHitSuperContentsMask(host_client->edict));
+	trace = SV_TraceLine(start, stop, MOVE_NOMONSTERS, host_client->edict, SV_GenericHitSuperContentsMask(host_client->edict), collision_extendmovelength.value);
 
 	if (trace.fraction == 1.0)
 		friction = sv_friction.value*sv_edgefriction.value;
@@ -878,7 +878,7 @@ void SV_ReadClientMessage(void)
 clc_stringcmd_invalid:
 			Con_Printf("Received invalid stringcmd from %s\n", host_client->name);
 			if(developer.integer > 0)
-				Com_HexDumpToConsole((unsigned char *) s, strlen(s));
+				Com_HexDumpToConsole((unsigned char *) s, (int)strlen(s));
 			break;
 
 		case clc_disconnect:

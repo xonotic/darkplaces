@@ -1490,7 +1490,7 @@ static void CL_LinkNetworkEntity(entity_t *e)
 		trace_t trace;
 		matrix4x4_t tempmatrix;
 		Matrix4x4_Transform(&e->render.matrix, muzzleflashorigin, v2);
-		trace = CL_TraceLine(origin, v2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, true, false, NULL, false, false);
+		trace = CL_TraceLine(origin, v2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, false);
 		Matrix4x4_Normalize(&tempmatrix, &e->render.matrix);
 		Matrix4x4_SetOrigin(&tempmatrix, trace.endpos[0], trace.endpos[1], trace.endpos[2]);
 		Matrix4x4_Scale(&tempmatrix, 150, 1);
@@ -1586,6 +1586,10 @@ static void CL_RelinkWorld(void)
 	CL_UpdateRenderEntity(&ent->render);
 	r_refdef.scene.worldentity = &ent->render;
 	r_refdef.scene.worldmodel = cl.worldmodel;
+
+	// if the world is q2bsp, animate the textures
+	if (ent->render.model && ent->render.model->brush.isq2bsp)
+		ent->render.framegroupblend[0].frame = (int)(cl.time * 2.0f);
 }
 
 static void CL_RelinkStaticEntities(void)
@@ -2109,7 +2113,7 @@ static void CL_Locs_AddNode(vec3_t mins, vec3_t maxs, const char *name)
 	int namelen;
 	if (!name)
 		name = "";
-	namelen = strlen(name);
+	namelen = (int)strlen(name);
 	node = (cl_locnode_t *) Mem_Alloc(cls.levelmempool, sizeof(cl_locnode_t) + namelen + 1);
 	VectorSet(node->mins, min(mins[0], maxs[0]), min(mins[1], maxs[1]), min(mins[2], maxs[2]));
 	VectorSet(node->maxs, max(mins[0], maxs[0]), max(mins[1], maxs[1]), max(mins[2], maxs[2]));

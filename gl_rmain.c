@@ -678,7 +678,8 @@ shaderpermutationinfo_t shaderpermutationinfo[SHADERPERMUTATION_COUNT] =
 	{"#define USETRIPPY\n", " trippy"},
 	{"#define USEDEPTHRGB\n", " depthrgb"},
 	{"#define USEALPHAGENVERTEX\n", " alphagenvertex"},
-	{"#define USESKELETAL\n", " skeletal"}
+	{"#define USESKELETAL\n", " skeletal"},
+	{"#define USEOCCLUDE\n", " occlude"}
 };
 
 // NOTE: MUST MATCH ORDER OF SHADERMODE_* ENUMS!
@@ -895,7 +896,7 @@ extern qboolean r_shadow_shadowmapsampler;
 extern int r_shadow_shadowmappcf;
 qboolean R_CompileShader_CheckStaticParms(void)
 {
-	static int r_compileshader_staticparms_save[1];
+	static int r_compileshader_staticparms_save[(SHADERSTATICPARMS_COUNT + 0x1F) >> 5];
 	memcpy(r_compileshader_staticparms_save, r_compileshader_staticparms, sizeof(r_compileshader_staticparms));
 	memset(r_compileshader_staticparms, 0, sizeof(r_compileshader_staticparms));
 
@@ -1629,7 +1630,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 					vsresult = qD3DXCompileShaderFromFileA(va(vabuf, sizeof(vabuf), "%s/%s_vs.fx", fs_gamedir, cachename), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
 				}
 				else
-					vsresult = qD3DXCompileShader(vertstring, strlen(vertstring), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
+					vsresult = qD3DXCompileShader(vertstring, (unsigned int)strlen(vertstring), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
 				if (vsbuffer)
 				{
 					vsbinsize = ID3DXBuffer_GetBufferSize(vsbuffer);
@@ -1652,7 +1653,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 					psresult = qD3DXCompileShaderFromFileA(va(vabuf, sizeof(vabuf), "%s/%s_ps.fx", fs_gamedir, cachename), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
 				}
 				else
-					psresult = qD3DXCompileShader(fragstring, strlen(fragstring), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
+					psresult = qD3DXCompileShader(fragstring, (unsigned int)strlen(fragstring), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
 				if (psbuffer)
 				{
 					psbinsize = ID3DXBuffer_GetBufferSize(psbuffer);
@@ -1780,23 +1781,23 @@ static void R_HLSL_CompilePermutation(r_hlsl_permutation_t *p, unsigned int mode
 
 	vertstring_length = 0;
 	for (i = 0;i < vertstrings_count;i++)
-		vertstring_length += strlen(vertstrings_list[i]);
+		vertstring_length += (int)strlen(vertstrings_list[i]);
 	vertstring = t = (char *)Mem_Alloc(tempmempool, vertstring_length + 1);
-	for (i = 0;i < vertstrings_count;t += strlen(vertstrings_list[i]), i++)
+	for (i = 0;i < vertstrings_count;t += (int)strlen(vertstrings_list[i]), i++)
 		memcpy(t, vertstrings_list[i], strlen(vertstrings_list[i]));
 
 	geomstring_length = 0;
 	for (i = 0;i < geomstrings_count;i++)
-		geomstring_length += strlen(geomstrings_list[i]);
+		geomstring_length += (int)strlen(geomstrings_list[i]);
 	geomstring = t = (char *)Mem_Alloc(tempmempool, geomstring_length + 1);
-	for (i = 0;i < geomstrings_count;t += strlen(geomstrings_list[i]), i++)
+	for (i = 0;i < geomstrings_count;t += (int)strlen(geomstrings_list[i]), i++)
 		memcpy(t, geomstrings_list[i], strlen(geomstrings_list[i]));
 
 	fragstring_length = 0;
 	for (i = 0;i < fragstrings_count;i++)
-		fragstring_length += strlen(fragstrings_list[i]);
+		fragstring_length += (int)strlen(fragstrings_list[i]);
 	fragstring = t = (char *)Mem_Alloc(tempmempool, fragstring_length + 1);
-	for (i = 0;i < fragstrings_count;t += strlen(fragstrings_list[i]), i++)
+	for (i = 0;i < fragstrings_count;t += (int)strlen(fragstrings_list[i]), i++)
 		memcpy(t, fragstrings_list[i], strlen(fragstrings_list[i]));
 
 	// try to load the cached shader, or generate one
@@ -1900,7 +1901,7 @@ void R_GLSL_Restart_f(void)
 		{
 			r_hlsl_permutation_t *p;
 			r_hlsl_permutation = NULL;
-			limit = Mem_ExpandableArray_IndexRange(&r_hlsl_permutationarray);
+			limit = (unsigned int)Mem_ExpandableArray_IndexRange(&r_hlsl_permutationarray);
 			for (i = 0;i < limit;i++)
 			{
 				if ((p = (r_hlsl_permutation_t*)Mem_ExpandableArray_RecordAtIndex(&r_hlsl_permutationarray, i)))
@@ -1927,7 +1928,7 @@ void R_GLSL_Restart_f(void)
 		{
 			r_glsl_permutation_t *p;
 			r_glsl_permutation = NULL;
-			limit = Mem_ExpandableArray_IndexRange(&r_glsl_permutationarray);
+			limit = (unsigned int)Mem_ExpandableArray_IndexRange(&r_glsl_permutationarray);
 			for (i = 0;i < limit;i++)
 			{
 				if ((p = (r_glsl_permutation_t*)Mem_ExpandableArray_RecordAtIndex(&r_glsl_permutationarray, i)))
@@ -2202,6 +2203,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		permutation |= SHADERPERMUTATION_TRIPPY;
 	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST)
 		permutation |= SHADERPERMUTATION_ALPHAKILL;
+	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_OCCLUDE)
+		permutation |= SHADERPERMUTATION_OCCLUDE;
 	if (rsurface.texture->r_water_waterscroll[0] && rsurface.texture->r_water_waterscroll[1])
 		permutation |= SHADERPERMUTATION_NORMALMAPSCROLLBLEND; // todo: make generic
 	if (rsurfacepass == RSURFPASS_BACKGROUND)
@@ -3400,6 +3403,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	skinframe->fog = NULL;
 	skinframe->reflect = NULL;
 	skinframe->hasalpha = false;
+	// we could store the q2animname here too
 
 	if (ddsbase)
 	{
@@ -4493,9 +4497,6 @@ int R_CullBox(const vec3_t mins, const vec3_t maxs)
 		return false;
 	for (i = 0;i < r_refdef.view.numfrustumplanes;i++)
 	{
-		// skip nearclip plane, it often culls portals when you are very close, and is almost never useful
-		if (i == 4)
-			continue;
 		p = r_refdef.view.frustum + i;
 		switch(p->signbits)
 		{
@@ -4835,7 +4836,7 @@ r_meshbuffer_t *R_BufferData_Store(size_t datasize, const void *data, r_bufferda
 		Sys_Error("R_BufferData_Store: failed to create a new buffer of sufficient size\n");
 
 	mem = r_bufferdata_buffer[r_bufferdata_cycle][type];
-	offset = mem->current;
+	offset = (int)mem->current;
 	mem->current += padsize;
 
 	// upload the data to the buffer at the chosen offset
@@ -5213,18 +5214,20 @@ static void R_View_UpdateEntityVisible (void)
 	int samples;
 	entity_render_t *ent;
 
-	renderimask = r_refdef.envmap                                    ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL)
-		: r_fb.water.hideplayer                                      ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL)
-		: (chase_active.integer || r_fb.water.renderingscene)  ? RENDER_VIEWMODEL
-		:                                                          RENDER_EXTERIORMODEL;
+	if (r_refdef.envmap || r_fb.water.hideplayer)
+		renderimask = RENDER_EXTERIORMODEL | RENDER_VIEWMODEL;
+	else if (chase_active.integer || r_fb.water.renderingscene)
+		renderimask = RENDER_VIEWMODEL;
+	else
+		renderimask = RENDER_EXTERIORMODEL;
 	if (!r_drawviewmodel.integer)
 		renderimask |= RENDER_VIEWMODEL;
 	if (!r_drawexteriormodel.integer)
 		renderimask |= RENDER_EXTERIORMODEL;
+	memset(r_refdef.viewcache.entityvisible, 0, r_refdef.scene.numentities);
 	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs)
 	{
 		// worldmodel can check visibility
-		memset(r_refdef.viewcache.entityvisible, 0, r_refdef.scene.numentities);
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			ent = r_refdef.scene.entities[i];
@@ -5240,7 +5243,9 @@ static void R_View_UpdateEntityVisible (void)
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			ent = r_refdef.scene.entities[i];
-			r_refdef.viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
+			if (!(ent->flags & renderimask))
+			if (!R_CullBox(ent->mins, ent->maxs) || (ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)))
+				r_refdef.viewcache.entityvisible[i] = true;
 		}
 	}
 	if(r_cullentities_trace.integer && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane && !r_trippy.integer)
@@ -6411,7 +6416,7 @@ static void R_Bloom_StartFrame(void)
 		Cvar_SetValueQuick(&r_damageblur, 0);
 	}
 
-	if (!(r_glsl_postprocess.integer || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial))
+	if (!((r_glsl_postprocess.integer || r_fxaa.integer) || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial))
 	 && !r_bloom.integer
 	 && (R_Stereo_Active() || (r_motionblur.value <= 0 && r_damageblur.value <= 0))
 	 && !useviewfbo
@@ -8142,7 +8147,9 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		{
 			// use an alternate animation if the entity's frame is not 0,
 			// and only if the texture has an alternate animation
-			if (rsurface.ent_alttextures && t->anim_total[1])
+			if (t->animated == 2) // q2bsp
+				t = t->anim_frames[0][ent->framegroupblend[0].frame % t->anim_total[0]];
+			else if (rsurface.ent_alttextures && t->anim_total[1])
 				t = t->anim_frames[1][(t->anim_total[1] >= 2) ? ((int)(rsurface.shadertime * 5.0f) % t->anim_total[1]) : 0];
 			else
 				t = t->anim_frames[0][(t->anim_total[0] >= 2) ? ((int)(rsurface.shadertime * 5.0f) % t->anim_total[0]) : 0];
@@ -8173,7 +8180,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		t->backgroundcurrentskinframe = t->backgroundskinframes[LoopingFrameNumberFromDouble(rsurface.shadertime * t->backgroundskinframerate, t->backgroundnumskinframes)];
 
 	t->currentmaterialflags = t->basematerialflags;
-	t->currentalpha = rsurface.colormod[3];
+	t->currentalpha = rsurface.colormod[3] * t->basealpha;
 	if (t->basematerialflags & MATERIALFLAG_WATERALPHA && (model->brush.supportwateralpha || r_novis.integer || r_trippy.integer))
 		t->currentalpha *= r_wateralpha.value;
 	if(t->basematerialflags & MATERIALFLAG_WATERSHADER && r_fb.water.enabled && !r_refdef.view.isoverlay)
@@ -10657,7 +10664,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, const msurface_
 	// in Quake3 maps as it causes problems with q3map2 sky tricks,
 	// and skymasking also looks very bad when noclipping outside the
 	// level, so don't use it then either.
-	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->type == mod_brushq1 && r_q1bsp_skymasking.integer && !r_refdef.viewcache.world_novis && !r_trippy.integer)
+	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.skymasking && r_q1bsp_skymasking.integer && !r_refdef.viewcache.world_novis && !r_trippy.integer)
 	{
 		R_Mesh_ResetTextureState();
 		if (skyrendermasked)
@@ -12720,6 +12727,7 @@ void R_DrawCustomSurface(skinframe_t *skinframe, const matrix4x4_t *texmatrix, i
 
 	texture.update_lastrenderframe = -1; // regenerate this texture
 	texture.basematerialflags = materialflags | MATERIALFLAG_CUSTOMSURFACE | MATERIALFLAG_WALL;
+	texture.basealpha = 1.0f;
 	texture.currentskinframe = skinframe;
 	texture.currenttexmatrix = *texmatrix; // requires MATERIALFLAG_CUSTOMSURFACE
 	texture.offsetmapping = OFFSETMAPPING_OFF;

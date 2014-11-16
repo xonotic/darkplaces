@@ -1624,7 +1624,9 @@ static void M_Menu_Options_AdjustSliders (int dir)
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&v_contrast, bound(1, v_contrast.value + dir * 0.0625, 4));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&v_gamma, bound(0.5, v_gamma.value + dir * 0.0625, 3));
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&volume, bound(0, volume.value + dir * 0.0625, 1));
+#ifdef CONFIG_CD
 	else if (options_cursor == optnum++) Cvar_SetValueQuick(&bgmvolume, bound(0, bgmvolume.value + dir * 0.0625, 1));
+#endif
 }
 
 static int optnum;
@@ -5479,7 +5481,7 @@ void MR_Init(void)
 	res_count = VID_SortModes(res, res_count, false, false, true);
 	if(res_count)
 	{
-		video_resolutions_count = res_count;
+		video_resolutions_count = (int)res_count;
 		video_resolutions = (video_resolution_t *) Mem_Alloc(cls.permanentmempool, sizeof(*video_resolutions) * (video_resolutions_count + 1));
 		memset(&video_resolutions[video_resolutions_count], 0, sizeof(video_resolutions[video_resolutions_count]));
 		for(i = 0; i < res_count; ++i)

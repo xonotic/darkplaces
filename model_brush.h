@@ -120,6 +120,8 @@ mplane_t;
 #define MATERIALFLAG_NORTLIGHT 134217728
 // alphagen vertex
 #define MATERIALFLAG_ALPHAGEN_VERTEX 268435456
+// use occlusion buffer for corona
+#define MATERIALFLAG_OCCLUDE 536870912
 // combined mask of all attributes that require depth sorted rendering
 #define MATERIALFLAGMASK_DEPTHSORTED (MATERIALFLAG_BLENDED | MATERIALFLAG_NODEPTHTEST)
 // combined mask of all attributes that cause some sort of transparency
@@ -225,6 +227,7 @@ svbspmesh_t;
 
 // Q2 bsp stuff
 
+#define Q2BSPMAGIC ('I' + 'B' * 256 + 'S' * 65536 + 'P' * 16777216)
 #define Q2BSPVERSION	38
 
 // leaffaces, leafbrushes, planes, and verts are still bounded by
@@ -323,9 +326,12 @@ typedef struct q2dmodel_s
 #define	Q2SURF_FLOWING	0x40	// scroll towards angle
 #define	Q2SURF_NODRAW		0x80	// don't bother referencing the texture
 
+#define Q2SURF_HINT		0x100   // make a primary bsp splitter
+#define Q2SURF_SKIP		0x200   // completely ignore, allowing non-closed brushes
 
 
 
+/*
 typedef struct q2dnode_s
 {
 	int			planenum;
@@ -336,13 +342,12 @@ typedef struct q2dnode_s
 	unsigned short	numfaces;	// counting both sides
 } q2dnode_t;
 
-
 typedef struct q2texinfo_s
 {
 	float		vecs[2][4];		// [s/t][xyz offset]
 	int			flags;			// miptex flags + overrides
 	int			value;			// light emission, etc
-	char		texture[32];	// texture name (textures/*.wal)
+	char		texture[32];	// texture name (textures/something.wal)
 	int			nexttexinfo;	// for animations, -1 = end of chain
 } q2texinfo_t;
 
@@ -402,6 +407,7 @@ typedef struct q2darea_s
 	int		numareaportals;
 	int		firstareaportal;
 } q2darea_t;
+*/
 
 
 //Q3 bsp stuff

@@ -22,6 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef QUAKEDEF_H
 #define QUAKEDEF_H
 
+#ifdef __APPLE__
+# include <TargetConditionals.h>
+#endif
+
 #if defined(__GNUC__) && (__GNUC__ > 2)
 #define DP_FUNC_PRINTF(n) __attribute__ ((format (printf, n, n+1)))
 #define DP_FUNC_PURE      __attribute__ ((pure))
@@ -162,8 +166,8 @@ extern char engineversion[128];
 #define	MAX_DLIGHTS				256 ///< max number of dynamic lights (rocket flashes, etc) in scene at once
 #define	MAX_CACHED_PICS			1024 ///< max number of 2D pics loaded at once
 #define	CACHEPICHASHSIZE		256 ///< number of hash buckets for accelerating 2D pic name lookups
-#define	MAX_PARTICLEEFFECTNAME	256 ///< maximum number of unique names of particle effects (for particleeffectnum)
-#define	MAX_PARTICLEEFFECTINFO	4096 ///< maximum number of unique particle effects (each name may associate with several of these)
+#define	MAX_PARTICLEEFFECTNAME	4096 ///< maximum number of unique names of particle effects (for particleeffectnum)
+#define	MAX_PARTICLEEFFECTINFO	8192 ///< maximum number of unique particle effects (each name may associate with several of these)
 #define	MAX_PARTICLETEXTURES	256 ///< maximum number of unique particle textures in the particle font
 #define	MAXCLVIDEOS				65 ///< maximum number of video streams being played back at once (1 is reserved for the playvideo command)
 #define	MAX_DYNAMIC_TEXTURE_COUNT	64 ///< maximum number of dynamic textures (web browsers, playvideo, etc)
@@ -427,7 +431,7 @@ extern cvar_t sessionid;
 # define LINK_TO_LIBVORBIS 1
 # define DP_MOBILETOUCH	1
 # define DP_FREETYPE_STATIC 1
-#elif defined(TARGET_OS_IPHONE) /* must come first because it also defines MACOSX */
+#elif TARGET_OS_IPHONE /* must come first because it also defines MACOSX */
 # define DP_OS_NAME		"iPhoneOS"
 # define DP_OS_STR		"iphoneos"
 # define USE_GLES2		1

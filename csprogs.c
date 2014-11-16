@@ -227,6 +227,7 @@ static void CSQC_SetGlobals (double frametime)
 	prvm_prog_t *prog = CLVM_prog;
 	CSQC_BEGIN
 		PRVM_clientglobalfloat(time) = cl.time;
+		PRVM_clientglobalfloat(cltime) = realtime; // Spike named it that way.
 		PRVM_clientglobalfloat(frametime) = frametime;
 		PRVM_clientglobalfloat(servercommandframe) = cls.servermovesequence;
 		PRVM_clientglobalfloat(clientcommandframe) = cl.movecmd[0].sequence;
@@ -941,7 +942,7 @@ static qboolean CLVM_load_edict(prvm_prog_t *prog, prvm_edict_t *ent)
 qboolean MakeDownloadPacket(const char *filename, unsigned char *data, size_t len, int crc, int cnt, sizebuf_t *buf, int protocol)
 {
 	int packetsize = buf->maxsize - 7; // byte short long
-	int npackets = (len + packetsize - 1) / (packetsize);
+	int npackets = ((int)len + packetsize - 1) / (packetsize);
 	char vabuf[1024];
 
 	if(protocol == PROTOCOL_QUAKEWORLD)
@@ -957,7 +958,7 @@ qboolean MakeDownloadPacket(const char *filename, unsigned char *data, size_t le
 	else if(cnt >= 1 && cnt <= npackets)
 	{
 		unsigned long thispacketoffset = (cnt - 1) * packetsize;
-		int thispacketsize = len - thispacketoffset;
+		int thispacketsize = (int)len - thispacketoffset;
 		if(thispacketsize > packetsize)
 			thispacketsize = packetsize;
 

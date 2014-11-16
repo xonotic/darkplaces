@@ -19,6 +19,7 @@ const char *vm_sv_extensions =
 "DP_CON_SET "
 "DP_CON_SETA "
 "DP_CON_STARTMAP "
+"DP_COVERAGE "
 "DP_CRYPTO "
 "DP_CSQC_BINDMAPS "
 "DP_CSQC_ENTITYWORLDOBJECT "
@@ -653,7 +654,7 @@ static void VM_SV_traceline(prvm_prog_t *prog)
 	if (VEC_IS_NAN(v1[0]) || VEC_IS_NAN(v1[1]) || VEC_IS_NAN(v1[2]) || VEC_IS_NAN(v2[0]) || VEC_IS_NAN(v2[1]) || VEC_IS_NAN(v2[2]))
 		prog->error_cmd("%s: NAN errors detected in traceline('%f %f %f', '%f %f %f', %i, entity %i)\n", prog->name, v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], move, PRVM_EDICT_TO_PROG(ent));
 
-	trace = SV_TraceLine(v1, v2, move, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceLine(v1, v2, move, ent, SV_GenericHitSuperContentsMask(ent), collision_extendtracelinelength.value);
 
 	VM_SetTraceGlobals(prog, &trace);
 }
@@ -692,7 +693,7 @@ static void VM_SV_tracebox(prvm_prog_t *prog)
 	if (VEC_IS_NAN(v1[0]) || VEC_IS_NAN(v1[1]) || VEC_IS_NAN(v1[2]) || VEC_IS_NAN(v2[0]) || VEC_IS_NAN(v2[1]) || VEC_IS_NAN(v2[2]))
 		prog->error_cmd("%s: NAN errors detected in tracebox('%f %f %f', '%f %f %f', '%f %f %f', '%f %f %f', %i, entity %i)\n", prog->name, v1[0], v1[1], v1[2], m1[0], m1[1], m1[2], m2[0], m2[1], m2[2], v2[0], v2[1], v2[2], move, PRVM_EDICT_TO_PROG(ent));
 
-	trace = SV_TraceBox(v1, m1, m2, v2, move, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceBox(v1, m1, m2, v2, move, ent, SV_GenericHitSuperContentsMask(ent), collision_extendtraceboxlength.value);
 
 	VM_SetTraceGlobals(prog, &trace);
 }
@@ -728,7 +729,7 @@ static trace_t SV_Trace_Toss(prvm_prog_t *prog, prvm_edict_t *tossent, prvm_edic
 		VectorCopy(PRVM_serveredictvector(tossent, origin), tossentorigin);
 		VectorCopy(PRVM_serveredictvector(tossent, mins), tossentmins);
 		VectorCopy(PRVM_serveredictvector(tossent, maxs), tossentmaxs);
-		trace = SV_TraceBox(tossentorigin, tossentmins, tossentmaxs, end, MOVE_NORMAL, tossent, SV_GenericHitSuperContentsMask(tossent));
+		trace = SV_TraceBox(tossentorigin, tossentmins, tossentmaxs, end, MOVE_NORMAL, tossent, SV_GenericHitSuperContentsMask(tossent), collision_extendmovelength.value);
 		VectorCopy (trace.endpos, PRVM_serveredictvector(tossent, origin));
 		PRVM_serveredictvector(tossent, velocity)[2] -= gravity;
 
@@ -1156,13 +1157,13 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 	VectorCopy(PRVM_serveredictvector(ent, origin), entorigin);
 	VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
 	VectorCopy(PRVM_serveredictvector(ent, maxs), entmaxs);
-	trace = SV_TraceBox(entorigin, entmins, entmaxs, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceBox(entorigin, entmins, entmaxs, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent), collision_extendmovelength.value);
 	if (trace.startsolid && sv_gameplayfix_droptofloorstartsolid.integer)
 	{
 		vec3_t offset, org;
 		VectorSet(offset, 0.5f * (PRVM_serveredictvector(ent, mins)[0] + PRVM_serveredictvector(ent, maxs)[0]), 0.5f * (PRVM_serveredictvector(ent, mins)[1] + PRVM_serveredictvector(ent, maxs)[1]), PRVM_serveredictvector(ent, mins)[2]);
 		VectorAdd(PRVM_serveredictvector(ent, origin), offset, org);
-		trace = SV_TraceLine(org, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent));
+		trace = SV_TraceLine(org, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent), collision_extendmovelength.value);
 		VectorSubtract(trace.endpos, offset, trace.endpos);
 		if (trace.startsolid)
 		{
@@ -1310,7 +1311,7 @@ static void VM_SV_aim(prvm_prog_t *prog)
 // try sending a trace straight
 	VectorCopy (PRVM_serverglobalvector(v_forward), dir);
 	VectorMA (start, 2048, dir, end);
-	tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY);
+	tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, collision_extendmovelength.value);
 	if (tr.ent && PRVM_serveredictfloat(((prvm_edict_t *)tr.ent), takedamage) == DAMAGE_AIM
 	&& (!teamplay.integer || PRVM_serveredictfloat(ent, team) <=0 || PRVM_serveredictfloat(ent, team) != PRVM_serveredictfloat(((prvm_edict_t *)tr.ent), team)) )
 	{
@@ -1342,7 +1343,7 @@ static void VM_SV_aim(prvm_prog_t *prog)
 		dist = DotProduct (dir, PRVM_serverglobalvector(v_forward));
 		if (dist < bestdist)
 			continue;	// to far to turn
-		tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY);
+		tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, collision_extendmovelength.value);
 		if (tr.ent == check)
 		{	// can shoot at this one
 			bestdist = dist;
@@ -1495,8 +1496,8 @@ static void VM_SV_WritePicture(prvm_prog_t *prog)
 	if(Image_Compress(imgname, size, &buf, &size))
 	{
 		// actual picture
-		MSG_WriteShort(WriteDest(prog), size);
-		SZ_Write(WriteDest(prog), (unsigned char *) buf, size);
+		MSG_WriteShort(WriteDest(prog), (int)size);
+		SZ_Write(WriteDest(prog), (unsigned char *) buf, (int)size);
 	}
 	else
 	{
@@ -3823,6 +3824,9 @@ NULL,							// #637
 NULL,							// #638
 VM_digest_hex,						// #639
 NULL,							// #640
+NULL,							// #641
+VM_coverage,						// #642
+NULL,							// #643
 };
 
 const int vm_sv_numbuiltins = sizeof(vm_sv_builtins) / sizeof(prvm_builtin_t);

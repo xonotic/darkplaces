@@ -269,6 +269,9 @@ static rtexture_t *r_shadow_fb_colortexture;
 // lights are reloaded when this changes
 char r_shadow_mapname[MAX_QPATH];
 
+// buffer for doing corona fading
+unsigned int r_shadow_occlusion_buf = 0;
+
 // used only for light filters (cubemaps)
 rtexturepool_t *r_shadow_filters_texturepool;
 
@@ -2418,7 +2421,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 	if (enable && r_shadow_bouncegrid_static.integer)
 	{
 		enable = false;
-		range = Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray); // checked
+		range = (unsigned int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray); // checked
 		for (lightindex = 0;lightindex < range;lightindex++)
 		{
 			light = (dlight_t *) Mem_ExpandableArray_RecordAtIndex(&r_shadow_worldlightsarray, lightindex);
@@ -2605,7 +2608,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 	// clear variables that produce warnings otherwise
 	memset(splatcolor, 0, sizeof(splatcolor));
 	// iterate world rtlights
-	range = Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray); // checked
+	range = (unsigned int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray); // checked
 	range1 = settings.staticmode ? 0 : r_refdef.scene.numlights;
 	range2 = range + range1;
 	photoncount = 0;
@@ -2651,7 +2654,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 		w = r_shadow_lightintensityscale.value * (rtlight->ambientscale + rtlight->diffusescale + rtlight->specularscale);
 		if (w * VectorLength2(rtlight->color) == 0.0f)
 			continue;
-		w *= (rtlight->style >= 0 ? r_refdef.scene.rtlightstylevalue[rtlight->style] : 1);
+		w *= ((rtlight->style >= 0 && rtlight->style < MAX_LIGHTSTYLES) ? r_refdef.scene.rtlightstylevalue[rtlight->style] : 1);
 		VectorScale(rtlight->color, w, rtlight->photoncolor);
 		//if (!VectorLength2(rtlight->photoncolor))
 		//	continue;
@@ -2715,7 +2718,7 @@ void R_Shadow_UpdateBounceGridTexture(void)
 				if (settings.staticmode)
 				{
 					// static mode fires a LOT of rays but none of them are identical, so they are not cached
-					cliptrace = CL_TraceLine(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), NULL, hitsupercontentsmask, true, false, NULL, true, true);
+					cliptrace = CL_TraceLine(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), NULL, hitsupercontentsmask, collision_extendmovelength.value, true, false, NULL, true, true);
 				}
 				else
 				{
@@ -3968,7 +3971,7 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 	rtlight->currentcubemap = rtlight->cubemapname[0] ? R_GetCubemap(rtlight->cubemapname) : r_texture_whitecube;
 
 	// look up the light style value at this time
-	f = (rtlight->style >= 0 ? r_refdef.scene.rtlightstylevalue[rtlight->style] : 1) * r_shadow_lightintensityscale.value;
+	f = ((rtlight->style >= 0 && rtlight->style < MAX_LIGHTSTYLES) ? r_refdef.scene.rtlightstylevalue[rtlight->style] : 1) * r_shadow_lightintensityscale.value;
 	VectorScale(rtlight->color, f, rtlight->currentcolor);
 	/*
 	if (rtlight->selected)
@@ -4629,7 +4632,7 @@ void R_Shadow_PrepareLights(int fbo, rtexture_t *depthtexture, rtexture_t *color
 		for (lnum = 0;lnum < r_refdef.scene.numlights;lnum++)
 		{
 			rtlight_t *rtlight = r_refdef.scene.lights[lnum];
-			f = (rtlight->style >= 0 ? r_refdef.scene.lightstylevalue[rtlight->style] : 1) * r_shadow_lightintensityscale.value;
+			f = ((rtlight->style >= 0 && rtlight->style < MAX_LIGHTSTYLES) ? r_refdef.scene.lightstylevalue[rtlight->style] : 1) * r_shadow_lightintensityscale.value;
 			VectorScale(rtlight->color, f, rtlight->currentcolor);
 		}
 	}
@@ -5147,7 +5150,9 @@ static float spritetexcoord2f[4*2] = {0, 1, 0, 0, 1, 0, 1, 1};
 static void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 {
 	vec3_t color;
+	unsigned int occlude = 0;
 	GLint allpixels = 0, visiblepixels = 0;
+
 	// now we have to check the query result
 	if (rtlight->corona_queryindex_visiblepixels)
 	{
@@ -5160,34 +5165,53 @@ static void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 		case RENDERPATH_GLES2:
 #if defined(GL_SAMPLES_PASSED_ARB) && !defined(USE_GLES2)
 			CHECKGLERROR
-			qglGetQueryObjectivARB(rtlight->corona_queryindex_visiblepixels, GL_QUERY_RESULT_ARB, &visiblepixels);
-			qglGetQueryObjectivARB(rtlight->corona_queryindex_allpixels, GL_QUERY_RESULT_ARB, &allpixels);
+			// See if we can use the GPU-side method to prevent implicit sync
+			if (vid.support.arb_query_buffer_object) {
+#define BUFFER_OFFSET(i)    ((void*)NULL + (i))
+				if (!r_shadow_occlusion_buf) {
+					qglGenBuffersARB(1, &r_shadow_occlusion_buf);
+					qglBindBufferARB(GL_QUERY_BUFFER_ARB, r_shadow_occlusion_buf);
+					qglBufferDataARB(GL_QUERY_BUFFER_ARB, 8, NULL, GL_DYNAMIC_COPY);
+				} else {
+					qglBindBufferARB(GL_QUERY_BUFFER_ARB, r_shadow_occlusion_buf);
+				}
+				qglGetQueryObjectivARB(rtlight->corona_queryindex_visiblepixels, GL_QUERY_RESULT_ARB, BUFFER_OFFSET(0));
+				qglGetQueryObjectivARB(rtlight->corona_queryindex_allpixels, GL_QUERY_RESULT_ARB, BUFFER_OFFSET(4));
+				qglBindBufferBase(GL_UNIFORM_BUFFER, 0, r_shadow_occlusion_buf);
+				occlude = MATERIALFLAG_OCCLUDE;
+			} else {
+				qglGetQueryObjectivARB(rtlight->corona_queryindex_visiblepixels, GL_QUERY_RESULT_ARB, &visiblepixels);
+				qglGetQueryObjectivARB(rtlight->corona_queryindex_allpixels, GL_QUERY_RESULT_ARB, &allpixels); 
+				if (visiblepixels < 1 || allpixels < 1)
+					return;
+				rtlight->corona_visibility *= bound(0, (float)visiblepixels / (float)allpixels, 1);
+			}
+			cscale *= rtlight->corona_visibility;
 			CHECKGLERROR
-#endif
 			break;
+#else
+			return;
+#endif
 		case RENDERPATH_D3D9:
 			Con_DPrintf("FIXME D3D9 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-			break;
+			return;
 		case RENDERPATH_D3D10:
 			Con_DPrintf("FIXME D3D10 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-			break;
+			return;
 		case RENDERPATH_D3D11:
 			Con_DPrintf("FIXME D3D11 %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-			break;
+			return;
 		case RENDERPATH_SOFT:
 			//Con_DPrintf("FIXME SOFT %s:%i %s\n", __FILE__, __LINE__, __FUNCTION__);
-			break;
-		}
-		//Con_Printf("%i of %i pixels\n", (int)visiblepixels, (int)allpixels);
-		if (visiblepixels < 1 || allpixels < 1)
 			return;
-		rtlight->corona_visibility *= bound(0, (float)visiblepixels / (float)allpixels, 1);
-		cscale *= rtlight->corona_visibility;
+		default:
+			return;
+		}
 	}
 	else
 	{
 		// FIXME: these traces should scan all render entities instead of cl.world
-		if (CL_TraceLine(r_refdef.view.origin, rtlight->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction < 1)
+		if (CL_TraceLine(r_refdef.view.origin, rtlight->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
 			return;
 	}
 	VectorScale(rtlight->currentcolor, cscale, color);
@@ -5202,7 +5226,7 @@ static void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 		}
 		R_CalcSprite_Vertex3f(vertex3f, rtlight->shadoworigin, r_refdef.view.right, r_refdef.view.up, scale, -scale, -scale, scale);
 		RSurf_ActiveCustomEntity(&identitymatrix, &identitymatrix, RENDER_NODEPTHTEST, 0, color[0], color[1], color[2], 1, 4, vertex3f, spritetexcoord2f, NULL, NULL, NULL, NULL, 2, polygonelement3i, polygonelement3s, false, false);
-		R_DrawCustomSurface(r_shadow_lightcorona, &identitymatrix, MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE | MATERIALFLAG_NODEPTHTEST, 0, 4, 0, 2, false, false);
+		R_DrawCustomSurface(r_shadow_lightcorona, &identitymatrix, MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE | MATERIALFLAG_NODEPTHTEST | occlude, 0, 4, 0, 2, false, false);
 		if(negated)
 			GL_BlendEquationSubtract(false);
 	}
@@ -5241,11 +5265,11 @@ void R_Shadow_DrawCoronas(void)
 		if (usequery)
 		{
 			GL_ColorMask(0,0,0,0);
-			if (r_maxqueries < (range + r_refdef.scene.numlights) * 2)
+			if (r_maxqueries < ((unsigned int)range + r_refdef.scene.numlights) * 2)
 			if (r_maxqueries < MAX_OCCLUSION_QUERIES)
 			{
 				i = r_maxqueries;
-				r_maxqueries = (range + r_refdef.scene.numlights) * 4;
+				r_maxqueries = ((unsigned int)range + r_refdef.scene.numlights) * 4;
 				r_maxqueries = min(r_maxqueries, MAX_OCCLUSION_QUERIES);
 				CHECKGLERROR
 				qglGenQueriesARB(r_maxqueries - i, r_queries + i);
@@ -5343,12 +5367,10 @@ static dlight_t *R_Shadow_NewWorldLight(void)
 static void R_Shadow_UpdateWorldLight(dlight_t *light, vec3_t origin, vec3_t angles, vec3_t color, vec_t radius, vec_t corona, int style, int shadowenable, const char *cubemapname, vec_t coronasizescale, vec_t ambientscale, vec_t diffusescale, vec_t specularscale, int flags)
 {
 	matrix4x4_t matrix;
+
+	// note that style is no longer validated here, -1 is used for unstyled lights and >= MAX_LIGHTSTYLES is accepted for sake of editing rtlights files that might be out of bounds but perfectly formatted
+
 	// validate parameters
-	if (style < 0 || style >= MAX_LIGHTSTYLES)
-	{
-		Con_Printf("R_Shadow_NewWorldLight: invalid light style number %i, must be >= 0 and < %i\n", light->style, MAX_LIGHTSTYLES);
-		style = 0;
-	}
 	if (!cubemapname)
 		cubemapname = "";
 
@@ -5485,7 +5507,7 @@ int R_Shadow_GetRTLightInfo(unsigned int lightindex, float *origin, float *radiu
 	unsigned int range;
 	dlight_t *light;
 	rtlight_t *rtlight;
-	range = Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
+	range = (unsigned int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
 	if (lightindex >= range)
 		return -1;
 	light = (dlight_t *) Mem_ExpandableArray_RecordAtIndex(&r_shadow_worldlightsarray, lightindex);
@@ -5522,7 +5544,7 @@ static void R_Shadow_SelectLightInView(void)
 		if (rating >= 0.95)
 		{
 			rating /= (1 + 0.0625f * sqrt(DotProduct(temp, temp)));
-			if (bestrating < rating && CL_TraceLine(light->origin, r_refdef.view.origin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction == 1.0f)
+			if (bestrating < rating && CL_TraceLine(light->origin, r_refdef.view.origin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1.0f)
 			{
 				bestrating = rating;
 				best = light;
@@ -5972,7 +5994,7 @@ static void R_Shadow_SetCursorLocationForView(void)
 	vec3_t dest, endpos;
 	trace_t trace;
 	VectorMA(r_refdef.view.origin, r_editlights_cursordistance.value, r_refdef.view.forward, dest);
-	trace = CL_TraceLine(r_refdef.view.origin, dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true);
+	trace = CL_TraceLine(r_refdef.view.origin, dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true);
 	if (trace.fraction < 1)
 	{
 		dist = trace.fraction * r_editlights_cursordistance.value;
@@ -6460,7 +6482,7 @@ void R_Shadow_EditLights_DrawSelectedLightProperties(void)
 		if (!light)
 			continue;
 		if (light == r_shadow_selectedlight)
-			lightnumber = lightindex;
+			lightnumber = (int)lightindex;
 		lightcount++;
 	}
 	dpsnprintf(temp, sizeof(temp), "Cursor origin: %.0f %.0f %.0f", r_editlights_cursorlocation[0], r_editlights_cursorlocation[1], r_editlights_cursorlocation[2]); DrawQ_String(x, y, temp, 0, 8, 8, 1, 1, 1, 1, 0, NULL, false, FONT_DEFAULT);y += 8;
@@ -6736,7 +6758,7 @@ void R_LightPoint(float *color, const vec3_t p, const int flags)
 	if (flags & LP_RTWORLD)
 	{
 		flag = r_refdef.scene.rtworld ? LIGHTFLAG_REALTIMEMODE : LIGHTFLAG_NORMALMODE;
-		numlights = Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
+		numlights = (int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
 		for (i = 0; i < numlights; i++)
 		{
 			dlight = (dlight_t *) Mem_ExpandableArray_RecordAtIndex(&r_shadow_worldlightsarray, i);
@@ -6756,7 +6778,7 @@ void R_LightPoint(float *color, const vec3_t p, const int flags)
 			if (f <= 0)
 				continue;
 			// todo: add to both ambient and diffuse
-			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction == 1)
+			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
 				VectorMA(color, f, light->currentcolor, color);
 		}
 	}
@@ -6777,7 +6799,7 @@ void R_LightPoint(float *color, const vec3_t p, const int flags)
 			if (f <= 0)
 				continue;
 			// todo: add to both ambient and diffuse
-			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction == 1)
+			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
 				VectorMA(color, f, light->color, color);
 		}
 	}
@@ -6842,7 +6864,7 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 	if (flags & LP_RTWORLD)
 	{
 		flag = r_refdef.scene.rtworld ? LIGHTFLAG_REALTIMEMODE : LIGHTFLAG_NORMALMODE;
-		numlights = Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
+		numlights = (int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray);
 		for (i = 0; i < numlights; i++)
 		{
 			dlight = (dlight_t *) Mem_ExpandableArray_RecordAtIndex(&r_shadow_worldlightsarray, i);
@@ -6861,7 +6883,7 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 			intensity = min(1.0f, (1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist)) * r_shadow_lightintensityscale.value;
 			if (intensity <= 0.0f)
 				continue;
-			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction < 1)
+			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
 				continue;
 			// scale down intensity to add to both ambient and diffuse
 			//intensity *= 0.5f;
@@ -6894,7 +6916,7 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 			intensity = (1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist) * r_shadow_lightintensityscale.value;
 			if (intensity <= 0.0f)
 				continue;
-			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, true, false, NULL, false, true).fraction < 1)
+			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
 				continue;
 			// scale down intensity to add to both ambient and diffuse
 			//intensity *= 0.5f;
