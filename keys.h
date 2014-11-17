@@ -367,9 +367,23 @@ extern	keydest_t	key_dest;
 extern	int			key_consoleactive;
 extern	char		*keybindings[MAX_BINDMAPS][MAX_KEYS];
 
-extern int chat_mode; // 0 for say, 1 for say_team, -1 for command
+typedef enum
+{
+	DP_CHAT_MODE_COMMAND,
+	DP_CHAT_MODE_SAY,
+	DP_CHAT_MODE_SAYTEAM
+} dp_chat_mode_t; /* Added by Izy (izy from izysoftware.com) */
+extern dp_chat_mode_t chat_mode;
 extern char chat_buffer[MAX_INPUTLINE];
 extern unsigned int chat_bufferlen;
+extern unsigned int chat_cursor; // Added by Izy (izy from izysoftware.com)
+typedef struct
+{
+#define DP_CHAT_MODIFIERS_OFF { false, false }
+	qboolean  ctrl;
+	qboolean  ins;
+} dp_chat_modifiers_t; /* Added by Izy (izy from izysoftware.com) */
+extern dp_chat_modifiers_t chat_modifiers;
 
 void Key_ClearEditLine(int edit_line);
 void Key_WriteBindings(qfile_t *f);
