@@ -11,6 +11,7 @@
 #include "cap_avi.h"
 #include "cap_ogg.h"
 #endif
+#include "thread.h"
 
 // we have to include snd_main.h here only to get access to snd_renderbuffer->format.speed when writing the AVI headers
 #include "snd_main.h"
@@ -52,6 +53,7 @@ cvar_t scr_infobar_height = {0, "scr_infobar_height", "8", "the height of the in
 cvar_t vid_conwidth = {CVAR_SAVE, "vid_conwidth", "640", "virtual width of 2D graphics system"};
 cvar_t vid_conheight = {CVAR_SAVE, "vid_conheight", "480", "virtual height of 2D graphics system"};
 cvar_t vid_pixelheight = {CVAR_SAVE, "vid_pixelheight", "1", "adjusts vertical field of vision to account for non-square pixels (1280x1024 on a CRT monitor for example)"};
+cvar_t scr_screenshot_async = {CVAR_SAVE, "scr_screenshot_async","1", "save screenshot asynchronously (fast but memory expensive)"}; // Added by Izy (izy from http://www.izysoftware.com )
 cvar_t scr_screenshot_jpeg = {CVAR_SAVE, "scr_screenshot_jpeg","1", "save jpeg instead of targa"};
 cvar_t scr_screenshot_jpeg_quality = {CVAR_SAVE, "scr_screenshot_jpeg_quality","0.9", "image quality of saved jpeg"};
 cvar_t scr_screenshot_png = {CVAR_SAVE, "scr_screenshot_png","0", "save png instead of targa"};
@@ -1310,8 +1312,11 @@ static void SCR_SizeDown_f (void)
 #ifdef CONFIG_VIDEO_CAPTURE
 void SCR_CaptureVideo_EndVideo(void);
 #endif
+void SCR_Screenshot_Async_End(void);
+void SCR_Screenshot_Async_Init(void);
 void CL_Screen_Shutdown(void)
 {
+	SCR_Screenshot_Async_End();
 #ifdef CONFIG_VIDEO_CAPTURE
 	SCR_CaptureVideo_EndVideo();
 #endif
@@ -1357,6 +1362,7 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable (&vid_conwidth);
 	Cvar_RegisterVariable (&vid_conheight);
 	Cvar_RegisterVariable (&vid_pixelheight);
+	Cvar_RegisterVariable (&scr_screenshot_async);
 	Cvar_RegisterVariable (&scr_screenshot_jpeg);
 	Cvar_RegisterVariable (&scr_screenshot_jpeg_quality);
 	Cvar_RegisterVariable (&scr_screenshot_png);
@@ -1419,6 +1425,7 @@ void CL_Screen_Init(void)
 #ifdef CONFIG_VIDEO_CAPTURE
 	SCR_CaptureVideo_Ogg_Init();
 #endif
+	SCR_Screenshot_Async_Init();
 
 	scr_initialized = true;
 }
@@ -1438,6 +1445,7 @@ void SCR_ScreenShot_f (void)
 	unsigned char *buffer2;
 	qboolean jpeg = (scr_screenshot_jpeg.integer != 0);
 	qboolean png = (scr_screenshot_png.integer != 0) && !jpeg;
+	qboolean alpha = (scr_screenshot_alpha.integer != 0);
 	char vabuf[1024];
 
 	if (Cmd_Argc() == 2)
@@ -1524,26 +1532,45 @@ void SCR_ScreenShot_f (void)
 		shotnumber++;
 	}
 
-	buffer1 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * 4);
-	buffer2 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * (scr_screenshot_alpha.integer ? 4 : 3));
-
-	if (SCR_ScreenShot (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, jpeg, png, true, scr_screenshot_alpha.integer != 0))
-		Con_Printf("Wrote %s\n", filename);
-	else
+	if(scr_screenshot_async.integer)
 	{
-		Con_Printf("Unable to write %s\n", filename);
-		if(jpeg || png)
+		/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+		if(SCR_ScreenShot_Async(filename, 0, 0, vid.width, vid.height, false, false, false, jpeg, png, true, alpha, GL_ReadPixelsBGRA))
 		{
-			if(SCR_ScreenShot (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, scr_screenshot_alpha.integer != 0))
-			{
-				strlcpy(filename + strlen(filename) - 3, "tga", 4);
-				Con_Printf("Wrote %s\n", filename);
-			}
+			Con_Printf("Writing %s\n", filename);
+		}
+		else
+		{
+			Con_Printf("Unable to write %s\n", filename);
 		}
 	}
+	else
+	{
+		// Join pending threads if you switched back to the sync mode at runtime
+		// This is gonna release some memory.
+		SCR_Screenshot_AsyncWait(); // Izy's Patch
 
-	Mem_Free (buffer1);
-	Mem_Free (buffer2);
+	    buffer1 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * 4);
+	    buffer2 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * (scr_screenshot_alpha.integer ? 4 : 3));
+
+	    if (SCR_ScreenShot_Sync (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, jpeg, png, true, alpha, GL_ReadPixelsBGRA))
+		    Con_Printf("Wrote %s\n", filename);
+	    else
+	    {
+		    Con_Printf("Unable to write %s\n", filename);
+		    if(jpeg || png)
+		    {
+			    if(SCR_ScreenShot_Sync (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, alpha, GL_ReadPixelsBGRA))
+			    {
+				    strlcpy(filename + strlen(filename) - 3, "tga", 4);
+				    Con_Printf("Wrote %s\n", filename);
+			    }
+		    }
+	    }
+
+	    Mem_Free (buffer1);
+	    Mem_Free (buffer2);
+	}
 }
 
 #ifdef CONFIG_VIDEO_CAPTURE
@@ -1568,9 +1595,9 @@ static void SCR_CaptureVideo_BeginVideo(void)
 		height = vid.height;
 
 	// ensure it's all even; if not, scale down a little
-	if(width % 1)
+	if(width & 1) // Izy's Patch
 		--width;
-	if(height % 1)
+	if(height & 1) // Izy's Patch
 		--height;
 
 	cls.capturevideo.width = width;
@@ -1911,7 +1938,7 @@ static void R_Envmap_f (void)
 		R_Mesh_Start();
 		R_RenderView();
 		R_Mesh_Finish();
-		SCR_ScreenShot(filename, buffer1, buffer2, 0, vid.height - (r_refdef.view.y + r_refdef.view.height), size, size, envmapinfo[j].flipx, envmapinfo[j].flipy, envmapinfo[j].flipdiagonaly, false, false, false, false);
+		SCR_ScreenShot_Sync(filename, buffer1, buffer2, 0, vid.height - (r_refdef.view.y + r_refdef.view.height), size, size, envmapinfo[j].flipx, envmapinfo[j].flipy, envmapinfo[j].flipdiagonaly, false, false, false, false, GL_ReadPixelsBGRA);
 	}
 
 	Mem_Free (buffer1);
@@ -1995,12 +2022,13 @@ void SHOWLMP_drawall(void)
 
 // buffer1: 4*w*h
 // buffer2: 3*w*h (or 4*w*h if screenshotting alpha too)
-qboolean SCR_ScreenShot(char *filename, unsigned char *buffer1, unsigned char *buffer2, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha)
+// ReadPixelsBGRA: GL_ReadPixelsBGRA
+qboolean SCR_ScreenShot_Sync(char *filename, unsigned char *buffer1, unsigned char *buffer2, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha, void (*ReadPixelsBGRA)(int x, int y, int width, int height, unsigned char *outpixels))
 {
 	int	indices[4] = {0,1,2,3}; // BGRA
 	qboolean ret;
 
-	GL_ReadPixelsBGRA(x, y, width, height, buffer1);
+	ReadPixelsBGRA(x, y, width, height, buffer1); // Izy's Patch
 
 	if(gammacorrect && (scr_screenshot_gammaboost.value != 1 || WANT_SCREENSHOT_HWGAMMA))
 	{
@@ -2058,6 +2086,164 @@ qboolean SCR_ScreenShot(char *filename, unsigned char *buffer1, unsigned char *b
 			ret = Image_WriteTGABGR_preflipped (filename, width, height, buffer2);
 	}
 
+	return ret;
+}
+
+struct scr_screenshots_thread_s
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	struct scr_screenshots_thread_s *next, *back;
+	void *thread;
+	int ended;
+
+	char filename[MAX_QPATH];
+	int x;
+	int y;
+	int width;
+	int height;
+	qboolean flipx;
+	qboolean flipy;
+	qboolean flipdiagonal;
+	qboolean jpeg;
+	qboolean png;
+	qboolean gammacorrect;
+	qboolean keep_alpha;
+};
+
+static mempool_t *scr_screenshots_mempool;
+static struct scr_screenshots_thread_s *scr_screenshots_thread_last = NULL;
+static struct scr_screenshots_thread_s *scr_screenshots_thread_first = NULL;
+
+void SCR_Screenshot_Async_Init(void)
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	scr_screenshots_mempool = Mem_AllocPool("Screenshots", 0, NULL);
+}
+
+void SCR_Screenshot_Async_End(void)
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	SCR_Screenshot_AsyncWait();
+	Mem_FreePool(&scr_screenshots_mempool);
+}
+
+void SCR_Screenshot_AsyncWait(void)
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	struct scr_screenshots_thread_s *it, *next;
+	for(it = scr_screenshots_thread_first; it; it = next)
+	{
+		next = it->next;
+		Thread_WaitThread(it->thread, NULL);
+		Mem_Free(it);
+	}
+	scr_screenshots_thread_last = scr_screenshots_thread_first = NULL;
+}
+
+static void Dummy_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpixels);
+static void Dummy_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpixels)
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	return;
+}
+
+static int SCR_ScreenShot_Async_Thread(void *data);
+static int SCR_ScreenShot_Async_Thread(void *data)
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	qboolean ret;
+	struct scr_screenshots_thread_s *it;
+	unsigned char *buffer1;
+	unsigned char *buffer2;
+	int width;
+	int height;
+	qboolean keep_alpha;
+	Thread_SetThreadPriorityLow();
+	it = (struct scr_screenshots_thread_s *)data;
+	width = it->width;
+	height = it->height;
+	keep_alpha = it->keep_alpha;
+	buffer1 = (unsigned char *)(it+1);
+	buffer2 = (unsigned char *)Mem_Alloc(scr_screenshots_mempool, width * height * (keep_alpha ? 4 : 3));
+	ret = SCR_ScreenShot_Sync(it->filename, buffer1, buffer2, it->x, it->y, width, height, it->flipx, it->flipy, it->flipdiagonal, it->jpeg, it->png, it->gammacorrect, keep_alpha, Dummy_ReadPixelsBGRA);
+	Mem_Free(buffer2);
+	it->ended = 1; // don't care about mutex sync objects...
+	return ret;
+}
+
+qboolean SCR_ScreenShot_Async(char *filename, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha, void (*ReadPixelsBGRA)(int x, int y, int width, int height, unsigned char *outpixels))
+{
+	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
+	qfile_t* file;
+	struct scr_screenshots_thread_s *it, *next, *cached = NULL;
+	qboolean ret;
+	unsigned char *buffer1;
+	unsigned char *buffer2;
+	if(Thread_HasThreads())
+	{
+		file = FS_OpenRealFile(filename, "wb", true); // Reserve our filename
+		if (!file)
+			goto failure0;
+		FS_Close(file);
+		for(it = scr_screenshots_thread_first; it && it->ended; it = next)
+		{
+			scr_screenshots_thread_first = next = it->next;
+			if(scr_screenshots_thread_last == it)
+				scr_screenshots_thread_last = NULL;
+			Thread_WaitThread(it->thread, NULL);
+			if(cached == NULL && width == it->width && height == it->height)
+				cached = it;
+			else
+				Mem_Free(it);
+		}
+		it = cached ? cached : (struct scr_screenshots_thread_s *)Mem_Alloc(scr_screenshots_mempool, sizeof(struct scr_screenshots_thread_s) + width * height * 4);
+		if (!it)
+			goto failure1;
+		it->ended = 0; // won't care about mutex sync objects...
+		strlcpy(it->filename, filename, MAX_QPATH);
+		it->x=x;
+		it->y=y;
+		it->width=width;
+		it->height=height;
+		it->flipx=flipx;
+		it->flipy=flipy;
+		it->flipdiagonal=flipdiagonal;
+		it->jpeg=jpeg;
+		it->png=png;
+		it->gammacorrect=gammacorrect;
+		it->keep_alpha=keep_alpha;
+		ReadPixelsBGRA(x, y, width, height, (unsigned char *)(it+1));
+		it->thread = Thread_CreateThread(SCR_ScreenShot_Async_Thread, it);
+		if (!it->thread)
+			goto failure2;
+		it->next = NULL;
+		it->back = scr_screenshots_thread_last;
+		if(scr_screenshots_thread_last)
+			scr_screenshots_thread_last->next = it;
+		scr_screenshots_thread_last = it;
+		if(scr_screenshots_thread_first == NULL)
+			scr_screenshots_thread_first = it;
+		return true;
+failure2:
+		Mem_Free(it);
+failure1:
+		file = FS_OpenRealFile(filename, "wb", true);
+		if(file)
+		{
+			FS_RemoveOnClose(file);
+			FS_Close(file);
+		}
+failure0:
+		ret = false;
+	}
+	else
+	{
+		buffer1 = (unsigned char *)Mem_Alloc(tempmempool, width * height * 4);
+		buffer2 = (unsigned char *)Mem_Alloc(tempmempool, width * height * (keep_alpha ? 4 : 3));
+		ret = SCR_ScreenShot_Sync(filename, buffer1, buffer2, x, y, width, height, flipx, flipy, flipdiagonal, jpeg, png, gammacorrect, keep_alpha, ReadPixelsBGRA);
+		Mem_Free (buffer1);
+		Mem_Free (buffer2);
+	}
 	return ret;
 }
 
@@ -2235,7 +2421,7 @@ static void SCR_DrawScreen (void)
 			dpsnprintf(filename, sizeof(filename), "timedemoscreenshots/%s%06d.tga", cls.demoname, cls.td_frames);
 			buffer1 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * 4);
 			buffer2 = (unsigned char *)Mem_Alloc(tempmempool, vid.width * vid.height * 3);
-			SCR_ScreenShot(filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, false);
+			SCR_ScreenShot_Sync(filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, false, GL_ReadPixelsBGRA);
 			Mem_Free(buffer1);
 			Mem_Free(buffer2);
 		}

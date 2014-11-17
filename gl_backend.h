@@ -119,7 +119,9 @@ void R_Mesh_ClearBindingsForTexture(int texnum);
 void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtriangles, const int *element3i, const r_meshbuffer_t *element3i_indexbuffer, int element3i_bufferoffset, const unsigned short *element3s, const r_meshbuffer_t *element3s_indexbuffer, int element3s_bufferoffset);
 
 // saves a section of the rendered frame to a .tga or .jpg file
-qboolean SCR_ScreenShot(char *filename, unsigned char *buffer1, unsigned char *buffer2, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha);
+qboolean SCR_ScreenShot_Sync(char *filename, unsigned char *buffer1, unsigned char *buffer2, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha, void (*ReadPixelsBGRA)(int x, int y, int width, int height, unsigned char *outpixels));
+qboolean SCR_ScreenShot_Async(char *filename, int x, int y, int width, int height, qboolean flipx, qboolean flipy, qboolean flipdiagonal, qboolean jpeg, qboolean png, qboolean gammacorrect, qboolean keep_alpha, void (*ReadPixelsBGRA)(int x, int y, int width, int height, unsigned char *outpixels));
+void SCR_Screenshot_AsyncWait(void);
 // used by R_Envmap_f and internally in backend, clears the frame
 void R_ClearScreen(qboolean fogcolor);
 
