@@ -4041,7 +4041,7 @@ void SV_StopThread(void)
 	if (!svs.threaded)
 		return;
 	svs.threadstop = true;
-	Thread_WaitThread(svs.thread, 0);
+	Thread_WaitThread(svs.thread, NULL);
 	Thread_DestroyMutex(svs.threadmutex);
 	svs.threaded = false;
 }

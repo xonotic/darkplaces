@@ -21,15 +21,12 @@ qboolean Thread_HasThreads(void)
 	return true;
 }
 
-void *_Thread_CreateMutex(const char *filename, int fileline)
+void *Thread_CreateMutex(void)
 {
 #ifdef THREADRECURSIVE
 	pthread_mutexattr_t    attr;
 #endif
-	pthread_mutex_t *mutexp = (pthread_mutex_t *) Z_Malloc(sizeof(pthread_mutex_t));
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p mutex create %s:%i\n" , mutexp, filename, fileline);
-#endif
+	pthread_mutex_t *mutexp = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
 #ifdef THREADRECURSIVE
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
@@ -41,135 +38,102 @@ void *_Thread_CreateMutex(const char *filename, int fileline)
 	return mutexp;
 }
 
-void _Thread_DestroyMutex(void *mutex, const char *filename, int fileline)
+void Thread_DestroyMutex(void *mutex)
 {
 	pthread_mutex_t *mutexp = (pthread_mutex_t *) mutex;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p mutex destroy %s:%i\n", mutex, filename, fileline);
-#endif
 	pthread_mutex_destroy(mutexp);
-	Z_Free(mutexp);
+	free(mutexp);
 }
 
-int _Thread_LockMutex(void *mutex, const char *filename, int fileline)
+int Thread_LockMutex(void *mutex)
 {
 	pthread_mutex_t *mutexp = (pthread_mutex_t *) mutex;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p mutex lock %s:%i\n"   , mutex, filename, fileline);
-#endif
 	return pthread_mutex_lock(mutexp);
 }
 
-int _Thread_UnlockMutex(void *mutex, const char *filename, int fileline)
+int Thread_UnlockMutex(void *mutex)
 {
 	pthread_mutex_t *mutexp = (pthread_mutex_t *) mutex;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p mutex unlock %s:%i\n" , mutex, filename, fileline);
-#endif
 	return pthread_mutex_unlock(mutexp);
 }
 
-void *_Thread_CreateCond(const char *filename, int fileline)
+void *Thread_CreateCond(void)
 {
-	pthread_cond_t *condp = (pthread_cond_t *) Z_Malloc(sizeof(pthread_cond_t));
+	pthread_cond_t *condp = (pthread_cond_t *) malloc(sizeof(pthread_cond_t));
 	pthread_cond_init(condp, NULL);
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p cond create %s:%i\n"   , condp, filename, fileline);
-#endif
 	return condp;
 }
 
-void _Thread_DestroyCond(void *cond, const char *filename, int fileline)
+void Thread_DestroyCond(void *cond)
 {
 	pthread_cond_t *condp = (pthread_cond_t *) cond;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p cond destroy %s:%i\n"   , cond, filename, fileline);
-#endif
 	pthread_cond_destroy(condp);
-	Z_Free(condp);
+	free(condp);
 }
 
-int _Thread_CondSignal(void *cond, const char *filename, int fileline)
+int Thread_CondSignal(void *cond)
 {
 	pthread_cond_t *condp = (pthread_cond_t *) cond;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p cond signal %s:%i\n"   , cond, filename, fileline);
-#endif
 	return pthread_cond_signal(condp);
 }
 
-int _Thread_CondBroadcast(void *cond, const char *filename, int fileline)
+int Thread_CondBroadcast(void *cond)
 {
 	pthread_cond_t *condp = (pthread_cond_t *) cond;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p cond broadcast %s:%i\n"   , cond, filename, fileline);
-#endif
 	return pthread_cond_broadcast(condp);
 }
 
-int _Thread_CondWait(void *cond, void *mutex, const char *filename, int fileline)
+int Thread_CondWait(void *cond, void *mutex)
 {
 	pthread_cond_t *condp = (pthread_cond_t *) cond;
 	pthread_mutex_t *mutexp = (pthread_mutex_t *) mutex;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p cond wait %s:%i\n"   , cond, filename, fileline);
-#endif
 	return pthread_cond_wait(condp, mutexp);
 }
 
-void *_Thread_CreateThread(int (*fn)(void *), void *data, const char *filename, int fileline)
+void *Thread_CreateThread(int (*fn)(void *), void *data)
 {
-	pthread_t *threadp = (pthread_t *) Z_Malloc(sizeof(pthread_t));
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p thread create %s:%i\n"   , threadp, filename, fileline);
-#endif
+	pthread_t *threadp = (pthread_t *) malloc(sizeof(pthread_t));
 	int r = pthread_create(threadp, NULL, (void * (*) (void *)) fn, data);
 	if(r)
 	{
-		Z_Free(threadp);
+		free(threadp);
 		return NULL;
 	}
 	return threadp;
 }
 
-int _Thread_WaitThread(void *thread, int retval, const char *filename, int fileline)
+void Thread_WaitThread(void *thread, int *retval)
 {
+	union
+	{
+		void *p;
+		int i;
+	} status;
 	pthread_t *threadp = (pthread_t *) thread;
-	void *status = (void *) (intptr_t) retval;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p thread wait %s:%i\n"   , thread, filename, fileline);
-#endif
-	pthread_join(*threadp, &status);
-	Z_Free(threadp);
-	return (int) (intptr_t) status;
+	pthread_join(*threadp, &status.p);
+	if(retval)
+		*retval = status.i;
+	free(threadp);
 }
 
 #ifdef PTHREAD_BARRIER_SERIAL_THREAD
-void *_Thread_CreateBarrier(unsigned int count, const char *filename, int fileline)
+void *Thread_CreateBarrier(unsigned int count)
 {
-	pthread_barrier_t *b = (pthread_barrier_t *) Z_Malloc(sizeof(pthread_barrier_t));
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier create(%d) %s:%i\n", b, count, filename, fileline);
-#endif
+	pthread_barrier_t *b = (pthread_barrier_t *) malloc(sizeof(pthread_barrier_t));
 	pthread_barrier_init(b, NULL, count);
 	return (void *) b;
 }
 
-void _Thread_DestroyBarrier(void *barrier, const char *filename, int fileline)
+void Thread_DestroyBarrier(void *barrier)
 {
 	pthread_barrier_t *b = (pthread_barrier_t *) barrier;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier destroy %s:%i\n", b, filename, fileline);
-#endif
 	pthread_barrier_destroy(b);
+	free(b); // Izy's Patch
 }
 
-void _Thread_WaitBarrier(void *barrier, const char *filename, int fileline)
+void Thread_WaitBarrier(void *barrier)
 {
 	pthread_barrier_t *b = (pthread_barrier_t *) barrier;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier wait %s:%i\n", b, filename, fileline);
-#endif
 	pthread_barrier_wait(b);
 }
 #else
@@ -182,12 +146,9 @@ typedef struct {
 	void *cond;
 } barrier_t;
 
-void *_Thread_CreateBarrier(unsigned int count, const char *filename, int fileline)
+void *Thread_CreateBarrier(unsigned int count)
 {
-	volatile barrier_t *b = (volatile barrier_t *) Z_Malloc(sizeof(barrier_t));
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier create(%d) %s:%i\n", b, count, filename, fileline);
-#endif
+	volatile barrier_t *b = (volatile barrier_t *) malloc(sizeof(barrier_t));
 	b->needed = count;
 	b->called = 0;
 	b->mutex = Thread_CreateMutex();
@@ -195,22 +156,17 @@ void *_Thread_CreateBarrier(unsigned int count, const char *filename, int fileli
 	return (void *) b;
 }
 
-void _Thread_DestroyBarrier(void *barrier, const char *filename, int fileline)
+void Thread_DestroyBarrier(void *barrier)
 {
 	volatile barrier_t *b = (volatile barrier_t *) barrier;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier destroy %s:%i\n", b, filename, fileline);
-#endif
 	Thread_DestroyMutex(b->mutex);
 	Thread_DestroyCond(b->cond);
+	free((void*)b); // Izy's Patch
 }
 
-void _Thread_WaitBarrier(void *barrier, const char *filename, int fileline)
+void Thread_WaitBarrier(void *barrier)
 {
 	volatile barrier_t *b = (volatile barrier_t *) barrier;
-#ifdef THREADDEBUG
-	Sys_PrintfToTerminal("%p barrier wait %s:%i\n", b, filename, fileline);
-#endif
 	Thread_LockMutex(b->mutex);
 	b->called++;
 	if (b->called == b->needed) {
@@ -224,3 +180,53 @@ void _Thread_WaitBarrier(void *barrier, const char *filename, int fileline)
 	Thread_UnlockMutex(b->mutex);
 }
 #endif
+
+
+void Thread_SetThreadPriorityLow(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
+	pthread_attr_t attr;
+	int policy = 0;
+	int min_prio_for_policy;
+	pthread_attr_init(&attr);
+	pthread_attr_getschedpolicy(&attr, &policy);
+	min_prio_for_policy = sched_get_priority_min(policy);
+	pthread_setschedprio(pthread_self(), min_prio_for_policy);
+	pthread_attr_destroy(&attr);
+}
+
+void Thread_SetThreadPriorityNormal(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
+	pthread_attr_t attr;
+	int policy = 0;
+	int min_prio_for_policy;
+	int max_prio_for_policy;
+	int normal_prio_for_policy;
+	pthread_attr_init(&attr);
+	pthread_attr_getschedpolicy(&attr, &policy);
+	min_prio_for_policy = sched_get_priority_min(policy);
+	max_prio_for_policy = sched_get_priority_max(policy);
+	if(min_prio_for_policy >= 0 && max_prio_for_policy >= 0)
+		normal_prio_for_policy = (max_prio_for_policy-min_prio_for_policy)/2+min_prio_for_policy;
+	else
+		if(min_prio_for_policy < 0 && max_prio_for_policy <= 0)
+			normal_prio_for_policy = (min_prio_for_policy-max_prio_for_policy)/2+max_prio_for_policy;
+		else
+			normal_prio_for_policy = (max_prio_for_policy+min_prio_for_policy)/2;
+	pthread_setschedprio(pthread_self(), normal_prio_for_policy);
+	pthread_attr_destroy(&attr);
+}
+
+void Thread_SetThreadPriorityHigh(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
+	pthread_attr_t attr;
+	int policy = 0;
+	int max_prio_for_policy;
+	pthread_attr_init(&attr);
+	pthread_attr_getschedpolicy(&attr, &policy);
+	max_prio_for_policy = sched_get_priority_max(policy);
+	pthread_setschedprio(pthread_self(), max_prio_for_policy);
+	pthread_attr_destroy(&attr);
+}

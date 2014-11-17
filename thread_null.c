@@ -15,68 +15,82 @@ qboolean Thread_HasThreads(void)
 	return false;
 }
 
-void *_Thread_CreateMutex(const char *filename, int fileline)
+void *Thread_CreateMutex(void)
 {
 	return NULL;
 }
 
-void _Thread_DestroyMutex(void *mutex, const char *filename, int fileline)
+void Thread_DestroyMutex(void *mutex)
 {
 }
 
-int _Thread_LockMutex(void *mutex, const char *filename, int fileline)
-{
-	return -1;
-}
-
-int _Thread_UnlockMutex(void *mutex, const char *filename, int fileline)
+int Thread_LockMutex(void *mutex)
 {
 	return -1;
 }
 
-void *_Thread_CreateCond(const char *filename, int fileline)
+int Thread_UnlockMutex(void *mutex)
+{
+	return -1;
+}
+
+void *Thread_CreateCond(void)
 {
 	return NULL;
 }
 
-void _Thread_DestroyCond(void *cond, const char *filename, int fileline)
+void Thread_DestroyCond(void *cond)
 {
 }
 
-int _Thread_CondSignal(void *cond, const char *filename, int fileline)
-{
-	return -1;
-}
-
-int _Thread_CondBroadcast(void *cond, const char *filename, int fileline)
+int Thread_CondSignal(void *cond)
 {
 	return -1;
 }
 
-int _Thread_CondWait(void *cond, void *mutex, const char *filename, int fileline)
+int Thread_CondBroadcast(void *cond)
 {
 	return -1;
 }
 
-void *_Thread_CreateThread(int (*fn)(void *), void *data, const char *filename, int fileline)
+int Thread_CondWait(void *cond, void *mutex)
+{
+	return -1;
+}
+
+void *Thread_CreateThread(int (*fn)(void *), void *data)
 {
 	return NULL;
 }
 
-int _Thread_WaitThread(void *thread, int retval, const char *filename, int fileline)
+void Thread_WaitThread(void *thread, int *retval)
 {
-	return retval;
 }
 
-void *_Thread_CreateBarrier(unsigned int count, const char *filename, int fileline)
+void *Thread_CreateBarrier(unsigned int count)
 {
 	return NULL;
 }
 
-void _Thread_DestroyBarrier(void *barrier, const char *filename, int fileline)
+void Thread_DestroyBarrier(void *barrier)
 {
 }
 
-void _Thread_WaitBarrier(void *barrier, const char *filename, int fileline)
+void Thread_WaitBarrier(void *barrier)
 {
+}
+
+void Thread_SetThreadPriorityLow(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
+}
+
+void Thread_SetThreadPriorityNormal(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
+}
+
+void Thread_SetThreadPriorityHigh(void)
+{
+	/* Thread Priority added by Izy (izy from http://www.izysoftware.com/) */
 }
