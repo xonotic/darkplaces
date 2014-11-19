@@ -1760,7 +1760,10 @@ void VM_Files_Init(prvm_prog_t *prog)
 {
 	int i;
 	for (i = 0;i < PRVM_MAX_OPENFILES;i++)
+	{
 		prog->openfiles[i] = NULL;
+		prog->open_xml_files[i] = NULL;
+	}
 }
 
 void VM_Files_CloseAll(prvm_prog_t *prog)
@@ -1771,6 +1774,7 @@ void VM_Files_CloseAll(prvm_prog_t *prog)
 		if (prog->openfiles[i])
 			FS_Close(prog->openfiles[i]);
 		prog->openfiles[i] = NULL;
+		XML_Close(prog,i);
 	}
 }
 

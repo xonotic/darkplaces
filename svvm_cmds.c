@@ -2,6 +2,7 @@
 
 #include "prvm_cmds.h"
 #include "jpeg.h"
+#include "xml.h"
 
 //============================================================================
 // Server
@@ -3308,17 +3309,17 @@ NULL,							// #124
 NULL,							// #125
 NULL,							// #126
 NULL,							// #127
-NULL,							// #128
-NULL,							// #129
-NULL,							// #130
-NULL,							// #131
-NULL,							// #132
-NULL,							// #133
-NULL,							// #134
-NULL,							// #135
-NULL,							// #136
-NULL,							// #137
-NULL,							// #138
+VM_xml_open,					// #128
+VM_xml_close,					// #129
+VM_xml_tree_name,				// #130
+VM_xml_tree_text,				// #131
+VM_xml_tree_leaf,				// #132
+VM_xml_tree_child,				// #133
+VM_xml_tree_parent,				// #134
+VM_xml_tree_has_sibling,		// #135
+VM_xml_tree_next,				// #136
+VM_xml_tree_type,				// #137
+VM_xml_tree_root,				// #138
 NULL,							// #139
 NULL,							// #140
 NULL,							// #141

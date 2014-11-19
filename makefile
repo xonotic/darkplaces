@@ -334,6 +334,9 @@ ifeq ($(DP_LINK_CRYPTO_RIJNDAEL), dlopen)
 	CFLAGS_CRYPTO_RIJNDAEL=
 endif
 
+LIB_XML=$(shell xml2-config --libs)
+CFLAGS_LIBXML=$(shell xml2-config --cflags)
+
 ##### Sound configuration #####
 
 ifndef DP_SOUND_API

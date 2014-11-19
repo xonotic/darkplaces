@@ -630,6 +630,7 @@ typedef struct prvm_prog_s
 	fssearch_t			*opensearches[PRVM_MAX_OPENSEARCHES];
 	const char *         opensearches_origin[PRVM_MAX_OPENSEARCHES];
 	skeleton_t			*skeletons[MAX_EDICTS];
+	void*				 open_xml_files[PRVM_MAX_OPENFILES];
 
 	// buffer for storing all tempstrings created during one invocation of ExecuteProgram
 	sizebuf_t			tempstringsbuf;
