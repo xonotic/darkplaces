@@ -189,7 +189,8 @@ OPTIM_DEBUG=$(CPUOPTIMIZATIONS)
 #OPTIM_RELEASE=-O2 -fno-strict-aliasing -fno-math-errno -fno-trapping-math -ffinite-math-only -fno-signaling-nans -fcx-limited-range -funroll-loops $(CPUOPTIMIZATIONS)
 #OPTIM_RELEASE=-O2 -fno-strict-aliasing -funroll-loops $(CPUOPTIMIZATIONS)
 #OPTIM_RELEASE=-O2 -fno-strict-aliasing $(CPUOPTIMIZATIONS)
-OPTIM_RELEASE=-O3 -fno-strict-aliasing $(CPUOPTIMIZATIONS)
+#OPTIM_RELEASE=-O3 -fno-strict-aliasing $(CPUOPTIMIZATIONS)
+OPTIM_RELEASE=-O3 -flto -fno-strict-aliasing $(CPUOPTIMIZATIONS)
 # NOTE: *never* *ever* use the -ffast-math or -funsafe-math-optimizations flag
 
 DO_CC=$(CC) $(CFLAGS) -c $< -o $@
@@ -228,9 +229,9 @@ CMD_UNIXMKDIR=mkdir -p
 ##### Linux specific variables #####
 
 # Link
-LDFLAGS_LINUXCL=$(LDFLAGS_UNIXCOMMON) -lrt -ldl $(LDFLAGS_UNIXCL)
-LDFLAGS_LINUXSV=$(LDFLAGS_UNIXCOMMON) -lrt -ldl
-LDFLAGS_LINUXSDL=$(LDFLAGS_UNIXCOMMON) -lrt -ldl $(LDFLAGS_UNIXSDL)
+LDFLAGS_LINUXCL=$(LDFLAGS_UNIXCOMMON) -lrt -ldl -Wl,-z,now -Wl,-z,relro $(LDFLAGS_UNIXCL)
+LDFLAGS_LINUXSV=$(LDFLAGS_UNIXCOMMON) -lrt -ldl -Wl,-z,now -Wl,-z,relro
+LDFLAGS_LINUXSDL=$(LDFLAGS_UNIXCOMMON) -lrt -ldl -Wl,-z,now -Wl,-z,relro $(LDFLAGS_UNIXSDL)
 
 
 ##### Mac OS X specific variables #####

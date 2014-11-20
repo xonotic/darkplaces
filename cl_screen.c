@@ -120,8 +120,6 @@ extern cvar_t sbar_info_pos;
 extern cvar_t r_fog_clear;
 #define WANT_SCREENSHOT_HWGAMMA (scr_screenshot_hwgamma.integer && vid_usinghwgamma)
 
-int jpeg_supported = false;
-
 qboolean	scr_initialized;		// ready to draw
 
 float		scr_con_current;
@@ -2092,7 +2090,7 @@ qboolean SCR_ScreenShot_Sync(char *filename, unsigned char *buffer1, unsigned ch
 struct scr_screenshots_thread_s
 {
 	/* SCR_ScreenShot_Async added by Izy (izy from http://www.izysoftware.com/) */
-	struct scr_screenshots_thread_s *next, *back;
+	struct scr_screenshots_thread_s *next;
 	void *thread;
 	int ended;
 
@@ -2164,9 +2162,9 @@ static int SCR_ScreenShot_Async_Thread(void *data)
 	height = it->height;
 	keep_alpha = it->keep_alpha;
 	buffer1 = (unsigned char *)(it+1);
-	buffer2 = (unsigned char *)Mem_Alloc(scr_screenshots_mempool, width * height * (keep_alpha ? 4 : 3));
+	buffer2 = (unsigned char *)malloc(width * height * (keep_alpha ? 4 : 3));
 	ret = SCR_ScreenShot_Sync(it->filename, buffer1, buffer2, it->x, it->y, width, height, it->flipx, it->flipy, it->flipdiagonal, it->jpeg, it->png, it->gammacorrect, keep_alpha, Dummy_ReadPixelsBGRA);
-	Mem_Free(buffer2);
+	free(buffer2);
 	it->ended = 1; // don't care about mutex sync objects...
 	return ret;
 }
@@ -2217,7 +2215,6 @@ qboolean SCR_ScreenShot_Async(char *filename, int x, int y, int width, int heigh
 		if (!it->thread)
 			goto failure2;
 		it->next = NULL;
-		it->back = scr_screenshots_thread_last;
 		if(scr_screenshots_thread_last)
 			scr_screenshots_thread_last->next = it;
 		scr_screenshots_thread_last = it;

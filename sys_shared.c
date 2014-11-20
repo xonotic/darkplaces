@@ -4,6 +4,10 @@
 # endif
 #endif
 
+#if defined(__GNUC__) && defined(__FAST_MATH__) // Izy's Patch
+#error "__FAST_MATH__ was defined by the GCC compiler. You are using -ffast-math"
+#endif
+
 #include "quakedef.h"
 #include "thread.h"
 
@@ -533,7 +537,7 @@ static int CPUID_Features(void)
 "        movl    %%edi,%%ebx\n"
         : "=m" (features)
         :
-        : "%eax", "%ecx", "%edx", "%edi"
+        : "%eax", "%ecx", "%edx", "%edi", "cc" // fix, izy's
         );
 # elif (defined(_MSC_VER) && defined(_M_IX86)) || defined(__WATCOMC__)
         __asm {
