@@ -1705,7 +1705,7 @@ static void NetConn_ClientParsePacket_ServerList_ParseDPList(lhnetaddress_t *sen
 		Con_Printf("received DarkPlaces %sserver list...\n", isextended ? "extended " : "");
 	while (length >= 7)
 	{
-		char ipstring [128];
+		char ipstring[128] = {0};
 
 		// IPv4 address
 		if (data[0] == '\\')
@@ -2324,15 +2324,15 @@ void NetConn_QueryQueueFrame(void)
 			continue;
 		}
 
-		serverlist_querysleep	= false;
-		if( entry->querycounter	!=	0 && entry->querytime >	timeouttime	)
+		serverlist_querysleep = false;
+		if( entry->querycounter != 0 && entry->querytime > timeouttime )
 		{
 			continue;
 		}
 
-		if( entry->querycounter	!=	(unsigned) net_slist_maxtries.integer )
+		if( entry->querycounter	!= (unsigned) net_slist_maxtries.integer )
 		{
-			lhnetaddress_t	address;
+			lhnetaddress_t address = {0};
 			int socket;
 
 			LHNETADDRESS_FromString(&address, entry->info.cname, 0);

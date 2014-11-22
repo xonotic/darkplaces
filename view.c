@@ -470,11 +470,11 @@ static void highpass3_limited(vec3_t value, vec_t fracx, vec_t limitx, vec_t fra
 void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight, qboolean cldead, qboolean clintermission, const vec3_t clvelocity)
 {
 	float vieworg[3], viewangles[3], smoothtime;
-	float gunorg[3], gunangles[3];
+	float gunorg[3], gunangles[3] = {0};
 	matrix4x4_t tmpmatrix;
-	
+
 	static float viewheightavg;
-	float viewheight;	
+	float viewheight;
 #if 0
 // begin of chase camera bounding box size for proper collisions by Alexander Zubov
 	vec3_t camboxmins = {-3, -3, -3};

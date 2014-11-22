@@ -1,0 +1,2 @@
+# $ valgrind [valgrind opts] darkplaces [dp args]
+--suppressions=valgrind_dp.supp

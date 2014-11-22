@@ -156,7 +156,7 @@ int LHNETADDRESS_FromPort(lhnetaddress_t *vaddress, lhnetaddresstype_t addressty
 #ifdef SUPPORTIPV6
 static int LHNETADDRESS_Resolve(lhnetaddressnative_t *address, const char *name, int port)
 {
-	char port_buff [16];
+	char port_buff [16] = {0};
 	struct addrinfo hints;
 	struct addrinfo* addrinf;
 	int err;
@@ -201,7 +201,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 	int i, port, d1, d2, d3, d4, resolved;
 	size_t namelen;
 	unsigned char *a;
-	char name[128];
+	char name[128] = {0};
 #ifdef STANDALONETEST
 	char string2[128];
 #endif

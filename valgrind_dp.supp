@@ -1,0 +1,87 @@
+# valgrind error suppression file for darkplaces
+#
+# (please expand and generalize -- only where needed)
+# how to write these: http://valgrind.org/docs/manual/mc-manual.html#mc-manual.suppfiles
+
+# suppress (leak) errors in all shared libraries
+#{
+#   ignore_unversioned_libs_leak
+#   Memcheck:Leak
+#   ...
+#   obj:*/lib*/lib*.so
+#}
+#{
+#   ignore_versioned_libs_leak
+#   Memcheck:Leak
+#   ...
+#   obj:*/lib*/lib*.so.*
+#}
+
+# SDL
+# ignore calls to it (or not, there are only a few issues here)
+#{
+#   sdl_c
+#   Memcheck:Cond
+#   obj:/usr/lib/x86_64-linux-gnu/libSDL-1.2.so.0.11.4
+#   ...
+#}
+
+# fglrx. IGNORE them all...
+# (these read: "ignoring anything that called into or is called by this lib (callbacks")
+{
+   ignore_fglrx_dri_leak
+   Memcheck:Leak
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_1
+   Memcheck:Addr1
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_2
+   Memcheck:Addr2
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_4
+   Memcheck:Addr4
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_8
+   Memcheck:Addr8
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_o
+   Memcheck:Overlap
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_c
+   Memcheck:Cond
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
+{
+   ignore_fglrx_dri_p
+   Memcheck:Param
+   ioctl(generic)
+   ...
+   obj:/usr/lib/x86_64-linux-gnu/dri/fglrx_dri.so
+   ...
+}
