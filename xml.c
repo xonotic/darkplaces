@@ -119,16 +119,7 @@ void VM_xml_close(prvm_prog_t *prog)
 		VM_Warning(prog, #funcname": null node in %s\n",prog->name); \
 		errorreturn; \
 		return; \
-	} \
-	Con_Printf(#funcname":\n\tnode: %s\n\ttype: %d\n\tattr: %s\n\tnext: %s\n\tprev: %s\n\tprnt: %s\n\tchld: %s\n",\
-		xml->node->name, \
-		xml->node->type, \
-		xml->attribute ? (char*)xml->attribute->name : "NULL", \
-		xml->node->next ? (char*)xml->node->next->name : "NULL", \
-		xml->node->prev ? (char*)xml->node->prev->name : "NULL", \
-		xml->node->parent ? (char*)xml->node->parent->name : "NULL", \
-		xml->node->children ? (char*)xml->node->children->name : "NULL" \
-		);
+	}
 #define VM_XML_CHECK(funcname) VM_XML_CHECK_RETURN(funcname,)
 
 void VM_xml_tree_name(prvm_prog_t *prog)
