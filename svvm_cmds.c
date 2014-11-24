@@ -3320,7 +3320,7 @@ VM_xml_tree_has_sibling,		// #135
 VM_xml_tree_next,				// #136
 VM_xml_tree_type,				// #137
 VM_xml_tree_root,				// #138
-NULL,							// #139
+VM_xml_tree_attribute,			// #139
 NULL,							// #140
 NULL,							// #141
 NULL,							// #142

@@ -245,3 +245,16 @@ void VM_xml_tree_root(prvm_prog_t *prog)
 		return;
 	xml->node = xmlDocGetRootElement(xml->doc);
 }
+
+void VM_xml_tree_attribute(prvm_prog_t *prog)
+{
+	qxml_p xml;
+	VM_XML_CHECK_RETURN(VM_xml_tree_type, PRVM_G_FLOAT(OFS_RETURN) = 0);
+	if ( !xml->attribute && xml->node->properties )
+	{
+		PRVM_G_FLOAT(OFS_RETURN) = 1;
+		xml->attribute = xml->node->properties;
+	}
+	else
+		PRVM_G_FLOAT(OFS_RETURN) = 0;
+}
