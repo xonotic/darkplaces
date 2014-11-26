@@ -107,7 +107,6 @@ void VM_xml_close(prvm_prog_t *prog)
 	XML_Close(prog,fileindex-1);
 }
 
-// TODO find out if errorreturn is really needed to return 0...
 #define VM_XML_CHECK_RETURN(funcname, errorreturn) \
 	VM_SAFEPARMCOUNT(1,#funcname); \
 	xml = VM_Xml_Data(prog,PRVM_G_FLOAT(OFS_PARM0)-1); \
@@ -258,3 +257,127 @@ void VM_xml_tree_attribute(prvm_prog_t *prog)
 	else
 		PRVM_G_FLOAT(OFS_RETURN) = 0;
 }
+
+// =================================================
+// Tiled Stuff
+// =================================================
+
+// x,y coordinate
+typedef struct {
+	long x;
+	long y;
+} Tiled_Coord;
+
+// Single Property
+typedef struct {
+	char* name;
+	char* value;
+} Tiled_Property;
+
+// Data structure to hold properties
+// Currently singly-linked list, would be more efficient to have a red-black tree
+typedef struct Tiled_PropertyNode Tiled_PropertyNode;
+struct Tiled_PropertyNode {
+	Tiled_Property property;
+	Tiled_PropertyNode* next;
+};
+
+typedef Tiled_PropertyNode* Tiled_Properties;
+
+// Image/Tile data
+typedef struct {
+	// Name of the image file
+	char * source;
+	// Width in pixels
+	unsigned width;
+	// Height in pixels
+	unsigned height;
+	// If used as a tile in a collection of images, relative ID
+	unsigned id;
+} Tiled_Image;
+
+// Tileset
+typedef struct {
+	// Images of acollection or single image split in a grid
+	Tiled_Image* image;
+	// Number of elements in image
+	unsigned image_count;
+	// Name of the tileset
+	char* name;
+	// (Maximum) size of the tiles in the tileset
+	Tiled_Coord tilesize;
+	// Number of pixels between tiles
+	unsigned spacing;
+	// The margin around the tiles in this tileset 
+	unsigned margin;
+	// Offset to use when drawing
+	Tiled_Coord tileoffset;
+	
+	Tiled_Properties properties;
+} Tiled_Tileset;
+
+// Common layer data
+typedef struct {
+	enum { TILED_TILELAYER, TILED_OBJECTLAYER, TILED_IMAGELAYER } type;
+	char* name;
+	// layer position in tiles
+	Tiled_Coord pos;
+	// layer size in tiles
+	Tiled_Coord size;
+	float opacity;
+	qboolean visible;
+	Tiled_Properties properties;
+} Tiled_Layer;
+
+// Tile layer
+typedef struct {
+	Tiled_Layer layer;
+	unsigned long* data;
+	unsigned data_size;
+} Tiled_TileLayer;
+
+// Object
+typedef struct {
+	char* name;
+	char* type;
+	// position in pixels
+	Tiled_Coord pos;
+	// size in pixels
+	Tiled_Coord size;
+	// In degress, clockwise
+	double rotation;
+	// Global tile ID
+	unsigned gid;
+	qboolean visible;
+	Tiled_Properties properties;
+} Tiled_Object;
+
+// Object Group
+typedef struct {
+	Tiled_Layer layer;
+	Tiled_Object * objects;
+	unsigned objects_size;
+} Tiled_ObjectLayer;
+
+// Image layer
+typedef struct {
+	Tiled_Layer layer;
+	Tiled_Image image;
+} Tiled_ImageLayer;
+
+// Map
+typedef struct {
+	// File format version
+	float version;
+	enum { ORTHOGONAL, ISOMETRIC, STAGGERED } orientation;
+	// size in tiles
+	Tiled_Coord size;
+	// size of a tile in pixels
+	Tiled_Coord tilesize;
+	// Color
+	vec3_t backgroundcolor;
+	// TODO renderorder
+	Tiled_Properties properties;
+	Tiled_Layer* layers;
+	unsigned layers_size;
+} Tiled_Map;
