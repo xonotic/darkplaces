@@ -262,6 +262,54 @@ void VM_xml_tree_attribute(prvm_prog_t *prog)
 // Tiled Stuff
 // =================================================
 
+// Read an attribute as a float
+static float xml_attribute_float( xmlNodePtr node, const char* attribute, float default_value )
+{
+	xmlChar* s;
+	float r;
+	
+	r = default_value;
+	if (( s = xmlGetProp(node, (xmlChar*)attribute) ))
+	{
+		sscanf((char*)s,"%f",&r);
+		xmlFree(s);
+	}
+	return r;
+}
+
+// Read an attribute as an integer
+static int xml_attribute_int( xmlNodePtr node, const char* attribute, int default_value )
+{
+	xmlChar* s;
+	int r;
+	
+	r = default_value;
+	if (( s = xmlGetProp(node, (xmlChar*)attribute) ))
+	{
+		sscanf((char*)s,"%d",&r);
+		xmlFree(s);
+	}
+	return r;
+}
+// Read an attribute as a color (defaults to -1 -1 -1)
+static void xml_attribute_color( xmlNodePtr node, const char* attribute, vec3_t output )
+{
+	xmlChar* s;
+	int r, g, b;
+	output[0] = output[1] = output[2] = -1;
+	
+	if (( s = xmlGetProp(node, (xmlChar*)attribute) ))
+	{
+		if ( sscanf((char*)s,"#%2x%2x%2x",&r,&g,&b) == 3 )
+		{
+			output[0] = r / 255.0;
+			output[1] = g / 255.0;
+			output[2] = b / 255.0;
+		}
+		xmlFree(s);
+	}
+}
+
 // x,y coordinate
 typedef struct {
 	long x;
@@ -317,7 +365,9 @@ typedef struct {
 } Tiled_Tileset;
 
 // Common layer data
-typedef struct {
+typedef struct Tiled_Layer Tiled_Layer;
+struct Tiled_Layer 
+{
 	enum { TILED_TILELAYER, TILED_OBJECTLAYER, TILED_IMAGELAYER } type;
 	char* name;
 	// layer position in tiles
@@ -327,7 +377,17 @@ typedef struct {
 	float opacity;
 	qboolean visible;
 	Tiled_Properties properties;
-} Tiled_Layer;
+	// next layer in the map
+	Tiled_Layer* next_layer;
+};
+
+// Load common data for <layer> <objectgroup> and <imagelayer>
+static Tiled_Layer tmx_layer_common(xmlNodePtr xml_node)
+{
+	Tiled_Layer l;
+	// TODO
+	return l;
+}
 
 // Tile layer
 typedef struct {
@@ -335,6 +395,13 @@ typedef struct {
 	unsigned long* data;
 	unsigned data_size;
 } Tiled_TileLayer;
+
+// Load <layer>
+static Tiled_TileLayer* tmx_layer(xmlNodePtr xml_node)
+{
+	// TODO
+	return NULL;
+}
 
 // Object
 typedef struct {
@@ -359,11 +426,25 @@ typedef struct {
 	unsigned objects_size;
 } Tiled_ObjectLayer;
 
+// load <objectgroup>
+static Tiled_ObjectLayer* tmx_objectgroup(xmlNodePtr xml_node)
+{
+	// TODO
+	return NULL;
+}
+
 // Image layer
 typedef struct {
 	Tiled_Layer layer;
 	Tiled_Image image;
 } Tiled_ImageLayer;
+
+// load <imagelayer>
+static Tiled_ImageLayer* tmx_imagelayer(xmlNodePtr xml_node)
+{
+	// TODO
+	return NULL;
+}
 
 // Map
 typedef struct {
@@ -378,6 +459,102 @@ typedef struct {
 	vec3_t backgroundcolor;
 	// TODO renderorder
 	Tiled_Properties properties;
-	Tiled_Layer* layers;
-	unsigned layers_size;
+	Tiled_Layer* first_layer;
 } Tiled_Map;
+
+// Load a TMX map from a data file
+static Tiled_Map* tmx_map_load(const char* filename)
+{	
+	char* data;
+	size_t datasize;
+	qfile_t* filepointer;
+	char vabuf[1024];
+	
+	Tiled_Map* map;
+	Tiled_Layer* last_layer;
+	Tiled_Layer* curr_layer;
+	
+	xmlDocPtr  doc;
+	xmlNodePtr xml_map;
+	xmlChar*   xml_tempstring;
+	xmlNodePtr xml_tempnode;
+	
+	
+	filepointer = FS_OpenVirtualFile(va(vabuf, sizeof(vabuf), "data/%s", filename), false);
+	if (filepointer == NULL)
+		filepointer = FS_OpenVirtualFile(va(vabuf, sizeof(vabuf), "%s", filename), false);
+	
+	if ( filepointer == NULL )
+		return NULL;
+	
+	datasize = FS_FileSize(filepointer);
+	data = malloc(datasize);
+	FS_Read(filepointer,data,datasize);
+	FS_Close(filepointer);
+
+	doc = xmlParseMemory(data,datasize);
+	free(data);
+	
+	if (doc == NULL) 
+		return NULL;
+	
+	xml_map = xmlDocGetRootElement(doc);
+	if ( !xml_map )
+		return NULL;
+	
+	map = malloc(sizeof(Tiled_Map));
+	
+	map->version = xml_attribute_float(xml_map,"version",1);
+	// TODO check version
+	
+	xml_tempstring = xmlGetProp(xml_map,(xmlChar*)"orientation");
+	map->orientation = ORTHOGONAL;
+	if ( xml_tempstring )
+	{
+		if ( strcmp((char*)xml_tempstring,"isometric") == 0 )
+			map->orientation = ISOMETRIC;
+		else if ( strcmp((char*)xml_tempstring,"staggered") == 0 )
+			map->orientation = STAGGERED;
+		xmlFree(xml_tempstring);
+	}
+	
+	map->size.x = xml_attribute_int(xml_map,"width",0);
+	map->size.y = xml_attribute_int(xml_map,"height",0);
+	map->tilesize.x = xml_attribute_int(xml_map,"tilewidth",0);
+	map->tilesize.y = xml_attribute_int(xml_map,"tileheight",0);
+	if ( map->size.x <= 0 || map->size.y <= 0 || map->tilesize.x <= 0 || map->tilesize.y <= 0 )
+	{
+		free(map);
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+	
+	xml_attribute_color(xml_map,"backgroundcolor",map->backgroundcolor);
+	
+	map->first_layer = NULL;
+	last_layer = NULL;
+	for ( xml_tempnode = xml_map->xmlChildrenNode; xml_tempnode; xml_tempnode = xml_tempnode->next )
+	{
+		if ( xml_tempnode->type != XML_ELEMENT_NODE )
+			continue;
+		
+		curr_layer = NULL;
+		if ( strcmp((char*)xml_tempnode->name,"layer") == 0  )
+			curr_layer = (Tiled_Layer*)tmx_layer(xml_tempnode);
+		else if ( strcmp((char*)xml_tempnode->name,"objectgroup") == 0  )
+			curr_layer = (Tiled_Layer*)tmx_objectgroup(xml_tempnode);
+		else if ( strcmp((char*)xml_tempnode->name,"imagelayer") == 0  )
+			curr_layer = (Tiled_Layer*)tmx_imagelayer(xml_tempnode);
+		// TODO properties
+		if ( curr_layer )
+		{
+			if ( !map->first_layer )
+				map->first_layer = curr_layer;
+			else
+				last_layer->next_layer = curr_layer;
+			last_layer = curr_layer;
+		}
+	}
+	
+	return map;
+}
