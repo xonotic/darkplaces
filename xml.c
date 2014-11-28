@@ -332,6 +332,18 @@ struct Tiled_PropertyNode {
 
 typedef Tiled_PropertyNode* Tiled_Properties;
 
+// clear the properties structure
+static void tmx_properties_clean(Tiled_Properties props)
+{
+	if ( !props )
+		return;
+	if ( props->next )
+		tmx_properties_clean(props->next);
+	free(props->property.name);
+	free(props->property.value);
+	free(props);
+}
+
 // Image/Tile data
 typedef struct {
 	// Name of the image file
@@ -343,6 +355,12 @@ typedef struct {
 	// If used as a tile in a collection of images, relative ID
 	unsigned id;
 } Tiled_Image;
+
+// Clean a Tiled_Image(Doesn't free the given pointer)
+static void tmx_image_clean(Tiled_Image *img)
+{
+	free(img->source);
+}
 
 // Tileset
 typedef struct {
@@ -381,27 +399,12 @@ struct Tiled_Layer
 	Tiled_Layer* next_layer;
 };
 
-// Load common data for <layer> <objectgroup> and <imagelayer>
-static Tiled_Layer tmx_layer_common(xmlNodePtr xml_node)
-{
-	Tiled_Layer l;
-	// TODO
-	return l;
-}
-
 // Tile layer
 typedef struct {
 	Tiled_Layer layer;
 	unsigned long* data;
 	unsigned data_size;
 } Tiled_TileLayer;
-
-// Load <layer>
-static Tiled_TileLayer* tmx_layer(xmlNodePtr xml_node)
-{
-	// TODO
-	return NULL;
-}
 
 // Object
 typedef struct {
@@ -426,6 +429,34 @@ typedef struct {
 	unsigned objects_size;
 } Tiled_ObjectLayer;
 
+// Image layer
+typedef struct {
+	Tiled_Layer layer;
+	Tiled_Image image;
+} Tiled_ImageLayer;
+
+// Load common data for <layer> <objectgroup> and <imagelayer>
+static Tiled_Layer tmx_layer_common(xmlNodePtr xml_node)
+{
+	Tiled_Layer l;
+	// TODO
+	return l;
+}
+
+// Load <layer>
+static Tiled_TileLayer* tmx_layer(xmlNodePtr xml_node)
+{
+	// TODO
+	return NULL;
+}
+
+// load <imagelayer>
+static Tiled_ImageLayer* tmx_imagelayer(xmlNodePtr xml_node)
+{
+	// TODO
+	return NULL;
+}
+
 // load <objectgroup>
 static Tiled_ObjectLayer* tmx_objectgroup(xmlNodePtr xml_node)
 {
@@ -433,17 +464,22 @@ static Tiled_ObjectLayer* tmx_objectgroup(xmlNodePtr xml_node)
 	return NULL;
 }
 
-// Image layer
-typedef struct {
-	Tiled_Layer layer;
-	Tiled_Image image;
-} Tiled_ImageLayer;
-
-// load <imagelayer>
-static Tiled_ImageLayer* tmx_imagelayer(xmlNodePtr xml_node)
+// clean up <layer> and friends
+static void tmx_layer_clean(Tiled_Layer* layer)
 {
-	// TODO
-	return NULL;
+	if ( !layer )
+		return;
+	if ( layer->next_layer )
+		tmx_layer_clean(layer->next_layer);
+	free(layer->name);
+	tmx_properties_clean(layer->properties);
+	if ( layer->type == TILED_TILELAYER )
+		free( ((Tiled_TileLayer*)layer)->data );
+	else if ( layer->type == TILED_OBJECTLAYER )
+		; // TODO clean objects
+	else if ( layer->type == TILED_IMAGELAYER )
+		tmx_image_clean(&((Tiled_ImageLayer*)layer)->image);
+	
 }
 
 // Map
@@ -558,3 +594,12 @@ static Tiled_Map* tmx_map_load(const char* filename)
 	
 	return map;
 }
+
+// Clean up the map struct
+static void tmx_map_clean(Tiled_Map* map)
+{
+	tmx_properties_clean(map->properties);
+	tmx_layer_clean(map->first_layer);
+	free(map);
+}
+
