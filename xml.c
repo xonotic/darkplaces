@@ -427,7 +427,9 @@ static void tmx_image_clean(Tiled_Image *img)
 }
 
 // Tileset
-typedef struct {
+typedef struct Tiled_Tileset Tiled_Tileset;
+struct Tiled_Tileset
+{
 	// Images of acollection or single image split in a grid
 	Tiled_Image* image;
 	// Number of elements in image
@@ -442,9 +444,27 @@ typedef struct {
 	unsigned margin;
 	// Offset to use when drawing
 	Tiled_Coord tileoffset;
-	
+	// properties
 	Tiled_Properties properties;
-} Tiled_Tileset;
+	
+	Tiled_Tileset* next;
+};
+
+static Tiled_Tileset* tmx_tileset(xmlNodePtr xml_node)
+{
+	Tiled_Tileset* tileset = malloc(sizeof(Tiled_Tileset));
+	tileset->next = NULL;
+	// TODO
+	return tileset;
+}
+
+static void tmx_tileset_clean(Tiled_Tileset* ts)
+{
+	if ( ts->next )
+		tmx_tileset_clean(ts->next);
+	// TODO
+	free(ts);
+}
 
 // Common layer data
 typedef struct Tiled_Layer Tiled_Layer;
@@ -503,29 +523,40 @@ typedef struct {
 static Tiled_Layer tmx_layer_common(xmlNodePtr xml_node)
 {
 	Tiled_Layer l;
+	l.next_layer = NULL;
 	// TODO
+	l.name = NULL;
 	return l;
 }
 
 // Load <layer>
 static Tiled_TileLayer* tmx_layer(xmlNodePtr xml_node)
 {
+	Tiled_TileLayer* layer = malloc(sizeof(Tiled_TileLayer));
+	layer->layer = tmx_layer_common(xml_node);
+	layer->layer.type = TILED_TILELAYER;
 	// TODO
-	return NULL;
+	return layer;
 }
 
 // load <imagelayer>
 static Tiled_ImageLayer* tmx_imagelayer(xmlNodePtr xml_node)
 {
+	Tiled_ImageLayer* layer = malloc(sizeof(Tiled_ImageLayer));
+	layer->layer = tmx_layer_common(xml_node);
+	layer->layer.type = TILED_IMAGELAYER;
 	// TODO
-	return NULL;
+	return layer;
 }
 
 // load <objectgroup>
 static Tiled_ObjectLayer* tmx_objectgroup(xmlNodePtr xml_node)
 {
+	Tiled_ObjectLayer* layer = malloc(sizeof(Tiled_ObjectLayer));
+	layer->layer = tmx_layer_common(xml_node);
+	layer->layer.type = TILED_OBJECTLAYER;
 	// TODO
-	return NULL;
+	return layer;
 }
 
 // clean up <layer> and friends
@@ -560,6 +591,7 @@ typedef struct {
 	// TODO renderorder
 	Tiled_Properties properties;
 	Tiled_Layer* first_layer;
+	Tiled_Tileset* first_tileset;
 } Tiled_Map;
 
 // Load a TMX map from a data file
@@ -573,6 +605,8 @@ static Tiled_Map* tmx_map_load(const char* filename)
 	Tiled_Map* map;
 	Tiled_Layer* last_layer;
 	Tiled_Layer* curr_layer;
+	Tiled_Tileset* last_tileset;
+	Tiled_Tileset* curr_tileset;
 	
 	xmlDocPtr  doc;
 	xmlNodePtr xml_map;
@@ -634,6 +668,7 @@ static Tiled_Map* tmx_map_load(const char* filename)
 	map->first_layer = NULL;
 	last_layer = NULL;
 	map->properties.first = map->properties.last = NULL;
+	map->first_tileset = last_tileset = NULL;
 	for ( xml_tempnode = xml_map->xmlChildrenNode; xml_tempnode; xml_tempnode = xml_tempnode->next )
 	{
 		if ( xml_tempnode->type != XML_ELEMENT_NODE )
@@ -648,7 +683,16 @@ static Tiled_Map* tmx_map_load(const char* filename)
 			curr_layer = (Tiled_Layer*)tmx_imagelayer(xml_tempnode);
 		else if ( strcmp((char*)xml_tempnode->name,"properties") == 0  )
 			tmx_properties_insert(&map->properties,xml_tempnode);
-		// TODO: tilesets
+		else if ( strcmp((char*)xml_tempnode->name,"tileset") == 0  )
+		{
+			curr_tileset = tmx_tileset(xml_tempnode);
+			if ( !map->first_tileset )
+				map->first_tileset = curr_tileset;
+			else
+				last_tileset->next = curr_tileset;
+			last_tileset = curr_tileset;
+			
+		}
 		if ( curr_layer )
 		{
 			if ( !map->first_layer )
@@ -670,3 +714,15 @@ static void tmx_map_clean(Tiled_Map* map)
 	free(map);
 }
 
+typedef struct Tiled_Map_Node Tiled_Map_Node;
+struct Tiled_Map_Node
+{
+	Tiled_Map* map;
+	Tiled_Map_Node* next;
+};
+
+struct Tiled_Data
+{
+	Tiled_Map_Node* map_first;
+	Tiled_Map_Node* map_last;
+};
