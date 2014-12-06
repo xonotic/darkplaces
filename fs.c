@@ -1847,7 +1847,19 @@ static int FS_ChooseUserDir(userdirmode_t userdirmode, char *userdir, size_t use
 		homedir = getenv("HOME");
 		if(homedir)
 		{
+#ifdef MACOSX
 			dpsnprintf(userdir, userdirsize, "%s/.%s/", homedir, gameuserdirname);
+#else
+			// Legacy ~/.userdir location
+			if(access(va(vabuf, sizeof(vabuf), "%s/.%s/", homedir, gameuserdirname), W_OK | X_OK) >= 0)
+			{
+				dpsnprintf(userdir, userdirsize, "%s/.%s/", homedir, gameuserdirname);
+				break;
+			}
+			// XDG_CONFIG_HOME
+			strlcat(homedir, "/.config", sizeof(homedir));
+			dpsnprintf(userdir, userdirsize, "%s/.config/%s/", homedir, gameuserdirname);
+#endif
 			break;
 		}
 		return -1;
