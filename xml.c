@@ -310,6 +310,35 @@ static void xml_attribute_color( xmlNodePtr node, const char* attribute, vec3_t 
 	}
 }
 
+// Read an attribute as a string
+static char* xml_attribute_string( xmlNodePtr node, const char* attribute )
+{
+	xmlChar* s;
+	char* r;
+	int size;
+	
+	size = 0;
+	r = 0;
+	if (( s = xmlGetProp(node, (xmlChar*)attribute) ))
+	{
+		// xmlChar is just an unsigned char but copy just in case
+		size = xmlStrlen(s);
+		r = malloc(size);
+		memcpy(r,s,size);
+		xmlFree(s);
+	}
+	
+	// ensure we always have a NUL-terminated string
+	if ( !size )
+	{
+		free(r);
+		r = malloc(1);
+		r[0] = 0;
+	}
+	
+	return r;
+}
+
 // x,y coordinate
 typedef struct {
 	long x;
@@ -330,18 +359,53 @@ struct Tiled_PropertyNode {
 	Tiled_PropertyNode* next;
 };
 
-typedef Tiled_PropertyNode* Tiled_Properties;
+typedef struct
+{
+	Tiled_PropertyNode* first;
+	Tiled_PropertyNode* last;
+} Tiled_Properties;
+
+// recursively clear the properties
+static void tmx_properties_clean_node(Tiled_PropertyNode* prop)
+{
+	if ( !prop )
+		return;
+	if ( prop->next )
+		tmx_properties_clean_node(prop->next);
+	free(prop->property.name);
+	free(prop->property.value);
+	free(prop);
+}
 
 // clear the properties structure
 static void tmx_properties_clean(Tiled_Properties props)
 {
-	if ( !props )
-		return;
-	if ( props->next )
-		tmx_properties_clean(props->next);
-	free(props->property.name);
-	free(props->property.value);
-	free(props);
+	tmx_properties_clean_node(props.first);
+}
+
+static void tmx_properties_insert(Tiled_Properties* out, xmlNodePtr xml)
+{
+	Tiled_PropertyNode* new_node;
+	
+	if ( strcmp((char*)xml->name,"properties") == 0  )
+	{
+		for ( xml = xml->xmlChildrenNode; xml; xml = xml->next )
+			tmx_properties_insert(out,xml);
+	}
+	else if ( strcmp((char*)xml->name,"property") == 0  )
+	{
+		new_node = malloc(sizeof(Tiled_PropertyNode));
+		new_node->property.name = xml_attribute_string(xml,"name");
+		new_node->property.value = xml_attribute_string(xml,"value");
+		new_node->next = NULL;
+		if ( out->last )
+		{
+			out->last->next = new_node;
+			out->last = new_node;
+		}
+		else
+			out->first = new_node;
+	}
 }
 
 // Image/Tile data
@@ -569,6 +633,7 @@ static Tiled_Map* tmx_map_load(const char* filename)
 	
 	map->first_layer = NULL;
 	last_layer = NULL;
+	map->properties.first = map->properties.last = NULL;
 	for ( xml_tempnode = xml_map->xmlChildrenNode; xml_tempnode; xml_tempnode = xml_tempnode->next )
 	{
 		if ( xml_tempnode->type != XML_ELEMENT_NODE )
@@ -581,7 +646,9 @@ static Tiled_Map* tmx_map_load(const char* filename)
 			curr_layer = (Tiled_Layer*)tmx_objectgroup(xml_tempnode);
 		else if ( strcmp((char*)xml_tempnode->name,"imagelayer") == 0  )
 			curr_layer = (Tiled_Layer*)tmx_imagelayer(xml_tempnode);
-		// TODO properties
+		else if ( strcmp((char*)xml_tempnode->name,"properties") == 0  )
+			tmx_properties_insert(&map->properties,xml_tempnode);
+		// TODO: tilesets
 		if ( curr_layer )
 		{
 			if ( !map->first_layer )
