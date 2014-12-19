@@ -2115,6 +2115,13 @@ void R_ClearScreen(qboolean fogcolor)
 	GL_Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | (vid.stencil ? GL_STENCIL_BUFFER_BIT : 0), clearcolor, 1.0f, 128);
 }
 
+void (*MR_Loading) (void);
+static void SCR_DrawCSQCLoadingScreen ()
+{
+	if (MR_Loading)
+		MR_Loading();
+}
+
 int r_stereo_side;
 
 static void SCR_DrawScreen (void)
@@ -2255,6 +2262,10 @@ static void SCR_DrawScreen (void)
 			Sbar_Draw();
 		SHOWLMP_drawall();
 		SCR_CheckDrawCenterString();
+	}
+	else
+	{
+		SCR_DrawCSQCLoadingScreen();
 	}
 	SCR_DrawNetGraph ();
 #ifdef CONFIG_MENU
@@ -2577,6 +2588,7 @@ static void SCR_DrawLoadingScreen (qboolean clear)
 	R_SetupShader_Generic(Draw_GetPicTexture(loadingscreenpic), NULL, GL_MODULATE, 1, true, true, false);
 	R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	SCR_DrawLoadingStack();
+	SCR_DrawCSQCLoadingScreen();
 }
 
 static void SCR_DrawLoadingScreen_SharedFinish (qboolean clear)
