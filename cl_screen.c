@@ -2116,7 +2116,7 @@ void R_ClearScreen(qboolean fogcolor)
 }
 
 void (*MR_Loading) (void);
-static void SCR_DrawCSQCLoadingScreen ()
+static void SCR_DrawMenuLoadingScreen ()
 {
 	if (MR_Loading)
 		MR_Loading();
@@ -2265,7 +2265,7 @@ static void SCR_DrawScreen (void)
 	}
 	else
 	{
-		SCR_DrawCSQCLoadingScreen();
+		SCR_DrawMenuLoadingScreen();
 	}
 	SCR_DrawNetGraph ();
 #ifdef CONFIG_MENU
@@ -2588,7 +2588,7 @@ static void SCR_DrawLoadingScreen (qboolean clear)
 	R_SetupShader_Generic(Draw_GetPicTexture(loadingscreenpic), NULL, GL_MODULATE, 1, true, true, false);
 	R_Mesh_Draw(0, 4, 0, 2, polygonelement3i, NULL, 0, polygonelement3s, NULL, 0);
 	SCR_DrawLoadingStack();
-	SCR_DrawCSQCLoadingScreen();
+	SCR_DrawMenuLoadingScreen();
 }
 
 static void SCR_DrawLoadingScreen_SharedFinish (qboolean clear)
