@@ -75,6 +75,7 @@ typedef struct globalvars_s
 	func_t	PlayerPreThink;
 	func_t	PlayerPostThink;
 	func_t	ClientKill;
+	func_t	ClientPreConnect;
 	func_t	ClientConnect;
 	func_t	PutClientInServer;
 	func_t	ClientDisconnect;

@@ -73,6 +73,7 @@ void() 		PlayerPreThink;
 void() 		PlayerPostThink;
 
 void()		ClientKill;
+void()		ClientPreConnect;
 void()		ClientConnect;
 void() 		PutClientInServer;		// call after setting the parm1... parms
 void()		ClientDisconnect;

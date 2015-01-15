@@ -1122,6 +1122,14 @@ void SV_ConnectClient (int clientnum, netconn_t *netconnection)
 
 		// set up the entity for this client (including .colormap, .team, etc)
 		PRVM_ED_ClearEdict(prog, client->edict);
+		
+		// call server hook
+		if (PRVM_serverfunction(ClientPreConnect))
+		{
+			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(client->edict);
+			prog->ExecuteProgram(prog, PRVM_serverfunction(ClientPreConnect), 
+				"QC function ClientPreConnect is missing");
+		}
 	}
 
 	// don't call SendServerinfo for a fresh botclient because its fields have
