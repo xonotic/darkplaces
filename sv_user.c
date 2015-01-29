@@ -859,7 +859,7 @@ void SV_ReadClientMessage(void)
 				*q = 0;
 			if (strncasecmp(s, "spawn", 5) == 0
 			 || strncasecmp(s, "begin", 5) == 0
-			 || (strncasecmp(s, "prespawn", 8) == 0 && !src_client->prespawned))
+			 || (strncasecmp(s, "prespawn", 8) == 0 && !host_client->prespawned))
 				Cmd_ExecuteString (s, src_client, true);
 			else if (PRVM_serverfunction(SV_ParseClientCommand))
 			{
