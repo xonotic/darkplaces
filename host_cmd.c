@@ -1824,6 +1824,7 @@ static void Host_PreSpawn_f (void)
 	if (host_client->prespawned)
 	{
 		Con_Print("prespawn not valid -- already prespawned\n");
+		SV_DropClient (false); // kicked
 		return;
 	}
 	host_client->prespawned = true;
