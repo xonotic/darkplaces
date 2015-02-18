@@ -933,7 +933,7 @@ void SV_SendServerinfo (client_t *client)
 	MSG_WriteString (&client->netconnection->message,message);
 
 	SV_StopDemoRecording(client); // to split up demos into different files
-	if(sv_autodemo_perclient.integer && client->netconnection)
+	if(sv_autodemo_perclient.integer)
 	{
 		char demofile[MAX_OSPATH];
 		char ipaddress[MAX_QPATH];
@@ -1085,12 +1085,14 @@ void SV_ConnectClient (int clientnum, netconn_t *netconnection)
 
 	if(client->netconnection && client->netconnection->crypto.authenticated)
 	{
-		Con_Printf("%s connection to %s has been established: client is %s@%.*s, I am %.*s@%.*s\n",
+		Con_Printf("%s connection to %s has been established: client is %s@%s%.*s, I am %.*s@%s%.*s\n",
 				client->netconnection->crypto.use_aes ? "Encrypted" : "Authenticated",
 				client->netconnection->address,
 				client->netconnection->crypto.client_idfp[0] ? client->netconnection->crypto.client_idfp : "-",
+				(client->netconnection->crypto.client_issigned || !client->netconnection->crypto.client_keyfp[0]) ? "" : "~",
 				crypto_keyfp_recommended_length, client->netconnection->crypto.client_keyfp[0] ? client->netconnection->crypto.client_keyfp : "-",
 				crypto_keyfp_recommended_length, client->netconnection->crypto.server_idfp[0] ? client->netconnection->crypto.server_idfp : "-",
+				(client->netconnection->crypto.server_issigned || !client->netconnection->crypto.server_keyfp[0]) ? "" : "~",
 				crypto_keyfp_recommended_length, client->netconnection->crypto.server_keyfp[0] ? client->netconnection->crypto.server_keyfp : "-"
 				);
 	}
@@ -3607,6 +3609,7 @@ static void SVVM_init_edict(prvm_prog_t *prog, prvm_edict_t *e)
 			PRVM_serveredictstring(e, crypto_idfp) = PRVM_SetEngineString(prog, svs.clients[num].netconnection->crypto.client_idfp);
 		else
 			PRVM_serveredictstring(e, crypto_idfp) = 0;
+		PRVM_serveredictfloat(e, crypto_idfp_signed) = (svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_issigned);
 		if(svs.clients[num].netconnection != NULL && svs.clients[num].netconnection->crypto.authenticated && svs.clients[num].netconnection->crypto.client_keyfp[0])
 			PRVM_serveredictstring(e, crypto_keyfp) = PRVM_SetEngineString(prog, svs.clients[num].netconnection->crypto.client_keyfp);
 		else
