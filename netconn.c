@@ -23,6 +23,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "thread.h"
 #include "lhnet.h"
+#include <sys/signal.h>
+#include <signal.h>
 
 // for secure rcon authentication
 #include "hmac.h"
@@ -80,6 +82,12 @@ char cl_readstring[MAX_INPUTLINE];
 char sv_readstring[MAX_INPUTLINE];
 
 cvar_t net_test = {0, "net_test", "0", "internal development use only, leave it alone (usually does nothing anyway)"};
+cvar_t net_inject = {0, "net_inject", "", "file name of a packet to inject"};
+cvar_t net_inject_index = {0, "net_inject_index", "0", "packet index where to inject"};
+cvar_t net_inject_exit = {0, "net_inject_exit", "0", "exit after injecting"};
+cvar_t net_dump = {0, "net_dump", "", "file name of a packet to dump"};
+cvar_t net_dump_index = {0, "net_dump_index", "0", "current packet index when dumping"};
+cvar_t net_dump_maxindex = {0, "net_dump_maxindex", "0", "max packet index to dump"};
 cvar_t net_usesizelimit = {0, "net_usesizelimit", "2", "use packet size limiting (0: never, 1: in non-CSQC mode, 2: always)"};
 cvar_t net_burstreserve = {0, "net_burstreserve", "0.3", "how much of the burst time to reserve for packet size spikes"};
 cvar_t net_messagetimeout = {0, "net_messagetimeout","300", "drops players who have not sent any packets for this many seconds"};
@@ -3535,12 +3543,53 @@ static int NetConn_ServerParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 
 void NetConn_ServerFrame(void)
 {
+	extern volatile char __afl_start_here;
+	if (__afl_start_here && net_inject_exit.integer) {
+		// Shouldn't ever happen - this would mean ServerFrame was exited weirdly (longjmp?).
+		raise(SIGXCPU);
+	}
 	int i, length;
 	lhnetaddress_t peeraddress;
 	unsigned char readbuffer[NET_HEADERSIZE+NET_MAXMESSAGE];
 	for (i = 0;i < sv_numsockets;i++)
 		while (sv_sockets[i] && (length = NetConn_Read(sv_sockets[i], readbuffer, sizeof(readbuffer), &peeraddress)) > 0)
+		{
+			if (net_inject_index.integer == 1) {
+				__afl_start_here = 1;
+				if (__afl_start_here != 1) {
+					// Shouldn't ever happen.
+					// This code just serves to force a branch so afl can start its fork server.
+					__afl_start_here = 2;
+				}
+				fs_offset_t size = 0;
+				unsigned char *buf = FS_LoadFile(net_inject.string, tempmempool, false, &size);
+				if (buf) {
+					NetConn_ServerParsePacket(sv_sockets[i], buf, size, &peeraddress);
+					Mem_Free(buf);
+				}
+				if (net_inject_exit.integer) {
+					for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
+					{
+						// never timeout loopback connections
+						if (host_client->netconnection && realtime > host_client->netconnection->timeout && LHNETADDRESS_GetAddressType(&host_client->netconnection->peeraddress) != LHNETADDRESSTYPE_LOOP)
+						{
+							Con_Printf("Client \"%s\" connection timed out\n", host_client->name);
+							SV_DropClient(false);
+						}
+					}
+					exit(0);
+				}
+			}
+			if (net_inject_index.integer >= 1) {
+				Cvar_SetValueQuick(&net_inject_index, net_inject_index.integer - 1);
+			}
+			if (net_dump_index.integer < net_dump_maxindex.integer) {
+				Cvar_SetValueQuick(&net_dump_index, net_dump_index.integer + 1);
+				char vabuf[1024];
+				FS_WriteFile(va(vabuf, sizeof(vabuf), "%s.%d", net_dump.string, net_dump_index.integer), readbuffer, length);
+			}
 			NetConn_ServerParsePacket(sv_sockets[i], readbuffer, length, &peeraddress);
+		}
 	for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
 	{
 		// never timeout loopback connections
@@ -3809,6 +3858,12 @@ void NetConn_Init(void)
 	Cmd_AddCommand("net_refresh", Net_Refresh_f, "query dp master servers and refresh all server information");
 #endif
 	Cmd_AddCommand("heartbeat", Net_Heartbeat_f, "send a heartbeat to the master server (updates your server information)");
+	Cvar_RegisterVariable(&net_inject);
+	Cvar_RegisterVariable(&net_inject_index);
+	Cvar_RegisterVariable(&net_inject_exit);
+	Cvar_RegisterVariable(&net_dump);
+	Cvar_RegisterVariable(&net_dump_index);
+	Cvar_RegisterVariable(&net_dump_maxindex);
 	Cvar_RegisterVariable(&net_test);
 	Cvar_RegisterVariable(&net_usesizelimit);
 	Cvar_RegisterVariable(&net_burstreserve);

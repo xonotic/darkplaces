@@ -899,6 +899,7 @@ static void signal_handler(int sig)
 
 static void InitSig(void)
 {
+	/*
 	signal(SIGHUP, signal_handler);
 	signal(SIGINT, signal_handler);
 	signal(SIGQUIT, signal_handler);
@@ -909,6 +910,7 @@ static void InitSig(void)
 	signal(SIGFPE, signal_handler);
 	signal(SIGSEGV, signal_handler);
 	signal(SIGTERM, signal_handler);
+	*/
 }
 
 void VID_Finish (void)
