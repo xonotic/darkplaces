@@ -764,9 +764,9 @@ int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolvers
 			sendreliable = true;
 		}
 		// outgoing unreliable packet number, and outgoing reliable packet number (0 or 1)
-		StoreLittleLong(sendbuffer, (unsigned int)conn->outgoing_unreliable_sequence | ((unsigned int)sendreliable<<31));
+		StoreLittleLong(sendbuffer, conn->outgoing_unreliable_sequence | (((unsigned int)sendreliable)<<31));
 		// last received unreliable packet number, and last received reliable packet number (0 or 1)
-		StoreLittleLong(sendbuffer + 4, (unsigned int)conn->qw.incoming_sequence | ((unsigned int)conn->qw.incoming_reliable_sequence<<31));
+		StoreLittleLong(sendbuffer + 4, conn->qw.incoming_sequence | (((unsigned int)conn->qw.incoming_reliable_sequence)<<31));
 		packetLen = 8;
 		conn->outgoing_unreliable_sequence++;
 		// client sends qport in every packet
@@ -1212,7 +1212,7 @@ static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, s
 
 	if (protocol == PROTOCOL_QUAKEWORLD)
 	{
-		int sequence, sequence_ack;
+		unsigned int sequence, sequence_ack;
 		int reliable_ack, reliable_message;
 		int count;
 		//int qport;
@@ -1248,6 +1248,12 @@ static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, s
 		{
 			conn->droppedDatagrams += count;
 			//Con_DPrintf("Dropped %u datagram(s)\n", count);
+			// If too may packets have been dropped, only write the
+			// last NETGRAPH_PACKETS ones to the netgraph. Why?
+			// Because there's no point in writing more than
+			// these as the netgraph is going to be full anyway.
+			if (count > NETGRAPH_PACKETS)
+				count = NETGRAPH_PACKETS;
 			while (count--)
 			{
 				conn->incoming_packetcounter = (conn->incoming_packetcounter + 1) % NETGRAPH_PACKETS;
@@ -1338,6 +1344,12 @@ static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, s
 						count = sequence - conn->nq.unreliableReceiveSequence;
 						conn->droppedDatagrams += count;
 						//Con_DPrintf("Dropped %u datagram(s)\n", count);
+						// If too may packets have been dropped, only write the
+						// last NETGRAPH_PACKETS ones to the netgraph. Why?
+						// Because there's no point in writing more than
+						// these as the netgraph is going to be full anyway.
+						if (count > NETGRAPH_PACKETS)
+							count = NETGRAPH_PACKETS;
 						while (count--)
 						{
 							conn->incoming_packetcounter = (conn->incoming_packetcounter + 1) % NETGRAPH_PACKETS;

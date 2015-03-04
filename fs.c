@@ -587,8 +587,8 @@ static qboolean PK3_GetEndOfCentralDir (const char *packfile, int packhandle, pk
 	Mem_Free (buffer);
 
 	if (
-			eocd->cdir_size < 0 || eocd->cdir_size > filesize ||
-			eocd->cdir_offset < 0 || eocd->cdir_offset >= filesize ||
+			eocd->cdir_size > filesize ||
+			eocd->cdir_offset >= filesize ||
 			eocd->cdir_offset + eocd->cdir_size > filesize
 	   )
 	{
@@ -3350,7 +3350,7 @@ void FS_DefaultExtension (char *path, const char *extension, size_t size_path)
 
 	// if path doesn't have a .EXT, append extension
 	// (extension should include the .)
-	src = path + strlen(path) - 1;
+	src = path + strlen(path);
 
 	while (*src != '/' && src != path)
 	{
