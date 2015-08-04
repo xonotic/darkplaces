@@ -1183,7 +1183,6 @@ Key_Console (int key, int unicode)
 		memcpy(key_line + key_linepos, buf, blen);
 		if (blen > len)
 			key_line[key_linepos + blen] = 0;
-		// END OF FIXME
 		key_linepos += blen;
 	}
 }

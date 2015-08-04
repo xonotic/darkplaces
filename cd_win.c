@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "cdaudio.h"
 
+LONG CDAudio_MessageHandler(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
 #if defined(_MSC_VER) && (_MSC_VER < 1300)
 typedef DWORD DWORD_PTR;
 #endif

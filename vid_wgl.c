@@ -1342,13 +1342,15 @@ static void AdjustWindowBounds(int fullscreen, int *width, int *height, viddef_m
 	else
 	{
 		RECT workArea;
-		SystemParametersInfo(SPI_GETWORKAREA, NULL, &workArea, 0);
-		int workWidth = workArea.right - workArea.left;
-		int workHeight = workArea.bottom - workArea.top;
+		int workWidth, workHeight;
+		const int titleBarPixels = 2;
+
+		SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+		workWidth = workArea.right - workArea.left;
+		workHeight = workArea.bottom - workArea.top;
 
 		// if height/width matches physical screen height/width, adjust it to available desktop size
 		// and allow 2 pixels on top for the title bar so the window can be moved
-		const int titleBarPixels = 2;
 		if (*width == GetSystemMetrics(SM_CXSCREEN) && (*height == GetSystemMetrics(SM_CYSCREEN) || *height == workHeight - titleBarPixels))
 		{
 			rect->right -= *width - workWidth;

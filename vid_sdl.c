@@ -2420,6 +2420,10 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 	LONG width = mode->width; // vid_width
 	LONG height = mode->height; // vid_height
 
+	RECT workArea;
+	int workWidth, workHeight;
+	int titleBarPixels, screenHeight;
+
 	// adjust width and height for the space occupied by window decorators (title bar, borders)
 	rect->top = 0;
 	rect->left = 0;
@@ -2427,16 +2431,15 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 	rect->bottom = height;
 	AdjustWindowRectEx(rect, WS_CAPTION|WS_THICKFRAME, false, 0);
 
-	RECT workArea;
 	SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
-	int workWidth = workArea.right - workArea.left;
-	int workHeight = workArea.bottom - workArea.top;
+	workWidth = workArea.right - workArea.left;
+	workHeight = workArea.bottom - workArea.top;
 
 	// SDL forces the window height to be <= screen height - 27px (on Win8.1 - probably intended for the title bar) 
 	// If the task bar is docked to the the left screen border and we move the window to negative y,
 	// there would be some part of the regular desktop visible on the bottom of the screen.
-	int titleBarPixels = 2;
-	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	titleBarPixels = 2;
+	screenHeight = GetSystemMetrics(SM_CYSCREEN);
 	if (screenHeight == workHeight)
 		titleBarPixels = -rect->top;
 
@@ -2453,7 +2456,7 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 	else 
 	{
 		rect->left = workArea.left + max(0, (workWidth - width) / 2);
-		rect->top = workArea.top + (0, (workHeight - height) / 2);
+		rect->top = workArea.top + max(0, (workHeight - height) / 2);
 	}
 }
 #endif
@@ -2470,6 +2473,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	int i;
 	const char *drivername;
 #endif
+	int xPos, yPos;
 
 	win_half_width = mode->width>>1;
 	win_half_height = mode->height>>1;
@@ -2527,8 +2531,8 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	// Knghtbrd: should do platform-specific extension string function here
 
 	vid_isfullscreen = false;
-	int xPos = SDL_WINDOWPOS_UNDEFINED;
-	int yPos = SDL_WINDOWPOS_UNDEFINED;
+	xPos = SDL_WINDOWPOS_UNDEFINED;
+	yPos = SDL_WINDOWPOS_UNDEFINED;
 #if SDL_MAJOR_VERSION == 1
 	{
 		const SDL_VideoInfo *vi = SDL_GetVideoInfo();
@@ -2553,7 +2557,8 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		if (mode->fullscreen) {
 			if (vid_desktopfullscreen.integer)
 			{
-				vid_mode_t *m = VID_GetDesktopMode();
+				vid_mode_t *m;
+				m = VID_GetDesktopMode();
 				mode->width = m->width;
 				mode->height = m->height;
 				windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
@@ -2564,7 +2569,6 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		}
 		else {
 #ifdef WIN32
-			DWORD windowStyle = 0;
 			RECT rect;
 			AdjustWindowBounds(mode, &rect);
 			xPos = rect.left;
