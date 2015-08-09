@@ -254,7 +254,7 @@ static void S_Play_Common (float fvol, float attenuation){
 		while (i < Cmd_Argc ())
 		{
 			// Get the name, and appends ".wav" as an extension if there's none
-			strlcpy (name, Cmd_Argv (i), sizeof (name));
+			dp_strlcpy (name, Cmd_Argv (i), sizeof (name));
 			if (!strrchr (name, '.'))
 				strlcat (name, ".wav", sizeof (name));
 			i++;
@@ -581,7 +581,7 @@ sfx_t* S_FindName (const char *name){
 		now->rasptr=0;
 		//sfx->looptstart=0;
 		//sfx->total_length=0;
-		strlcpy (now->name, name, sizeof (now->name));
+		dp_strlcpy (now->name, name, sizeof (now->name));
 		return now;
 	}
 	return NULL;

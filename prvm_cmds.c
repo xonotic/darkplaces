@@ -2594,7 +2594,7 @@ void VM_tokenize (prvm_prog_t *prog)
 
 	VM_SAFEPARMCOUNT(1,VM_tokenize);
 
-	strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
+	dp_strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
 	p = tokenize_string;
 
 	num_tokens = 0;
@@ -2625,7 +2625,7 @@ void VM_tokenize_console (prvm_prog_t *prog)
 
 	VM_SAFEPARMCOUNT(1,VM_tokenize);
 
-	strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
+	dp_strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
 	p = tokenize_string;
 
 	num_tokens = 0;
@@ -2675,7 +2675,7 @@ void VM_tokenizebyseparator (prvm_prog_t *prog)
 
 	VM_SAFEPARMCOUNTRANGE(2, 8,VM_tokenizebyseparator);
 
-	strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
+	dp_strlcpy(tokenize_string, PRVM_G_STRING(OFS_PARM0), sizeof(tokenize_string));
 	p = tokenize_string;
 
 	numseparators = 0;
@@ -3613,7 +3613,7 @@ void VM_loadfont(prvm_prog_t *prog)
 		if (i >= 0 && i < dp_fonts.maxsize)
 		{
 			f = &dp_fonts.f[i];
-			strlcpy(f->title, fontname, sizeof(f->title)); // replace name
+			dp_strlcpy(f->title, fontname, sizeof(f->title)); // replace name
 		}
 	}
 	if (!f)
@@ -3638,7 +3638,7 @@ void VM_loadfont(prvm_prog_t *prog)
 		c = cm;
 	}
 	if(!c || (c - filelist) > MAX_QPATH)
-		strlcpy(mainfont, filelist, sizeof(mainfont));
+		dp_strlcpy(mainfont, filelist, sizeof(mainfont));
 	else
 	{
 		memcpy(mainfont, filelist, c - filelist);
@@ -3665,7 +3665,7 @@ void VM_loadfont(prvm_prog_t *prog)
 		}
 		if(!c || (c-filelist) > MAX_QPATH)
 		{
-			strlcpy(f->fallbacks[i], filelist, sizeof(mainfont));
+			dp_strlcpy(f->fallbacks[i], filelist, sizeof(mainfont));
 		}
 		else
 		{
@@ -4536,7 +4536,7 @@ void VM_altstr_set(prvm_prog_t *prog)
 		if( *in == '\'' || (*in == '\\' && !*++in) )
 			break;
 
-	strlcpy(out, in, outstr + sizeof(outstr) - out);
+	dp_strlcpy(out, in, outstr + sizeof(outstr) - out);
 	PRVM_G_INT( OFS_RETURN ) = PRVM_SetTempString(prog,  outstr );
 }
 
@@ -4575,7 +4575,7 @@ void VM_altstr_ins(prvm_prog_t *prog)
 	for( ; *set ; *out++ = *set++ );
 	*out++ = '\'';
 
-	strlcpy(out, in, outstr + sizeof(outstr) - out);
+	dp_strlcpy(out, in, outstr + sizeof(outstr) - out);
 	PRVM_G_INT( OFS_RETURN ) = PRVM_SetTempString(prog,  outstr );
 }
 
@@ -5363,7 +5363,7 @@ void VM_bufstr_find(prvm_prog_t *prog)
 		match = PRVM_G_STRING(OFS_PARM1);
 	else
 	{
-		strlcpy(string, PRVM_G_STRING(OFS_PARM1), sizeof(string));
+		dp_strlcpy(string, PRVM_G_STRING(OFS_PARM1), sizeof(string));
 		match = detect_match_rule(string, &matchrule);
 	}
 	matchlen = (int)strlen(match);
@@ -5409,7 +5409,7 @@ void VM_matchpattern(prvm_prog_t *prog)
 		match = PRVM_G_STRING(OFS_PARM1);
 	else
 	{
-		strlcpy(string, PRVM_G_STRING(OFS_PARM1), sizeof(string));
+		dp_strlcpy(string, PRVM_G_STRING(OFS_PARM1), sizeof(string));
 		match = detect_match_rule(string, &matchrule);
 	}
 
@@ -5866,7 +5866,7 @@ void VM_infoadd (prvm_prog_t *prog)
 	key = PRVM_G_STRING(OFS_PARM1);
 	VM_VarString(prog, 2, value, sizeof(value));
 
-	strlcpy(temp, info, VM_STRINGTEMP_LENGTH);
+	dp_strlcpy(temp, info, VM_STRINGTEMP_LENGTH);
 
 	InfoString_SetValue(temp, VM_STRINGTEMP_LENGTH, key, value);
 
@@ -6282,7 +6282,7 @@ void VM_uri_get (prvm_prog_t *prog)
 			// POST: we sign postdata \0 query string
 			size_t ll;
 			handle->sigdata = (char *)Z_Malloc(8192);
-			strlcpy(handle->sigdata, "X-D0-Blind-ID-Detached-Signature: ", 8192);
+			dp_strlcpy(handle->sigdata, "X-D0-Blind-ID-Detached-Signature: ", 8192);
 			l = strlen(handle->sigdata);
 			handle->siglen = Crypto_SignDataDetached(handle->postdata, handle->postlen + 1 + lq, postkeyid, handle->sigdata + l, 8192 - l);
 			if(!handle->siglen)
@@ -6302,7 +6302,7 @@ void VM_uri_get (prvm_prog_t *prog)
 			handle->sigdata[handle->siglen] = 0;
 		}
 out1:
-		strlcpy(handle->posttype, posttype, sizeof(handle->posttype));
+		dp_strlcpy(handle->posttype, posttype, sizeof(handle->posttype));
 		ret = Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, handle->posttype, handle->postdata, handle->postlen, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
 	}
 	else
@@ -6312,7 +6312,7 @@ out1:
 			// GET: we sign JUST the query string
 			size_t l, ll;
 			handle->sigdata = (char *)Z_Malloc(8192);
-			strlcpy(handle->sigdata, "X-D0-Blind-ID-Detached-Signature: ", 8192);
+			dp_strlcpy(handle->sigdata, "X-D0-Blind-ID-Detached-Signature: ", 8192);
 			l = strlen(handle->sigdata);
 			handle->siglen = Crypto_SignDataDetached(query_string, lq, postkeyid, handle->sigdata + l, 8192 - l);
 			if(!handle->siglen)

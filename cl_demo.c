@@ -377,7 +377,7 @@ void CL_Record_f (void)
 		track = -1;
 
 	// get the demo name
-	strlcpy (name, Cmd_Argv(1), sizeof (name));
+	dp_strlcpy (name, Cmd_Argv(1), sizeof (name));
 	FS_DefaultExtension (name, ".dem", sizeof (name));
 
 	// start the map up
@@ -392,7 +392,7 @@ void CL_Record_f (void)
 		Con_Print("ERROR: couldn't open.\n");
 		return;
 	}
-	strlcpy(cls.demoname, name, sizeof(cls.demoname));
+	dp_strlcpy(cls.demoname, name, sizeof(cls.demoname));
 
 	cls.forcetrack = track;
 	FS_Printf(cls.demofile, "%i\n", cls.forcetrack);
@@ -424,7 +424,7 @@ void CL_PlayDemo_f (void)
 	}
 
 	// open the demo file
-	strlcpy (name, Cmd_Argv(1), sizeof (name));
+	dp_strlcpy (name, Cmd_Argv(1), sizeof (name));
 	FS_DefaultExtension (name, ".dem", sizeof (name));
 	f = FS_OpenVirtualFile(name, false);
 	if (!f)
@@ -447,7 +447,7 @@ void CL_PlayDemo_f (void)
 
 	Con_Printf("Playing demo %s.\n", name);
 	cls.demofile = f;
-	strlcpy(cls.demoname, name, sizeof(cls.demoname));
+	dp_strlcpy(cls.demoname, name, sizeof(cls.demoname));
 
 	cls.demoplayback = true;
 	cls.state = ca_connected;

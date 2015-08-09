@@ -233,7 +233,7 @@ void CDAudio_SysInit (void)
 
 // COMMANDLINEOPTION: Linux Sound: -cddev <devicepath> chooses which CD drive to use
 	if ((i = COM_CheckParm("-cddev")) != 0 && i < com_argc - 1)
-		strlcpy(cd_dev, com_argv[i + 1], sizeof(cd_dev));
+		dp_strlcpy(cd_dev, com_argv[i + 1], sizeof(cd_dev));
 }
 
 int CDAudio_SysStartup (void)

@@ -554,7 +554,7 @@ static void R_BuildFogHeightTexture(void)
 	float c[4];
 	float f;
 	inpixels = NULL;
-	strlcpy(r_refdef.fogheighttexturename, r_refdef.fog_height_texturename, sizeof(r_refdef.fogheighttexturename));
+	dp_strlcpy(r_refdef.fogheighttexturename, r_refdef.fog_height_texturename, sizeof(r_refdef.fogheighttexturename));
 	if (r_refdef.fogheighttexturename[0])
 		inpixels = loadimagepixelsbgra(r_refdef.fogheighttexturename, true, false, false, NULL);
 	if (!inpixels)
@@ -1641,7 +1641,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 				}
 				if (vslog)
 				{
-					strlcpy(temp, (const char *)ID3DXBuffer_GetBufferPointer(vslog), min(sizeof(temp), ID3DXBuffer_GetBufferSize(vslog)));
+					dp_strlcpy(temp, (const char *)ID3DXBuffer_GetBufferPointer(vslog), min(sizeof(temp), ID3DXBuffer_GetBufferSize(vslog)));
 					Con_DPrintf("HLSL vertex shader compile output for %s follows:\n%s\n", cachename, temp);
 					ID3DXBuffer_Release(vslog);
 				}
@@ -1664,7 +1664,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 				}
 				if (pslog)
 				{
-					strlcpy(temp, (const char *)ID3DXBuffer_GetBufferPointer(pslog), min(sizeof(temp), ID3DXBuffer_GetBufferSize(pslog)));
+					dp_strlcpy(temp, (const char *)ID3DXBuffer_GetBufferPointer(pslog), min(sizeof(temp), ID3DXBuffer_GetBufferSize(pslog)));
 					Con_DPrintf("HLSL pixel shader compile output for %s follows:\n%s\n", cachename, temp);
 					ID3DXBuffer_Release(pslog);
 				}
@@ -3266,7 +3266,7 @@ skinframe_t *R_SkinFrame_Find(const char *name, int textureflags, int comparewid
 			return NULL;
 		item = (skinframe_t *)Mem_ExpandableArray_AllocRecord(&r_skinframe.array);
 		memset(item, 0, sizeof(*item));
-		strlcpy(item->basename, basename, sizeof(item->basename));
+		dp_strlcpy(item->basename, basename, sizeof(item->basename));
 		item->base = dyntexture; // either NULL or dyntexture handle
 		item->textureflags = textureflags & ~TEXF_FORCE_RELOAD;
 		item->comparewidth = comparewidth;
@@ -3959,7 +3959,7 @@ rtexture_t *R_GetCubemap(const char *basename)
 		return r_texture_whitecube;
 	r_texture_numcubemaps++;
 	r_texture_cubemaps[i] = (cubemapinfo_t *)Mem_Alloc(r_main_mempool, sizeof(cubemapinfo_t));
-	strlcpy(r_texture_cubemaps[i]->basename, basename, sizeof(r_texture_cubemaps[i]->basename));
+	dp_strlcpy(r_texture_cubemaps[i]->basename, basename, sizeof(r_texture_cubemaps[i]->basename));
 	r_texture_cubemaps[i]->texture = R_LoadCubemap(r_texture_cubemaps[i]->basename);
 	return r_texture_cubemaps[i]->texture;
 }
@@ -8104,7 +8104,7 @@ static void R_LoadQWSkin(r_qwskincache_t *cache, const char *skinname)
 	char name[MAX_QPATH];
 	skinframe_t *skinframe;
 	unsigned char pixels[296*194];
-	strlcpy(cache->name, skinname, sizeof(cache->name));
+	dp_strlcpy(cache->name, skinname, sizeof(cache->name));
 	dpsnprintf(name, sizeof(name), "skins/%s.pcx", cache->name);
 	if (developer_loading.integer)
 		Con_Printf("loading %s\n", name);

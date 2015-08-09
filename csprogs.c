@@ -593,7 +593,7 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 				l = strlen(p);
 			if(l > sizeof(buf) - 1)
 				l = sizeof(buf) - 1;
-			strlcpy(buf, p, l + 1); // strlcpy needs a + 1 as it includes the newline!
+			dp_strlcpy(buf, p, l + 1); // dp_strlcpy needs a + 1 as it includes the newline!
 
 			Cmd_ExecuteString(buf, src_command, true);
 

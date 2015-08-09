@@ -527,7 +527,7 @@ mempool_t *_Mem_AllocPool(const char *name, int flags, mempool_t *parent, const 
 	pool->chain = NULL;
 	pool->totalsize = 0;
 	pool->realsize = sizeof(mempool_t);
-	strlcpy (pool->name, name, sizeof (pool->name));
+	dp_strlcpy (pool->name, name, sizeof (pool->name));
 	pool->parent = parent;
 	pool->next = poolchain;
 	poolchain = pool;
@@ -879,7 +879,7 @@ char* Mem_strdup (mempool_t *pool, const char* s)
 		return NULL;
 	sz = strlen (s) + 1;
 	p = (char*)Mem_Alloc (pool, sz);
-	strlcpy (p, s, sz);
+	dp_strlcpy (p, s, sz);
 	return p;
 }
 

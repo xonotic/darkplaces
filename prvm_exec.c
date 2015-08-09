@@ -259,7 +259,7 @@ void PRVM_ShortStackTrace(prvm_prog_t *prog, char *buf, size_t bufsize)
 	}
 	else
 	{
-		strlcpy(buf, "<NO PROG>", bufsize);
+		dp_strlcpy(buf, "<NO PROG>", bufsize);
 		return;
 	}
 

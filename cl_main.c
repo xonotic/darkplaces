@@ -2021,7 +2021,7 @@ static void CL_Fog_HeightTexture_f (void)
 	r_refdef.fog_end = atof(Cmd_Argv(7));
 	r_refdef.fog_height = atof(Cmd_Argv(8));
 	r_refdef.fog_fadedepth = atof(Cmd_Argv(9));
-	strlcpy(r_refdef.fog_height_texturename, Cmd_Argv(10), sizeof(r_refdef.fog_height_texturename));
+	dp_strlcpy(r_refdef.fog_height_texturename, Cmd_Argv(10), sizeof(r_refdef.fog_height_texturename));
 }
 
 
@@ -2086,7 +2086,7 @@ void CL_Locs_FindLocationName(char *buffer, size_t buffersize, vec3_t point)
 	cl_locnode_t *loc;
 	loc = CL_Locs_FindNearest(point);
 	if (loc)
-		strlcpy(buffer, loc->name, buffersize);
+		dp_strlcpy(buffer, loc->name, buffersize);
 	else
 		dpsnprintf(buffer, buffersize, "LOC=%.0f:%.0f:%.0f", point[0], point[1], point[2]);
 }

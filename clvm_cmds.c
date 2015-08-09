@@ -580,7 +580,7 @@ static void VM_CL_lightstyle (prvm_prog_t *prog)
 		VM_Warning(prog, "VM_CL_lightstyle >= MAX_LIGHTSTYLES\n");
 		return;
 	}
-	strlcpy (cl.lightstyle[i].map, c, sizeof (cl.lightstyle[i].map));
+	dp_strlcpy (cl.lightstyle[i].map, c, sizeof (cl.lightstyle[i].map));
 	cl.lightstyle[i].map[MAX_STYLESTRING - 1] = 0;
 	cl.lightstyle[i].length = (int)strlen(cl.lightstyle[i].map);
 }
@@ -1257,7 +1257,7 @@ static void VM_CL_getstats (prvm_prog_t *prog)
 		VM_Warning(prog, "VM_CL_getstats: index>MAX_CL_STATS-4 or index<0\n");
 		return;
 	}
-	strlcpy(t, (char*)&cl.stats[i], sizeof(t));
+	dp_strlcpy(t, (char*)&cl.stats[i], sizeof(t));
 	PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(prog, t);
 }
 
@@ -1576,7 +1576,7 @@ static void VM_CL_getplayerkey (prvm_prog_t *prog)
 	t[0] = 0;
 
 	if(!strcasecmp(c, "name"))
-		strlcpy(t, cl.scores[i].name, sizeof(t));
+		dp_strlcpy(t, cl.scores[i].name, sizeof(t));
 	else
 		if(!strcasecmp(c, "frags"))
 			dpsnprintf(t, sizeof(t), "%i", cl.scores[i].frags);

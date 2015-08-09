@@ -160,7 +160,7 @@ for a few moments
 */
 void SCR_CenterPrint(const char *str)
 {
-	strlcpy (scr_centerstring, str, sizeof (scr_centerstring));
+	dp_strlcpy (scr_centerstring, str, sizeof (scr_centerstring));
 	scr_centertime_off = scr_centertime.value;
 	scr_centertime_start = cl.time;
 
@@ -678,7 +678,7 @@ static void SCR_InfoBar_f(void)
 	if(Cmd_Argc() == 3)
 	{
 		scr_infobartime_off = atof(Cmd_Argv(1));
-		strlcpy(scr_infobarstring, Cmd_Argv(2), sizeof(scr_infobarstring));
+		dp_strlcpy(scr_infobarstring, Cmd_Argv(2), sizeof(scr_infobarstring));
 	}
 	else
 	{
@@ -1444,7 +1444,7 @@ void SCR_ScreenShot_f (void)
 	if (Cmd_Argc() == 2)
 	{
 		const char *ext;
-		strlcpy(filename, Cmd_Argv(1), sizeof(filename));
+		dp_strlcpy(filename, Cmd_Argv(1), sizeof(filename));
 		ext = FS_FileExtension(filename);
 		if (!strcasecmp(ext, "jpg"))
 		{
@@ -1537,7 +1537,7 @@ void SCR_ScreenShot_f (void)
 		{
 			if(SCR_ScreenShot (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, scr_screenshot_alpha.integer != 0))
 			{
-				strlcpy(filename + strlen(filename) - 3, "tga", 4);
+				dp_strlcpy(filename + strlen(filename) - 3, "tga", 4);
 				Con_Printf("Wrote %s\n", filename);
 			}
 		}
@@ -1869,7 +1869,7 @@ static void R_Envmap_f (void)
 		return;
 	}
 
-	strlcpy (basename, Cmd_Argv(1), sizeof (basename));
+	dp_strlcpy (basename, Cmd_Argv(1), sizeof (basename));
 	size = atoi(Cmd_Argv(2));
 	if (size != 128 && size != 256 && size != 512 && size != 1024)
 	{
@@ -1941,8 +1941,8 @@ void SHOWLMP_decodeshow(void)
 	int k;
 	char lmplabel[256], picname[256];
 	float x, y;
-	strlcpy (lmplabel,MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (lmplabel));
-	strlcpy (picname, MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (picname));
+	dp_strlcpy (lmplabel,MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (lmplabel));
+	dp_strlcpy (picname, MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (picname));
 	if (gamemode == GAME_NEHAHRA) // LordHavoc: nasty old legacy junk
 	{
 		x = MSG_ReadByte(&cl_message);
@@ -1973,8 +1973,8 @@ void SHOWLMP_decodeshow(void)
 			if (!cl.showlmps[k].isactive)
 				break;
 	cl.showlmps[k].isactive = true;
-	strlcpy (cl.showlmps[k].label, lmplabel, sizeof (cl.showlmps[k].label));
-	strlcpy (cl.showlmps[k].pic, picname, sizeof (cl.showlmps[k].pic));
+	dp_strlcpy (cl.showlmps[k].label, lmplabel, sizeof (cl.showlmps[k].label));
+	dp_strlcpy (cl.showlmps[k].pic, picname, sizeof (cl.showlmps[k].pic));
 	cl.showlmps[k].x = x;
 	cl.showlmps[k].y = y;
 	cl.num_showlmps = max(cl.num_showlmps, k + 1);
@@ -2360,7 +2360,7 @@ void SCR_PushLoadingScreen (qboolean redraw, const char *msg, float len_in_paren
 	s->prev = loadingscreenstack;
 	loadingscreenstack = s;
 
-	strlcpy(s->msg, msg, sizeof(s->msg));
+	dp_strlcpy(s->msg, msg, sizeof(s->msg));
 	s->relative_completion = 0;
 
 	if(s->prev)

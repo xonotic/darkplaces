@@ -150,9 +150,9 @@ static void Host_Status_f (void)
 		}
 
 		if(sv_status_privacy.integer && cmd_source != src_command)
-			strlcpy(ip, client->netconnection ? "hidden" : "botclient", 48);
+			dp_strlcpy(ip, client->netconnection ? "hidden" : "botclient", 48);
 		else
-			strlcpy(ip, (client->netconnection && client->netconnection->address) ? client->netconnection->address : "botclient", 48);
+			dp_strlcpy(ip, (client->netconnection && client->netconnection->address) ? client->netconnection->address : "botclient", 48);
 
 		frags = client->frags;
 
@@ -389,7 +389,7 @@ static void Host_Map_f (void)
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	allowcheats = sv_cheats.integer != 0;
-	strlcpy(level, Cmd_Argv(1), sizeof(level));
+	dp_strlcpy(level, Cmd_Argv(1), sizeof(level));
 	SV_SpawnServer(level);
 	if (sv.active && cls.state == ca_disconnected)
 		CL_EstablishConnection("local:1", -2);
@@ -426,7 +426,7 @@ static void Host_Changelevel_f (void)
 
 	SV_SaveSpawnparms ();
 	allowcheats = sv_cheats.integer != 0;
-	strlcpy(level, Cmd_Argv(1), sizeof(level));
+	dp_strlcpy(level, Cmd_Argv(1), sizeof(level));
 	SV_SpawnServer(level);
 	if (sv.active && cls.state == ca_disconnected)
 		CL_EstablishConnection("local:1", -2);
@@ -462,7 +462,7 @@ static void Host_Restart_f (void)
 	key_dest = key_game;
 
 	allowcheats = sv_cheats.integer != 0;
-	strlcpy(mapname, sv.name, sizeof(mapname));
+	dp_strlcpy(mapname, sv.name, sizeof(mapname));
 	SV_SpawnServer(mapname);
 	if (sv.active && cls.state == ca_disconnected)
 		CL_EstablishConnection("local:1", -2);
@@ -749,7 +749,7 @@ static void Host_Savegame_f (void)
 		return;
 	}
 
-	strlcpy (name, Cmd_Argv(1), sizeof (name));
+	dp_strlcpy (name, Cmd_Argv(1), sizeof (name));
 	FS_DefaultExtension (name, ".sav", sizeof (name));
 
 	Host_Savegame_to(prog, name);
@@ -785,7 +785,7 @@ static void Host_Loadgame_f (void)
 		return;
 	}
 
-	strlcpy (filename, Cmd_Argv(1), sizeof(filename));
+	dp_strlcpy (filename, Cmd_Argv(1), sizeof(filename));
 	FS_DefaultExtension (filename, ".sav", sizeof (filename));
 
 	Con_Printf("Loading game from %s...\n", filename);
@@ -845,7 +845,7 @@ static void Host_Loadgame_f (void)
 
 	// mapname
 	COM_ParseToken_Simple(&t, false, false, true);
-	strlcpy (mapname, com_token, sizeof(mapname));
+	dp_strlcpy (mapname, com_token, sizeof(mapname));
 
 	if(developer_entityparsing.integer)
 		Con_Printf("Host_Loadgame_f: loading time\n");
@@ -889,7 +889,7 @@ static void Host_Loadgame_f (void)
 			t = start;
 			break;
 		}
-		strlcpy(sv.lightstyles[i], com_token, sizeof(sv.lightstyles[i]));
+		dp_strlcpy(sv.lightstyles[i], com_token, sizeof(sv.lightstyles[i]));
 	}
 
 	if(developer_entityparsing.integer)
@@ -1008,7 +1008,7 @@ static void Host_Loadgame_f (void)
 					i = atoi(com_token);
 					COM_ParseToken_Simple(&t, false, false, true);
 					if (i >= 0 && i < MAX_LIGHTSTYLES)
-						strlcpy(sv.lightstyles[i], com_token, sizeof(sv.lightstyles[i]));
+						dp_strlcpy(sv.lightstyles[i], com_token, sizeof(sv.lightstyles[i]));
 					else
 						Con_Printf("unsupported lightstyle %i \"%s\"\n", i, com_token);
 				}
@@ -1019,7 +1019,7 @@ static void Host_Loadgame_f (void)
 					COM_ParseToken_Simple(&t, false, false, true);
 					if (i >= 0 && i < MAX_MODELS)
 					{
-						strlcpy(sv.model_precache[i], com_token, sizeof(sv.model_precache[i]));
+						dp_strlcpy(sv.model_precache[i], com_token, sizeof(sv.model_precache[i]));
 						sv.models[i] = Mod_ForName (sv.model_precache[i], true, false, sv.model_precache[i][0] == '*' ? sv.worldname : NULL);
 					}
 					else
@@ -1031,7 +1031,7 @@ static void Host_Loadgame_f (void)
 					i = atoi(com_token);
 					COM_ParseToken_Simple(&t, false, false, true);
 					if (i >= 0 && i < MAX_SOUNDS)
-						strlcpy(sv.sound_precache[i], com_token, sizeof(sv.sound_precache[i]));
+						dp_strlcpy(sv.sound_precache[i], com_token, sizeof(sv.sound_precache[i]));
 					else
 						Con_Printf("unsupported sound %i \"%s\"\n", i, com_token);
 				}
@@ -1134,7 +1134,7 @@ static void Host_Name_f (void)
 	else
 		newNameSource = Cmd_Args();
 
-	strlcpy(newName, newNameSource, sizeof(newName));
+	dp_strlcpy(newName, newNameSource, sizeof(newName));
 
 	if (cmd_source == src_command)
 	{
@@ -1156,7 +1156,7 @@ static void Host_Name_f (void)
 	host_client->nametime = realtime + max(0.0f, sv_namechangetimer.value);
 
 	// point the string back at updateclient->name to keep it safe
-	strlcpy (host_client->name, newName, sizeof (host_client->name));
+	dp_strlcpy (host_client->name, newName, sizeof (host_client->name));
 
 	for (i = 0, j = 0;host_client->name[i];i++)
 		if (host_client->name[i] != '\r' && host_client->name[i] != '\n')
@@ -1228,7 +1228,7 @@ static void Host_Name_f (void)
 	{
 		if (host_client->begun)
 			SV_BroadcastPrintf("%s ^7changed name to %s\n", host_client->old_name, host_client->name);
-		strlcpy(host_client->old_name, host_client->name, sizeof(host_client->old_name));
+		dp_strlcpy(host_client->old_name, host_client->name, sizeof(host_client->old_name));
 		// send notification to all clients
 		MSG_WriteByte (&sv.reliable_datagram, svc_updatename);
 		MSG_WriteByte (&sv.reliable_datagram, host_client - svs.clients);
@@ -1260,9 +1260,9 @@ static void Host_Playermodel_f (void)
 	}
 
 	if (Cmd_Argc () == 2)
-		strlcpy (newPath, Cmd_Argv(1), sizeof (newPath));
+		dp_strlcpy (newPath, Cmd_Argv(1), sizeof (newPath));
 	else
-		strlcpy (newPath, Cmd_Args(), sizeof (newPath));
+		dp_strlcpy (newPath, Cmd_Args(), sizeof (newPath));
 
 	for (i = 0, j = 0;newPath[i];i++)
 		if (newPath[i] != '\r' && newPath[i] != '\n')
@@ -1286,11 +1286,11 @@ static void Host_Playermodel_f (void)
 	*/
 
 	// point the string back at updateclient->name to keep it safe
-	strlcpy (host_client->playermodel, newPath, sizeof (host_client->playermodel));
+	dp_strlcpy (host_client->playermodel, newPath, sizeof (host_client->playermodel));
 	PRVM_serveredictstring(host_client->edict, playermodel) = PRVM_SetEngineString(prog, host_client->playermodel);
 	if (strcmp(host_client->old_model, host_client->playermodel))
 	{
-		strlcpy(host_client->old_model, host_client->playermodel, sizeof(host_client->old_model));
+		dp_strlcpy(host_client->old_model, host_client->playermodel, sizeof(host_client->old_model));
 		/*// send notification to all clients
 		MSG_WriteByte (&sv.reliable_datagram, svc_updatepmodel);
 		MSG_WriteByte (&sv.reliable_datagram, host_client - svs.clients);
@@ -1320,9 +1320,9 @@ static void Host_Playerskin_f (void)
 	}
 
 	if (Cmd_Argc () == 2)
-		strlcpy (newPath, Cmd_Argv(1), sizeof (newPath));
+		dp_strlcpy (newPath, Cmd_Argv(1), sizeof (newPath));
 	else
-		strlcpy (newPath, Cmd_Args(), sizeof (newPath));
+		dp_strlcpy (newPath, Cmd_Args(), sizeof (newPath));
 
 	for (i = 0, j = 0;newPath[i];i++)
 		if (newPath[i] != '\r' && newPath[i] != '\n')
@@ -1346,13 +1346,13 @@ static void Host_Playerskin_f (void)
 	*/
 
 	// point the string back at updateclient->name to keep it safe
-	strlcpy (host_client->playerskin, newPath, sizeof (host_client->playerskin));
+	dp_strlcpy (host_client->playerskin, newPath, sizeof (host_client->playerskin));
 	PRVM_serveredictstring(host_client->edict, playerskin) = PRVM_SetEngineString(prog, host_client->playerskin);
 	if (strcmp(host_client->old_skin, host_client->playerskin))
 	{
 		//if (host_client->begun)
 		//	SV_BroadcastPrintf("%s changed skin to %s\n", host_client->name, host_client->playerskin);
-		strlcpy(host_client->old_skin, host_client->playerskin, sizeof(host_client->old_skin));
+		dp_strlcpy(host_client->old_skin, host_client->playerskin, sizeof(host_client->old_skin));
 		/*// send notification to all clients
 		MSG_WriteByte (&sv.reliable_datagram, svc_updatepskin);
 		MSG_WriteByte (&sv.reliable_datagram, host_client - svs.clients);
@@ -2427,7 +2427,7 @@ static void Host_Startdemos_f (void)
 	Con_DPrintf("%i demo(s) in loop\n", c);
 
 	for (i=1 ; i<c+1 ; i++)
-		strlcpy (cls.demos[i-1], Cmd_Argv(i), sizeof (cls.demos[i-1]));
+		dp_strlcpy (cls.demos[i-1], Cmd_Argv(i), sizeof (cls.demos[i-1]));
 
 	// LordHavoc: clear the remaining slots
 	for (;i <= MAX_DEMOS;i++)
@@ -2582,7 +2582,7 @@ static void Host_PQRcon_f (void)
 			Con_Printf ("You must either be connected, or set the rcon_address cvar to issue rcon commands\n");
 			return;
 		}
-		strlcpy(peer_address, rcon_address.string, strlen(rcon_address.string)+1);
+		dp_strlcpy(peer_address, rcon_address.string, strlen(rcon_address.string)+1);
 	}
 	LHNETADDRESS_FromString(&to, peer_address, sv_netport.integer);
 	mysocket = NetConn_ChooseClientSocketForAddress(&to);
@@ -2670,7 +2670,7 @@ static void Host_Rcon_f (void) // credit: taken from QuakeWorld
 			++cls.rcon_trying;
 			if(i >= MAX_RCONS)
 				NetConn_WriteString(mysocket, "\377\377\377\377getchallenge", &to); // otherwise we'll request the challenge later
-			strlcpy(cls.rcon_commands[cls.rcon_ringpos], Cmd_Args(), sizeof(cls.rcon_commands[cls.rcon_ringpos]));
+			dp_strlcpy(cls.rcon_commands[cls.rcon_ringpos], Cmd_Args(), sizeof(cls.rcon_commands[cls.rcon_ringpos]));
 			cls.rcon_addresses[cls.rcon_ringpos] = to;
 			cls.rcon_timeout[cls.rcon_ringpos] = realtime + rcon_secure_challengetimeout.value;
 			cls.rcon_ringpos = (cls.rcon_ringpos + 1) % MAX_RCONS;
@@ -2684,7 +2684,7 @@ static void Host_Rcon_f (void) // credit: taken from QuakeWorld
 			if(HMAC_MDFOUR_16BYTES((unsigned char *) (buf + 24), (unsigned char *) argbuf, (int)strlen(argbuf), (unsigned char *) rcon_password.string, n))
 			{
 				buf[40] = ' ';
-				strlcpy(buf + 41, argbuf, sizeof(buf) - 41);
+				dp_strlcpy(buf + 41, argbuf, sizeof(buf) - 41);
 				NetConn_Write(mysocket, buf, 41 + (int)strlen(buf + 41), &to);
 			}
 		}
@@ -2774,7 +2774,7 @@ static void Host_FullServerinfo_f (void) // credit: taken from QuakeWorld
 		return;
 	}
 
-	strlcpy (cl.qw_serverinfo, Cmd_Argv(1), sizeof(cl.qw_serverinfo));
+	dp_strlcpy (cl.qw_serverinfo, Cmd_Argv(1), sizeof(cl.qw_serverinfo));
 	InfoString_GetValue(cl.qw_serverinfo, "teamplay", temp, sizeof(temp));
 	cl.qw_teamplay = atoi(temp);
 }
@@ -2808,7 +2808,7 @@ static void Host_FullInfo_f (void) // credit: taken from QuakeWorld
 		if (len >= sizeof(key)) {
 			len = sizeof(key) - 1;
 		}
-		strlcpy(key, s, len + 1);
+		dp_strlcpy(key, s, len + 1);
 		s += len;
 		if (!*s)
 		{
@@ -2821,7 +2821,7 @@ static void Host_FullInfo_f (void) // credit: taken from QuakeWorld
 		if (len >= sizeof(value)) {
 			len = sizeof(value) - 1;
 		}
-		strlcpy(value, s, len + 1);
+		dp_strlcpy(value, s, len + 1);
 
 		CL_SetInfo(key, value, false, false, false, false);
 

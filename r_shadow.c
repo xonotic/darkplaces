@@ -3410,7 +3410,7 @@ void R_RTLight_Update(rtlight_t *rtlight, int isstatic, matrix4x4_t *matrix, vec
 	VectorCopy(color, rtlight->color);
 	rtlight->cubemapname[0] = 0;
 	if (cubemapname && cubemapname[0])
-		strlcpy(rtlight->cubemapname, cubemapname, sizeof(rtlight->cubemapname));
+		dp_strlcpy(rtlight->cubemapname, cubemapname, sizeof(rtlight->cubemapname));
 	rtlight->shadow = shadow;
 	rtlight->corona = corona;
 	rtlight->style = style;
@@ -5393,7 +5393,7 @@ static void R_Shadow_UpdateWorldLight(dlight_t *light, vec3_t origin, vec3_t ang
 	light->style = style;
 	light->shadow = shadowenable;
 	light->corona = corona;
-	strlcpy(light->cubemapname, cubemapname, sizeof(light->cubemapname));
+	dp_strlcpy(light->cubemapname, cubemapname, sizeof(light->cubemapname));
 	light->coronasizescale = coronasizescale;
 	light->ambientscale = ambientscale;
 	light->diffusescale = diffusescale;
@@ -5817,14 +5817,14 @@ void R_Shadow_LoadWorldLightsFromMap_LightArghliteTyrlite(void)
 			if (com_token[0] == '}')
 				break; // end of entity
 			if (com_token[0] == '_')
-				strlcpy(key, com_token + 1, sizeof(key));
+				dp_strlcpy(key, com_token + 1, sizeof(key));
 			else
-				strlcpy(key, com_token, sizeof(key));
+				dp_strlcpy(key, com_token, sizeof(key));
 			while (key[strlen(key)-1] == ' ') // remove trailing spaces
 				key[strlen(key)-1] = 0;
 			if (!COM_ParseToken_Simple(&data, false, false, true))
 				break; // error
-			strlcpy(value, com_token, sizeof(value));
+			dp_strlcpy(value, com_token, sizeof(value));
 
 			// now that we have the key pair worked out...
 			if (!strcmp("light", key))
@@ -6036,7 +6036,7 @@ void R_Shadow_EditLights_Reload_f(void)
 {
 	if (!cl.worldmodel)
 		return;
-	strlcpy(r_shadow_mapname, cl.worldname, sizeof(r_shadow_mapname));
+	dp_strlcpy(r_shadow_mapname, cl.worldname, sizeof(r_shadow_mapname));
 	R_Shadow_ClearWorldLights();
 	if (r_shadow_realtime_world_importlightentitiesfrommap.integer <= 1)
 	{
@@ -6109,7 +6109,7 @@ static void R_Shadow_EditLights_Edit_f(void)
 	radius = r_shadow_selectedlight->radius;
 	style = r_shadow_selectedlight->style;
 	if (r_shadow_selectedlight->cubemapname)
-		strlcpy(cubemapname, r_shadow_selectedlight->cubemapname, sizeof(cubemapname));
+		dp_strlcpy(cubemapname, r_shadow_selectedlight->cubemapname, sizeof(cubemapname));
 	else
 		cubemapname[0] = 0;
 	shadows = r_shadow_selectedlight->shadow;
@@ -6313,7 +6313,7 @@ static void R_Shadow_EditLights_Edit_f(void)
 			return;
 		}
 		if (Cmd_Argc() == 3)
-			strlcpy(cubemapname, Cmd_Argv(2), sizeof(cubemapname));
+			dp_strlcpy(cubemapname, Cmd_Argv(2), sizeof(cubemapname));
 		else
 			cubemapname[0] = 0;
 	}
@@ -6633,7 +6633,7 @@ static void R_Shadow_EditLights_CopyInfo_f(void)
 	r_shadow_bufferlight.radius = r_shadow_selectedlight->radius;
 	r_shadow_bufferlight.style = r_shadow_selectedlight->style;
 	if (r_shadow_selectedlight->cubemapname)
-		strlcpy(r_shadow_bufferlight.cubemapname, r_shadow_selectedlight->cubemapname, sizeof(r_shadow_bufferlight.cubemapname));
+		dp_strlcpy(r_shadow_bufferlight.cubemapname, r_shadow_selectedlight->cubemapname, sizeof(r_shadow_bufferlight.cubemapname));
 	else
 		r_shadow_bufferlight.cubemapname[0] = 0;
 	r_shadow_bufferlight.shadow = r_shadow_selectedlight->shadow;

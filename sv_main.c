@@ -1097,8 +1097,8 @@ void SV_ConnectClient (int clientnum, netconn_t *netconnection)
 				);
 	}
 
-	strlcpy(client->name, "unconnected", sizeof(client->name));
-	strlcpy(client->old_name, "unconnected", sizeof(client->old_name));
+	dp_strlcpy(client->name, "unconnected", sizeof(client->name));
+	dp_strlcpy(client->old_name, "unconnected", sizeof(client->old_name));
 	client->prespawned = false;
 	client->spawned = false;
 	client->begun = false;
@@ -2024,7 +2024,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	s = PRVM_GetString(prog, PRVM_serveredictstring(ent, weaponmodel));
 	if (strcmp(s, client->weaponmodel))
 	{
-		strlcpy(client->weaponmodel, s, sizeof(client->weaponmodel));
+		dp_strlcpy(client->weaponmodel, s, sizeof(client->weaponmodel));
 		client->weaponmodelindex = SV_ModelIndex(s, 1);
 	}
 
@@ -2479,15 +2479,15 @@ static void SV_UpdateToReliableMessages (void)
 		if (name == NULL)
 			name = "";
 		// always point the string back at host_client->name to keep it safe
-		//strlcpy (host_client->name, name, sizeof (host_client->name));
+		//dp_strlcpy (host_client->name, name, sizeof (host_client->name));
 		if (name != host_client->name) // prevent buffer overlap SIGABRT on Mac OSX
-			strlcpy (host_client->name, name, sizeof (host_client->name));
+			dp_strlcpy (host_client->name, name, sizeof (host_client->name));
 		PRVM_serveredictstring(host_client->edict, netname) = PRVM_SetEngineString(prog, host_client->name);
 		if (strcmp(host_client->old_name, host_client->name))
 		{
 			if (host_client->begun)
 				SV_BroadcastPrintf("%s ^7changed name to %s\n", host_client->old_name, host_client->name);
-			strlcpy(host_client->old_name, host_client->name, sizeof(host_client->old_name));
+			dp_strlcpy(host_client->old_name, host_client->name, sizeof(host_client->old_name));
 			// send notification to all clients
 			MSG_WriteByte (&sv.reliable_datagram, svc_updatename);
 			MSG_WriteByte (&sv.reliable_datagram, i);
@@ -2511,9 +2511,9 @@ static void SV_UpdateToReliableMessages (void)
 		if (model == NULL)
 			model = "";
 		// always point the string back at host_client->name to keep it safe
-		//strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
+		//dp_strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
 		if (model != host_client->playermodel) // prevent buffer overlap SIGABRT on Mac OSX
-			strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
+			dp_strlcpy (host_client->playermodel, model, sizeof (host_client->playermodel));
 		PRVM_serveredictstring(host_client->edict, playermodel) = PRVM_SetEngineString(prog, host_client->playermodel);
 
 		// NEXUIZ_PLAYERSKIN
@@ -2521,9 +2521,9 @@ static void SV_UpdateToReliableMessages (void)
 		if (skin == NULL)
 			skin = "";
 		// always point the string back at host_client->name to keep it safe
-		//strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
+		//dp_strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
 		if (skin != host_client->playerskin) // prevent buffer overlap SIGABRT on Mac OSX
-			strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
+			dp_strlcpy (host_client->playerskin, skin, sizeof (host_client->playerskin));
 		PRVM_serveredictstring(host_client->edict, playerskin) = PRVM_SetEngineString(prog, host_client->playerskin);
 
 		// TODO: add an extension name for this [1/17/2008 Black]
@@ -2701,7 +2701,7 @@ static void SV_Download_f(void)
 
 	Download_CheckExtensions();
 
-	strlcpy(host_client->download_name, Cmd_Argv(1), sizeof(host_client->download_name));
+	dp_strlcpy(host_client->download_name, Cmd_Argv(1), sizeof(host_client->download_name));
 	extension = FS_FileExtension(host_client->download_name);
 
 	// host_client is asking to download a specified file
@@ -2869,7 +2869,7 @@ int SV_ModelIndex(const char *s, int precachemode)
 	// testing
 	//if (precachemode == 2)
 	//	return 0;
-	strlcpy(filename, s, sizeof(filename));
+	dp_strlcpy(filename, s, sizeof(filename));
 	for (i = 2;i < limit;i++)
 	{
 		if (!sv.model_precache[i][0])
@@ -2883,7 +2883,7 @@ int SV_ModelIndex(const char *s, int precachemode)
 				}
 				if (precachemode == 1)
 					Con_Printf("SV_ModelIndex(\"%s\"): not precached (fix your code), precaching anyway\n", filename);
-				strlcpy(sv.model_precache[i], filename, sizeof(sv.model_precache[i]));
+				dp_strlcpy(sv.model_precache[i], filename, sizeof(sv.model_precache[i]));
 				if (sv.state == ss_loading)
 				{
 					// running from SV_SpawnServer which is launched from the client console command interpreter
@@ -2932,7 +2932,7 @@ int SV_SoundIndex(const char *s, int precachemode)
 	// testing
 	//if (precachemode == 2)
 	//	return 0;
-	strlcpy(filename, s, sizeof(filename));
+	dp_strlcpy(filename, s, sizeof(filename));
 	for (i = 1;i < limit;i++)
 	{
 		if (!sv.sound_precache[i][0])
@@ -2946,7 +2946,7 @@ int SV_SoundIndex(const char *s, int precachemode)
 				}
 				if (precachemode == 1)
 					Con_Printf("SV_SoundIndex(\"%s\"): not precached (fix your code), precaching anyway\n", filename);
-				strlcpy(sv.sound_precache[i], filename, sizeof(sv.sound_precache[i]));
+				dp_strlcpy(sv.sound_precache[i], filename, sizeof(sv.sound_precache[i]));
 				if (sv.state != ss_loading)
 				{
 					MSG_WriteByte(&sv.reliable_datagram, svc_precache);
@@ -2987,7 +2987,7 @@ int SV_ParticleEffectIndex(const char *name)
 		sv.particleeffectnamesloaded = true;
 		memset(sv.particleeffectname, 0, sizeof(sv.particleeffectname));
 		for (i = 0;i < EFFECT_TOTAL;i++)
-			strlcpy(sv.particleeffectname[i], standardeffectnames[i], sizeof(sv.particleeffectname[i]));
+			dp_strlcpy(sv.particleeffectname[i], standardeffectnames[i], sizeof(sv.particleeffectname[i]));
 		for (filepass = 0;;filepass++)
 		{
 			if (filepass == 0)
@@ -3011,7 +3011,7 @@ int SV_ParticleEffectIndex(const char *name)
 						break;
 					if (argc < 16)
 					{
-						strlcpy(argv[argc], com_token, sizeof(argv[argc]));
+						dp_strlcpy(argv[argc], com_token, sizeof(argv[argc]));
 						argc++;
 					}
 				}
@@ -3032,7 +3032,7 @@ int SV_ParticleEffectIndex(const char *name)
 							}
 							else
 							{
-								strlcpy(sv.particleeffectname[effectnameindex], argv[1], sizeof(sv.particleeffectname[effectnameindex]));
+								dp_strlcpy(sv.particleeffectname[effectnameindex], argv[1], sizeof(sv.particleeffectname[effectnameindex]));
 								break;
 							}
 						}
@@ -3185,7 +3185,7 @@ static void SV_Prepare_CSQC(void)
 
 		sv.csqc_progsize = (int)progsize;
 		sv.csqc_progcrc = CRC_Block(svs.csqc_progdata, progsize);
-		strlcpy(sv.csqc_progname, csqc_progname.string, sizeof(sv.csqc_progname));
+		dp_strlcpy(sv.csqc_progname, csqc_progname.string, sizeof(sv.csqc_progname));
 		Con_DPrintf("server detected csqc progs file \"%s\" with size %i and crc %i\n", sv.csqc_progname, sv.csqc_progsize, sv.csqc_progcrc);
 
 		Con_DPrint("Compressing csprogs.dat\n");
@@ -3369,10 +3369,10 @@ void SV_SpawnServer (const char *server)
 	sv.active = true;
 
 	// set level base name variables for later use
-	strlcpy (sv.name, server, sizeof (sv.name));
-	strlcpy(sv.worldname, modelname, sizeof(sv.worldname));
+	dp_strlcpy (sv.name, server, sizeof (sv.name));
+	dp_strlcpy(sv.worldname, modelname, sizeof(sv.worldname));
 	FS_StripExtension(sv.worldname, sv.worldnamenoextension, sizeof(sv.worldnamenoextension));
-	strlcpy(sv.worldbasename, !strncmp(sv.worldnamenoextension, "maps/", 5) ? sv.worldnamenoextension + 5 : sv.worldnamenoextension, sizeof(sv.worldbasename));
+	dp_strlcpy(sv.worldbasename, !strncmp(sv.worldnamenoextension, "maps/", 5) ? sv.worldnamenoextension + 5 : sv.worldnamenoextension, sizeof(sv.worldbasename));
 	//Cvar_SetQuick(&sv_worldmessage, sv.worldmessage); // set later after QC is spawned
 	Cvar_SetQuick(&sv_worldname, sv.worldname);
 	Cvar_SetQuick(&sv_worldnamenoextension, sv.worldnamenoextension);
@@ -3423,10 +3423,10 @@ void SV_SpawnServer (const char *server)
 	World_SetSize(&sv.world, sv.worldname, sv.worldmodel->normalmins, sv.worldmodel->normalmaxs, prog);
 	World_Start(&sv.world);
 
-	strlcpy(sv.sound_precache[0], "", sizeof(sv.sound_precache[0]));
+	dp_strlcpy(sv.sound_precache[0], "", sizeof(sv.sound_precache[0]));
 
-	strlcpy(sv.model_precache[0], "", sizeof(sv.model_precache[0]));
-	strlcpy(sv.model_precache[1], sv.worldname, sizeof(sv.model_precache[1]));
+	dp_strlcpy(sv.model_precache[0], "", sizeof(sv.model_precache[0]));
+	dp_strlcpy(sv.model_precache[1], sv.worldname, sizeof(sv.model_precache[1]));
 	for (i = 1;i < sv.worldmodel->brush.numsubmodels && i+1 < MAX_MODELS;i++)
 	{
 		dpsnprintf(sv.model_precache[i+1], sizeof(sv.model_precache[i+1]), "*%i", i);
@@ -3536,7 +3536,7 @@ void SV_SpawnServer (const char *server)
 	}
 
 	// update the map title cvar
-	strlcpy(sv.worldmessage, PRVM_GetString(prog, PRVM_serveredictstring(prog->edicts, message)), sizeof(sv.worldmessage)); // map title (not related to filename)
+	dp_strlcpy(sv.worldmessage, PRVM_GetString(prog, PRVM_serveredictstring(prog->edicts, message)), sizeof(sv.worldmessage)); // map title (not related to filename)
 	Cvar_SetQuick(&sv_worldmessage, sv.worldmessage);
 
 	Con_DPrint("Server spawned.\n");

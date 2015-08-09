@@ -1588,7 +1588,7 @@ static void COM_SetGameType(int index)
 		// if there are spaces in the game's network filter name it would
 		// cause parse errors in getservers in dpmaster, so we need to replace
 		// them with _ characters
-		strlcpy(gamenetworkfilternamebuffer, gamenetworkfiltername, sizeof(gamenetworkfilternamebuffer));
+		dp_strlcpy(gamenetworkfilternamebuffer, gamenetworkfiltername, sizeof(gamenetworkfilternamebuffer));
 		while ((s = strchr(gamenetworkfilternamebuffer, ' ')) != NULL)
 			*s = '_';
 		gamenetworkfiltername = gamenetworkfilternamebuffer;
@@ -2097,13 +2097,13 @@ void InfoString_SetValue(char *buffer, size_t bufferlength, const char *key, con
 	{
 		// set the key/value and append the remaining text
 		char tempbuffer[MAX_INPUTLINE];
-		strlcpy(tempbuffer, buffer + pos2, sizeof(tempbuffer));
+		dp_strlcpy(tempbuffer, buffer + pos2, sizeof(tempbuffer));
 		dpsnprintf(buffer + pos, bufferlength - pos, "\\%s\\%s%s", key, value, tempbuffer);
 	}
 	else
 	{
 		// just remove the key from the text
-		strlcpy(buffer + pos, buffer + pos2, bufferlength - pos);
+		dp_strlcpy(buffer + pos, buffer + pos2, bufferlength - pos);
 	}
 }
 
@@ -2138,7 +2138,7 @@ void InfoString_Print(char *buffer)
 }
 
 //========================================================
-// strlcat and strlcpy, from OpenBSD
+// strlcat and dp_strlcpy, from OpenBSD
 
 /*
  * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
@@ -2191,9 +2191,9 @@ strlcat(char *dst, const char *src, size_t siz)
 #endif  // #ifndef HAVE_STRLCAT
 
 
-#ifndef HAVE_STRLCPY
+//#ifndef HAVE_STRLCPY
 size_t
-strlcpy(char *dst, const char *src, size_t siz)
+dp_strlcpy(char *dst, const char *src, size_t siz)
 {
 	register char *d = dst;
 	register const char *s = src;
@@ -2218,7 +2218,7 @@ strlcpy(char *dst, const char *src, size_t siz)
 	return(s - src - 1);	/* count does not include NUL */
 }
 
-#endif  // #ifndef HAVE_STRLCPY
+//#endif  // #ifndef HAVE_STRLCPY
 
 void FindFraction(double val, int *num, int *denom, int denomMax)
 {
@@ -2256,7 +2256,7 @@ char **XPM_DecodeString(const char *in)
 	while(COM_ParseToken_QuakeC(&in, false))
 	{
 		tokens[line] = lines[line];
-		strlcpy(lines[line++], com_token, sizeof(lines[0]));
+		dp_strlcpy(lines[line++], com_token, sizeof(lines[0]));
 		if(!COM_ParseToken_QuakeC(&in, false))
 			return NULL;
 		if(!strcmp(com_token, "}"))

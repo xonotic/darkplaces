@@ -216,7 +216,7 @@ char *Sys_GetClipboardData (void)
 				size_t allocsize;
 				allocsize = GlobalSize (hClipboardData) + 1;
 				data = (char *)Z_Malloc (allocsize);
-				strlcpy (data, cliptext, allocsize);
+				dp_strlcpy (data, cliptext, allocsize);
 				GlobalUnlock (hClipboardData);
 			}
 		}

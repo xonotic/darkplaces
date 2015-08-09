@@ -112,7 +112,7 @@ static qboolean	m_entersound;		///< play after drawing a frame, so caching won't
 
 void M_Update_Return_Reason(const char *s)
 {
-	strlcpy(m_return_reason, s, sizeof(m_return_reason));
+	dp_strlcpy(m_return_reason, s, sizeof(m_return_reason));
 	if (s)
 		Con_DPrintf("%s\n", s);
 }
@@ -860,7 +860,7 @@ static void M_ScanSaves (void)
 
 	for (i=0 ; i<MAX_SAVEGAMES ; i++)
 	{
-		strlcpy (m_filenames[i], "--- UNUSED SLOT ---", sizeof(m_filenames[i]));
+		dp_strlcpy (m_filenames[i], "--- UNUSED SLOT ---", sizeof(m_filenames[i]));
 		loadable[i] = false;
 		dpsnprintf (name, sizeof(name), "s%i.sav", (int)i);
 		f = FS_OpenRealFile (name, "rb", false);
@@ -876,7 +876,7 @@ static void M_ScanSaves (void)
 		//version = atoi(com_token);
 		// description
 		COM_ParseToken_Simple(&t, false, false, true);
-		strlcpy (m_filenames[i], com_token, sizeof (m_filenames[i]));
+		dp_strlcpy (m_filenames[i], com_token, sizeof (m_filenames[i]));
 
 	// change _ back to space
 		for (j=0 ; j<SAVEGAME_COMMENT_LENGTH ; j++)
@@ -1291,7 +1291,7 @@ void M_Menu_Setup_f (void)
 	key_dest = key_menu;
 	m_state = m_setup;
 	m_entersound = true;
-	strlcpy(setup_myname, cl_name.string, sizeof(setup_myname));
+	dp_strlcpy(setup_myname, cl_name.string, sizeof(setup_myname));
 	setup_top = setup_oldtop = cl_color.integer >> 4;
 	setup_bottom = setup_oldbottom = cl_color.integer & 15;
 	setup_rate = cl_rate.integer;
@@ -2499,8 +2499,8 @@ static void M_AddBindToCategory(bindcategory_t *c, char *command, char *descript
 	*b = Z_Alloc(sizeof(binditem_t) + strlen(command) + 1 + strlen(description) + 1);
 	*b->command = (char *)((*b) + 1);
 	*b->description = *b->command + strlen(command) + 1;
-	strlcpy(*b->command, command, strlen(command) + 1);
-	strlcpy(*b->description, description, strlen(description) + 1);
+	dp_strlcpy(*b->command, command, strlen(command) + 1);
+	dp_strlcpy(*b->description, description, strlen(description) + 1);
 }
 
 static void M_AddBind (char *category, char *command, char *description)
@@ -2643,7 +2643,7 @@ static void M_Keys_Draw (void)
 
 		// LordHavoc: redesigned to print more than 2 keys, inspired by Tomaz's MiniRacer
 		if (keys[0] == -1)
-			strlcpy(keystring, "???", sizeof(keystring));
+			dp_strlcpy(keystring, "???", sizeof(keystring));
 		else
 		{
 			char tinystr[2];
@@ -4551,7 +4551,7 @@ static void ModList_RebuildList(void)
 		if (FS_CheckNastyPath (list.strings[i], true)) continue;
 		if (!FS_CheckGameDir(list.strings[i])) continue;
 
-		strlcpy (modlist[modlist_count].dir, list.strings[i], sizeof(modlist[modlist_count].dir));
+		dp_strlcpy (modlist[modlist_count].dir, list.strings[i], sizeof(modlist[modlist_count].dir));
 		//check currently loaded mods
 		modlist[modlist_count].loaded = false;
 		if (fs_numgamedirs)
@@ -4577,7 +4577,7 @@ static void ModList_Enable (void)
 	// copy our mod list into an array for FS_ChangeGameDirs
 	numgamedirs = modlist_numenabled;
 	for (i = 0; i < modlist_numenabled; i++)
-		strlcpy (gamedirs[i], modlist[modlist_enabled[i]].dir,sizeof (gamedirs[i]));
+		dp_strlcpy (gamedirs[i], modlist[modlist_enabled[i]].dir,sizeof (gamedirs[i]));
 
 	// this code snippet is from FS_ChangeGameDirs
 	if (fs_numgamedirs == numgamedirs)

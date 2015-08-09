@@ -370,7 +370,7 @@ static int GL_OpenLibrary(void)
 		Con_Printf("Unable to open symbol list for %s\n", name);
 		return false;
 	}
-	strlcpy(gl_driver, name, sizeof(gl_driver));
+	dp_strlcpy(gl_driver, name, sizeof(gl_driver));
 
 	Con_Printf("Loading OpenGL driver %s\n", name2);
 	if (!(cglobj = dlopen(name2, RTLD_LAZY)))

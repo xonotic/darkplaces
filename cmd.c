@@ -136,7 +136,7 @@ static void Cmd_Centerprint_f (void)
 	c = Cmd_Argc();
 	if(c >= 2)
 	{
-		strlcpy(msg, Cmd_Argv(1), sizeof(msg));
+		dp_strlcpy(msg, Cmd_Argv(1), sizeof(msg));
 		for(i = 2; i < c; ++i)
 		{
 			strlcat(msg, " ", sizeof(msg));
@@ -869,7 +869,7 @@ static void Cmd_Alias_f (void)
 		cmdalias_t *prev, *current;
 
 		a = (cmdalias_t *)Z_Malloc (sizeof(cmdalias_t));
-		strlcpy (a->name, s, sizeof (a->name));
+		dp_strlcpy (a->name, s, sizeof (a->name));
 		// insert it at the right alphanumeric position
 		for( prev = NULL, current = cmd_alias ; current && strcmp( current->name, a->name ) < 0 ; prev = current, current = current->next )
 			;

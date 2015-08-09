@@ -168,7 +168,7 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 	char pattern[4096], *c;
 	WIN32_FIND_DATA n_file;
 	HANDLE hFile;
-	strlcpy (pattern, basepath, sizeof(pattern));
+	dp_strlcpy (pattern, basepath, sizeof(pattern));
 	strlcat (pattern, path, sizeof (pattern));
 	strlcat (pattern, "*", sizeof (pattern));
 	// ask for the directory listing handle

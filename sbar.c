@@ -605,7 +605,7 @@ void Sbar_SortFrags (void)
 						teamname = "Total Team Score";
 						break;
 				}
-				strlcpy(teams[teamlines-1].name, teamname, sizeof(teams[teamlines-1].name));
+				dp_strlcpy(teams[teamlines-1].name, teamname, sizeof(teams[teamlines-1].name));
 
 				teams[teamlines-1].frags = 0;
 				teams[teamlines-1].colors = color + 16 * color;
@@ -1136,12 +1136,12 @@ void Sbar_ShowFPS(void)
 	}
 	if (showtime.integer)
 	{
-		strlcpy(timestring, Sys_TimeString(showtime_format.string), sizeof(timestring));
+		dp_strlcpy(timestring, Sys_TimeString(showtime_format.string), sizeof(timestring));
 		fps_strings++;
 	}
 	if (showdate.integer)
 	{
-		strlcpy(datestring, Sys_TimeString(showdate_format.string), sizeof(datestring));
+		dp_strlcpy(datestring, Sys_TimeString(showdate_format.string), sizeof(datestring));
 		fps_strings++;
 	}
 	if (showblur.integer)
@@ -1207,9 +1207,9 @@ void Sbar_ShowFPS(void)
 		// probably needs adding a new SUPERCONTENTS type
 		trace = CL_TraceLine(org, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, collision_extendmovelength.value, true, false, NULL, true, true);
 		if(trace.hittexture)
-			strlcpy(texstring, trace.hittexture->name, sizeof(texstring));
+			dp_strlcpy(texstring, trace.hittexture->name, sizeof(texstring));
 		else
-			strlcpy(texstring, "(no texture hit)", sizeof(texstring));
+			dp_strlcpy(texstring, "(no texture hit)", sizeof(texstring));
 		fps_strings++;
 	}
 	if (fps_strings)

@@ -153,7 +153,7 @@ int R_SetSkyBox(const char *sky)
 		return false;
 	}
 
-	strlcpy(skyname, sky, sizeof(skyname));
+	dp_strlcpy(skyname, sky, sizeof(skyname));
 
 	return R_LoadSkyBox();
 }

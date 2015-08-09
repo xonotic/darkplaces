@@ -127,7 +127,7 @@ static qboolean Key_History_Get_foundCommand(void)
 {
 	if (!history_matchfound)
 		return false;
-	strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+	dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 	key_linepos = (int)strlen(key_line);
 	history_matchfound = false;
 	return true;
@@ -136,7 +136,7 @@ static qboolean Key_History_Get_foundCommand(void)
 static void Key_History_Up(void)
 {
 	if(history_line == -1) // editing the "new" line
-		strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
+		dp_strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
 
 	if (Key_History_Get_foundCommand())
 		return;
@@ -146,14 +146,14 @@ static void Key_History_Up(void)
 		history_line = CONBUFFER_LINES_COUNT(&history) - 1;
 		if(history_line != -1)
 		{
-			strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+			dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 			key_linepos = (int)strlen(key_line);
 		}
 	}
 	else if(history_line > 0)
 	{
 		--history_line; // this also does -1 -> 0, so it is good
-		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+		dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 		key_linepos = (int)strlen(key_line);
 	}
 }
@@ -169,12 +169,12 @@ static void Key_History_Down(void)
 	if(history_line < CONBUFFER_LINES_COUNT(&history) - 1)
 	{
 		++history_line;
-		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+		dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 	}
 	else
 	{
 		history_line = -1;
-		strlcpy(key_line + 1, history_savedline, sizeof(key_line) - 1);
+		dp_strlcpy(key_line + 1, history_savedline, sizeof(key_line) - 1);
 	}
 
 	key_linepos = (int)strlen(key_line);
@@ -183,12 +183,12 @@ static void Key_History_Down(void)
 static void Key_History_First(void)
 {
 	if(history_line == -1) // editing the "new" line
-		strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
+		dp_strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
 
 	if (CONBUFFER_LINES_COUNT(&history) > 0)
 	{
 		history_line = 0;
-		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+		dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 		key_linepos = (int)strlen(key_line);
 	}
 }
@@ -196,12 +196,12 @@ static void Key_History_First(void)
 static void Key_History_Last(void)
 {
 	if(history_line == -1) // editing the "new" line
-		strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
+		dp_strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
 
 	if (CONBUFFER_LINES_COUNT(&history) > 0)
 	{
 		history_line = CONBUFFER_LINES_COUNT(&history) - 1;
-		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
+		dp_strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
 		key_linepos = (int)strlen(key_line);
 	}
 }
@@ -214,11 +214,11 @@ static void Key_History_Find_Backwards(void)
 	size_t digits = strlen(va(vabuf, sizeof(vabuf), "%i", HIST_MAXLINES));
 
 	if (history_line == -1) // editing the "new" line
-		strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
+		dp_strlcpy(history_savedline, key_line + 1, sizeof(history_savedline));
 
 	if (strcmp(key_line + 1, history_searchstring)) // different string? Start a new search
 	{
-		strlcpy(history_searchstring, key_line + 1, sizeof(history_searchstring));
+		dp_strlcpy(history_searchstring, key_line + 1, sizeof(history_searchstring));
 		i = CONBUFFER_LINES_COUNT(&history) - 1;
 	}
 	else if (history_line == -1)
@@ -253,7 +253,7 @@ static void Key_History_Find_Forwards(void)
 
 	if (strcmp(key_line + 1, history_searchstring)) // different string? Start a new search
 	{
-		strlcpy(history_searchstring, key_line + 1, sizeof(history_searchstring));
+		dp_strlcpy(history_searchstring, key_line + 1, sizeof(history_searchstring));
 		i = 0;
 	}
 	else i = history_line + 1;
@@ -759,7 +759,7 @@ Key_Console (int key, int unicode)
 				cbd[i]=0;
 				temp[0]=0;
 				if ( key_linepos < (int)strlen(key_line) )
-					strlcpy(temp, key_line + key_linepos, (int)strlen(key_line) - key_linepos +1);
+					dp_strlcpy(temp, key_line + key_linepos, (int)strlen(key_line) - key_linepos +1);
 				key_line[key_linepos] = 0;
 				strlcat(key_line, cbd, sizeof(key_line));
 				if (temp[0])
@@ -945,7 +945,7 @@ Key_Console (int key, int unicode)
 		if (key_linepos > 1)
 		{
 			int newpos = (int)u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
-			strlcpy(key_line + newpos, key_line + key_linepos, sizeof(key_line) + 1 - key_linepos);
+			dp_strlcpy(key_line + newpos, key_line + key_linepos, sizeof(key_line) + 1 - key_linepos);
 			key_linepos = newpos;
 		}
 		return;

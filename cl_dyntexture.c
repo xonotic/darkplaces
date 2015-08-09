@@ -39,7 +39,7 @@ static dyntexture_t * cl_finddyntexture( const char *name, qboolean warnonfailur
 		return NULL;
 	}
 	dyntexture = &dyntextures[ dyntexturecount++ ];
-	strlcpy( dyntexture->name, name, sizeof( dyntexture->name ) );
+	dp_strlcpy( dyntexture->name, name, sizeof( dyntexture->name ) );
 	dyntexture->texture = DEFAULT_DYNTEXTURE;
 	return dyntexture;
 }

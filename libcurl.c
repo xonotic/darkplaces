@@ -250,7 +250,7 @@ static void Curl_CommandWhenDone(const char *cmd)
 	if(!curl_dll)
 		return;
 	if(cmd)
-		strlcpy(command_when_done, cmd, sizeof(command_when_done));
+		dp_strlcpy(command_when_done, cmd, sizeof(command_when_done));
 	else
 		*command_when_done = 0;
 }
@@ -266,7 +266,7 @@ static void Curl_CommandWhenError(const char *cmd)
 	if(!curl_dll)
 		return;
 	if(cmd)
-		strlcpy(command_when_error, cmd, sizeof(command_when_error));
+		dp_strlcpy(command_when_error, cmd, sizeof(command_when_error));
 	else
 		*command_when_error = 0;
 }
@@ -545,7 +545,7 @@ static void Curl_EndDownload(downloadinfo *di, CurlStatus status, CURLcode error
 			break;
 	}
 	if(content_type_)
-		strlcpy(content_type, content_type_, sizeof(content_type));
+		dp_strlcpy(content_type, content_type_, sizeof(content_type));
 	else
 		*content_type = 0;
 
@@ -1053,8 +1053,8 @@ static qboolean Curl_Begin(const char *URL, const char *extraheaders, double max
 		if(forthismap)
 			++numdownloads_added;
 		di = (downloadinfo *) Z_Malloc(sizeof(*di));
-		strlcpy(di->filename, name, sizeof(di->filename));
-		strlcpy(di->url, URL, sizeof(di->url));
+		dp_strlcpy(di->filename, name, sizeof(di->filename));
+		dp_strlcpy(di->url, URL, sizeof(di->url));
 		dpsnprintf(di->referer, sizeof(di->referer), "dp://%s/", cls.netcon ? cls.netcon->address : "notconnected.invalid");
 		di->forthismap = forthismap;
 		di->stream = NULL;
@@ -1595,7 +1595,7 @@ Curl_downloadinfo_t *Curl_GetDownloadInfo(int *nDownloads, const char **addition
 		if(developer.integer <= 0)
 			if(di->buffer)
 				continue;
-		strlcpy(downinfo[i].filename, di->filename, sizeof(downinfo[i].filename));
+		dp_strlcpy(downinfo[i].filename, di->filename, sizeof(downinfo[i].filename));
 		if(di->curle)
 		{
 			downinfo[i].progress = Curl_GetDownloadAmount(di);
@@ -1686,7 +1686,7 @@ static const char *Curl_FindPackURL(const char *filename)
 						*urlend = 0;
 						if(matchpattern(filename, pattern, true))
 						{
-							strlcpy(foundurl, url, sizeof(foundurl));
+							dp_strlcpy(foundurl, url, sizeof(foundurl));
 							Z_Free(buf);
 							return foundurl;
 						}
@@ -1738,7 +1738,7 @@ void Curl_RequireFile(const char *filename)
 {
 	requirement *req = (requirement *) Z_Malloc(sizeof(*requirements));
 	req->next = requirements;
-	strlcpy(req->filename, filename, sizeof(req->filename));
+	dp_strlcpy(req->filename, filename, sizeof(req->filename));
 	requirements = req;
 }
 

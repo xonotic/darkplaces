@@ -832,7 +832,7 @@ void Image_StripImageExtension (const char *in, char *out, size_t size_out)
 	if (ext && (!strcmp(ext, "tga") || !strcmp(ext, "pcx") || !strcmp(ext, "lmp") || !strcmp(ext, "png") || !strcmp(ext, "jpg") || !strcmp(ext, "wal")))
 		FS_StripExtension(in, out, size_out);
 	else
-		strlcpy(out, in, size_out);
+		dp_strlcpy(out, in, size_out);
 }
 
 static unsigned char image_linearfromsrgb[256];

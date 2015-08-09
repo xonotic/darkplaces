@@ -115,27 +115,27 @@ void Mod_BrushInit(void)
 		Cvar_SetQuick(&mod_q3shader_force_addalpha, "1");
 
 	memset(&mod_q1bsp_texture_solid, 0, sizeof(mod_q1bsp_texture_solid));
-	strlcpy(mod_q1bsp_texture_solid.name, "solid" , sizeof(mod_q1bsp_texture_solid.name));
+	dp_strlcpy(mod_q1bsp_texture_solid.name, "solid" , sizeof(mod_q1bsp_texture_solid.name));
 	mod_q1bsp_texture_solid.surfaceflags = 0;
 	mod_q1bsp_texture_solid.supercontents = SUPERCONTENTS_SOLID;
 
 	mod_q1bsp_texture_sky = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_sky.name, "sky", sizeof(mod_q1bsp_texture_sky.name));
+	dp_strlcpy(mod_q1bsp_texture_sky.name, "sky", sizeof(mod_q1bsp_texture_sky.name));
 	mod_q1bsp_texture_sky.surfaceflags = Q3SURFACEFLAG_SKY | Q3SURFACEFLAG_NOIMPACT | Q3SURFACEFLAG_NOMARKS | Q3SURFACEFLAG_NODLIGHT | Q3SURFACEFLAG_NOLIGHTMAP;
 	mod_q1bsp_texture_sky.supercontents = SUPERCONTENTS_SKY | SUPERCONTENTS_NODROP;
 
 	mod_q1bsp_texture_lava = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_lava.name, "*lava", sizeof(mod_q1bsp_texture_lava.name));
+	dp_strlcpy(mod_q1bsp_texture_lava.name, "*lava", sizeof(mod_q1bsp_texture_lava.name));
 	mod_q1bsp_texture_lava.surfaceflags = Q3SURFACEFLAG_NOMARKS;
 	mod_q1bsp_texture_lava.supercontents = SUPERCONTENTS_LAVA | SUPERCONTENTS_NODROP;
 
 	mod_q1bsp_texture_slime = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_slime.name, "*slime", sizeof(mod_q1bsp_texture_slime.name));
+	dp_strlcpy(mod_q1bsp_texture_slime.name, "*slime", sizeof(mod_q1bsp_texture_slime.name));
 	mod_q1bsp_texture_slime.surfaceflags = Q3SURFACEFLAG_NOMARKS;
 	mod_q1bsp_texture_slime.supercontents = SUPERCONTENTS_SLIME;
 
 	mod_q1bsp_texture_water = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_water.name, "*water", sizeof(mod_q1bsp_texture_water.name));
+	dp_strlcpy(mod_q1bsp_texture_water.name, "*water", sizeof(mod_q1bsp_texture_water.name));
 	mod_q1bsp_texture_water.surfaceflags = Q3SURFACEFLAG_NOMARKS;
 	mod_q1bsp_texture_water.supercontents = SUPERCONTENTS_WATER;
 }
@@ -1656,7 +1656,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		skinframe = NULL;
 	for (i = 0, tx = loadmodel->data_textures;i < loadmodel->num_textures;i++, tx++)
 	{
-		strlcpy(tx->name, "NO TEXTURE FOUND", sizeof(tx->name));
+		dp_strlcpy(tx->name, "NO TEXTURE FOUND", sizeof(tx->name));
 		tx->width = 16;
 		tx->height = 16;
 		tx->basealpha = 1.0f;
@@ -1771,7 +1771,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		loadmodel->data_textures[i] = backuptex;
 
 		tx = loadmodel->data_textures + i;
-		strlcpy(tx->name, name, sizeof(tx->name));
+		dp_strlcpy(tx->name, name, sizeof(tx->name));
 		tx->width = mtwidth;
 		tx->height = mtheight;
 		tx->basealpha = 1.0f;
@@ -2016,9 +2016,9 @@ static void Mod_Q1BSP_LoadLighting(sizebuf_t *sb)
 	else // LordHavoc: bsp version 29 (normal white lighting)
 	{
 		// LordHavoc: hope is not lost yet, check for a .lit file to load
-		strlcpy (litfilename, loadmodel->name, sizeof (litfilename));
+		dp_strlcpy (litfilename, loadmodel->name, sizeof (litfilename));
 		FS_StripExtension (litfilename, litfilename, sizeof (litfilename));
-		strlcpy (dlitfilename, litfilename, sizeof (dlitfilename));
+		dp_strlcpy (dlitfilename, litfilename, sizeof (dlitfilename));
 		strlcat (litfilename, ".lit", sizeof (litfilename));
 		strlcat (dlitfilename, ".dlit", sizeof (dlitfilename));
 		data = (unsigned char*) FS_LoadFile(litfilename, tempmempool, false, &filesize);
@@ -2113,9 +2113,9 @@ static void Mod_Q1BSP_ParseWadsFromEntityLump(const char *data)
 		if (com_token[0] == '}')
 			break; // end of worldspawn
 		if (com_token[0] == '_')
-			strlcpy(key, com_token + 1, sizeof(key));
+			dp_strlcpy(key, com_token + 1, sizeof(key));
 		else
-			strlcpy(key, com_token, sizeof(key));
+			dp_strlcpy(key, com_token, sizeof(key));
 		while (key[strlen(key)-1] == ' ') // remove trailing spaces
 			key[strlen(key)-1] = 0;
 		if (!COM_ParseToken_Simple(&data, false, false, true))
@@ -3218,7 +3218,7 @@ static void Mod_Q1BSP_LoadMapBrushes(void)
 						COM_ParseToken_Simple(&data, false, false, true);
 					}
 					COM_ParseToken_Simple(&data, false, false, true);
-					strlcpy(facetexture, com_token, sizeof(facetexture));
+					dp_strlcpy(facetexture, com_token, sizeof(facetexture));
 					COM_ParseToken_Simple(&data, false, false, true);
 					//scroll_s = atof(com_token);
 					COM_ParseToken_Simple(&data, false, false, true);
@@ -3979,7 +3979,7 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			// copy the base model to this one
 			*mod = *loadmodel;
 			// rename the clone back to its proper name
-			strlcpy(mod->name, name, sizeof(mod->name));
+			dp_strlcpy(mod->name, name, sizeof(mod->name));
 			mod->brush.parentmodel = loadmodel;
 			// textures and memory belong to the main model
 			mod->texturepool = NULL;
@@ -4892,7 +4892,7 @@ static void Mod_Q2BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			// copy the base model to this one
 			*mod = *loadmodel;
 			// rename the clone back to its proper name
-			strlcpy(mod->name, name, sizeof(mod->name));
+			dp_strlcpy(mod->name, name, sizeof(mod->name));
 			mod->brush.parentmodel = loadmodel;
 			// textures and memory belong to the main model
 			mod->texturepool = NULL;
@@ -5068,14 +5068,14 @@ static void Mod_Q3BSP_LoadEntities(lump_t *l)
 			if (com_token[0] == '}')
 				break; // end of worldspawn
 			if (com_token[0] == '_')
-				strlcpy(key, com_token + 1, sizeof(key));
+				dp_strlcpy(key, com_token + 1, sizeof(key));
 			else
-				strlcpy(key, com_token, sizeof(key));
+				dp_strlcpy(key, com_token, sizeof(key));
 			while (key[strlen(key)-1] == ' ') // remove trailing spaces
 				key[strlen(key)-1] = 0;
 			if (!COM_ParseToken_Simple(&data, false, false, true))
 				break; // error
-			strlcpy(value, com_token, sizeof(value));
+			dp_strlcpy(value, com_token, sizeof(value));
 			if (!strcasecmp("gridsize", key)) // this one is case insensitive to 100% match q3map2
 			{
 #if _MSC_VER >= 1400
@@ -5293,7 +5293,7 @@ static void Mod_Q3BSP_LoadEffects(lump_t *l)
 
 	for (i = 0;i < count;i++, in++, out++)
 	{
-		strlcpy (out->shadername, in->shadername, sizeof (out->shadername));
+		dp_strlcpy (out->shadername, in->shadername, sizeof (out->shadername));
 		n = LittleLong(in->brushindex);
 		if (n >= loadmodel->brush.num_brushes)
 		{
@@ -7832,7 +7832,7 @@ static void Mod_Q3BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			// copy the base model to this one
 			*mod = *loadmodel;
 			// rename the clone back to its proper name
-			strlcpy(mod->name, name, sizeof(mod->name));
+			dp_strlcpy(mod->name, name, sizeof(mod->name));
 			mod->brush.parentmodel = loadmodel;
 			// textures and memory belong to the main model
 			mod->texturepool = NULL;
@@ -8180,7 +8180,7 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 					texturenames = (char *)Mem_Realloc(loadmodel->mempool, texturenames, maxtextures * MAX_QPATH);
 				}
 				textureindex = numtextures++;
-				strlcpy(texturenames + textureindex*MAX_QPATH, loadmodel->name, MAX_QPATH);
+				dp_strlcpy(texturenames + textureindex*MAX_QPATH, loadmodel->name, MAX_QPATH);
 			}
 			for (j = 1;j < argc;j++)
 			{
@@ -8273,7 +8273,7 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 					texturenames = (char *)Mem_Realloc(loadmodel->mempool, texturenames, maxtextures * MAX_QPATH);
 				}
 				textureindex = numtextures++;
-				strlcpy(texturenames + textureindex*MAX_QPATH, argv[1], MAX_QPATH);
+				dp_strlcpy(texturenames + textureindex*MAX_QPATH, argv[1], MAX_QPATH);
 			}
 		}
 	}
@@ -8488,7 +8488,7 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			// copy the base model to this one
 			*mod = *loadmodel;
 			// rename the clone back to its proper name
-			strlcpy(mod->name, name, sizeof(mod->name));
+			dp_strlcpy(mod->name, name, sizeof(mod->name));
 			mod->brush.parentmodel = loadmodel;
 			// textures and memory belong to the main model
 			mod->texturepool = NULL;

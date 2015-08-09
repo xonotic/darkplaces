@@ -384,7 +384,7 @@ const char *ConBuffer_GetLine(conbuffer_t *buf, int i)
 	static char copybuf[MAX_INPUTLINE]; // client only
 	con_lineinfo_t *l = &CONBUFFER_LINES(buf, i);
 	size_t sz = l->len+1 > sizeof(copybuf) ? sizeof(copybuf) : l->len+1;
-	strlcpy(copybuf, l->start, sz);
+	dp_strlcpy(copybuf, l->start, sz);
 	return copybuf;
 }
 
@@ -504,7 +504,7 @@ static void Log_Open (void)
 	logfile = FS_OpenRealFile(log_file.string, "a", false);
 	if (logfile != NULL)
 	{
-		strlcpy (crt_log_file, log_file.string, sizeof (crt_log_file));
+		dp_strlcpy (crt_log_file, log_file.string, sizeof (crt_log_file));
 		FS_Print (logfile, Log_Timestamp ("Log started"));
 	}
 }
@@ -1519,7 +1519,7 @@ static void Con_DrawInput (void)
 	if (!key_consoleactive)
 		return;		// don't draw anything
 
-	strlcpy(editlinecopy, key_line, sizeof(editlinecopy));
+	dp_strlcpy(editlinecopy, key_line, sizeof(editlinecopy));
 	text = editlinecopy;
 
 	// Advanced Console Editing by Radix radix@planetquake.com
@@ -2127,12 +2127,12 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 		char entfilename[MAX_QPATH];
 		char desc[64];
 		desc[0] = 0;
-		strlcpy(message, "^1ERROR: open failed^7", sizeof(message));
+		dp_strlcpy(message, "^1ERROR: open failed^7", sizeof(message));
 		p = 0;
 		f = FS_OpenVirtualFile(t->filenames[i], true);
 		if(f)
 		{
-			strlcpy(message, "^1ERROR: not a known map format^7", sizeof(message));
+			dp_strlcpy(message, "^1ERROR: not a known map format^7", sizeof(message));
 			memset(buf, 0, 1024);
 			FS_Read(f, buf, 1024);
 			if (!memcmp(buf, "IBSP", 4))
@@ -2183,7 +2183,7 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 			{
 				dpsnprintf(desc, sizeof(desc), "unknown%i", BuffLittleLong(buf));
 			}
-			strlcpy(entfilename, t->filenames[i], sizeof(entfilename));
+			dp_strlcpy(entfilename, t->filenames[i], sizeof(entfilename));
 			memcpy(entfilename + strlen(entfilename) - 4, ".ent", 5);
 			entities = (char *)FS_LoadFile(entfilename, tempmempool, true, NULL);
 			if (!entities && lumplen >= 10)
@@ -2219,7 +2219,7 @@ qboolean GetMapList (const char *s, char *completedname, int completednamebuffer
 					if (!strcmp(keyname, "message"))
 					{
 						// get the message contents
-						strlcpy(message, com_token, sizeof(message));
+						dp_strlcpy(message, com_token, sizeof(message));
 						break;
 					}
 				}
@@ -2429,10 +2429,10 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qboolean is
 		if(match < 0)
 			continue;
 		//Con_Printf("Possible match: %s|%s\n", cl.scores[p].name, name);
-		strlcpy(Nicks_list[count], cl.scores[p].name, sizeof(Nicks_list[count]));
+		dp_strlcpy(Nicks_list[count], cl.scores[p].name, sizeof(Nicks_list[count]));
 
 		// the sanitized list
-		strlcpy(Nicks_sanlist[count], name, sizeof(Nicks_sanlist[count]));
+		dp_strlcpy(Nicks_sanlist[count], name, sizeof(Nicks_sanlist[count]));
 		if(!count)
 		{
 			Nicks_matchpos = match;
@@ -2546,7 +2546,7 @@ static void Nicks_CutMatchesAlphaNumeric(int count)
 	if(Nicks_strcleanlen(Nicks_sanlist[0]) < strlen(tempstr))
 	{
 		// if the clean sanitized one is longer than the current one, use it, it has crap chars which definitely are in there
-		strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
+		dp_strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
 	}
 }
 
@@ -2602,7 +2602,7 @@ static void Nicks_CutMatchesNoSpaces(int count)
 	if(Nicks_strcleanlen(Nicks_sanlist[0]) < strlen(tempstr))
 	{
 		// if the clean sanitized one is longer than the current one, use it, it has crap chars which definitely are in there
-		strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
+		dp_strlcpy(Nicks_sanlist[0], tempstr, sizeof(Nicks_sanlist[0]));
 	}
 }
 
@@ -2770,13 +2770,13 @@ void Con_CompleteCommandLine (void)
 	pos++;
 
 	s = key_line + pos;
-	strlcpy(s2, key_line + key_linepos, sizeof(s2));	//save chars after cursor
+	dp_strlcpy(s2, key_line + key_linepos, sizeof(s2));	//save chars after cursor
 	key_line[key_linepos] = 0;					//hide them
 
 	space = strchr(key_line + 1, ' ');
 	if(space && pos == (space - key_line) + 1)
 	{
-		strlcpy(command, key_line + 1, min(sizeof(command), (unsigned int)(space - key_line)));
+		dp_strlcpy(command, key_line + 1, min(sizeof(command), (unsigned int)(space - key_line)));
 
 		patterns = Cvar_VariableString(va(vabuf, sizeof(vabuf), "con_completion_%s", command)); // TODO maybe use a better place for this?
 		if(patterns && !*patterns)
@@ -2842,7 +2842,7 @@ void Con_CompleteCommandLine (void)
 						const char *slash = strrchr(s, '/');
 						if(slash)
 						{
-							strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
+							dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
 							strlcat(t, com_token, sizeof(t));
 							search = FS_Search(t, true, true);
 						}
@@ -2865,7 +2865,7 @@ void Con_CompleteCommandLine (void)
 					const char *slash = strrchr(s, '/');
 					if(slash)
 					{
-						strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
+						dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
 						strlcat(t, "*", sizeof(t));
 						search = FS_Search(t, true, true);
 					}
@@ -2925,7 +2925,7 @@ void Con_CompleteCommandLine (void)
 						// of resultbuf.strings[0]. We want to append the characters
 						// from resultbuf.strings[0] to (not including) p as these are
 						// the unique prefix
-						strlcpy(t, (resultbuf.numstrings > 0 ? resultbuf : dirbuf).strings[0], min(matchchars + 1, sizeof(t)));
+						dp_strlcpy(t, (resultbuf.numstrings > 0 ? resultbuf : dirbuf).strings[0], min(matchchars + 1, sizeof(t)));
 					}
 
 					// first move the cursor
@@ -2977,7 +2977,7 @@ void Con_CompleteCommandLine (void)
 	if (!(c + v + a + n))	// No possible matches
 	{
 		if(s2[0])
-			strlcpy(&key_line[key_linepos], s2, sizeof(key_line) - key_linepos);
+			dp_strlcpy(&key_line[key_linepos], s2, sizeof(key_line) - key_linepos);
 		return;
 	}
 

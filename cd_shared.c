@@ -474,7 +474,7 @@ static void CD_f (void)
 			return;
 		}
 		for (n = 1; n <= ret; n++)
-			strlcpy(remap[n], Cmd_Argv (n+1), sizeof(*remap));
+			dp_strlcpy(remap[n], Cmd_Argv (n+1), sizeof(*remap));
 #endif
 		return;
 	}
@@ -633,7 +633,7 @@ void CDAudio_StartPlaylist(qboolean resume)
 					break;
 				// if we don't find the desired track, use the first one
 				if (count == 0)
-					strlcpy(trackname, com_token, sizeof(trackname));
+					dp_strlcpy(trackname, com_token, sizeof(trackname));
 			}
 		}
 		if (count > 0)
@@ -663,7 +663,7 @@ void CDAudio_StartPlaylist(qboolean resume)
 						break;
 					if (listindex == current)
 					{
-						strlcpy(trackname, com_token, sizeof(trackname));
+						dp_strlcpy(trackname, com_token, sizeof(trackname));
 						break;
 					}
 				}
