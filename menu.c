@@ -5020,6 +5020,10 @@ static void M_NewMap(void)
 {
 }
 
+static void M_Loading(qboolean show)
+{
+}
+
 static int M_GetServerListEntryCategory(const serverlist_entry_t *entry)
 {
 	return 0;
@@ -5339,6 +5343,16 @@ static void MP_NewMap(void)
 		prog->ExecuteProgram(prog, PRVM_menufunction(m_newmap),"m_newmap() required");
 }
 
+static void MP_Loading(qboolean show)
+{
+	prvm_prog_t *prog = MVM_prog;
+	if (PRVM_menufunction(m_loading))
+	{
+		prog->globals.fp[OFS_PARM0] = (prvm_vec_t) show;
+		prog->ExecuteProgram(prog, PRVM_menufunction(m_loading),"m_loading() required");
+	}
+}
+
 const serverlist_entry_t *serverlist_callbackentry = NULL;
 static int MP_GetServerListEntryCategory(const serverlist_entry_t *entry)
 {
@@ -5417,6 +5431,7 @@ void (*MR_Draw) (void);
 void (*MR_ToggleMenu) (int mode);
 void (*MR_Shutdown) (void);
 void (*MR_NewMap) (void);
+void (*MR_Loading) (qboolean show);
 int (*MR_GetServerListEntryCategory) (const serverlist_entry_t *entry);
 
 void MR_SetRouting(qboolean forceold)
@@ -5430,6 +5445,7 @@ void MR_SetRouting(qboolean forceold)
 		MR_ToggleMenu = M_ToggleMenu;
 		MR_Shutdown = M_Shutdown;
 		MR_NewMap = M_NewMap;
+		MR_Loading = M_Loading;
 		MR_GetServerListEntryCategory = M_GetServerListEntryCategory;
 		M_Init();
 	}
@@ -5441,6 +5457,7 @@ void MR_SetRouting(qboolean forceold)
 		MR_ToggleMenu = MP_ToggleMenu;
 		MR_Shutdown = MP_Shutdown;
 		MR_NewMap = MP_NewMap;
+		MR_Loading = MP_Loading;
 		MR_GetServerListEntryCategory = MP_GetServerListEntryCategory;
 		MP_Init();
 	}

@@ -2118,6 +2118,13 @@ void R_ClearScreen(qboolean fogcolor)
 	GL_Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | (vid.stencil ? GL_STENCIL_BUFFER_BIT : 0), clearcolor, 1.0f, 128);
 }
 
+void (*MR_Loading) (qboolean show);
+static void SCR_DrawMenuLoadingScreen (qboolean show)
+{
+	if (MR_Loading)
+		MR_Loading(show);
+}
+
 int r_stereo_side;
 
 static void SCR_DrawScreen (void)
@@ -2260,6 +2267,7 @@ static void SCR_DrawScreen (void)
 		SCR_CheckDrawCenterString();
 	}
 	SCR_DrawNetGraph ();
+	SCR_DrawMenuLoadingScreen(cls.signon != SIGNONS);
 #ifdef CONFIG_MENU
 	MR_Draw();
 #endif
@@ -2563,6 +2571,7 @@ static void SCR_DrawLoadingScreen_SharedSetup (qboolean clear)
 
 static void SCR_DrawLoadingScreen (qboolean clear)
 {
+	SCR_DrawMenuLoadingScreen(true);
 	// we only need to draw the image if it isn't already there
 	GL_BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	GL_DepthRange(0, 1);
