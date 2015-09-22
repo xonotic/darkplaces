@@ -152,6 +152,9 @@ ifeq ($(DP_MAKE_TARGET), pnacl)
 	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include/pnacl -DNOSUPPORTIPV6
 	CFLAGS_SSE=
 	CFLAGS_SSE2=
+
+	# TODO use pnacl-finalize and pnacl-compress
+	STRIP=:
 endif
 
 # Mac OS X configuration
