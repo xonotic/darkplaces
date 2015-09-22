@@ -5,15 +5,16 @@
 #else
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/select.h>
 #include <sys/time.h>
 #endif
 
 #ifdef __ANDROID__
 #include <android/log.h>
+#endif
 
 #ifndef FNDELAY
 #define FNDELAY		O_NDELAY
-#endif
 #endif
 
 #include <signal.h>

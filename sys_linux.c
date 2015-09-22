@@ -7,7 +7,12 @@
 #else
 #include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#endif
+
+#ifndef FNDELAY
+#define FNDELAY		O_NDELAY
 #endif
 
 #include <signal.h>

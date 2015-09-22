@@ -7,7 +7,9 @@
 #include "quakedef.h"
 #include "thread.h"
 
-#define SUPPORTDLL
+#ifndef __pnacl__
+# define SUPPORTDLL
+#endif
 
 #ifdef WIN32
 # include <windows.h>

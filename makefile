@@ -114,6 +114,46 @@ ifeq ($(DP_MAKE_TARGET), linux)
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
 endif
 
+# PNaCl configuration
+ifeq ($(DP_MAKE_TARGET), pnacl)
+	DEFAULT_SNDAPI=BRLOGENSHFEGLE
+	OBJ_CD=BRLOGENSHFEGLE
+
+	OBJ_CL=BRLOGENSHFEGLE
+	OBJ_ICON=
+	OBJ_ICON_NEXUIZ=
+
+	LDFLAGS_CL=BRLOGENSHFEGLE
+	# TODO is there a better way to get this path?
+	LDFLAGS_SV=$(LDFLAGS_UNIXCOMMON) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release
+	# TODO is there a better way to get this path?
+	LDFLAGS_SDL=$(LDFLAGS_UNIXSDL) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release
+
+	SDLCONFIG_CFLAGS=$(SDLCONFIG_UNIXCFLAGS)
+	SDLCONFIG_LIBS=$(SDLCONFIG_STATICLIBS)
+	# TODO wtf cycles
+	SDLCONFIG_STATICLIBS=$(SDLCONFIG_UNIXSTATICLIBS) -lSDL2 -lppapi_simple -lSDL2main -lSDL2 -lppapi_simple -lnacl_io -lppapi_gles2 -lppapi_cpp -lppapi -lpthread
+
+	EXE_CL=BRLOGENSHFEGLE
+	EXE_SV=$(EXE_UNIXSV)
+	EXE_SDL=$(EXE_UNIXSDL)
+	EXE_CLNEXUIZ=BRLOGENSHFEGLE
+	EXE_SVNEXUIZ=$(EXE_UNIXSVNEXUIZ)
+	EXE_SDLNEXUIZ=$(EXE_UNIXSDLNEXUIZ)
+
+	DP_LINK_ZLIB?=dlopen
+	DP_LINK_JPEG?=dlopen
+	DP_LINK_ODE?=dlopen
+	DP_LINK_CRYPTO?=dlopen
+	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
+
+	# TODO is there a better way to get this path?
+	# TODO is net/if.h really missing?
+	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include/pnacl -DNOSUPPORTIPV6
+	CFLAGS_SSE=
+	CFLAGS_SSE2=
+endif
+
 # Mac OS X configuration
 ifeq ($(DP_MAKE_TARGET), macosx)
 	DEFAULT_SNDAPI=COREAUDIO
