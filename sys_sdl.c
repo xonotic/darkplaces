@@ -201,6 +201,18 @@ void Sys_InitConsole (void)
 {
 }
 
+#ifdef __native_client__
+#include <sys/mount.h>
+static void NaCl_Init(void)
+{
+	mount("", "/dev", "dev", 0, "");
+	mount("", "/.persistentfs", "html5fs", 0, "type=PERSISTENT,expected_size=8388608");
+	mount("", "/.tempfs", "html5fs", 0, "type=TEMPORARY,expected_size=1073741824");
+	int fd = open("/dev/console0", O_WRONLY, 0644);
+	outfd = fd;
+}
+#endif
+
 int main (int argc, char *argv[])
 {
 	signal(SIGFPE, SIG_IGN);
@@ -228,6 +240,10 @@ int main (int argc, char *argv[])
 
 	// we don't know which systems we'll want to init, yet...
 	SDL_Init(0);
+
+#ifdef __native_client__
+	NaCl_Init();
+#endif
 
 	Host_Main();
 

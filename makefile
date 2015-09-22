@@ -149,12 +149,13 @@ ifeq ($(DP_MAKE_TARGET), pnacl)
 
 	# TODO is there a better way to get this path?
 	# TODO is net/if.h really missing?
-	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include/pnacl -DNOSUPPORTIPV6
+	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include -I$(HOME)/nacl_sdk/pepper_44/include/pnacl $(SDLCONFIG_CFLAGS) -DNOSUPPORTIPV6
 	CFLAGS_SSE=
 	CFLAGS_SSE2=
 
 	# TODO use pnacl-finalize and pnacl-compress
-	STRIP=:
+	CC=$(HOME)/nacl_sdk/pepper_44/toolchain/linux_pnacl/bin/pnacl-clang++
+	STRIP=$(HOME)/nacl_sdk/pepper_44/toolchain/linux_pnacl/bin/pnacl-finalize --compress
 endif
 
 # Mac OS X configuration

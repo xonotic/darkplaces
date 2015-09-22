@@ -431,6 +431,10 @@ extern cvar_t sessionid;
 # define LINK_TO_LIBVORBIS 1
 # define DP_MOBILETOUCH	1
 # define DP_FREETYPE_STATIC 1
+#elif defined(__native_client__) /* must come first because it also defines linux */
+# define DP_OS_NAME		"NaCl"
+# define DP_OS_STR		"nacl"
+# define USE_GLES2		1
 #elif TARGET_OS_IPHONE /* must come first because it also defines MACOSX */
 # define DP_OS_NAME		"iPhoneOS"
 # define DP_OS_STR		"iphoneos"
