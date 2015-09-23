@@ -208,6 +208,7 @@ static void NaCl_Init(void)
 	mount("", "/dev", "dev", 0, "");
 	mount("", "/.config", "html5fs", 0, "type=PERSISTENT,expected_size=8388608");
 	mount("", "/.cache", "html5fs", 0, "type=TEMPORARY,expected_size=1073741824");
+	mount("", "/http", "httpfs", 0, "cache_stat=true,cache_content=false");
 	int fd = open("/dev/console0", O_WRONLY, 0644);
 	outfd = fd;
 }
