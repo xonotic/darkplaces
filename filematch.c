@@ -195,7 +195,28 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 	dpsnprintf(fullpath, sizeof(fullpath), "%s%s", basepath, *path ? path : "./");
 	dir = opendir(fullpath);
 	if (!dir)
+#ifdef __native_client__
+	{
+		char listpath[MAX_OSPATH];
+		dpsnprintf(listpath, sizeof(listpath), "%s.ls.txt", fullpath);
+		char *buf = (char *) FS_LoadFile(listpath, tempmempool, true, NULL);
+		if (!buf)
+			return;
+		char *p = buf;
+		for (;;)
+		{
+			char *q = strchr(p, '\n');
+			if (q == NULL)
+				break;
+			*q = 0;
+			adddirentry(list, path, p);
+			p = q + 1;
+		}
+		Mem_Free(buf);
+	}
+#else
 		return;
+#endif
 	while ((ent = readdir(dir)))
 		adddirentry(list, path, ent->d_name);
 	closedir(dir);
