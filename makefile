@@ -125,9 +125,9 @@ ifeq ($(DP_MAKE_TARGET), pnacl)
 
 	LDFLAGS_CL=BRLOGENSHFEGLE
 	# TODO is there a better way to get this path?
-	LDFLAGS_SV=$(LDFLAGS_UNIXCOMMON) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release
+	LDFLAGS_SV=$(LDFLAGS_UNIXCOMMON) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release -L$(HOME)/nacl_sdk/pepper_44/ports/lib/newlib_pnacl/Release
 	# TODO is there a better way to get this path?
-	LDFLAGS_SDL=$(LDFLAGS_UNIXSDL) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release
+	LDFLAGS_SDL=$(LDFLAGS_UNIXCOMMON) $(LDFLAGS_UNIXSDL) -L$(HOME)/nacl_sdk/pepper_44/lib/pnacl/Release -L$(HOME)/nacl_sdk/pepper_44/ports/lib/newlib_pnacl/Release
 
 	SDLCONFIG_CFLAGS=$(SDLCONFIG_UNIXCFLAGS)
 	SDLCONFIG_LIBS=$(SDLCONFIG_STATICLIBS)
@@ -141,15 +141,15 @@ ifeq ($(DP_MAKE_TARGET), pnacl)
 	EXE_SVNEXUIZ=$(EXE_UNIXSVNEXUIZ)
 	EXE_SDLNEXUIZ=$(EXE_UNIXSDLNEXUIZ)
 
-	DP_LINK_ZLIB?=dlopen
-	DP_LINK_JPEG?=dlopen
+	DP_LINK_ZLIB?=shared
+	DP_LINK_JPEG?=shared
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
 
 	# TODO is there a better way to get this path?
 	# TODO is net/if.h really missing?
-	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include -I$(HOME)/nacl_sdk/pepper_44/include/pnacl $(SDLCONFIG_CFLAGS) -DNOSUPPORTIPV6
+	CFLAGS_EXTRA=-I$(HOME)/nacl_sdk/pepper_44/include -I$(HOME)/nacl_sdk/pepper_44/include/pnacl -I$(HOME)/nacl_sdk/pepper_44/ports/include $(SDLCONFIG_CFLAGS) -DNOSUPPORTIPV6
 	CFLAGS_SSE=
 	CFLAGS_SSE2=
 

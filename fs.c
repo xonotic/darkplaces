@@ -226,7 +226,7 @@ struct qfile_s
 
 	const unsigned char *data;	///< For data files.
 
-	const char *filename; ///< Kept around for QFILE_FLAG_REMOVE, unused otherwise
+	const char *filename; ///< Kept around for QFILE_FLAG_REMOVE and logging, unused otherwise
 };
 
 
@@ -339,7 +339,11 @@ const char *const fs_checkgamedir_missing = "missing";
 #define MAX_FILES_IN_PACK	65536
 
 char fs_userdir[MAX_OSPATH];
+char fs_cachedir[MAX_OSPATH];
+
 char fs_gamedir[MAX_OSPATH];
+char fs_gamecachedir[MAX_OSPATH];
+
 char fs_basedir[MAX_OSPATH];
 static pack_t *fs_selfpack = NULL;
 
@@ -1230,13 +1234,16 @@ Sets fs_gamedir, adds the directory to the head of the path,
 then loads and adds pak1.pak pak2.pak ...
 ================
 */
-static void FS_AddGameDirectory (const char *dir)
+static void FS_AddGameDirectory (const char *dir, qboolean iscache)
 {
 	int i;
 	stringlist_t list;
 	searchpath_t *search;
 
-	strlcpy (fs_gamedir, dir, sizeof (fs_gamedir));
+	if (iscache)
+		strlcpy (fs_gamedir, dir, sizeof (fs_gamedir));
+	else
+		strlcpy (fs_gamecachedir, dir, sizeof (fs_gamedir));
 
 	stringlistinit(&list);
 	listdirectory(&list, "", dir);
@@ -1280,10 +1287,12 @@ static void FS_AddGameHierarchy (const char *dir)
 {
 	char vabuf[1024];
 	// Add the common game directory
-	FS_AddGameDirectory (va(vabuf, sizeof(vabuf), "%s%s/", fs_basedir, dir));
+	FS_AddGameDirectory (va(vabuf, sizeof(vabuf), "%s%s/", fs_basedir, dir), false);
 
+	if (*fs_cachedir)
+		FS_AddGameDirectory(va(vabuf, sizeof(vabuf), "%s%s/", fs_cachedir, dir), true);
 	if (*fs_userdir)
-		FS_AddGameDirectory(va(vabuf, sizeof(vabuf), "%s%s/", fs_userdir, dir));
+		FS_AddGameDirectory(va(vabuf, sizeof(vabuf), "%s%s/", fs_userdir, dir), false);
 }
 
 
@@ -1779,14 +1788,26 @@ void FS_Init_SelfPack (void)
 	}
 }
 
-static int FS_ChooseUserDir(userdirmode_t userdirmode, char *userdir, size_t userdirsize)
+static int FS_ChooseUserDir(userdirmode_t userdirmode, char *userdir, size_t userdirsize, char *cachedir, size_t cachedirsize)
 {
+	*userdir = 0;
+	*cachedir = 0;
+
 #if defined(__IPHONEOS__)
 	if (userdirmode == USERDIRMODE_HOME)
 	{
 		// fs_basedir is "" by default, to utilize this you can simply add your gamedir to the Resources in xcode
 		// fs_userdir stores configurations to the Documents folder of the app
-		strlcpy(userdir, "../Documents/", MAX_OSPATH);
+		strlcpy(userdir, "../Documents/", userdirsize);
+		return 1;
+	}
+	return -1;
+
+#elif defined(__native_client__)
+	if (userdirmode == USERDIRMODE_HOME)
+	{
+		dpsnprintf(userdir, userdirsize, "/.config/%s/", gameuserdirname);
+		dpsnprintf(cachedir, cachedirsize, "/.cache/%s/", gameuserdirname);
 		return 1;
 	}
 	return -1;
@@ -1915,7 +1936,7 @@ static int FS_ChooseUserDir(userdirmode_t userdirmode, char *userdir, size_t use
 #endif
 
 
-#if !defined(__IPHONEOS__)
+#if !defined(__IPHONEOS__) && !defined(__native_client__)
 
 #ifdef WIN32
 	// historical behavior...
@@ -1962,7 +1983,9 @@ void FS_Init (void)
 
 	*fs_basedir = 0;
 	*fs_userdir = 0;
+	*fs_cachedir = 0;
 	*fs_gamedir = 0;
+	*fs_gamecachedir = 0;
 
 	// -basedir <path>
 	// Overrides the system supplied base directory (under GAMENAME)
@@ -2043,7 +2066,7 @@ void FS_Init (void)
 		// gather the status of the possible userdirs
 		for (dirmode = 0;dirmode < USERDIRMODE_COUNT;dirmode++)
 		{
-			userdirstatus[dirmode] = FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir));
+			userdirstatus[dirmode] = FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir), fs_cachedir, sizeof(fs_cachedir));
 			if (userdirstatus[dirmode] == 1)
 				Con_DPrintf("userdir %i = %s (writable)\n", dirmode, fs_userdir);
 			else if (userdirstatus[dirmode] == 0)
@@ -2065,7 +2088,7 @@ void FS_Init (void)
 				if (userdirstatus[dirmode] >= 0)
 					break;
 		// and finally, we picked one...
-		FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir));
+		FS_ChooseUserDir((userdirmode_t)dirmode, fs_userdir, sizeof(fs_userdir), fs_cachedir, sizeof(fs_cachedir));
 		Con_DPrintf("userdir %i is the winner\n", dirmode);
 	}
 
@@ -2642,7 +2665,10 @@ qfile_t* FS_OpenRealFile (const char* filepath, const char* mode, qboolean quiet
 		return NULL;
 	}
 
-	dpsnprintf (real_path, sizeof (real_path), "%s/%s", fs_gamedir, filepath); // this is never a vpack
+	if (!strncmp(filepath, "dlcache/", 8))
+		dpsnprintf (real_path, sizeof (real_path), "%s/%s", fs_gamecachedir, filepath); // this is never a vpack
+	else
+		dpsnprintf (real_path, sizeof (real_path), "%s/%s", fs_gamedir, filepath); // this is never a vpack
 
 	// If the file is opened in "write", "append", or "read/write" mode,
 	// create directories up to the file.
@@ -3228,6 +3254,31 @@ void FS_Purge (qfile_t* file)
 
 /*
 ============
+FS_LoadQFile
+
+Loads a file content from a qfile_t.
+============
+*/
+unsigned char *FS_LoadQFile (qfile_t *file, mempool_t *pool, qboolean quiet, fs_offset_t *filesizepointer)
+{
+	unsigned char *buf;
+	fs_offset_t filesize = file->real_length;
+	if(filesize < 0)
+	{
+		Con_Printf("FS_LoadQFile(\"%s\", pool, %s, filesizepointer): trying to open a non-regular file\n", file->filename, quiet ? "true" : "false");
+		return NULL;
+	}
+	buf = (unsigned char *)Mem_Alloc (pool, filesize + 1);
+	buf[filesize] = '\0';
+	FS_Read (file, buf, filesize);
+	if (filesizepointer)
+		*filesizepointer = filesize;
+	return buf;
+}
+
+
+/*
+============
 FS_LoadFile
 
 Filename are relative to the quake directory.
@@ -3238,29 +3289,14 @@ unsigned char *FS_LoadFile (const char *path, mempool_t *pool, qboolean quiet, f
 {
 	qfile_t *file;
 	unsigned char *buf = NULL;
-	fs_offset_t filesize = 0;
-
 	file = FS_OpenVirtualFile(path, quiet);
-	if (file)
-	{
-		filesize = file->real_length;
-		if(filesize < 0)
-		{
-			Con_Printf("FS_LoadFile(\"%s\", pool, %s, filesizepointer): trying to open a non-regular file\n", path, quiet ? "true" : "false");
-			FS_Close(file);
-			return NULL;
-		}
-
-		buf = (unsigned char *)Mem_Alloc (pool, filesize + 1);
-		buf[filesize] = '\0';
-		FS_Read (file, buf, filesize);
-		FS_Close (file);
-		if (developer_loadfile.integer)
-			Con_Printf("loaded file \"%s\" (%u bytes)\n", path, (unsigned int)filesize);
-	}
-
-	if (filesizepointer)
-		*filesizepointer = filesize;
+	if (!file)
+		return NULL;
+	buf = FS_LoadQFile(file, pool, quiet, filesizepointer);
+	if (buf == NULL)
+		return NULL;
+	if (developer_loadfile.integer)
+		Con_Printf("loaded file \"%s\"\n", path);
 	return buf;
 }
 

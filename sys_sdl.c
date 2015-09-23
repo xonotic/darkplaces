@@ -206,8 +206,8 @@ void Sys_InitConsole (void)
 static void NaCl_Init(void)
 {
 	mount("", "/dev", "dev", 0, "");
-	mount("", "/.persistentfs", "html5fs", 0, "type=PERSISTENT,expected_size=8388608");
-	mount("", "/.tempfs", "html5fs", 0, "type=TEMPORARY,expected_size=1073741824");
+	mount("", "/.config", "html5fs", 0, "type=PERSISTENT,expected_size=8388608");
+	mount("", "/.cache", "html5fs", 0, "type=TEMPORARY,expected_size=1073741824");
 	int fd = open("/dev/console0", O_WRONLY, 0644);
 	outfd = fd;
 }

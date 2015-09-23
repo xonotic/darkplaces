@@ -953,6 +953,7 @@ void Memory_Init_Commands (void)
 		// first guess
 		Cvar_SetValueQuick(&sys_memsize_virtual, (sizeof(void*) == 4) ? 2048 : 268435456);
 		// then improve
+#ifndef __native_client__
 		{
 			// Linux, and BSD with linprocfs mounted
 			FILE *f = fopen("/proc/meminfo", "r");
@@ -980,6 +981,7 @@ void Memory_Init_Commands (void)
 				fclose(f);
 			}
 		}
+#endif
 	}
 #endif
 }

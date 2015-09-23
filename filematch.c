@@ -192,14 +192,24 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 	char fullpath[MAX_OSPATH];
 	DIR *dir;
 	struct dirent *ent;
-	dpsnprintf(fullpath, sizeof(fullpath), "%s%s", basepath, *path ? path : "./");
-	dir = opendir(fullpath);
-	if (!dir)
+	dpsnprintf(fullpath, sizeof(fullpath), "%s%s", basepath, path);
 #ifdef __native_client__
+	// In NaCl, only html5fs supports readdir. And attempting to readdir a
+	// directory before opening a file in it will actually mark the
+	// directory as a file for httpfs, leading to files inside becoming
+	// inaccessible. So our only solution is to read text files as a virtual
+	// directory listing. Create using "ls > .ls.txt" in any httpfs
+	// directory you want to support.
+	if (strncmp(basepath, "/.", 2))
 	{
 		char listpath[MAX_OSPATH];
+		qfile_t *listfile;
 		dpsnprintf(listpath, sizeof(listpath), "%s.ls.txt", fullpath);
-		char *buf = (char *) FS_LoadFile(listpath, tempmempool, true, NULL);
+		listfile = FS_SysOpen(listpath, "rb", false);
+		if (!listfile)
+			return;
+		char *buf = (char *) FS_LoadQFile(listfile, tempmempool, true, NULL);
+		FS_Close(listfile);
 		if (!buf)
 			return;
 		char *p = buf;
@@ -209,14 +219,18 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 			if (q == NULL)
 				break;
 			*q = 0;
+                        Con_Printf("Got file: %s\n", p);
 			adddirentry(list, path, p);
 			p = q + 1;
 		}
 		Mem_Free(buf);
-	}
-#else
 		return;
+	}
 #endif
+	dir = opendir(fullpath);
+	if (!dir)
+		return;
+	
 	while ((ent = readdir(dir)))
 		adddirentry(list, path, ent->d_name);
 	closedir(dir);
