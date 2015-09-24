@@ -1268,7 +1268,7 @@ static void FS_AddGameDirectory (const char *dir, qboolean iscache)
 	{
 		if (!strcasecmp(list.strings[i] + strlen(dir), ".packs-only"))
 		{
-			Con_Printf("Found %s/.packs-only file - not loading other files from there.", dir);
+			Con_Printf("Found %s/.packs-only file - not loading other files from there.\n", dir);
 			add_unpacked = false;
 		}
 	}
