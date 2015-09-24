@@ -219,7 +219,6 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 			if (q == NULL)
 				break;
 			*q = 0;
-                        Con_Printf("Got file: %s\n", p);
 			adddirentry(list, path, p);
 			p = q + 1;
 		}

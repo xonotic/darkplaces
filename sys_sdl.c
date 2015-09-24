@@ -205,12 +205,21 @@ void Sys_InitConsole (void)
 #include <sys/mount.h>
 static void NaCl_Init(void)
 {
+	char vabuf[1024];
+
 	mount("", "/dev", "dev", 0, "");
 	mount("", "/.config", "html5fs", 0, "type=PERSISTENT,expected_size=8388608");
 	mount("", "/.cache", "html5fs", 0, "type=TEMPORARY,expected_size=1073741824");
-	mount("", "/http", "httpfs", 0, "cache_stat=true,cache_content=false");
-	int fd = open("/dev/console0", O_WRONLY, 0644);
-	outfd = fd;
+
+	const char *http_root = "";
+	int i = COM_CheckParm("-http_root");
+	if (i && i < com_argc - 1)
+		http_root = com_argv[i + 1];
+	int cache_content = COM_CheckParm("-http_cache_content");
+
+	mount(http_root, "/http", "httpfs", 0, va(vabuf, sizeof(vabuf),
+		"cache_stat=true,cache_content=%s,allow_cross_origin_requests=true",
+		cache_content ? "true" : "false"));
 }
 #endif
 

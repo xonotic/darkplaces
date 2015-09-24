@@ -1240,11 +1240,6 @@ static void FS_AddGameDirectory (const char *dir, qboolean iscache)
 	stringlist_t list;
 	searchpath_t *search;
 
-	if (iscache)
-		strlcpy (fs_gamedir, dir, sizeof (fs_gamedir));
-	else
-		strlcpy (fs_gamecachedir, dir, sizeof (fs_gamedir));
-
 	stringlistinit(&list);
 	listdirectory(&list, "", dir);
 	stringlistsort(&list, false);
@@ -1267,14 +1262,34 @@ static void FS_AddGameDirectory (const char *dir, qboolean iscache)
 		}
 	}
 
+	// test if we want to add the dir itself too
+	qboolean add_unpacked = true;
+	for (i = 0;i < list.numstrings;i++)
+	{
+		if (!strcasecmp(list.strings[i] + strlen(dir), ".packs-only"))
+		{
+			Con_Printf("Found %s/.packs-only file - not loading other files from there.", dir);
+			add_unpacked = false;
+		}
+	}
+
 	stringlistfreecontents(&list);
 
-	// Add the directory to the search path
-	// (unpacked files have the priority over packed files)
-	search = (searchpath_t *)Mem_Alloc(fs_mempool, sizeof(searchpath_t));
-	strlcpy (search->filename, dir, sizeof (search->filename));
-	search->next = fs_searchpaths;
-	fs_searchpaths = search;
+	if (add_unpacked)
+	{
+		// Add the directory to the search path
+		// (unpacked files have the priority over packed files)
+		search = (searchpath_t *)Mem_Alloc(fs_mempool, sizeof(searchpath_t));
+		strlcpy (search->filename, dir, sizeof (search->filename));
+		search->next = fs_searchpaths;
+		fs_searchpaths = search;
+
+		// Register the directory as a writable path.
+		if (iscache)
+			strlcpy (fs_gamedir, dir, sizeof (fs_gamedir));
+		else
+			strlcpy (fs_gamecachedir, dir, sizeof (fs_gamedir));
+	}
 }
 
 
