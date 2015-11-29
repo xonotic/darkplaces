@@ -2892,6 +2892,49 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 	}
 }
 
+static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
+{
+	prvm_prog_t *prog = SVVM_prog;
+
+	switch ((int) PRVM_serveredictfloat(ent, movetype))
+	{
+	case MOVETYPE_PUSH:
+	case MOVETYPE_FAKEPUSH:
+		SV_Physics_Pusher (ent);
+		break;
+	case MOVETYPE_NONE:
+		break;
+	case MOVETYPE_FOLLOW:
+		SV_Physics_Follow (ent);
+		break;
+	case MOVETYPE_NOCLIP:
+		VectorMA(PRVM_serveredictvector(ent, origin), sv.frametime, PRVM_serveredictvector(ent, velocity), PRVM_serveredictvector(ent, origin));
+		VectorMA(PRVM_serveredictvector(ent, angles), sv.frametime, PRVM_serveredictvector(ent, avelocity), PRVM_serveredictvector(ent, angles));
+		break;
+	case MOVETYPE_STEP:
+		SV_Physics_Step (ent);
+		break;
+	case MOVETYPE_WALK:
+		SV_WalkMove (ent);
+		break;
+	case MOVETYPE_TOSS:
+	case MOVETYPE_BOUNCE:
+	case MOVETYPE_BOUNCEMISSILE:
+	case MOVETYPE_FLYMISSILE:
+		SV_Physics_Toss (ent);
+		break;
+	case MOVETYPE_FLY:
+	case MOVETYPE_FLY_WORLDONLY:
+		SV_WalkMove (ent);
+		break;
+	case MOVETYPE_PHYSICS:
+		break;
+	default:
+		Con_Printf ("SV_Physics_ClientEntity: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
+		break;
+	}
+}
+
 void SV_Physics_ClientMove(void)
 {
 	prvm_prog_t *prog = SVVM_prog;
@@ -2913,7 +2956,7 @@ void SV_Physics_ClientMove(void)
 	SV_CheckVelocity(ent);
 
 	// perform MOVETYPE_WALK behavior
-	SV_WalkMove (ent);
+	SV_Physics_ClientEntity_NoThink (ent);
 
 	// call standard player post-think, with frametime = 0
 	PRVM_serverglobalfloat(time) = sv.time;
