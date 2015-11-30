@@ -2899,6 +2899,7 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 	// don't run think at all, that is done during server frames
 	// instead, call the movetypes directly so they match client input
 
+	// This probably only makes sense for CSQC-networked (SendEntity field set) player entities
 	switch ((int) PRVM_serveredictfloat(ent, movetype))
 	{
 	case MOVETYPE_PUSH:
