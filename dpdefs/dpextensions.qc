@@ -3,6 +3,9 @@
 
 //things that don't have extensions yet:
 .float disableclientprediction;
+// 0 allows prediction only for MOVETYPE_WALK
+// 1 disables prediction completely
+// -1 allows prediction for all movetypes
 
 //definitions that id Software left out:
 //these are passed as the 'nomonsters' parameter to traceline/tracebox (yes really this was supported in all quake engines, nomonsters is misnamed)

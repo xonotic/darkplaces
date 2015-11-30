@@ -2896,6 +2896,9 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 {
 	prvm_prog_t *prog = SVVM_prog;
 
+	// don't run think at all, that is done during server frames
+	// instead, call the movetypes directly so they match client input
+
 	switch ((int) PRVM_serveredictfloat(ent, movetype))
 	{
 	case MOVETYPE_PUSH:
@@ -2955,7 +2958,8 @@ void SV_Physics_ClientMove(void)
 	// make sure the velocity is sane (not a NaN)
 	SV_CheckVelocity(ent);
 
-	// perform MOVETYPE_WALK behavior
+	// perform movetype behaviour
+	// note: will always be MOVETYPE_WALK if disableclientprediction = 0
 	SV_Physics_ClientEntity_NoThink (ent);
 
 	// call standard player post-think, with frametime = 0
