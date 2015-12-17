@@ -2898,7 +2898,8 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 	{
 	case MOVETYPE_PUSH:
 	case MOVETYPE_FAKEPUSH:
-		SV_Physics_Pusher (ent);
+		// push physics relies heavily on think times and calls, and so cannot be predicted currently
+		//SV_Physics_Pusher (ent);
 		break;
 	case MOVETYPE_NONE:
 		break;
