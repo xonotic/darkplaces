@@ -3070,7 +3070,6 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 		break;
 	case MOVETYPE_NONE:
 		// LordHavoc: manually inlined the thinktime check here because MOVETYPE_NONE is used on so many objects
-		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
 		if (PRVM_serveredictfloat(ent, nextthink) > 0 && PRVM_serveredictfloat(ent, nextthink) <= sv.time + sv.frametime)
 			SV_RunThink (ent);
 		break;
