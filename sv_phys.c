@@ -3065,15 +3065,18 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	{
 	case MOVETYPE_PUSH:
 	case MOVETYPE_FAKEPUSH:
-		SV_Physics_Pusher (ent);
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
+			SV_Physics_Pusher (ent);
 		break;
 	case MOVETYPE_NONE:
 		// LordHavoc: manually inlined the thinktime check here because MOVETYPE_NONE is used on so many objects
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
 		if (PRVM_serveredictfloat(ent, nextthink) > 0 && PRVM_serveredictfloat(ent, nextthink) <= sv.time + sv.frametime)
 			SV_RunThink (ent);
 		break;
 	case MOVETYPE_FOLLOW:
-		SV_Physics_Follow (ent);
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
+			SV_Physics_Follow (ent);
 		break;
 	case MOVETYPE_NOCLIP:
 		SV_RunThink(ent);
@@ -3082,7 +3085,8 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 		VectorMA(PRVM_serveredictvector(ent, angles), sv.frametime, PRVM_serveredictvector(ent, avelocity), PRVM_serveredictvector(ent, angles));
 		break;
 	case MOVETYPE_STEP:
-		SV_Physics_Step (ent);
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
+			SV_Physics_Step (ent);
 		break;
 	case MOVETYPE_WALK:
 		SV_RunThink (ent);
@@ -3096,12 +3100,14 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	case MOVETYPE_FLYMISSILE:
 		// regular thinking
 		SV_RunThink (ent);
-		SV_Physics_Toss (ent);
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
+			SV_Physics_Toss (ent);
 		break;
 	case MOVETYPE_FLY:
 	case MOVETYPE_FLY_WORLDONLY:
 		SV_RunThink (ent);
-		SV_WalkMove (ent);
+		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
+			SV_WalkMove (ent);
 		break;
 	case MOVETYPE_PHYSICS:
 		SV_RunThink (ent);
