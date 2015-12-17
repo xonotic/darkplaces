@@ -2489,10 +2489,6 @@ static void SV_Physics_Follow (prvm_edict_t *ent)
 	vec3_t vf, vr, vu, angles, v;
 	prvm_edict_t *e;
 
-	// regular thinking
-	if (!SV_RunThink (ent))
-		return;
-
 	// LordHavoc: implemented rotation on MOVETYPE_FOLLOW objects
 	e = PRVM_PROG_TO_EDICT(PRVM_serveredictedict(ent, aiment));
 	if (PRVM_serveredictvector(e, angles)[0] == PRVM_serveredictvector(ent, punchangle)[0] && PRVM_serveredictvector(e, angles)[1] == PRVM_serveredictvector(ent, punchangle)[1] && PRVM_serveredictvector(e, angles)[2] == PRVM_serveredictvector(ent, punchangle)[2])
@@ -2811,17 +2807,6 @@ static void SV_Physics_Step (prvm_edict_t *ent)
 			ent->priv.server->waterposition_forceupdate = true;
 		}
 	}
-
-// regular thinking
-	if (!SV_RunThink(ent))
-		return;
-
-	if (ent->priv.server->waterposition_forceupdate || !VectorCompare(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin))
-	{
-		ent->priv.server->waterposition_forceupdate = false;
-		VectorCopy(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin);
-		SV_CheckWaterTransition(ent);
-	}
 }
 
 //============================================================================
@@ -2851,7 +2836,8 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 			SV_RunThink (ent);
 		break;
 	case MOVETYPE_FOLLOW:
-		SV_Physics_Follow (ent);
+		if(SV_RunThink(ent))
+			SV_Physics_Follow (ent);
 		break;
 	case MOVETYPE_NOCLIP:
 		if (SV_RunThink(ent))
@@ -2864,6 +2850,14 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 		break;
 	case MOVETYPE_STEP:
 		SV_Physics_Step (ent);
+		// regular thinking
+		if (SV_RunThink(ent))
+		if (ent->priv.server->waterposition_forceupdate || !VectorCompare(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin))
+		{
+			ent->priv.server->waterposition_forceupdate = false;
+			VectorCopy(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin);
+			SV_CheckWaterTransition(ent);
+		}
 		break;
 	case MOVETYPE_WALK:
 		if (SV_RunThink (ent))
@@ -3074,6 +3068,7 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 			SV_RunThink (ent);
 		break;
 	case MOVETYPE_FOLLOW:
+		SV_RunThink (ent);
 		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
 			SV_Physics_Follow (ent);
 		break;
@@ -3086,6 +3081,13 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	case MOVETYPE_STEP:
 		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
 			SV_Physics_Step (ent);
+		if (SV_RunThink(ent))
+		if (ent->priv.server->waterposition_forceupdate || !VectorCompare(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin))
+		{
+			ent->priv.server->waterposition_forceupdate = false;
+			VectorCopy(PRVM_serveredictvector(ent, origin), ent->priv.server->waterposition_origin);
+			SV_CheckWaterTransition(ent);
+		}
 		break;
 	case MOVETYPE_WALK:
 		SV_RunThink (ent);
