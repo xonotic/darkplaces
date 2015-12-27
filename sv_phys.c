@@ -3060,7 +3060,7 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	{
 	case MOVETYPE_PUSH:
 	case MOVETYPE_FAKEPUSH:
-		Con_Printf ("SV_Physics_ClientEntity: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
+		SV_Physics_Pusher (ent);
 		break;
 	case MOVETYPE_NONE:
 		// LordHavoc: manually inlined the thinktime check here because MOVETYPE_NONE is used on so many objects
