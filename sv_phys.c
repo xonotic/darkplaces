@@ -2899,7 +2899,7 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 	case MOVETYPE_PUSH:
 	case MOVETYPE_FAKEPUSH:
 		// push physics relies heavily on think times and calls, and so cannot be predicted currently
-		//SV_Physics_Pusher (ent);
+		Con_Printf ("SV_Physics_ClientEntity_NoThink: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
 	case MOVETYPE_NONE:
 		break;
@@ -2929,7 +2929,7 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 	case MOVETYPE_PHYSICS:
 		break;
 	default:
-		Con_Printf ("SV_Physics_ClientEntity: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
+		Con_Printf ("SV_Physics_ClientEntity_NoThink: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
 	}
 }
@@ -3060,8 +3060,7 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	{
 	case MOVETYPE_PUSH:
 	case MOVETYPE_FAKEPUSH:
-		if (host_client->clmovement_inputtimeout <= 0) // don't run physics here if running asynchronously
-			SV_Physics_Pusher (ent);
+		Con_Printf ("SV_Physics_ClientEntity: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
 	case MOVETYPE_NONE:
 		// LordHavoc: manually inlined the thinktime check here because MOVETYPE_NONE is used on so many objects
