@@ -972,6 +972,15 @@ void VM_spawn(prvm_prog_t *prog)
 	VM_RETURN_EDICT(ed);
 }
 
+void VM_spawn2(prvm_prog_t *prog)
+{
+	prvm_edict_t	*ed;
+	VM_SAFEPARMCOUNT(0, VM_spawn2);
+	prog->xfunction->builtinsprofile += 20;
+	ed = PRVM_ED_Alloc2(prog);
+	prog->globals.ip[OFS_RETURN] = -(int)(ed - prog->edicts2.ed) - 1;
+}
+
 /*
 =========
 VM_remove

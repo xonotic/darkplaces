@@ -256,6 +256,7 @@ void VM_itof(prvm_prog_t *prog);
 void VM_ftoe(prvm_prog_t *prog);
 void VM_strftime(prvm_prog_t *prog);
 void VM_spawn (prvm_prog_t *prog);
+void VM_spawn2 (prvm_prog_t *prog);
 void VM_remove (prvm_prog_t *prog);
 void VM_find (prvm_prog_t *prog);
 void VM_findfloat (prvm_prog_t *prog);

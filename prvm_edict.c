@@ -84,6 +84,20 @@ static void PRVM_MEM_Alloc(prvm_prog_t *prog)
 		prog->edicts[i].priv.required = (prvm_edict_private_t *)((unsigned char  *)prog->edictprivate + i * prog->edictprivate_size);
 		prog->edicts[i].fields.fp = prog->edictsfields + i * prog->entityfields;
 	}
+
+	// pure entities
+	{
+		prog->edicts2.ed = (prvm_edict_t *)Mem_Alloc(prog->progs_mempool, SPAWN2_LIMIT * sizeof(prvm_edict_t));
+		prog->edicts2.priv = Mem_Alloc(prog->progs_mempool, SPAWN2_LIMIT * prog->edictprivate_size);
+		prog->edicts2.fields = (prvm_vec_t *)Mem_Alloc(prog->progs_mempool, SPAWN2_LIMIT * prog->entityfields * sizeof(prvm_vec_t));
+		for(i = 0; i < SPAWN2_LIMIT; ++i)
+		{
+			prog->edicts2.ed[i].priv.required = (prvm_edict_private_t *)((unsigned char *)prog->edicts2.priv + i * prog->edictprivate_size);
+			prog->edicts2.ed[i].priv.required->free = true;
+			prog->edicts2.ed[i].priv.required->freetime = -1337;
+			prog->edicts2.ed[i].fields.fp = prog->edicts2.fields + i * prog->entityfields;
+		}
+	}
 }
 
 /*
@@ -285,6 +299,22 @@ prvm_edict_t *PRVM_ED_Alloc(prvm_prog_t *prog)
 
 	PRVM_ED_ClearEdict(prog, e);
 	return e;
+}
+
+prvm_edict_t *PRVM_ED_Alloc2(prvm_prog_t *prog)
+{
+	int i;
+	for (i = 0; i < SPAWN2_LIMIT; ++i)
+	{
+		prvm_edict_t *e = &prog->edicts2.ed[i];
+		if (PRVM_ED_CanAlloc(prog, e))
+		{
+			PRVM_ED_ClearEdict(prog, e);
+			return e;
+		}
+	}
+	prog->error_cmd("%s: PRVM_ED_Alloc2: no free edicts (%d)", prog->name, i);
+	return NULL;
 }
 
 /*

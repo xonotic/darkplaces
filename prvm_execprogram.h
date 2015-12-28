@@ -296,46 +296,68 @@
 			HANDLE_OPCODE(OP_STOREP_FLD):		// integers
 			HANDLE_OPCODE(OP_STOREP_S):
 			HANDLE_OPCODE(OP_STOREP_FNC):		// pointers
-				if ((prvm_uint_t)OPB->_int - cached_entityfields >= cached_entityfieldsarea_entityfields)
-				{
-					if ((prvm_uint_t)OPB->_int >= cached_entityfieldsarea)
-					{
-						PRE_ERROR();
-						prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, (int)OPB->_int);
-						goto cleanup;
-					}
-					if ((prvm_uint_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
-					{
-						PRE_ERROR();
-						VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
-					}
+			{
+				int i, fld;
+				if (OPB->_int >= 0) {
+					i = OPB->_int / cached_entityfields;
+					fld = OPB->_int % cached_entityfields;
+				} else {
+					int inp = -OPB->_int - 1;
+					i = -((inp / cached_entityfields) + 1);
+					fld = inp % cached_entityfields;
+					// VM_Warning(prog, "storep %i : %i . %i = %i\n", OPB->_int, i, fld);
 				}
-				ptr = (prvm_eval_t *)(cached_edictsfields + OPB->_int);
+				if (i >= cached_max_edicts || i < -SPAWN2_LIMIT)
+				{
+					PRE_ERROR();
+					prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, i);
+					goto cleanup;
+				}
+				if (i == 0 && !cached_allowworldwrites)
+				{
+					PRE_ERROR();
+					VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
+				}
+				ptr = i >= 0
+					? (prvm_eval_t *)(cached_edictsfields + OPB->_int)
+					: (prvm_eval_t *)(prog->edicts2.fields + (-i - 1) * cached_entityfields + fld);
 				ptr->_int = OPA->_int;
 				DISPATCH_OPCODE();
+			}
 			HANDLE_OPCODE(OP_STOREP_V):
-				if ((prvm_uint_t)OPB->_int - cached_entityfields > (prvm_uint_t)cached_entityfieldsarea_entityfields_3)
-				{
-					if ((prvm_uint_t)OPB->_int > cached_entityfieldsarea_3)
-					{
-						PRE_ERROR();
-						prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, (int)OPB->_int);
-						goto cleanup;
-					}
-					if ((prvm_uint_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
-					{
-						PRE_ERROR();
-						VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
-					}
+			{
+				int i, fld;
+				if (OPB->_int >= 0) {
+					i = OPB->_int / cached_entityfields;
+					fld = OPB->_int % cached_entityfields;
+				} else {
+					int o = -OPB->_int - 1;
+					i = -((o / cached_entityfields) + 1);
+					fld = o % cached_entityfields;
+					// VM_Warning(prog, "storep %i : %i . %i = %i\n", OPB->_int, i, fld);
 				}
-				ptr = (prvm_eval_t *)(cached_edictsfields + OPB->_int);
+				if (i >= cached_max_edicts || i < -SPAWN2_LIMIT)
+				{
+					PRE_ERROR();
+					prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, i);
+					goto cleanup;
+				}
+				if (i == 0 && !cached_allowworldwrites)
+				{
+					PRE_ERROR();
+					VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
+				}
+				ptr = i >= 0
+					? (prvm_eval_t *)(cached_edictsfields + OPB->_int)
+					: (prvm_eval_t *)(prog->edicts2.fields + (-i - 1) * cached_entityfields + fld);
 				ptr->ivector[0] = OPA->ivector[0];
 				ptr->ivector[1] = OPA->ivector[1];
 				ptr->ivector[2] = OPA->ivector[2];
 				DISPATCH_OPCODE();
+			}
 
 			HANDLE_OPCODE(OP_ADDRESS):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if (OPA->edict >= cached_max_edicts || OPA->edict < -SPAWN2_LIMIT)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to address an out of bounds edict number", prog->name);
@@ -355,7 +377,16 @@
 					goto cleanup;
 				}
 #endif
-				OPC->_int = OPA->edict * cached_entityfields + OPB->_int;
+				if (OPA->edict >= 0)
+					OPC->_int = OPA->edict * cached_entityfields + OPB->_int;
+				else {
+					int e = -OPA->edict - 1;
+					int out = e * cached_entityfields + OPB->_int;
+					out = out + 1;
+					out = 0 - out;
+					//VM_Warning(prog, "addressing %i . %i = %i\n", OPA->edict, OPB->_int, out);
+					OPC->_int = out;
+				}
 				DISPATCH_OPCODE();
 
 			HANDLE_OPCODE(OP_LOAD_F):
@@ -363,7 +394,7 @@
 			HANDLE_OPCODE(OP_LOAD_ENT):
 			HANDLE_OPCODE(OP_LOAD_S):
 			HANDLE_OPCODE(OP_LOAD_FNC):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if (OPA->edict >= cached_max_edicts || OPA->edict < -SPAWN2_LIMIT)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to read an out of bounds edict number", prog->name);
@@ -380,7 +411,7 @@
 				DISPATCH_OPCODE();
 
 			HANDLE_OPCODE(OP_LOAD_V):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if (OPA->edict >= cached_max_edicts || OPA->edict < -SPAWN2_LIMIT)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to read an out of bounds edict number", prog->name);

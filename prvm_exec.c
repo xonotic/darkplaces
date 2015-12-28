@@ -753,7 +753,7 @@ void MVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessag
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
 	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
-	unsigned int cached_max_edicts = prog->max_edicts;
+	int cached_max_edicts = prog->max_edicts;
 	// these do not change
 	mstatement_t *cached_statements = prog->statements;
 	qboolean cached_allowworldwrites = prog->allowworldwrites;
@@ -860,7 +860,7 @@ void CLVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
 	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
-	unsigned int cached_max_edicts = prog->max_edicts;
+	int cached_max_edicts = prog->max_edicts;
 	// these do not change
 	mstatement_t *cached_statements = prog->statements;
 	qboolean cached_allowworldwrites = prog->allowworldwrites;
@@ -971,7 +971,7 @@ void PRVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
 	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
-	unsigned int cached_max_edicts = prog->max_edicts;
+	int cached_max_edicts = prog->max_edicts;
 	// these do not change
 	mstatement_t *cached_statements = prog->statements;
 	qboolean cached_allowworldwrites = prog->allowworldwrites;

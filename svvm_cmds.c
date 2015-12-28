@@ -3783,7 +3783,7 @@ NULL,							// #596
 NULL,							// #597
 NULL,							// #598
 NULL,							// #599
-NULL,							// #600
+VM_spawn2,						// #600
 NULL,							// #601
 NULL,							// #602
 NULL,							// #603
