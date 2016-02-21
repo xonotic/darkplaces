@@ -949,6 +949,7 @@ void SV_SendServerinfo (client_t *client)
 		dpsnprintf (demofile, sizeof(demofile), "%s_%s_%d_%s.dem", Sys_TimeString (sv_autodemo_perclient_nameformat.string), sv.worldbasename, PRVM_NUM_FOR_EDICT(client->edict), ipaddress);
 
 		SV_StartDemoRecording(client, demofile, -1);
+		SV_WriteNetnameIntoDemo(client);
 	}
 
 	//[515]: init csprogs according to version of svprogs, check the crc, etc.
