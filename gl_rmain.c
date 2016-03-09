@@ -825,6 +825,7 @@ typedef struct r_glsl_permutation_s
 	int loc_DeferredMod_Specular;
 	int loc_DistortScaleRefractReflect;
 	int loc_EyePosition;
+	int loc_EyeDirection;
 	int loc_FogColor;
 	int loc_FogHeightFade;
 	int loc_FogPlane;
@@ -1245,6 +1246,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_DeferredMod_Specular       = qglGetUniformLocation(p->program, "DeferredMod_Specular");
 		p->loc_DistortScaleRefractReflect = qglGetUniformLocation(p->program, "DistortScaleRefractReflect");
 		p->loc_EyePosition                = qglGetUniformLocation(p->program, "EyePosition");
+		p->loc_EyeDirection               = qglGetUniformLocation(p->program, "EyeDirection");
 		p->loc_FogColor                   = qglGetUniformLocation(p->program, "FogColor");
 		p->loc_FogHeightFade              = qglGetUniformLocation(p->program, "FogHeightFade");
 		p->loc_FogPlane                   = qglGetUniformLocation(p->program, "FogPlane");
@@ -2843,6 +2845,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		if (r_glsl_permutation->loc_Color_Glow >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Glow, rsurface.glowmod[0], rsurface.glowmod[1], rsurface.glowmod[2]);
 		if (r_glsl_permutation->loc_Alpha >= 0) qglUniform1f(r_glsl_permutation->loc_Alpha, rsurface.texture->lightmapcolor[3] * ((rsurface.texture->basematerialflags & MATERIALFLAG_WATERSHADER && r_fb.water.enabled && !r_refdef.view.isoverlay) ? rsurface.texture->r_water_wateralpha : 1));
 		if (r_glsl_permutation->loc_EyePosition >= 0) qglUniform3f(r_glsl_permutation->loc_EyePosition, rsurface.localvieworigin[0], rsurface.localvieworigin[1], rsurface.localvieworigin[2]);
+		if (r_glsl_permutation->loc_EyeDirection >= 0) qglUniform3f(r_glsl_permutation->loc_EyeDirection, rsurface.localviewdirection[0], rsurface.localviewdirection[1], rsurface.localviewdirection[2]);
 		if (r_glsl_permutation->loc_Color_Pants >= 0)
 		{
 			if (rsurface.texture->pantstexture)
@@ -5636,11 +5639,7 @@ static void R_View_UpdateWithScissor(const int *myscissor)
 
 static void R_View_Update(void)
 {
-	R_Main_ResizeViewCache();
-	R_View_SetFrustum(NULL);
-	R_View_WorldVisibility(r_refdef.view.useclipplane);
-	R_View_UpdateEntityVisible();
-	R_View_UpdateEntityLighting();
+	R_View_UpdateWithScissor(NULL);
 }
 
 float viewscalefpsadjusted = 1.0f;
@@ -6179,6 +6178,17 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			// update the r_refdef.view.origin because otherwise the sky renders at the wrong location (amongst other problems)
 			Matrix4x4_OriginFromMatrix(&r_refdef.view.matrix, r_refdef.view.origin);
 			r_refdef.view.clipplane = p->plane;
+
+			float dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			float normalLength = VectorLength(p->plane.normal);
+			float planeDist = dotProduct/normalLength - p->plane.dist;
+			if(planeDist > 100)
+				r_refdef.view.clipplane.dist += 100.0;
+			else if(planeDist < -100)
+				r_refdef.view.clipplane.dist -= 100.0;
+			else
+				r_refdef.view.clipplane.dist += 0.95*planeDist;
+
 			// reverse the cullface settings for this render
 			r_refdef.view.cullface_front = GL_FRONT;
 			r_refdef.view.cullface_back = GL_BACK;
@@ -6225,6 +6235,15 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			r_refdef.view.clipplane = p->plane;
 			VectorNegate(r_refdef.view.clipplane.normal, r_refdef.view.clipplane.normal);
 			r_refdef.view.clipplane.dist = -r_refdef.view.clipplane.dist;
+			float dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			float normalLength = VectorLength(p->plane.normal);
+			float planeDist = dotProduct/normalLength - p->plane.dist;
+			if(planeDist > 100)
+				r_refdef.view.clipplane.dist -= 100.0;
+			else if(planeDist < -100)
+				r_refdef.view.clipplane.dist += 100.0;
+			else
+				r_refdef.view.clipplane.dist -= 0.95*planeDist;
 
 			if((p->materialflags & MATERIALFLAG_CAMERA) && p->camera_entity)
 			{
@@ -8471,6 +8490,7 @@ void RSurf_ActiveWorldEntity(void)
 	rsurface.inversematrixscale = 1;
 	R_EntityMatrix(&identitymatrix);
 	VectorCopy(r_refdef.view.origin, rsurface.localvieworigin);
+	VectorCopy(r_refdef.view.forward, rsurface.localviewdirection);
 	Vector4Copy(r_refdef.fogplane, rsurface.fogplane);
 	rsurface.fograngerecip = r_refdef.fograngerecip;
 	rsurface.fogheightfade = r_refdef.fogheightfade;
@@ -8600,6 +8620,7 @@ void RSurf_ActiveModelEntity(const entity_render_t *ent, qboolean wantnormals, q
 	rsurface.inversematrixscale = 1.0f / rsurface.matrixscale;
 	R_EntityMatrix(&rsurface.matrix);
 	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.origin, rsurface.localvieworigin);
+	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.forward, rsurface.localviewdirection);
 	Matrix4x4_TransformStandardPlane(&rsurface.inversematrix, r_refdef.fogplane[0], r_refdef.fogplane[1], r_refdef.fogplane[2], r_refdef.fogplane[3], rsurface.fogplane);
 	rsurface.fogplaneviewdist *= rsurface.inversematrixscale;
 	rsurface.fograngerecip = r_refdef.fograngerecip * rsurface.matrixscale;
@@ -8850,6 +8871,7 @@ void RSurf_ActiveCustomEntity(const matrix4x4_t *matrix, const matrix4x4_t *inve
 	rsurface.inversematrixscale = 1.0f / rsurface.matrixscale;
 	R_EntityMatrix(&rsurface.matrix);
 	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.origin, rsurface.localvieworigin);
+	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.forward, rsurface.localviewdirection);
 	Matrix4x4_TransformStandardPlane(&rsurface.inversematrix, r_refdef.fogplane[0], r_refdef.fogplane[1], r_refdef.fogplane[2], r_refdef.fogplane[3], rsurface.fogplane);
 	rsurface.fogplaneviewdist *= rsurface.inversematrixscale;
 	rsurface.fograngerecip = r_refdef.fograngerecip * rsurface.matrixscale;

@@ -415,6 +415,8 @@ typedef struct rsurfacestate_s
 	float glowmod[3];
 	// view location in model space
 	vec3_t localvieworigin;
+	// view directoion in model space
+	vec3_t localviewdirection;
 	// polygon offset data for submodels
 	float basepolygonfactor;
 	float basepolygonoffset;
