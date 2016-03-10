@@ -6074,6 +6074,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 	vec3_t visorigin;
 	qboolean usewaterfbo = (r_viewfbo.integer >= 1 || r_water_fbo.integer >= 1) && vid.support.ext_framebuffer_object && vid.support.arb_texture_non_power_of_two && vid.samples < 2;
 	char vabuf[1024];
+	float dotProduct, normalLength, planeDist;
 
 	originalview = r_refdef.view;
 
@@ -6179,9 +6180,9 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			Matrix4x4_OriginFromMatrix(&r_refdef.view.matrix, r_refdef.view.origin);
 			r_refdef.view.clipplane = p->plane;
 
-			float dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
-			float normalLength = VectorLength(p->plane.normal);
-			float planeDist = dotProduct/normalLength - p->plane.dist;
+			dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			normalLength = VectorLength(p->plane.normal);
+			planeDist = dotProduct/normalLength - p->plane.dist;
 			if(planeDist > 100)
 				r_refdef.view.clipplane.dist += 100.0;
 			else if(planeDist < -100)
@@ -6235,9 +6236,9 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			r_refdef.view.clipplane = p->plane;
 			VectorNegate(r_refdef.view.clipplane.normal, r_refdef.view.clipplane.normal);
 			r_refdef.view.clipplane.dist = -r_refdef.view.clipplane.dist;
-			float dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
-			float normalLength = VectorLength(p->plane.normal);
-			float planeDist = dotProduct/normalLength - p->plane.dist;
+			dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			normalLength = VectorLength(p->plane.normal);
+			planeDist = dotProduct/normalLength - p->plane.dist;
 			if(planeDist > 100)
 				r_refdef.view.clipplane.dist -= 100.0;
 			else if(planeDist < -100)
