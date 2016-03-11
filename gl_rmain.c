@@ -204,6 +204,7 @@ cvar_t r_water_scissormode = {0, "r_water_scissormode", "3", "scissor (1) or cul
 cvar_t r_water_lowquality = {0, "r_water_lowquality", "0", "special option to accelerate water rendering, 1 disables shadows and particles, 2 disables all dynamic lights"};
 cvar_t r_water_hideplayer = {CVAR_SAVE, "r_water_hideplayer", "0", "if set to 1 then player will be hidden in refraction views, if set to 2 then player will also be hidden in reflection views, player is always visible in camera views"};
 cvar_t r_water_fbo = {CVAR_SAVE, "r_water_fbo", "1", "enables use of render to texture for water effects, otherwise copy to texture is used (slower)"};
+cvar_t r_water_clipplayerinreflection = {CVAR_SAVE, "r_water_clipplayerinreflection", "-1", "if set to -1 the player will not be clipped in the reflection view, else it will be clipped at the given value"};
 
 cvar_t r_lerpsprites = {CVAR_SAVE, "r_lerpsprites", "0", "enables animation smoothing on sprites"};
 cvar_t r_lerpmodels = {CVAR_SAVE, "r_lerpmodels", "1", "enables animation smoothing on models"};
@@ -4399,6 +4400,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_water_lowquality);
 	Cvar_RegisterVariable(&r_water_hideplayer);
 	Cvar_RegisterVariable(&r_water_fbo);
+	Cvar_RegisterVariable(&r_water_clipplayerinreflection);
 
 	Cvar_RegisterVariable(&r_lerpsprites);
 	Cvar_RegisterVariable(&r_lerpmodels);
@@ -6202,7 +6204,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 					memset(r_refdef.viewcache.world_pvsbits, 0xFF, r_refdef.scene.worldmodel->brush.num_pvsclusterbytes);
 			}
 
-			r_fb.water.hideplayer = ((r_water_hideplayer.integer >= 2) && !chase_active.integer) || (abs(planeDist) < 45);
+			r_fb.water.hideplayer = ((r_water_hideplayer.integer >= 2) && !chase_active.integer) || (abs(planeDist) < r_water_clipplayerinreflection.value);
 			R_ResetViewRendering3D(p->fbo_reflection, r_fb.water.depthtexture, p->texture_reflection);
 			R_ClearScreen(r_refdef.fogenabled);
 			if(r_water_scissormode.integer & 2)
