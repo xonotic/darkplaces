@@ -103,7 +103,7 @@ static size_t Crypto_UnParsePack(char *buf, size_t len, unsigned long header, co
 
 #ifdef LINK_TO_CRYPTO
 
-#include <d0_blind_id/d0_blind_id.h>
+#include <../d0_blind_id/d0_blind_id.h>
 
 #define d0_blind_id_dll 1
 #define Crypto_OpenLibrary() true
@@ -286,7 +286,7 @@ static void Crypto_CloseLibrary (void)
 
 #ifdef LINK_TO_CRYPTO_RIJNDAEL
 
-#include <d0_blind_id/d0_rijndael.h>
+#include <../d0_blind_id/d0_rijndael.h>
 
 #define d0_rijndael_dll 1
 #define Crypto_Rijndael_OpenLibrary() true
