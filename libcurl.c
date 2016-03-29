@@ -46,6 +46,7 @@ CURLMcode;
 #define CURL_GLOBAL_WIN32 2
 #define CURLOPTTYPE_LONG          0
 #define CURLOPTTYPE_OBJECTPOINT   10000
+#define CURLOPTTYPE_STRINGPOINT   10000
 #define CURLOPTTYPE_FUNCTIONPOINT 20000
 #define CURLOPTTYPE_OFF_T         30000
 #define CINIT(name,type,number) CURLOPT_ ## name = CURLOPTTYPE_ ## type + number
@@ -62,6 +63,7 @@ typedef enum
 	CINIT(LOW_SPEED_TIME, LONG, 20),
 	CINIT(RESUME_FROM, LONG, 21),
 	CINIT(HTTPHEADER, OBJECTPOINT, 23),
+	CINIT(CUSTOMREQUEST, STRINGPOINT, 36),
 	CINIT(POST, LONG, 47),         /* HTTP POST method */
 	CINIT(FOLLOWLOCATION, LONG, 52),  /* use Location: Luke! */
 	CINIT(POSTFIELDSIZE, LONG, 60),
@@ -223,6 +225,7 @@ typedef struct downloadinfo_s
 	size_t postbufsize;
 	const char *post_content_type;
 	const char *extraheaders;
+	const char *verb;
 }
 downloadinfo;
 static downloadinfo *downloads = NULL;
@@ -509,7 +512,7 @@ CURL_DOWNLOAD_FAILED or CURL_DOWNLOAD_ABORTED) and in the second case the error
 code from libcurl, or 0, if another error has occurred.
 ====================
 */
-static qboolean Curl_Begin(const char *URL, const char *extraheaders, double maxspeed, const char *name, int loadtype, qboolean forthismap, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata);
+static qboolean Curl_Begin(const char *URL, const char *verb, const char *extraheaders, double maxspeed, const char *name, int loadtype, qboolean forthismap, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata);
 static void Curl_EndDownload(downloadinfo *di, CurlStatus status, CURLcode error, const char *content_type_)
 {
 	char content_type[64];
@@ -573,7 +576,7 @@ static void Curl_EndDownload(downloadinfo *di, CurlStatus status, CURLcode error
 		FS_Close(di->stream); \
 		if(di->startpos && !di->callback) \
 		{ \
-			Curl_Begin(di->url, di->extraheaders, di->maxspeed, di->filename, di->loadtype, di->forthismap, di->post_content_type, di->postbuf, di->postbufsize, NULL, 0, NULL, NULL); \
+			Curl_Begin(di->url, di->verb, di->extraheaders, di->maxspeed, di->filename, di->loadtype, di->forthismap, di->post_content_type, di->postbuf, di->postbufsize, NULL, 0, NULL, NULL); \
 			di->forthismap = false; \
 		} \
 	} \
@@ -756,6 +759,8 @@ static void CheckPendingDownloads(void)
 				if(di->post_content_type)
 				{
 					qcurl_easy_setopt(di->curle, CURLOPT_POST, 1);
+					if(di->verb)
+						qcurl_easy_setopt(di->curle, CURLOPT_CUSTOMREQUEST, di->verb);
 					qcurl_easy_setopt(di->curle, CURLOPT_POSTFIELDS, di->postbuf);
 					qcurl_easy_setopt(di->curle, CURLOPT_POSTFIELDSIZE, di->postbufsize);
 					di->slist = qcurl_slist_append(di->slist, va(vabuf, sizeof(vabuf), "Content-Type: %s", di->post_content_type));
@@ -875,7 +880,7 @@ Starts a download of a given URL to the file name portion of this URL (or name
 if given) in the "dlcache/" folder.
 ====================
 */
-static qboolean Curl_Begin(const char *URL, const char *extraheaders, double maxspeed, const char *name, int loadtype, qboolean forthismap, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
+static qboolean Curl_Begin(const char *URL, const char *verb, const char *extraheaders, double maxspeed, const char *name, int loadtype, qboolean forthismap, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
 {
 	if(buf)
 		if(loadtype != LOADTYPE_NONE)
@@ -1067,6 +1072,7 @@ static qboolean Curl_Begin(const char *URL, const char *extraheaders, double max
 		di->bytes_received_curl = 0;
 		di->bytes_sent_curl = 0;
 		di->extraheaders = extraheaders;
+		di->verb = verb;
 		di->next = downloads;
 		di->prev = NULL;
 		if(di->next)
@@ -1106,15 +1112,15 @@ static qboolean Curl_Begin(const char *URL, const char *extraheaders, double max
 
 qboolean Curl_Begin_ToFile(const char *URL, double maxspeed, const char *name, int loadtype, qboolean forthismap)
 {
-	return Curl_Begin(URL, NULL, maxspeed, name, loadtype, forthismap, NULL, NULL, 0, NULL, 0, NULL, NULL);
+	return Curl_Begin(URL, NULL, NULL, maxspeed, name, loadtype, forthismap, NULL, NULL, 0, NULL, 0, NULL, NULL);
 }
 qboolean Curl_Begin_ToMemory(const char *URL, double maxspeed, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
 {
-	return Curl_Begin(URL, NULL, maxspeed, NULL, false, false, NULL, NULL, 0, buf, bufsize, callback, cbdata);
+	return Curl_Begin(URL, NULL, NULL, maxspeed, NULL, false, false, NULL, NULL, 0, buf, bufsize, callback, cbdata);
 }
-qboolean Curl_Begin_ToMemory_POST(const char *URL, const char *extraheaders, double maxspeed, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
+qboolean Curl_Begin_ToMemory_POST(const char *URL, const char *verb, const char *extraheaders, double maxspeed, const char *post_content_type, const unsigned char *postbuf, size_t postbufsize, unsigned char *buf, size_t bufsize, curl_callback_t callback, void *cbdata)
 {
-	return Curl_Begin(URL, extraheaders, maxspeed, NULL, false, false, post_content_type, postbuf, postbufsize, buf, bufsize, callback, cbdata);
+	return Curl_Begin(URL, verb, extraheaders, maxspeed, NULL, false, false, post_content_type, postbuf, postbufsize, buf, bufsize, callback, cbdata);
 }
 
 /*

@@ -6202,6 +6202,7 @@ void VM_uri_get (prvm_prog_t *prog)
 	uri_to_prog_t *handle;
 	const char *posttype = NULL;
 	const char *postseparator = NULL;
+	const char *verb = NULL;
 	int poststringbuffer = -1;
 	int postkeyid = -1;
 	const char *query_string = NULL;
@@ -6217,7 +6218,16 @@ void VM_uri_get (prvm_prog_t *prog)
 	if(prog->argc >= 3)
 		posttype = PRVM_G_STRING(OFS_PARM2);
 	if(prog->argc >= 4)
-		postseparator = PRVM_G_STRING(OFS_PARM3);
+	{
+		const char *s = PRVM_G_STRING(OFS_PARM3);
+		postseparator = "";
+		if(strcmp(s, "PUT") == 0)
+			verb = "PUT";
+		else if(strcmp(s, "DELETE") == 0)
+			verb = "DELETE";
+		else
+			postseparator = PRVM_G_STRING(OFS_PARM3);
+	}
 	if(prog->argc >= 5)
 		poststringbuffer = PRVM_G_FLOAT(OFS_PARM4);
 	if(prog->argc >= 6)
@@ -6309,7 +6319,7 @@ void VM_uri_get (prvm_prog_t *prog)
 		}
 out1:
 		strlcpy(handle->posttype, posttype, sizeof(handle->posttype));
-		ret = Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, handle->posttype, handle->postdata, handle->postlen, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
+		ret = Curl_Begin_ToMemory_POST(url, verb, handle->sigdata, 0, handle->posttype, handle->postdata, handle->postlen, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
 	}
 	else
 	{
@@ -6340,7 +6350,7 @@ out1:
 out2:
 		handle->postdata = NULL;
 		handle->postlen = 0;
-		ret = Curl_Begin_ToMemory_POST(url, handle->sigdata, 0, NULL, NULL, 0, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
+		ret = Curl_Begin_ToMemory_POST(url, NULL, handle->sigdata, 0, NULL, NULL, 0, (unsigned char *) handle->buffer, sizeof(handle->buffer), uri_to_string_callback, handle);
 	}
 	if(ret)
 	{
