@@ -430,7 +430,8 @@ extern cvar_t sessionid;
 # define LINK_TO_ZLIB	1
 # define LINK_TO_LIBVORBIS 1
 # define DP_MOBILETOUCH	1
-# define DP_FREETYPE_STATIC 1
+//# define DP_FREETYPE_STATIC 1
+//# define HAVE_KTX 1
 #elif TARGET_OS_IPHONE /* must come first because it also defines MACOSX */
 # define DP_OS_NAME		"iPhoneOS"
 # define DP_OS_STR		"iphoneos"

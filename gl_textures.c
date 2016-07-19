@@ -107,7 +107,7 @@ static textypeinfo_t textype_rgba                        = {"rgba",             
 static textypeinfo_t textype_rgba_alpha                  = {"rgba_alpha",               TEXTYPE_RGBA          ,  4,  4,  4.0f, GL_RGBA                               , GL_RGBA           , GL_UNSIGNED_BYTE };
 static textypeinfo_t textype_bgra                        = {"bgra",                     TEXTYPE_BGRA          ,  4,  4,  4.0f, GL_RGBA                               , GL_BGRA           , GL_UNSIGNED_BYTE };
 static textypeinfo_t textype_bgra_alpha                  = {"bgra_alpha",               TEXTYPE_BGRA          ,  4,  4,  4.0f, GL_RGBA                               , GL_BGRA           , GL_UNSIGNED_BYTE };
-#ifdef __ANDROID__
+#ifdef HAVE_KTX
 static textypeinfo_t textype_etc1                        = {"etc1",                     TEXTYPE_ETC1          ,  1,  3,  0.5f, GL_ETC1_RGB8_OES                         , 0                 , 0                };
 #endif
 #else
@@ -282,7 +282,7 @@ static textypeinfo_t *R_GetTexTypeInfo(textype_t textype, int flags)
 	case TEXTYPE_PALETTE: return (flags & TEXF_ALPHA) ? &textype_palette_alpha : &textype_palette;
 	case TEXTYPE_RGBA: return ((flags & TEXF_ALPHA) ? &textype_rgba_alpha : &textype_rgba);
 	case TEXTYPE_BGRA: return ((flags & TEXF_ALPHA) ? &textype_bgra_alpha : &textype_bgra);
-#ifdef __ANDROID__
+#ifdef HAVE_KTX
 	case TEXTYPE_ETC1: return &textype_etc1;
 #endif
 	case TEXTYPE_ALPHA: return &textype_alpha;
@@ -2188,8 +2188,7 @@ int R_SaveTextureDDSFile(rtexture_t *rt, const char *filename, qboolean skipunco
 #endif
 }
 
-#ifdef __ANDROID__
-// ELUAN: FIXME: separate this code
+#ifdef HAVE_KTX
 #include "ktx10/include/ktx.h"
 #endif
 
@@ -2213,7 +2212,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	fs_offset_t ddsfilesize;
 	unsigned int ddssize;
 	qboolean force_swdecode, npothack;
-#ifdef __ANDROID__
+#ifdef HAVE_KTX
 	// ELUAN: FIXME: separate this code
 	char vabuf[1024];
 	char vabuf2[1024];
@@ -2224,7 +2223,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	if (cls.state == ca_dedicated)
 		return NULL;
 
-#ifdef __ANDROID__
+#ifdef HAVE_KTX
 	// ELUAN: FIXME: separate this code
 	if (vid.renderpath != RENDERPATH_GLES2)
 	{
@@ -2359,7 +2358,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 			return NULL;
 		}
 	}
-#endif // __ANDROID__
+#endif // HAVE_KTX
 
 	dds = FS_LoadFile(filename, tempmempool, true, &ddsfilesize);
 	ddssize = ddsfilesize;
