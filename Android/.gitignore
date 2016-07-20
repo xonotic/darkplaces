@@ -1,0 +1,4 @@
+local.properties
+jni/SDL
+jni/ogg/libogg-*
+jni/vorbis/libvorbis-*
