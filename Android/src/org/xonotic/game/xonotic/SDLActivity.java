@@ -26,13 +26,11 @@ public class SDLActivity extends org.libsdl.app.SDLActivity {
      */
     protected String[] getArguments() {
         return new String[]{
+            "-xonotic",
+            "-basedir", "xonotic/",
+            "-userdir", "/sdcard/xonotic/",
             "+vid_touchscreen 1",
             "+vid_touchscreen_outlinealpha 1",
-            "-basedir", "darkplaces/",
-            "-userdir", "/sdcard/darkplaces/",
-            //"-game", "xonotic",
-            //"-basedir", "xonotic/",
-            //"-userdir", "/sdcard/xonotic/",
         };
     }
 }
