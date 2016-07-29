@@ -2880,6 +2880,9 @@ static void SV_Physics_Entity (prvm_edict_t *ent)
 			SV_LinkEdict_TouchAreaGrid(ent);
 		}
 		break;
+	case MOVETYPE_ANGLECLIP:
+	case MOVETYPE_ANGLENOCLIP:
+		break; // no actual handling, just don't warn
 	default:
 		Con_Printf ("SV_Physics: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
@@ -2928,6 +2931,9 @@ static void SV_Physics_ClientEntity_NoThink (prvm_edict_t *ent)
 		break;
 	case MOVETYPE_PHYSICS:
 		break;
+	case MOVETYPE_ANGLECLIP:
+	case MOVETYPE_ANGLENOCLIP:
+		break; // no actual handling, just don't warn
 	default:
 		Con_Printf ("SV_Physics_ClientEntity_NoThink: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
@@ -3113,6 +3119,9 @@ static void SV_Physics_ClientEntity(prvm_edict_t *ent)
 	case MOVETYPE_PHYSICS:
 		SV_RunThink (ent);
 		break;
+	case MOVETYPE_ANGLECLIP:
+	case MOVETYPE_ANGLENOCLIP:
+		break; // no actual handling, just don't warn
 	default:
 		Con_Printf ("SV_Physics_ClientEntity: bad movetype %i\n", (int)PRVM_serveredictfloat(ent, movetype));
 		break;
