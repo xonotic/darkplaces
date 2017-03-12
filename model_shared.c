@@ -63,7 +63,7 @@ static q3shader_data_t* q3shader_data;
 static void mod_start(void)
 {
 	int i, count;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 
 	SCR_PushLoadingScreen(false, "Loading models", 1.0);
@@ -86,7 +86,7 @@ static void mod_start(void)
 static void mod_shutdown(void)
 {
 	int i;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 
 	for (i = 0;i < nummodels;i++)
@@ -101,7 +101,7 @@ static void mod_newmap(void)
 {
 	msurface_t *surface;
 	int i, j, k, surfacenum, ssize, tsize;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 
 	for (i = 0;i < nummodels;i++)
@@ -533,7 +533,7 @@ dp_model_t *Mod_LoadModel(dp_model_t *mod, qboolean crash, qboolean checkdisk)
 void Mod_ClearUsed(void)
 {
 	int i;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 	for (i = 0;i < nummodels;i++)
 		if ((mod = (dp_model_t*) Mem_ExpandableArray_RecordAtIndex(&models, i)) && mod->name[0])
@@ -543,7 +543,7 @@ void Mod_ClearUsed(void)
 void Mod_PurgeUnused(void)
 {
 	int i;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 	for (i = 0;i < nummodels;i++)
 	{
@@ -573,7 +573,7 @@ dp_model_t *Mod_FindName(const char *name, const char *parentname)
 	// if we're not dedicatd, the renderer calls will crash without video
 	Host_StartVideo();
 
-	nummodels = Mem_ExpandableArray_IndexRange(&models);
+	nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 
 	if (!name[0])
 		Host_Error ("Mod_ForName: empty name");
@@ -626,7 +626,7 @@ Reloads all models if they have changed
 void Mod_Reload(void)
 {
 	int i, count;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 
 	SCR_PushLoadingScreen(false, "Reloading models", 1.0);
@@ -657,7 +657,7 @@ Mod_Print
 static void Mod_Print(void)
 {
 	int i;
-	int nummodels = Mem_ExpandableArray_IndexRange(&models);
+	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
 	dp_model_t *mod;
 
 	Con_Print("Loaded models:\n");
@@ -921,7 +921,7 @@ static void Mod_BuildBumpVectors(const float *v0, const float *v1, const float *
 void Mod_BuildTextureVectorsFromNormals(int firstvertex, int numvertices, int numtriangles, const float *vertex3f, const float *texcoord2f, const float *normal3f, const int *elements, float *svector3f, float *tvector3f, qboolean areaweighting)
 {
 	int i, tnum;
-	float sdir[3], tdir[3], normal[3], *sv, *tv;
+	float sdir[3], tdir[3], normal[3], *svec, *tvec;
 	const float *v0, *v1, *v2, *tc0, *tc1, *tc2, *n;
 	float f, tangentcross[3], v10[3], v20[3], tc10[2], tc20[2];
 	const int *e;
@@ -987,14 +987,14 @@ void Mod_BuildTextureVectorsFromNormals(int firstvertex, int numvertices, int nu
 	// make the tangents completely perpendicular to the surface normal, and
 	// then normalize them
 	// 16 assignments, 2 divide, 2 sqrt, 2 negates, 14 adds, 24 multiplies
-	for (i = 0, sv = svector3f + 3 * firstvertex, tv = tvector3f + 3 * firstvertex, n = normal3f + 3 * firstvertex;i < numvertices;i++, sv += 3, tv += 3, n += 3)
+	for (i = 0, svec = svector3f + 3 * firstvertex, tvec = tvector3f + 3 * firstvertex, n = normal3f + 3 * firstvertex;i < numvertices;i++, svec += 3, tvec += 3, n += 3)
 	{
-		f = -DotProduct(sv, n);
-		VectorMA(sv, f, n, sv);
-		VectorNormalize(sv);
-		f = -DotProduct(tv, n);
-		VectorMA(tv, f, n, tv);
-		VectorNormalize(tv);
+		f = -DotProduct(svec, n);
+		VectorMA(svec, f, n, svec);
+		VectorNormalize(svec);
+		f = -DotProduct(tvec, n);
+		VectorMA(tvec, f, n, tvec);
+		VectorNormalize(tvec);
 	}
 }
 
@@ -1244,7 +1244,7 @@ static void Mod_ShadowMesh_CreateVBOs(shadowmesh_t *mesh, mempool_t *mempool)
 	// other hand animated models don't use a lot of vertices anyway...
 	if (!mesh->vbo_vertexbuffer && !vid.useinterleavedarrays)
 	{
-		size_t size;
+		int size;
 		unsigned char *mem;
 		size = 0;
 		mesh->vbooffset_vertexmesh         = size;if (mesh->vertexmesh        ) size += mesh->numverts * sizeof(r_vertexmesh_t);
@@ -1578,7 +1578,7 @@ static void Q3Shader_AddToHash (q3shaderinfo_t* shader)
 	unsigned short hash = CRC_Block_CaseInsensitive ((const unsigned char *)shader->name, strlen (shader->name));
 	q3shader_hash_entry_t* entry = q3shader_data->hash + (hash % Q3SHADER_HASH_SIZE);
 	q3shader_hash_entry_t* lastEntry = NULL;
-	while (entry != NULL)
+	do
 	{
 		if (strcasecmp (entry->shader.name, shader->name) == 0)
 		{
@@ -1611,6 +1611,7 @@ static void Q3Shader_AddToHash (q3shaderinfo_t* shader)
 		lastEntry = entry;
 		entry = entry->chain;
 	}
+	while (entry != NULL);
 	if (entry == NULL)
 	{
 		if (lastEntry->shader.name[0] != 0)
@@ -1691,7 +1692,7 @@ void Mod_LoadQ3Shaders(void)
 						break;
 					}
 					// name
-					j = strlen(com_token)+1;
+					j = (int)strlen(com_token)+1;
 					custsurfaceparmnames[numcustsurfaceflags] = (char *)Mem_Alloc(tempmempool, j);
 					strlcpy(custsurfaceparmnames[numcustsurfaceflags], com_token, j+1);
 					// value
@@ -2443,6 +2444,7 @@ qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qbool
 	if (!name)
 		name = "";
 	strlcpy(texture->name, name, sizeof(texture->name));
+	texture->basealpha = 1.0f;
 	shader = name[0] ? Mod_LookupQ3Shader(name) : NULL;
 
 	texflagsmask = ~0;
@@ -2746,6 +2748,8 @@ nothing                GL_ZERO GL_ONE
 				{
 					if(texture->skinframes[0]->hasalpha)
 						texture->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
+					if (texture->q2contents)
+						texture->supercontents = Mod_Q2BSP_SuperContentsFromNativeContents(loadmodel, texture->q2contents);
 				}
 				else
 					success = false;
@@ -2963,7 +2967,7 @@ void Mod_MakeSortedSurfaces(dp_model_t *mod)
 	for (j = 0;j < mod->nummodelsurfaces;j++)
 	{
 		const msurface_t *surface = mod->data_surfaces + j + mod->firstmodelsurface;
-		int t = (int)(surface->texture - mod->data_textures);
+		t = (int)(surface->texture - mod->data_textures);
 		numsurfacesfortexture[t]++;
 	}
 	j = 0;
@@ -2975,7 +2979,7 @@ void Mod_MakeSortedSurfaces(dp_model_t *mod)
 	for (j = 0;j < mod->nummodelsurfaces;j++)
 	{
 		const msurface_t *surface = mod->data_surfaces + j + mod->firstmodelsurface;
-		int t = (int)(surface->texture - mod->data_textures);
+		t = (int)(surface->texture - mod->data_textures);
 		mod->sortedmodelsurfaces[firstsurfacefortexture[t]++] = j + mod->firstmodelsurface;
 	}
 	Mem_Free(firstsurfacefortexture);
@@ -3042,7 +3046,7 @@ void Mod_BuildVBOs(void)
 	// other hand animated models don't use a lot of vertices anyway...
 	if (!loadmodel->surfmesh.vbo_vertexbuffer && !vid.useinterleavedarrays)
 	{
-		size_t size;
+		int size;
 		unsigned char *mem;
 		size = 0;
 		loadmodel->surfmesh.vbooffset_vertexmesh         = size;if (loadmodel->surfmesh.data_vertexmesh        ) size += loadmodel->surfmesh.num_vertices * sizeof(r_vertexmesh_t);
@@ -3434,7 +3438,7 @@ static void Mod_Decompile_f(void)
 			{
 				// individual frame
 				// check for additional frames with same name
-				for (l = 0, k = strlen(animname);animname[l];l++)
+				for (l = 0, k = (int)strlen(animname);animname[l];l++)
 					if(animname[l] < '0' || animname[l] > '9')
 						k = l + 1;
 				if(k > 0 && animname[k-1] == '_')
@@ -3444,7 +3448,7 @@ static void Mod_Decompile_f(void)
 				for (j = i + 1;j < mod->numframes;j++)
 				{
 					strlcpy(animname2, mod->animscenes[j].name, sizeof(animname2));
-					for (l = 0, k = strlen(animname2);animname2[l];l++)
+					for (l = 0, k = (int)strlen(animname2);animname2[l];l++)
 						if(animname2[l] < '0' || animname2[l] > '9')
 							k = l + 1;
 					if(k > 0 && animname[k-1] == '_')
@@ -3660,7 +3664,7 @@ static void Mod_GenerateLightmaps_LightPoint(dp_model_t *model, const vec3_t pos
 			continue;
 		if (model && model->TraceLine)
 		{
-			model->TraceLine(model, NULL, NULL, &trace, pos, lightorigin, SUPERCONTENTS_VISBLOCKERMASK);
+			model->TraceLine(model, NULL, NULL, &trace, pos, lightorigin, SUPERCONTENTS_VISBLOCKERMASK, SUPERCONTENTS_SKY);
 			if (trace.fraction < 1)
 				continue;
 		}
@@ -3862,7 +3866,7 @@ static void Mod_GenerateLightmaps_SamplePoint(const float *pos, const float *nor
 				if (!normal)
 				{
 					// for light grid we'd better check visibility of the offset point
-					cl.worldmodel->TraceLine(cl.worldmodel, NULL, NULL, &trace, pos, offsetpos, SUPERCONTENTS_VISBLOCKERMASK);
+					cl.worldmodel->TraceLine(cl.worldmodel, NULL, NULL, &trace, pos, offsetpos, SUPERCONTENTS_VISBLOCKERMASK, SUPERCONTENTS_SKY);
 					if (trace.fraction < 1)
 						VectorLerp(pos, trace.fraction, offsetpos, offsetpos);
 				}

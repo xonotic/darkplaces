@@ -67,6 +67,7 @@ static void Mod_SpriteSetupTexture(texture_t *texture, skinframe_t *skinframe, q
 	texture->specularscalemod = 1;
 	texture->specularpowermod = 1;
 	texture->basematerialflags = MATERIALFLAG_WALL;
+	texture->basealpha = 1.0f;
 	if (fullbright)
 		texture->basematerialflags |= MATERIALFLAG_FULLBRIGHT;
 	if (additive)
@@ -370,6 +371,9 @@ void Mod_IDSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		Host_Error("Mod_IDSP_Load: %s has wrong version number (%i). Only %i (quake), %i (HalfLife), and %i (sprite32) supported",
 					loadmodel->name, version, SPRITE_VERSION, SPRITEHL_VERSION, SPRITE32_VERSION);
 
+	// TODO: Note that isanimated only means whether vertices change due to
+	// the animation. This may happen due to sprframe parameters changing.
+	// Mere texture chanegs OTOH shouldn't require isanimated to be 1.
 	loadmodel->surfmesh.isanimated = loadmodel->numframes > 1 || (loadmodel->animscenes && loadmodel->animscenes[0].framecount > 1);
 }
 
@@ -478,5 +482,8 @@ void Mod_IDS2_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->radius = modelradius;
 	loadmodel->radius2 = modelradius * modelradius;
 
+	// TODO: Note that isanimated only means whether vertices change due to
+	// the animation. This may happen due to sprframe parameters changing.
+	// Mere texture chanegs OTOH shouldn't require isanimated to be 1.
 	loadmodel->surfmesh.isanimated = loadmodel->numframes > 1 || (loadmodel->animscenes && loadmodel->animscenes[0].framecount > 1);
 }

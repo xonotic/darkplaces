@@ -1,4 +1,3 @@
-// TODO key loading, generating, saving
 #include "quakedef.h"
 #include "crypto.h"
 #include "common.h"
@@ -8,15 +7,20 @@
 #include "libcurl.h"
 
 cvar_t crypto_developer = {CVAR_SAVE, "crypto_developer", "0", "print extra info about crypto handshake"};
+cvar_t crypto_aeslevel = {CVAR_SAVE, "crypto_aeslevel", "1", "whether to support AES encryption in authenticated connections (0 = no, 1 = supported, 2 = requested, 3 = required)"};
+
 cvar_t crypto_servercpupercent = {CVAR_SAVE, "crypto_servercpupercent", "10", "allowed crypto CPU load in percent for server operation (0 = no limit, faster)"};
 cvar_t crypto_servercpumaxtime = {CVAR_SAVE, "crypto_servercpumaxtime", "0.01", "maximum allowed crypto CPU time per frame (0 = no limit)"};
 cvar_t crypto_servercpudebug = {CVAR_SAVE, "crypto_servercpudebug", "0", "print statistics about time usage by crypto"};
 static double crypto_servercpu_accumulator = 0;
 static double crypto_servercpu_lastrealtime = 0;
-cvar_t crypto_aeslevel = {CVAR_SAVE, "crypto_aeslevel", "1", "whether to support AES encryption in authenticated connections (0 = no, 1 = supported, 2 = requested, 3 = required)"};
+
+extern cvar_t net_sourceaddresscheck;
+
 int crypto_keyfp_recommended_length;
 static const char *crypto_idstring = NULL;
 static char crypto_idstring_buf[512];
+
 
 #define PROTOCOL_D0_BLIND_ID FOURCC_D0PK
 #define PROTOCOL_VLEN (('v' << 0) | ('l' << 8) | ('e' << 16) | ('n' << 24))
@@ -91,7 +95,7 @@ static size_t Crypto_UnParsePack(char *buf, size_t len, unsigned long header, co
 	{
 		if(pos + 4 + lumpsize[i] > len)
 			return 0;
-		Crypto_UnLittleLong(&buf[pos], lumpsize[i]);
+		Crypto_UnLittleLong(&buf[pos], (unsigned long)lumpsize[i]);
 		pos += 4;
 		memcpy(&buf[pos], lumps[i], lumpsize[i]);
 		pos += lumpsize[i];
@@ -413,17 +417,12 @@ static const char *GetUntilNul(const char **data, size_t *len)
 		*len = 0;
 		return NULL;
 	}
-	else
-	{
-		n = (p - *data) + 1;
-		*len -= n;
-		*data += n;
-		if(*len == 0)
-			*data = NULL;
-		return (const char *) data_save;
-	}
-	*data = NULL;
-	return NULL;
+	n = (p - *data) + 1;
+	*len -= n;
+	*data += n;
+	if(*len == 0)
+		*data = NULL;
+	return (const char *) data_save;
 }
 
 // d0pk reading
@@ -495,6 +494,7 @@ typedef struct
 	char challenge[2048];
 	char wantserver_idfp[FP64_SIZE+1];
 	qboolean wantserver_aes;
+	qboolean wantserver_issigned;
 	int cdata_id;
 }
 crypto_data_t;
@@ -534,7 +534,7 @@ static crypto_t *Crypto_ServerFindInstance(lhnetaddress_t *peeraddress, qboolean
 	return crypto;
 }
 
-qboolean Crypto_ServerFinishInstance(crypto_t *out, crypto_t *crypto)
+qboolean Crypto_FinishInstance(crypto_t *out, crypto_t *crypto)
 {
 	// no check needed here (returned pointers are only used in prefilled fields)
 	if(!crypto || !crypto->authenticated)
@@ -562,6 +562,7 @@ typedef struct crypto_storedhostkey_s
 	int keyid;
 	char idfp[FP64_SIZE+1];
 	int aeslevel;
+	qboolean issigned;
 }
 crypto_storedhostkey_t;
 static crypto_storedhostkey_t *crypto_storedhostkey_hashtable[CRYPTO_HOSTKEY_HASHSIZE];
@@ -618,6 +619,7 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 	int keyid;
 	char idfp[FP64_SIZE+1];
 	int aeslevel;
+	qboolean issigned;
 
 	if(!d0_blind_id_dll)
 		return;
@@ -632,10 +634,12 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 		++keystring;
 
 	keyid = -1;
+	issigned = false;
 	while(*keystring && keyid < 0)
 	{
 		// id@key
 		const char *idstart, *idend, *keystart, *keyend;
+		qboolean thisissigned = true;
 		++keystring; // skip the space
 		idstart = keystring;
 		while(*keystring && *keystring != ' ' && *keystring != '@')
@@ -649,18 +653,26 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 			++keystring;
 		keyend = keystring;
 
+		if (keystart[0] == '~')
+		{
+			thisissigned = false;
+			++keystart;
+		}
+
 		if(idend - idstart == FP64_SIZE && keyend - keystart == FP64_SIZE)
 		{
-			for(keyid = 0; keyid < MAX_PUBKEYS; ++keyid)
-				if(pubkeys[keyid])
-					if(!memcmp(pubkeys_fp64[keyid], keystart, FP64_SIZE))
+			int thiskeyid;
+			for(thiskeyid = MAX_PUBKEYS - 1; thiskeyid >= 0; --thiskeyid)
+				if(pubkeys[thiskeyid])
+					if(!memcmp(pubkeys_fp64[thiskeyid], keystart, FP64_SIZE))
 					{
 						memcpy(idfp, idstart, FP64_SIZE);
 						idfp[FP64_SIZE] = 0;
+						keyid = thiskeyid;
+						issigned = thisissigned;
 						break;
 					}
-			if(keyid >= MAX_PUBKEYS)
-				keyid = -1;
+			// If this failed, keyid will be -1.
 		}
 	}
 
@@ -679,8 +691,11 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 				Con_Printf("Server %s tried to change the host key to a value not in the host cache. Connecting to it will fail. To accept the new host key, do crypto_hostkey_clear %s\n", buf, buf);
 			if(hk->aeslevel > aeslevel)
 				Con_Printf("Server %s tried to reduce encryption status, not accepted. Connecting to it will fail. To accept, do crypto_hostkey_clear %s\n", buf, buf);
+			if(hk->issigned > issigned)
+				Con_Printf("Server %s tried to reduce signature status, not accepted. Connecting to it will fail. To accept, do crypto_hostkey_clear %s\n", buf, buf);
 		}
 		hk->aeslevel = max(aeslevel, hk->aeslevel);
+		hk->issigned = issigned;
 		return;
 	}
 
@@ -691,10 +706,11 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 	memcpy(hk->idfp, idfp, FP64_SIZE+1);
 	hk->next = crypto_storedhostkey_hashtable[hashindex];
 	hk->aeslevel = aeslevel;
+	hk->issigned = issigned;
 	crypto_storedhostkey_hashtable[hashindex] = hk;
 }
 
-qboolean Crypto_RetrieveHostKey(lhnetaddress_t *peeraddress, int *keyid, char *keyfp, size_t keyfplen, char *idfp, size_t idfplen, int *aeslevel)
+qboolean Crypto_RetrieveHostKey(lhnetaddress_t *peeraddress, int *keyid, char *keyfp, size_t keyfplen, char *idfp, size_t idfplen, int *aeslevel, qboolean *issigned)
 {
 	char buf[128];
 	int hashindex;
@@ -718,6 +734,8 @@ qboolean Crypto_RetrieveHostKey(lhnetaddress_t *peeraddress, int *keyid, char *k
 		strlcpy(idfp, hk->idfp, idfplen);
 	if(aeslevel)
 		*aeslevel = hk->aeslevel;
+	if(issigned)
+		*issigned = hk->issigned;
 
 	return true;
 }
@@ -800,6 +818,19 @@ static qboolean Crypto_SavePubKeyTextFile(int i)
 	return true;
 }
 
+static void Crypto_BuildIdString(void)
+{
+	int i;
+	char vabuf[1024];
+
+	crypto_idstring = NULL;
+	dpsnprintf(crypto_idstring_buf, sizeof(crypto_idstring_buf), "%d", d0_rijndael_dll ? crypto_aeslevel.integer : 0);
+	for (i = 0; i < MAX_PUBKEYS; ++i)
+		if (pubkeys[i])
+			strlcat(crypto_idstring_buf, va(vabuf, sizeof(vabuf), " %s@%s%s", pubkeys_priv_fp64[i], pubkeys_havesig[i] ? "" : "~", pubkeys_fp64[i]), sizeof(crypto_idstring_buf));
+	crypto_idstring = crypto_idstring_buf;
+}
+
 void Crypto_LoadKeys(void)
 {
 	char buf[8192];
@@ -821,8 +852,6 @@ void Crypto_LoadKeys(void)
 	//   PUBLIC KEYS to accept (including modulus)
 	//   PRIVATE KEY of user
 
-	crypto_idstring = NULL;
-	dpsnprintf(crypto_idstring_buf, sizeof(crypto_idstring_buf), "%d", d0_rijndael_dll ? crypto_aeslevel.integer : 0);
 	for(i = 0; i < MAX_PUBKEYS; ++i)
 	{
 		memset(pubkeys_fp64[i], 0, sizeof(pubkeys_fp64[i]));
@@ -852,12 +881,10 @@ void Crypto_LoadKeys(void)
 							if(qd0_blind_id_verify_private_id(pubkeys[i]) && qd0_blind_id_verify_public_id(pubkeys[i], &status))
 							{
 								pubkeys_havepriv[i] = true;
-								strlcat(crypto_idstring_buf, va(vabuf, sizeof(vabuf), " %s@%s", pubkeys_priv_fp64[i], pubkeys_fp64[i]), sizeof(crypto_idstring_buf));
+								pubkeys_havesig[i] = status;
 
 								// verify the key we just got (just in case)
-								if(status)
-									pubkeys_havesig[i] = true;
-								else
+								if(!status)
 									Con_Printf("NOTE: this ID has not yet been signed!\n");
 
 								Crypto_SavePubKeyTextFile(i);
@@ -886,9 +913,9 @@ void Crypto_LoadKeys(void)
 			}
 		}
 	}
-	crypto_idstring = crypto_idstring_buf;
 
 	keygen_i = -1;
+	Crypto_BuildIdString();
 	Crypto_BuildChallengeAppend();
 
 	// find a good prefix length for all the keys we know (yes, algorithm is not perfect yet, may yield too long prefix length)
@@ -1075,17 +1102,17 @@ static void Crypto_KeyGen_Finished(int code, size_t length_received, unsigned ch
 		return;
 	}
 
+	if(keygen_i < 0)
+	{
+		Con_Printf("Unexpected response from keygen server:\n");
+		Com_HexDumpToConsole(buffer, (int)length_received);
+		SV_UnlockThreadMutex();
+		return;
+	}
 	if(keygen_i >= MAX_PUBKEYS || !pubkeys[keygen_i])
 	{
 		Con_Printf("overflow of keygen_i\n");
 		keygen_i = -1;
-		SV_UnlockThreadMutex();
-		return;
-	}
-	if(keygen_i < 0)
-	{
-		Con_Printf("Unexpected response from keygen server:\n");
-		Com_HexDumpToConsole(buffer, length_received);
 		SV_UnlockThreadMutex();
 		return;
 	}
@@ -1098,7 +1125,7 @@ static void Crypto_KeyGen_Finished(int code, size_t length_received, unsigned ch
 		else
 		{
 			Con_Printf("Invalid response from keygen server:\n");
-			Com_HexDumpToConsole(buffer, length_received);
+			Com_HexDumpToConsole(buffer, (int)length_received);
 		}
 		keygen_i = -1;
 		SV_UnlockThreadMutex();
@@ -1159,6 +1186,8 @@ static void Crypto_KeyGen_Finished(int code, size_t length_received, unsigned ch
 	Crypto_SavePubKeyTextFile(keygen_i);
 
 	Con_Printf("Saved to key_%d.d0si%s\n", keygen_i, sessionid.string);
+
+	Crypto_BuildIdString();
 
 	keygen_i = -1;
 	SV_UnlockThreadMutex();
@@ -1487,15 +1516,15 @@ const void *Crypto_EncryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			if(developer_networking.integer)
 			{
 				Con_Print("To be encrypted:\n");
-				Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+				Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 			}
-			if(len_src + 32 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, len_src, crypto->dhkey, DHKEY_SIZE))
+			if(len_src + 32 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, (int)len_src, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("Crypto_EncryptPacket failed (not enough space: %d bytes in, %d bytes out)\n", (int) len_src, (int) len);
 				return NULL;
 			}
 			*len_dst = ((len_src + 15) / 16) * 16 + 16; // add 16 for HMAC, then round to 16-size for AES
-			((unsigned char *) data_dst)[0] = *len_dst - len_src;
+			((unsigned char *) data_dst)[0] = (unsigned char)(*len_dst - len_src);
 			memcpy(((unsigned char *) data_dst)+1, h, 15);
 			aescpy(crypto->dhkey, (const unsigned char *) data_dst, ((unsigned char *) data_dst) + 16, (const unsigned char *) data_src, len_src);
 			//                    IV                                dst                                src                               len
@@ -1503,7 +1532,7 @@ const void *Crypto_EncryptPacket(crypto_t *crypto, const void *data_src, size_t 
 		else
 		{
 			// HMAC packet = 16 bytes HMAC-SHA-256 (truncated to 128 bits), data
-			if(len_src + 16 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, len_src, crypto->dhkey, DHKEY_SIZE))
+			if(len_src + 16 > len || !HMAC_SHA256_32BYTES(h, (const unsigned char *) data_src, (int)len_src, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("Crypto_EncryptPacket failed (not enough space: %d bytes in, %d bytes out)\n", (int) len_src, (int) len);
 				return NULL;
@@ -1561,7 +1590,7 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			}
 			seacpy(crypto->dhkey, (unsigned char *) data_src, (unsigned char *) data_dst, ((const unsigned char *) data_src) + 16, *len_dst);
 			//                    IV                          dst                         src                                      len
-			if(!HMAC_SHA256_32BYTES(h, (const unsigned char *) data_dst, *len_dst, crypto->dhkey, DHKEY_SIZE))
+			if(!HMAC_SHA256_32BYTES(h, (const unsigned char *) data_dst, (int)*len_dst, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("HMAC fail\n");
 				return NULL;
@@ -1574,7 +1603,7 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 			if(developer_networking.integer)
 			{
 				Con_Print("Decrypted:\n");
-				Com_HexDumpToConsole((const unsigned char *) data_dst, *len_dst);
+				Com_HexDumpToConsole((const unsigned char *) data_dst, (int)*len_dst);
 			}
 			return data_dst; // no need to copy
 		}
@@ -1592,10 +1621,10 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 				return NULL;
 			}
 			//memcpy(data_dst, data_src + 16, *len_dst);
-			if(!HMAC_SHA256_32BYTES(h, ((const unsigned char *) data_src) + 16, *len_dst, crypto->dhkey, DHKEY_SIZE))
+			if(!HMAC_SHA256_32BYTES(h, ((const unsigned char *) data_src) + 16, (int)*len_dst, crypto->dhkey, DHKEY_SIZE))
 			{
 				Con_Printf("HMAC fail\n");
-				Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+				Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 				return NULL;
 			}
 
@@ -1613,14 +1642,14 @@ const void *Crypto_DecryptPacket(crypto_t *crypto, const void *data_src, size_t 
 					if(memcmp((const unsigned char *) data_src, h, 16)) // ignore first byte, used for length
 					{
 						Con_Printf("HMAC mismatch\n");
-						Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+						Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 						return NULL;
 					}
 				}
 				else
 				{
 					Con_Printf("HMAC mismatch\n");
-					Com_HexDumpToConsole((const unsigned char *) data_src, len_src);
+					Com_HexDumpToConsole((const unsigned char *) data_src, (int)len_src);
 					return NULL;
 				}
 			}
@@ -1698,12 +1727,12 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 			return CRYPTO_NOMATCH; // will be later accepted if encryption was set up
 		// validate the challenge
 		for (i = 0;i < MAX_CHALLENGES;i++)
-			if(challenge[i].time > 0)
-				if (!LHNETADDRESS_Compare(peeraddress, &challenge[i].address) && !strcmp(challenge[i].string, s))
+			if(challenges[i].time > 0)
+				if (!LHNETADDRESS_Compare(peeraddress, &challenges[i].address) && !strcmp(challenges[i].string, s))
 					break;
 		// if the challenge is not recognized, drop the packet
 		if (i == MAX_CHALLENGES) // challenge mismatch is silent
-			return CRYPTO_DISCARD; // pre-challenge: rather be silent
+			return Crypto_SoftServerError(data_out, len_out, "missing challenge in connect");
 
 		crypto = Crypto_ServerFindInstance(peeraddress, false);
 		if(!crypto || !crypto->authenticated)
@@ -1718,23 +1747,23 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 		id = (cnt ? atoi(cnt) : -1);
 		cnt = InfoString_GetValue(string + 4, "cnt", infostringvalue, sizeof(infostringvalue));
 		if(!cnt)
-			return CRYPTO_DISCARD; // pre-challenge: rather be silent
+			return Crypto_SoftServerError(data_out, len_out, "missing cnt in d0pk");
 		GetUntilNul(&data_in, &len_in);
 		if(!data_in)
-			return CRYPTO_DISCARD; // pre-challenge: rather be silent
+			return Crypto_SoftServerError(data_out, len_out, "missing appended data in d0pk");
 		if(!strcmp(cnt, "0"))
 		{
 			int i;
 			if (!(s = InfoString_GetValue(string + 4, "challenge", infostringvalue, sizeof(infostringvalue))))
-				return CRYPTO_DISCARD; // pre-challenge: rather be silent
+				return Crypto_SoftServerError(data_out, len_out, "missing challenge in d0pk\\0");
 			// validate the challenge
 			for (i = 0;i < MAX_CHALLENGES;i++)
-				if(challenge[i].time > 0)
-					if (!LHNETADDRESS_Compare(peeraddress, &challenge[i].address) && !strcmp(challenge[i].string, s))
+				if(challenges[i].time > 0)
+					if (!LHNETADDRESS_Compare(peeraddress, &challenges[i].address) && !strcmp(challenges[i].string, s))
 						break;
 			// if the challenge is not recognized, drop the packet
-			if (i == MAX_CHALLENGES) // challenge mismatch is silent
-				return CRYPTO_DISCARD; // pre-challenge: rather be silent
+			if (i == MAX_CHALLENGES)
+				return Crypto_SoftServerError(data_out, len_out, "invalid challenge in d0pk\\0");
 
 			if (!(s = InfoString_GetValue(string + 4, "aeslevel", infostringvalue, sizeof(infostringvalue))))
 				aeslevel = 0; // not supported
@@ -1764,13 +1793,13 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 			p = GetUntilNul(&data_in, &len_in);
 			if(p && *p)
 			{
+				// Find the highest numbered matching key for p.
 				for(i = 0; i < MAX_PUBKEYS; ++i)
 				{
 					if(pubkeys[i])
 						if(!strcmp(p, pubkeys_fp64[i]))
 							if(pubkeys_havepriv[i])
-								if(serverid < 0)
-									serverid = i;
+								serverid = i;
 				}
 				if(serverid < 0)
 					return Crypto_ServerError(data_out, len_out, "Invalid server key", NULL);
@@ -1778,12 +1807,12 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 			p = GetUntilNul(&data_in, &len_in);
 			if(p && *p)
 			{
+				// Find the highest numbered matching key for p.
 				for(i = 0; i < MAX_PUBKEYS; ++i)
 				{
 					if(pubkeys[i])
 						if(!strcmp(p, pubkeys_fp64[i]))
-							if(clientid < 0)
-								clientid = i;
+							clientid = i;
 				}
 				if(clientid < 0)
 					return Crypto_ServerError(data_out, len_out, "Invalid client key", NULL);
@@ -1809,6 +1838,7 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 				// I am the server, and my key is ok... so let's set server_keyfp and server_idfp
 				strlcpy(crypto->server_keyfp, pubkeys_fp64[CDATA->s], sizeof(crypto->server_keyfp));
 				strlcpy(crypto->server_idfp, pubkeys_priv_fp64[CDATA->s], sizeof(crypto->server_idfp));
+				crypto->server_issigned = pubkeys_havesig[CDATA->s];
 
 				if(!CDATA->id)
 					CDATA->id = qd0_blind_id_new();
@@ -1949,10 +1979,9 @@ static int Crypto_ServerParsePacket_Internal(const char *data_in, size_t len_in,
 				CLEAR_CDATA;
 				return Crypto_ServerError(data_out, len_out, "d0_blind_id_authenticate_with_private_id_verify failed (authentication error)", "Authentication error");
 			}
-			if(status)
-				strlcpy(crypto->client_keyfp, pubkeys_fp64[CDATA->c], sizeof(crypto->client_keyfp));
-			else
-				crypto->client_keyfp[0] = 0;
+			strlcpy(crypto->client_keyfp, pubkeys_fp64[CDATA->c], sizeof(crypto->client_keyfp));
+			crypto->client_issigned = status;
+
 			memset(crypto->client_idfp, 0, sizeof(crypto->client_idfp));
 			fpbuflen = FP64_SIZE;
 			if(!qd0_blind_id_fingerprint64_public_id(CDATA->id, crypto->client_idfp, &fpbuflen))
@@ -2051,7 +2080,7 @@ static int Crypto_ClientError(char *data_out, size_t *len_out, const char *msg)
 static int Crypto_SoftClientError(char *data_out, size_t *len_out, const char *msg)
 {
 	*len_out = 0;
-	Con_Printf("%s\n", msg);
+	Con_DPrintf("%s\n", msg);
 	return CRYPTO_DISCARD;
 }
 
@@ -2075,7 +2104,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 	if (len_in == 6 && !memcmp(string, "accept", 6) && cls.connect_trying && d0_rijndael_dll)
 	{
 		int wantserverid = -1;
-		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL);
+		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL, NULL);
 		if(!crypto || !crypto->authenticated) // we ALSO get here if we are using an encrypted connection, so let's rule this out
 		{
 			if(wantserverid >= 0)
@@ -2088,7 +2117,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 	else if (len_in >= 1 && string[0] == 'j' && cls.connect_trying && d0_rijndael_dll)
 	{
 		int wantserverid = -1;
-		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL);
+		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL, NULL);
 		//if(!crypto || !crypto->authenticated)
 		{
 			if(wantserverid >= 0)
@@ -2103,14 +2132,14 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 		int wantserverid = -1;
 
 		// these three are harmless
-		if(string[4] == CCREP_SERVER_INFO)
+		if((unsigned char) string[4] == CCREP_SERVER_INFO)
 			return CRYPTO_NOMATCH;
-		if(string[4] == CCREP_PLAYER_INFO)
+		if((unsigned char) string[4] == CCREP_PLAYER_INFO)
 			return CRYPTO_NOMATCH;
-		if(string[4] == CCREP_RULE_INFO)
+		if((unsigned char) string[4] == CCREP_RULE_INFO)
 			return CRYPTO_NOMATCH;
 
-		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL);
+		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, NULL, 0, NULL, NULL);
 		//if(!crypto || !crypto->authenticated)
 		{
 			if(wantserverid >= 0)
@@ -2159,11 +2188,16 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 		qboolean server_can_auth = true;
 		char wantserver_idfp[FP64_SIZE+1];
 		int wantserver_aeslevel = 0;
+		qboolean wantserver_issigned = false;
+
+		// Must check the source IP here, if we want to prevent other servers' replies from falsely advancing the crypto state, preventing successful connect to the real server.
+		if (net_sourceaddresscheck.integer && LHNETADDRESS_Compare(peeraddress, &cls.connect_address))
+			return Crypto_SoftClientError(data_out, len_out, "challenge message from wrong server");
 
 		// if we have a stored host key for the server, assume serverid to already be selected!
 		// (the loop will refuse to overwrite this one then)
 		wantserver_idfp[0] = 0;
-		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, wantserver_idfp, sizeof(wantserver_idfp), &wantserver_aeslevel);
+		Crypto_RetrieveHostKey(&cls.connect_address, &wantserverid, NULL, 0, wantserver_idfp, sizeof(wantserver_idfp), &wantserver_aeslevel, &wantserver_issigned);
 		// requirement: wantserver_idfp is a full ID if wantserverid set
 
 		// if we leave, we have to consider the connection
@@ -2176,7 +2210,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 		GetUntilNul(&data_in, &len_in);
 		if(!data_in)
 			return (wantserverid >= 0) ? Crypto_ClientError(data_out, len_out, "Server tried an unauthenticated connection even though a host key is present") :
-				(d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ServerError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)", NULL) :
+				(d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ClientError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)") :
 				CRYPTO_NOMATCH;
 
 		// FTEQW extension protocol
@@ -2212,7 +2246,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 
 		if(!vlen_blind_id_ptr)
 			return (wantserverid >= 0) ? Crypto_ClientError(data_out, len_out, "Server tried an unauthenticated connection even though authentication is required") :
-				(d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ServerError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)", NULL) :
+				(d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ClientError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)") :
 				CRYPTO_NOMATCH;
 
 		data_in = vlen_blind_id_ptr;
@@ -2236,22 +2270,20 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 					break;
 				continue;
 			}
+			// Find the highest numbered matching key for p.
 			for(i = 0; i < MAX_PUBKEYS; ++i)
 			{
 				if(pubkeys[i])
 				if(!strcmp(p, pubkeys_fp64[i]))
 				{
 					if(pubkeys_havepriv[i])
-						if(clientid < 0)
-							clientid = i;
+						clientid = i;
 					if(server_can_auth)
-						if(serverid < 0)
-							if(wantserverid < 0 || i == wantserverid)
-								serverid = i;
+						if(wantserverid < 0 || i == wantserverid)
+							serverid = i;
 				}
 			}
-			if(clientid >= 0 && serverid >= 0)
-				break;
+			// Not breaking, as higher keys in the list always have priority.
 		}
 
 		// if stored host key is not found:
@@ -2260,7 +2292,6 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 
 		if(serverid >= 0 || clientid >= 0)
 		{
-			// TODO at this point, fill clientside crypto struct!
 			MAKE_CDATA;
 			CDATA->cdata_id = ++cdata_id;
 			CDATA->s = serverid;
@@ -2272,6 +2303,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 			crypto->server_keyfp[0] = 0;
 			crypto->server_idfp[0] = 0;
 			memcpy(CDATA->wantserver_idfp, wantserver_idfp, sizeof(crypto->server_idfp));
+			CDATA->wantserver_issigned = wantserver_issigned;
 
 			if(CDATA->wantserver_idfp[0]) // if we know a host key, honor its encryption setting
 			switch(bound(0, d0_rijndael_dll ? crypto_aeslevel.integer : 0, 3))
@@ -2279,7 +2311,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 				default: // dummy, never happens, but to make gcc happy...
 				case 0:
 					if(wantserver_aeslevel >= 3)
-						return Crypto_ServerError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)", NULL);
+						return Crypto_ClientError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)");
 					CDATA->wantserver_aes = false;
 					break;
 				case 1:
@@ -2290,7 +2322,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 					break;
 				case 3:
 					if(wantserver_aeslevel <= 0)
-						return Crypto_ServerError(data_out, len_out, "This server requires encryption to be supported (crypto_aeslevel >= 1, and d0_rijndael library must be present)", NULL);
+						return Crypto_ClientError(data_out, len_out, "This server requires encryption to be supported (crypto_aeslevel >= 1, and d0_rijndael library must be present)");
 					CDATA->wantserver_aes = true;
 					break;
 			}
@@ -2306,6 +2338,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 				// I am the client, and my key is ok... so let's set client_keyfp and client_idfp
 				strlcpy(crypto->client_keyfp, pubkeys_fp64[CDATA->c], sizeof(crypto->client_keyfp));
 				strlcpy(crypto->client_idfp, pubkeys_priv_fp64[CDATA->c], sizeof(crypto->client_idfp));
+				crypto->client_issigned = pubkeys_havesig[CDATA->c];
 			}
 
 			if(serverid >= 0)
@@ -2325,7 +2358,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 				CDATA->next_step = 1;
 				*len_out = data_out_p - data_out;
 			}
-			else if(clientid >= 0)
+			else // if(clientid >= 0) // guaranteed by condition one level outside
 			{
 				// skip over server auth, perform client auth only
 				if(!CDATA->id)
@@ -2349,9 +2382,6 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 				data_out_p += *len_out;
 				*len_out = data_out_p - data_out;
 			}
-			else
-				*len_out = data_out_p - data_out;
-
 			return CRYPTO_DISCARD;
 		}
 		else
@@ -2359,7 +2389,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 			if(wantserver_idfp[0]) // if we know a host key, honor its encryption setting
 			if(wantserver_aeslevel >= 3)
 				return Crypto_ClientError(data_out, len_out, "Server insists on encryption, but neither can authenticate to the other");
-			return (d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ServerError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)", NULL) :
+			return (d0_rijndael_dll && crypto_aeslevel.integer >= 3) ? Crypto_ClientError(data_out, len_out, "This server requires encryption to be not required (crypto_aeslevel <= 2)") :
 				CRYPTO_NOMATCH;
 		}
 	}
@@ -2367,6 +2397,11 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 	{
 		const char *cnt;
 		int id;
+
+		// Must check the source IP here, if we want to prevent other servers' replies from falsely advancing the crypto state, preventing successful connect to the real server.
+		if (net_sourceaddresscheck.integer && LHNETADDRESS_Compare(peeraddress, &cls.connect_address))
+			return Crypto_SoftClientError(data_out, len_out, "d0pk\\ message from wrong server");
+
 		cnt = InfoString_GetValue(string + 4, "id", infostringvalue, sizeof(infostringvalue));
 		id = (cnt ? atoi(cnt) : -1);
 		cnt = InfoString_GetValue(string + 4, "cnt", infostringvalue, sizeof(infostringvalue));
@@ -2380,7 +2415,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 		{
 			if(id >= 0)
 				if(CDATA->cdata_id != id)
-					return Crypto_SoftServerError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
+					return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
 			if(CDATA->next_step != 1)
 				return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\cnt\\%s when expecting %d", cnt, CDATA->next_step));
 
@@ -2429,7 +2464,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 
 			if(id >= 0)
 				if(CDATA->cdata_id != id)
-					return Crypto_SoftServerError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
+					return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
 			if(CDATA->next_step != 3)
 				return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\cnt\\%s when expecting %d", cnt, CDATA->next_step));
 
@@ -2440,10 +2475,15 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 				CLEAR_CDATA;
 				return Crypto_ClientError(data_out, len_out, "d0_blind_id_authenticate_with_private_id_verify failed (server authentication error)");
 			}
-			if(status)
-				strlcpy(crypto->server_keyfp, pubkeys_fp64[CDATA->s], sizeof(crypto->server_keyfp));
-			else
-				crypto->server_keyfp[0] = 0;
+
+			strlcpy(crypto->server_keyfp, pubkeys_fp64[CDATA->s], sizeof(crypto->server_keyfp));
+			if (!status && CDATA->wantserver_issigned)
+			{
+				CLEAR_CDATA;
+				return Crypto_ClientError(data_out, len_out, "Stored host key requires a valid signature, but server did not provide any");
+			}
+			crypto->server_issigned = status;
+
 			memset(crypto->server_idfp, 0, sizeof(crypto->server_idfp));
 			fpbuflen = FP64_SIZE;
 			if(!qd0_blind_id_fingerprint64_public_id(CDATA->id, crypto->server_idfp, &fpbuflen))
@@ -2465,7 +2505,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 			}
 
 			// cache the server key
-			Crypto_StoreHostKey(&cls.connect_address, va(vabuf, sizeof(vabuf), "%d %s@%s", crypto->use_aes ? 1 : 0, crypto->server_idfp, pubkeys_fp64[CDATA->s]), false);
+			Crypto_StoreHostKey(&cls.connect_address, va(vabuf, sizeof(vabuf), "%d %s@%s%s", crypto->use_aes ? 1 : 0, crypto->server_idfp, crypto->server_issigned ? "" : "~", pubkeys_fp64[CDATA->s]), false);
 
 			if(CDATA->c >= 0)
 			{
@@ -2506,7 +2546,7 @@ int Crypto_ClientParsePacket(const char *data_in, size_t len_in, char *data_out,
 
 			if(id >= 0)
 				if(CDATA->cdata_id != id)
-					return Crypto_SoftServerError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
+					return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\id\\%d when expecting %d", id, CDATA->cdata_id));
 			if(CDATA->next_step != 5)
 				return Crypto_SoftClientError(data_out, len_out, va(vabuf, sizeof(vabuf), "Got d0pk\\cnt\\%s when expecting %d", cnt, CDATA->next_step));
 

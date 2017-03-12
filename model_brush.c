@@ -42,6 +42,7 @@ cvar_t r_trippy = {0, "r_trippy", "0", "easter egg"};
 cvar_t r_fxaa = {CVAR_SAVE, "r_fxaa", "0", "fast approximate anti aliasing"};
 cvar_t mod_noshader_default_offsetmapping = {CVAR_SAVE, "mod_noshader_default_offsetmapping", "1", "use offsetmapping by default on all surfaces that are not using q3 shader files"};
 cvar_t mod_obj_orientation = {0, "mod_obj_orientation", "1", "fix orientation of OBJ models to the usual conventions (if zero, use coordinates as is)"};
+cvar_t mod_q2bsp_littransparentsurfaces = {0, "mod_q2bsp_littransparentsurfaces", "0", "allows lighting on rain in 3v3gloom3 and other cases of transparent surfaces that have lightmaps that were ignored by quake2"};
 cvar_t mod_q3bsp_curves_collisions = {0, "mod_q3bsp_curves_collisions", "1", "enables collisions with curves (SLOW)"};
 cvar_t mod_q3bsp_curves_collisions_stride = {0, "mod_q3bsp_curves_collisions_stride", "16", "collisions against curves: optimize performance by doing a combined collision check for this triangle amount first (-1 avoids any box tests)"};
 cvar_t mod_q3bsp_curves_stride = {0, "mod_q3bsp_curves_stride", "16", "particle effect collisions against curves: optimize performance by doing a combined collision check for this triangle amount first (-1 avoids any box tests)"};
@@ -69,6 +70,8 @@ static texture_t mod_q1bsp_texture_lava;
 static texture_t mod_q1bsp_texture_slime;
 static texture_t mod_q1bsp_texture_water;
 
+static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end);
+
 void Mod_BrushInit(void)
 {
 //	Cvar_RegisterVariable(&r_subdivide_size);
@@ -87,6 +90,7 @@ void Mod_BrushInit(void)
 	Cvar_RegisterVariable(&r_fxaa);
 	Cvar_RegisterVariable(&mod_noshader_default_offsetmapping);
 	Cvar_RegisterVariable(&mod_obj_orientation);
+	Cvar_RegisterVariable(&mod_q2bsp_littransparentsurfaces);
 	Cvar_RegisterVariable(&mod_q3bsp_curves_collisions);
 	Cvar_RegisterVariable(&mod_q3bsp_curves_collisions_stride);
 	Cvar_RegisterVariable(&mod_q3bsp_curves_stride);
@@ -693,7 +697,6 @@ RecursiveHullCheckTraceInfo_t;
 #define HULLCHECKSTATE_SOLID 1
 #define HULLCHECKSTATE_DONE 2
 
-extern cvar_t collision_prefernudgedfraction;
 static int Mod_Q1BSP_RecursiveHullCheck(RecursiveHullCheckTraceInfo_t *t, int num, double p1f, double p2f, double p1[3], double p2[3])
 {
 	// status variables, these don't need to be saved on the stack when
@@ -705,156 +708,151 @@ static int Mod_Q1BSP_RecursiveHullCheck(RecursiveHullCheckTraceInfo_t *t, int nu
 
 	// variables that need to be stored on the stack when recursing
 	mclipnode_t *node;
-	int side;
+	int p1side, p2side;
 	double midf, mid[3];
 
-	// LordHavoc: a goto!  everyone flee in terror... :)
-loc0:
+	// keep looping until we hit a leaf
+	while (num >= 0)
+	{
+		// find the point distances
+		node = t->hull->clipnodes + num;
+		plane = t->hull->planes + node->planenum;
+
+		// axial planes can be calculated more quickly without the DotProduct
+		if (plane->type < 3)
+		{
+			t1 = p1[plane->type] - plane->dist;
+			t2 = p2[plane->type] - plane->dist;
+		}
+		else
+		{
+			t1 = DotProduct (plane->normal, p1) - plane->dist;
+			t2 = DotProduct (plane->normal, p2) - plane->dist;
+		}
+
+		// negative plane distances indicate children[1] (behind plane)
+		p1side = t1 < 0;
+		p2side = t2 < 0;
+
+		// if the line starts and ends on the same side of the plane, recurse
+		// into that child instantly
+		if (p1side == p2side)
+		{
+#if COLLISIONPARANOID >= 3
+			if (p1side)
+				Con_Print("<");
+			else
+				Con_Print(">");
+#endif
+			// loop back and process the start child
+			num = node->children[p1side];
+		}
+		else
+		{
+			// find the midpoint where the line crosses the plane, use the
+			// original line for best accuracy
+#if COLLISIONPARANOID >= 3
+			Con_Print("M");
+#endif
+			if (plane->type < 3)
+			{
+				t1 = t->start[plane->type] - plane->dist;
+				t2 = t->end[plane->type] - plane->dist;
+			}
+			else
+			{
+				t1 = DotProduct (plane->normal, t->start) - plane->dist;
+				t2 = DotProduct (plane->normal, t->end) - plane->dist;
+			}
+			midf = t1 / (t1 - t2);
+			midf = bound(p1f, midf, p2f);
+			VectorMA(t->start, midf, t->dist, mid);
+
+			// we now have a mid point, essentially splitting the line into
+			// the segments in the near child and the far child, we can now
+			// recurse those in order and get their results
+
+			// recurse both sides, front side first
+			ret = Mod_Q1BSP_RecursiveHullCheck(t, node->children[p1side], p1f, midf, p1, mid);
+			// if this side is not empty, return what it is (solid or done)
+			if (ret != HULLCHECKSTATE_EMPTY)
+				return ret;
+
+			ret = Mod_Q1BSP_RecursiveHullCheck(t, node->children[p2side], midf, p2f, mid, p2);
+			// if other side is not solid, return what it is (empty or done)
+			if (ret != HULLCHECKSTATE_SOLID)
+				return ret;
+
+			// front is air and back is solid, this is the impact point...
+
+			// copy the plane information, flipping it if needed
+			if (p1side)
+			{
+				t->trace->plane.dist = -plane->dist;
+				VectorNegate (plane->normal, t->trace->plane.normal);
+			}
+			else
+			{
+				t->trace->plane.dist = plane->dist;
+				VectorCopy (plane->normal, t->trace->plane.normal);
+			}
+
+			// calculate the return fraction which is nudged off the surface a bit
+			t1 = DotProduct(t->trace->plane.normal, t->start) - t->trace->plane.dist;
+			t2 = DotProduct(t->trace->plane.normal, t->end) - t->trace->plane.dist;
+			midf = (t1 - collision_impactnudge.value) / (t1 - t2);
+			t->trace->fraction = bound(0, midf, 1);
+
+#if COLLISIONPARANOID >= 3
+			Con_Print("D");
+#endif
+			return HULLCHECKSTATE_DONE;
+		}
+	}
+
+	// we reached a leaf contents
+
 	// check for empty
-	if (num < 0)
+	num = Mod_Q1BSP_SuperContentsFromNativeContents(NULL, num);
+	if (!t->trace->startfound)
 	{
-		num = Mod_Q1BSP_SuperContentsFromNativeContents(NULL, num);
-		if (!t->trace->startfound)
-		{
-			t->trace->startfound = true;
-			t->trace->startsupercontents |= num;
-		}
-		if (num & SUPERCONTENTS_LIQUIDSMASK)
-			t->trace->inwater = true;
-		if (num == 0)
-			t->trace->inopen = true;
-		if (num & SUPERCONTENTS_SOLID)
-			t->trace->hittexture = &mod_q1bsp_texture_solid;
-		else if (num & SUPERCONTENTS_SKY)
-			t->trace->hittexture = &mod_q1bsp_texture_sky;
-		else if (num & SUPERCONTENTS_LAVA)
-			t->trace->hittexture = &mod_q1bsp_texture_lava;
-		else if (num & SUPERCONTENTS_SLIME)
-			t->trace->hittexture = &mod_q1bsp_texture_slime;
-		else
-			t->trace->hittexture = &mod_q1bsp_texture_water;
-		t->trace->hitq3surfaceflags = t->trace->hittexture->surfaceflags;
-		t->trace->hitsupercontents = num;
-		if (num & t->trace->hitsupercontentsmask)
-		{
-			// if the first leaf is solid, set startsolid
-			if (t->trace->allsolid)
-				t->trace->startsolid = true;
-#if COLLISIONPARANOID >= 3
-			Con_Print("S");
-#endif
-			return HULLCHECKSTATE_SOLID;
-		}
-		else
-		{
-			t->trace->allsolid = false;
-#if COLLISIONPARANOID >= 3
-			Con_Print("E");
-#endif
-			return HULLCHECKSTATE_EMPTY;
-		}
+		t->trace->startfound = true;
+		t->trace->startsupercontents |= num;
 	}
-
-	// find the point distances
-	node = t->hull->clipnodes + num;
-
-	plane = t->hull->planes + node->planenum;
-	if (plane->type < 3)
+	if (num & SUPERCONTENTS_LIQUIDSMASK)
+		t->trace->inwater = true;
+	if (num == 0)
+		t->trace->inopen = true;
+	if (num & SUPERCONTENTS_SOLID)
+		t->trace->hittexture = &mod_q1bsp_texture_solid;
+	else if (num & SUPERCONTENTS_SKY)
+		t->trace->hittexture = &mod_q1bsp_texture_sky;
+	else if (num & SUPERCONTENTS_LAVA)
+		t->trace->hittexture = &mod_q1bsp_texture_lava;
+	else if (num & SUPERCONTENTS_SLIME)
+		t->trace->hittexture = &mod_q1bsp_texture_slime;
+	else
+		t->trace->hittexture = &mod_q1bsp_texture_water;
+	t->trace->hitq3surfaceflags = t->trace->hittexture->surfaceflags;
+	t->trace->hitsupercontents = num;
+	if (num & t->trace->hitsupercontentsmask)
 	{
-		t1 = p1[plane->type] - plane->dist;
-		t2 = p2[plane->type] - plane->dist;
+		// if the first leaf is solid, set startsolid
+		if (t->trace->allsolid)
+			t->trace->startsolid = true;
+#if COLLISIONPARANOID >= 3
+		Con_Print("S");
+#endif
+		return HULLCHECKSTATE_SOLID;
 	}
 	else
 	{
-		t1 = DotProduct (plane->normal, p1) - plane->dist;
-		t2 = DotProduct (plane->normal, p2) - plane->dist;
-	}
-
-	if (t1 < 0)
-	{
-		if (t2 < 0)
-		{
+		t->trace->allsolid = false;
 #if COLLISIONPARANOID >= 3
-			Con_Print("<");
+		Con_Print("E");
 #endif
-			num = node->children[1];
-			goto loc0;
-		}
-		side = 1;
+		return HULLCHECKSTATE_EMPTY;
 	}
-	else
-	{
-		if (t2 >= 0)
-		{
-#if COLLISIONPARANOID >= 3
-			Con_Print(">");
-#endif
-			num = node->children[0];
-			goto loc0;
-		}
-		side = 0;
-	}
-
-	// the line intersects, find intersection point
-	// LordHavoc: this uses the original trace for maximum accuracy
-#if COLLISIONPARANOID >= 3
-	Con_Print("M");
-#endif
-	if (plane->type < 3)
-	{
-		t1 = t->start[plane->type] - plane->dist;
-		t2 = t->end[plane->type] - plane->dist;
-	}
-	else
-	{
-		t1 = DotProduct (plane->normal, t->start) - plane->dist;
-		t2 = DotProduct (plane->normal, t->end) - plane->dist;
-	}
-
-	midf = t1 / (t1 - t2);
-	midf = bound(p1f, midf, p2f);
-	VectorMA(t->start, midf, t->dist, mid);
-
-	// recurse both sides, front side first
-	ret = Mod_Q1BSP_RecursiveHullCheck(t, node->children[side], p1f, midf, p1, mid);
-	// if this side is not empty, return what it is (solid or done)
-	if (ret != HULLCHECKSTATE_EMPTY)
-		return ret;
-
-	ret = Mod_Q1BSP_RecursiveHullCheck(t, node->children[side ^ 1], midf, p2f, mid, p2);
-	// if other side is not solid, return what it is (empty or done)
-	if (ret != HULLCHECKSTATE_SOLID)
-		return ret;
-
-	// front is air and back is solid, this is the impact point...
-	if (side)
-	{
-		t->trace->plane.dist = -plane->dist;
-		VectorNegate (plane->normal, t->trace->plane.normal);
-	}
-	else
-	{
-		t->trace->plane.dist = plane->dist;
-		VectorCopy (plane->normal, t->trace->plane.normal);
-	}
-
-	// calculate the true fraction
-	t1 = DotProduct(t->trace->plane.normal, t->start) - t->trace->plane.dist;
-	t2 = DotProduct(t->trace->plane.normal, t->end) - t->trace->plane.dist;
-	midf = t1 / (t1 - t2);
-	t->trace->realfraction = bound(0, midf, 1);
-
-	// calculate the return fraction which is nudged off the surface a bit
-	midf = (t1 - DIST_EPSILON) / (t1 - t2);
-	t->trace->fraction = bound(0, midf, 1);
-
-	if (collision_prefernudgedfraction.integer)
-		t->trace->realfraction = t->trace->fraction;
-
-#if COLLISIONPARANOID >= 3
-	Con_Print("D");
-#endif
-	return HULLCHECKSTATE_DONE;
 }
 
 //#if COLLISIONPARANOID < 2
@@ -889,7 +887,7 @@ static int Mod_Q1BSP_RecursiveHullCheckPoint(RecursiveHullCheckTraceInfo_t *t, i
 }
 //#endif
 
-static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask)
+static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
@@ -897,7 +895,6 @@ static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *fram
 	memset(trace, 0, sizeof(trace_t));
 	rhc.trace = trace;
 	rhc.trace->fraction = 1;
-	rhc.trace->realfraction = 1;
 	rhc.trace->allsolid = true;
 	rhc.hull = &model->brushq1.hulls[0]; // 0x0x0
 	VectorCopy(start, rhc.start);
@@ -905,22 +902,22 @@ static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *fram
 	Mod_Q1BSP_RecursiveHullCheckPoint(&rhc, rhc.hull->firstclipnode);
 }
 
-static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask);
+static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
 
-static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
 	if (VectorCompare(start, end))
 	{
-		Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
 	// sometimes we want to traceline against polygons so we can report the texture that was hit rather than merely a contents, but using this method breaks one of negke's maps so it must be a cvar check...
 	if (sv_gameplayfix_q1bsptracelinereportstexture.integer)
 	{
-		Mod_Q1BSP_TraceLineAgainstSurfaces(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+		Mod_Q1BSP_TraceLineAgainstSurfaces(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
@@ -928,8 +925,8 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 	memset(trace, 0, sizeof(trace_t));
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 	rhc.trace->fraction = 1;
-	rhc.trace->realfraction = 1;
 	rhc.trace->allsolid = true;
 	rhc.hull = &model->brushq1.hulls[0]; // 0x0x0
 	VectorCopy(start, rhc.start);
@@ -946,8 +943,8 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 		memset(&testtrace, 0, sizeof(trace_t));
 		rhc.trace = &testtrace;
 		rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+		rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 		rhc.trace->fraction = 1;
-		rhc.trace->realfraction = 1;
 		rhc.trace->allsolid = true;
 		VectorCopy(test, rhc.start);
 		VectorCopy(test, rhc.end);
@@ -966,7 +963,7 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 #endif
 }
 
-static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask)
+static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	// this function currently only supports same size start and end
 	double boxsize[3];
@@ -975,9 +972,9 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 	if (VectorCompare(boxmins, boxmaxs))
 	{
 		if (VectorCompare(start, end))
-			Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+			Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 		else
-			Mod_Q1BSP_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+			Mod_Q1BSP_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
@@ -985,8 +982,8 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 	memset(trace, 0, sizeof(trace_t));
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 	rhc.trace->fraction = 1;
-	rhc.trace->realfraction = 1;
 	rhc.trace->allsolid = true;
 	VectorSubtract(boxmaxs, boxmins, boxsize);
 	if (boxsize[0] < 3)
@@ -1028,8 +1025,8 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 		memset(&testtrace, 0, sizeof(trace_t));
 		rhc.trace = &testtrace;
 		rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+		rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 		rhc.trace->fraction = 1;
-		rhc.trace->realfraction = 1;
 		rhc.trace->allsolid = true;
 		VectorCopy(test, rhc.start);
 		VectorCopy(test, rhc.end);
@@ -1062,7 +1059,7 @@ static int Mod_Q1BSP_PointSuperContents(struct model_s *model, int frame, const 
 	return Mod_Q1BSP_SuperContentsFromNativeContents(NULL, num);
 }
 
-void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int hitsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
+void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
 {
 #if 1
 	colbrushf_t cbox;
@@ -1097,8 +1094,8 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 	cbox_planes[5].q3surfaceflags = boxq3surfaceflags;cbox_planes[5].texture = boxtexture;
 	memset(trace, 0, sizeof(trace_t));
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	Collision_TraceLineBrushFloat(trace, start, end, &cbox, &cbox);
 #else
 	RecursiveHullCheckTraceInfo_t rhc;
@@ -1155,8 +1152,8 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 	rhc.hull = &box_hull;
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 	rhc.trace->fraction = 1;
-	rhc.trace->realfraction = 1;
 	rhc.trace->allsolid = true;
 	VectorCopy(start, rhc.start);
 	VectorCopy(end, rhc.end);
@@ -1168,15 +1165,16 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 #endif
 }
 
-void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, int hitsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
+void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
 {
 	memset(trace, 0, sizeof(trace_t));
 	trace->fraction = 1;
-	trace->realfraction = 1;
+	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	if (BoxesOverlap(start, start, cmins, cmaxs))
 	{
 		trace->startsupercontents |= boxsupercontents;
-		if (hitsupercontentsmask & boxsupercontents)
+		if ((hitsupercontentsmask & boxsupercontents) && !(skipsupercontentsmask & boxsupercontents))
 		{
 			trace->startsolid = true;
 			trace->allsolid = true;
@@ -1187,7 +1185,7 @@ void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t 
 static qboolean Mod_Q1BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
 {
 	trace_t trace;
-	Mod_Q1BSP_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK);
+	Mod_Q1BSP_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
 	return trace.fraction == 1;
 }
 
@@ -1197,48 +1195,45 @@ static int Mod_Q1BSP_LightPoint_RecursiveBSPNode(dp_model_t *model, vec3_t ambie
 	float front, back;
 	float mid, distz = endz - startz;
 
-loc0:
-	if (!node->plane)
-		return false;		// didn't hit anything
-
-	switch (node->plane->type)
+	while (node->plane)
 	{
-	case PLANE_X:
-		node = node->children[x < node->plane->dist];
-		goto loc0;
-	case PLANE_Y:
-		node = node->children[y < node->plane->dist];
-		goto loc0;
-	case PLANE_Z:
-		side = startz < node->plane->dist;
-		if ((endz < node->plane->dist) == side)
+		switch (node->plane->type)
 		{
-			node = node->children[side];
-			goto loc0;
+		case PLANE_X:
+			node = node->children[x < node->plane->dist];
+			continue; // loop back and process the new node
+		case PLANE_Y:
+			node = node->children[y < node->plane->dist];
+			continue; // loop back and process the new node
+		case PLANE_Z:
+			side = startz < node->plane->dist;
+			if ((endz < node->plane->dist) == side)
+			{
+				node = node->children[side];
+				continue; // loop back and process the new node
+			}
+			// found an intersection
+			mid = node->plane->dist;
+			break;
+		default:
+			back = front = x * node->plane->normal[0] + y * node->plane->normal[1];
+			front += startz * node->plane->normal[2];
+			back += endz * node->plane->normal[2];
+			side = front < node->plane->dist;
+			if ((back < node->plane->dist) == side)
+			{
+				node = node->children[side];
+				continue; // loop back and process the new node
+			}
+			// found an intersection
+			mid = startz + distz * (front - node->plane->dist) / (front - back);
+			break;
 		}
-		// found an intersection
-		mid = node->plane->dist;
-		break;
-	default:
-		back = front = x * node->plane->normal[0] + y * node->plane->normal[1];
-		front += startz * node->plane->normal[2];
-		back += endz * node->plane->normal[2];
-		side = front < node->plane->dist;
-		if ((back < node->plane->dist) == side)
-		{
-			node = node->children[side];
-			goto loc0;
-		}
-		// found an intersection
-		mid = startz + distz * (front - node->plane->dist) / (front - back);
-		break;
-	}
 
-	// go down front side
-	if (node->children[side]->plane && Mod_Q1BSP_LightPoint_RecursiveBSPNode(model, ambientcolor, diffusecolor, diffusenormal, node->children[side], x, y, startz, mid))
-		return true;	// hit something
-	else
-	{
+		// go down front side
+		if (node->children[side]->plane && Mod_Q1BSP_LightPoint_RecursiveBSPNode(model, ambientcolor, diffusecolor, diffusenormal, node->children[side], x, y, startz, mid))
+			return true;	// hit something
+
 		// check for impact on this node
 		if (node->numsurfaces)
 		{
@@ -1263,22 +1258,44 @@ loc0:
 				dt = ((x * surface->lightmapinfo->texinfo->vecs[1][0] + y * surface->lightmapinfo->texinfo->vecs[1][1] + mid * surface->lightmapinfo->texinfo->vecs[1][2] + surface->lightmapinfo->texinfo->vecs[1][3]) - surface->lightmapinfo->texturemins[1]) * 0.0625f;
 
 				// check the bounds
-				dsi = (int)ds;
-				dti = (int)dt;
+				// thanks to jitspoe for pointing out that this int cast was
+				// rounding toward zero, so we floor it
+				dsi = (int)floor(ds);
+				dti = (int)floor(dt);
 				lmwidth = ((surface->lightmapinfo->extents[0]>>4)+1);
 				lmheight = ((surface->lightmapinfo->extents[1]>>4)+1);
 
 				// is it in bounds?
-				if (dsi >= 0 && dsi < lmwidth-1 && dti >= 0 && dti < lmheight-1)
+				// we have to tolerate a position of lmwidth-1 for some rare
+				// cases - in which case the sampling position still gets
+				// clamped but the color gets interpolated to that edge.
+				if (dsi >= 0 && dsi < lmwidth && dti >= 0 && dti < lmheight)
 				{
+					// in the rare cases where we're sampling slightly off
+					// the polygon, clamp the sampling position (we can still
+					// interpolate outside it, where it becomes extrapolation)
+					if (dsi < 0)
+						dsi = 0;
+					if (dti < 0)
+						dti = 0;
+					if (dsi > lmwidth-2)
+						dsi = lmwidth-2;
+					if (dti > lmheight-2)
+						dti = lmheight-2;
+					
 					// calculate bilinear interpolation factors
-					// and also multiply by fixedpoint conversion factors
+					// and also multiply by fixedpoint conversion factors to
+					// compensate for lightmaps being 0-255 (as 0-2), we use
+					// r_refdef.scene.rtlightstylevalue here which is already
+					// 0.000-2.148 range
+					// (if we used r_refdef.scene.lightstylevalue this
+					//  divisor would be 32768 rather than 128)
 					dsfrac = ds - dsi;
 					dtfrac = dt - dti;
-					w00 = (1 - dsfrac) * (1 - dtfrac) * (1.0f / 32768.0f);
-					w01 = (    dsfrac) * (1 - dtfrac) * (1.0f / 32768.0f);
-					w10 = (1 - dsfrac) * (    dtfrac) * (1.0f / 32768.0f);
-					w11 = (    dsfrac) * (    dtfrac) * (1.0f / 32768.0f);
+					w00 = (1 - dsfrac) * (1 - dtfrac) * (1.0f / 128.0f);
+					w01 = (    dsfrac) * (1 - dtfrac) * (1.0f / 128.0f);
+					w10 = (1 - dsfrac) * (    dtfrac) * (1.0f / 128.0f);
+					w11 = (    dsfrac) * (    dtfrac) * (1.0f / 128.0f);
 
 					// values for pointer math
 					line3 = lmwidth * 3; // LordHavoc: *3 for colored lighting
@@ -1290,7 +1307,7 @@ loc0:
 					// bilinear filter each lightmap style, and sum them
 					for (maps = 0;maps < MAXLIGHTMAPS && surface->lightmapinfo->styles[maps] != 255;maps++)
 					{
-						scale = r_refdef.scene.lightstylevalue[surface->lightmapinfo->styles[maps]];
+						scale = r_refdef.scene.rtlightstylevalue[surface->lightmapinfo->styles[maps]];
 						w = w00 * scale;VectorMA(ambientcolor, w, lightmap            , ambientcolor);
 						w = w01 * scale;VectorMA(ambientcolor, w, lightmap + 3        , ambientcolor);
 						w = w10 * scale;VectorMA(ambientcolor, w, lightmap + line3    , ambientcolor);
@@ -1307,8 +1324,11 @@ loc0:
 		node = node->children[side ^ 1];
 		startz = mid;
 		distz = endz - startz;
-		goto loc0;
+		// loop back and process the new node
 	}
+
+	// did not hit anything
+	return false;
 }
 
 static void Mod_Q1BSP_LightPoint(dp_model_t *model, const vec3_t p, vec3_t ambientcolor, vec3_t diffusecolor, vec3_t diffusenormal)
@@ -1352,6 +1372,9 @@ static const texture_t *Mod_Q1BSP_TraceLineAgainstSurfacesFindTextureOnNode(Recu
 		// skip faces with contents we don't care about
 		if (!(t->trace->hitsupercontentsmask & surface->texture->supercontents))
 			continue;
+		// ignore surfaces matching the skipsupercontentsmask (this is rare)
+		if (t->trace->skipsupercontentsmask & surface->texture->supercontents)
+			continue;
 		// get the surface normal - since it is flat we know any vertex normal will suffice
 		VectorCopy(model->surfmesh.data_normal3f + 3 * surface->num_firstvertex, normal);
 		// skip backfaces
@@ -1375,18 +1398,11 @@ static const texture_t *Mod_Q1BSP_TraceLineAgainstSurfacesFindTextureOnNode(Recu
 		VectorCopy(normal, t->trace->plane.normal);
 		t->trace->plane.dist = DotProduct(normal, p);
 
-		// calculate the true fraction
+		// calculate the return fraction which is nudged off the surface a bit
 		t1 = DotProduct(t->start, t->trace->plane.normal) - t->trace->plane.dist;
 		t2 = DotProduct(t->end, t->trace->plane.normal) - t->trace->plane.dist;
-		midf = t1 / (t1 - t2);
-		t->trace->realfraction = midf;
-
-		// calculate the return fraction which is nudged off the surface a bit
-		midf = (t1 - DIST_EPSILON) / (t1 - t2);
+		midf = (t1 - collision_impactnudge.value) / (t1 - t2);
 		t->trace->fraction = bound(0, midf, 1);
-
-		if (collision_prefernudgedfraction.integer)
-			t->trace->realfraction = t->trace->fraction;
 
 		t->trace->hittexture = surface->texture->currentframe;
 		t->trace->hitq3surfaceflags = t->trace->hittexture->surfaceflags;
@@ -1489,7 +1505,7 @@ static int Mod_Q1BSP_TraceLineAgainstSurfacesRecursiveBSPNode(RecursiveHullCheck
 	}
 }
 
-static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
@@ -1497,8 +1513,8 @@ static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const fram
 	memset(trace, 0, sizeof(trace_t));
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
+	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
 	rhc.trace->fraction = 1;
-	rhc.trace->realfraction = 1;
 	rhc.trace->allsolid = true;
 	rhc.hull = &model->brushq1.hulls[0]; // 0x0x0
 	VectorCopy(start, rhc.start);
@@ -1657,6 +1673,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		strlcpy(tx->name, "NO TEXTURE FOUND", sizeof(tx->name));
 		tx->width = 16;
 		tx->height = 16;
+		tx->basealpha = 1.0f;
 		if (cls.state != ca_dedicated)
 		{
 			tx->numskinframes = 1;
@@ -1729,7 +1746,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 			name[j] = MSG_ReadByte(&miptexsb);
 		name[j] = 0;
 		// pretty up the buffer (replacing any trailing garbage with 0)
-		for (j = strlen(name);j < 16;j++)
+		for (j = (int)strlen(name);j < 16;j++)
 			name[j] = 0;
 
 		if (!name[0])
@@ -1771,6 +1788,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		strlcpy(tx->name, name, sizeof(tx->name));
 		tx->width = mtwidth;
 		tx->height = mtheight;
+		tx->basealpha = 1.0f;
 
 		if (tx->name[0] == '*')
 		{
@@ -1876,6 +1894,10 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 			if (tx->skinframes[0] && tx->skinframes[0]->hasalpha)
 				tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
 		}
+		else if (tx->name[0] == '{') // fence textures
+		{
+			tx->basematerialflags |= MATERIALFLAG_ALPHATEST | MATERIALFLAG_NOSHADOW;
+		}
 		else if (!strncmp(tx->name, "mirror", 6)) // Tenebrae
 		{
 			// replace the texture with black
@@ -1900,6 +1922,12 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		tx = loadmodel->data_textures + i;
 		if (!tx || tx->name[0] != '+' || tx->name[1] == 0 || tx->name[2] == 0)
 			continue;
+		num = tx->name[1];
+		if ((num < '0' || num > '9') && (num < 'a' || num > 'j'))
+		{
+			Con_Printf("Bad animating texture %s\n", tx->name);
+			continue;
+		}
 		if (tx->anim_total[0] || tx->anim_total[1])
 			continue;	// already sequenced
 
@@ -1918,8 +1946,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 				anims[num - '0'] = tx2;
 			else if (num >= 'a' && num <= 'j')
 				altanims[num - 'a'] = tx2;
-			else
-				Con_Printf("Bad animating texture %s\n", tx->name);
+			// No need to warn otherwise - we already did above.
 		}
 
 		max = altmax = 0;
@@ -1952,6 +1979,12 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		if (incomplete)
 			continue;
 
+		// If we have exactly one frame, something's wrong.
+		if (max + altmax <= 1)
+		{
+			Con_Printf("Texture %s is animated (leading +) but has only one frame\n", tx->name);
+		}
+
 		if (altmax < 1)
 		{
 			// if there is no alternate animation, duplicate the primary
@@ -1961,11 +1994,23 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 				altanims[k] = anims[k];
 		}
 
+		if (max < 1)
+		{
+			// Warn.
+			Con_Printf("Missing frame 0 of %s\n", tx->name);
+
+			// however, we can handle this by duplicating the alternate animation into the primary
+			max = altmax;
+			for (k = 0;k < 10;k++)
+				anims[k] = altanims[k];
+		}
+
+
 		// link together the primary animation
 		for (j = 0;j < max;j++)
 		{
 			tx2 = anims[j];
-			tx2->animated = true;
+			tx2->animated = 1; // q1bsp
 			tx2->anim_total[0] = max;
 			tx2->anim_total[1] = altmax;
 			for (k = 0;k < 10;k++)
@@ -1982,7 +2027,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 			for (j = 0;j < altmax;j++)
 			{
 				tx2 = altanims[j];
-				tx2->animated = true;
+				tx2->animated = 1; // q1bsp
 				// the primary/alternate are reversed here
 				tx2->anim_total[0] = altmax;
 				tx2->anim_total[1] = max;
@@ -2125,7 +2170,7 @@ static void Mod_Q1BSP_ParseWadsFromEntityLump(const char *data)
 				for (i = 0;i < (int)sizeof(value);i++)
 					if (value[i] != ';' && value[i] != '\\' && value[i] != '/' && value[i] != ':')
 						break;
-				if (value[i])
+				if (i < (int)sizeof(value) && value[i])
 				{
 					for (;i < (int)sizeof(value);i++)
 					{
@@ -2165,7 +2210,7 @@ static void Mod_Q1BSP_LoadVertexes(sizebuf_t *sb)
 {
 	mvertex_t	*out;
 	int			i, count;
-	size_t		structsize = 12;
+	int			structsize = 12;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadVertexes: funny lump size in %s",loadmodel->name);
@@ -2187,7 +2232,7 @@ static void Mod_Q1BSP_LoadSubmodels(sizebuf_t *sb, hullinfo_t *hullinfo)
 {
 	mmodel_t	*out;
 	int			i, j, count;
-	size_t structsize = (48+4*hullinfo->filehulls);
+	int			structsize = (48+4*hullinfo->filehulls);
 
 	if (sb->cursize % structsize)
 		Host_Error ("Mod_Q1BSP_LoadSubmodels: funny lump size in %s", loadmodel->name);
@@ -2222,7 +2267,7 @@ static void Mod_Q1BSP_LoadEdges(sizebuf_t *sb)
 {
 	medge_t *out;
 	int 	i, count;
-	size_t	structsize = loadmodel->brush.isbsp2 ? 8 : 4;
+	int		structsize = loadmodel->brush.isbsp2 ? 8 : 4;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadEdges: funny lump size in %s",loadmodel->name);
@@ -2260,7 +2305,7 @@ static void Mod_Q1BSP_LoadTexinfo(sizebuf_t *sb)
 {
 	mtexinfo_t *out;
 	int i, j, k, count, miptex;
-	size_t structsize = 40;
+	int structsize = 40;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadTexinfo: funny lump size in %s",loadmodel->name);
@@ -2277,28 +2322,26 @@ static void Mod_Q1BSP_LoadTexinfo(sizebuf_t *sb)
 				out->vecs[k][j] = MSG_ReadLittleFloat(sb);
 
 		miptex = MSG_ReadLittleLong(sb);
-		out->flags = MSG_ReadLittleLong(sb);
+		out->q1flags = MSG_ReadLittleLong(sb);
 
-		out->texture = NULL;
+		if (out->q1flags & TEX_SPECIAL)
+		{
+			// if texture chosen is NULL or the shader needs a lightmap,
+			// force to notexture water shader
+			out->textureindex = loadmodel->num_textures - 1;
+		}
+		else
+		{
+			// if texture chosen is NULL, force to notexture
+			out->textureindex = loadmodel->num_textures - 2;
+		}
+		// see if the specified miptex is valid and try to use it instead
 		if (loadmodel->data_textures)
 		{
 			if ((unsigned int) miptex >= (unsigned int) loadmodel->num_textures)
 				Con_Printf("error in model \"%s\": invalid miptex index %i(of %i)\n", loadmodel->name, miptex, loadmodel->num_textures);
 			else
-				out->texture = loadmodel->data_textures + miptex;
-		}
-		if (out->flags & TEX_SPECIAL)
-		{
-			// if texture chosen is NULL or the shader needs a lightmap,
-			// force to notexture water shader
-			if (out->texture == NULL)
-				out->texture = loadmodel->data_textures + (loadmodel->num_textures - 1);
-		}
-		else
-		{
-			// if texture chosen is NULL, force to notexture
-			if (out->texture == NULL)
-				out->texture = loadmodel->data_textures + (loadmodel->num_textures - 2);
+				out->textureindex = miptex;
 		}
 	}
 }
@@ -2463,7 +2506,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 	float texmins[2], texmaxs[2], val;
 	rtexture_t *lightmaptexture, *deluxemaptexture;
 	char vabuf[1024];
-	size_t structsize = loadmodel->brush.isbsp2 ? 28 : 20;
+	int structsize = loadmodel->brush.isbsp2 ? 28 : 20;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadFaces: funny lump size in %s",loadmodel->name);
@@ -2501,6 +2544,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 	for (surfacenum = 0, surface = loadmodel->data_surfaces;surfacenum < count;surfacenum++, surface++)
 	{
 		surface->lightmapinfo = loadmodel->data_surfaces_lightmapinfo + surfacenum;
+		// the struct on disk is the same in BSP29 (Q1), BSP30 (HL1), and IBSP38 (Q2)
 		planenum = loadmodel->brush.isbsp2 ? MSG_ReadLittleLong(sb) : (unsigned short)MSG_ReadLittleShort(sb);
 		/*side = */loadmodel->brush.isbsp2 ? MSG_ReadLittleLong(sb) : (unsigned short)MSG_ReadLittleShort(sb);
 		firstedge = MSG_ReadLittleLong(sb);
@@ -2519,7 +2563,11 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 			Host_Error("Mod_Q1BSP_LoadFaces: invalid plane index %i (model has %i planes)", planenum, loadmodel->brush.num_planes);
 
 		surface->lightmapinfo->texinfo = loadmodel->brushq1.texinfo + texinfoindex;
-		surface->texture = surface->lightmapinfo->texinfo->texture;
+		surface->texture = loadmodel->data_textures + surface->lightmapinfo->texinfo->textureindex;
+
+		// Q2BSP doesn't use lightmaps on sky or warped surfaces (water), but still has a lightofs of 0
+		if (lightmapoffset == 0 && (surface->texture->q2flags & (Q2SURF_SKY | Q2SURF_WARP)))
+			lightmapoffset = -1;
 
 		//surface->flags = surface->texture->flags;
 		//if (LittleShort(in->side))
@@ -2595,7 +2643,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 			surface->lightmapinfo->samples = NULL;
 #if 1
 			// give non-lightmapped water a 1x white lightmap
-			if (surface->texture->name[0] == '*' && (surface->lightmapinfo->texinfo->flags & TEX_SPECIAL) && ssize <= 256 && tsize <= 256)
+			if (!loadmodel->brush.isq2bsp && surface->texture->name[0] == '*' && (surface->lightmapinfo->texinfo->q1flags & TEX_SPECIAL) && ssize <= 256 && tsize <= 256)
 			{
 				surface->lightmapinfo->samples = (unsigned char *)Mem_Alloc(loadmodel->mempool, ssize * tsize * 3);
 				surface->lightmapinfo->styles[0] = 0;
@@ -2603,7 +2651,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 			}
 #endif
 		}
-		else if (loadmodel->brush.ishlbsp) // LordHavoc: HalfLife map (bsp version 30)
+		else if (loadmodel->brush.ishlbsp || loadmodel->brush.isq2bsp) // LordHavoc: HalfLife map (bsp version 30)
 			surface->lightmapinfo->samples = loadmodel->brushq1.lightdata + lightmapoffset;
 		else // LordHavoc: white lighting (bsp version 29)
 		{
@@ -2613,7 +2661,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 		}
 
 		// check if we should apply a lightmap to this
-		if (!(surface->lightmapinfo->texinfo->flags & TEX_SPECIAL) || surface->lightmapinfo->samples)
+		if (!(surface->lightmapinfo->texinfo->q1flags & TEX_SPECIAL) || surface->lightmapinfo->samples)
 		{
 			if (ssize > 256 || tsize > 256)
 				Host_Error("Bad surface extents");
@@ -2654,7 +2702,7 @@ static void Mod_Q1BSP_LoadFaces(sizebuf_t *sb)
 		Mod_AllocLightmap_Init(&allocState, lightmapsize, lightmapsize);
 		for (surfacenum = 0, surface = loadmodel->data_surfaces;surfacenum < count;surfacenum++, surface++)
 		{
-			int i, iu, iv, lightmapx = 0, lightmapy = 0;
+			int iu, iv, lightmapx = 0, lightmapy = 0;
 			float u, v, ubase, vbase, uscale, vscale;
 
 			if (!loadmodel->brushq1.lightmapupdateflags[surfacenum])
@@ -2771,7 +2819,7 @@ static void Mod_Q1BSP_LoadNodes(sizebuf_t *sb)
 {
 	int			i, j, count, p, child[2];
 	mnode_t 	*out;
-	size_t structsize = loadmodel->brush.isbsp2rmqe ? 32 : (loadmodel->brush.isbsp2 ? 44 : 24);
+	int structsize = loadmodel->brush.isbsp2rmqe ? 32 : (loadmodel->brush.isbsp2 ? 44 : 24);
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadNodes: funny lump size in %s",loadmodel->name);
@@ -2875,7 +2923,7 @@ static void Mod_Q1BSP_LoadLeafs(sizebuf_t *sb)
 {
 	mleaf_t *out;
 	int i, j, count, p, firstmarksurface, nummarksurfaces;
-	size_t structsize = loadmodel->brush.isbsp2rmqe ? 32 : (loadmodel->brush.isbsp2 ? 44 : 28);
+	int structsize = loadmodel->brush.isbsp2rmqe ? 32 : (loadmodel->brush.isbsp2 ? 44 : 28);
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadLeafs: funny lump size in %s",loadmodel->name);
@@ -2991,7 +3039,7 @@ static void Mod_Q1BSP_LoadClipnodes(sizebuf_t *sb, hullinfo_t *hullinfo)
 	mclipnode_t *out;
 	int			i, count;
 	hull_t		*hull;
-	size_t structsize = loadmodel->brush.isbsp2 ? 12 : 8;
+	int structsize = loadmodel->brush.isbsp2 ? 12 : 8;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadClipnodes: funny lump size in %s",loadmodel->name);
@@ -3073,7 +3121,7 @@ static void Mod_Q1BSP_MakeHull0(void)
 static void Mod_Q1BSP_LoadLeaffaces(sizebuf_t *sb)
 {
 	int i, j;
-	size_t structsize = loadmodel->brush.isbsp2 ? 4 : 2;
+	int structsize = loadmodel->brush.isbsp2 ? 4 : 2;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadLeaffaces: funny lump size in %s",loadmodel->name);
@@ -3105,7 +3153,7 @@ static void Mod_Q1BSP_LoadLeaffaces(sizebuf_t *sb)
 static void Mod_Q1BSP_LoadSurfedges(sizebuf_t *sb)
 {
 	int		i;
-	size_t structsize = 4;
+	int structsize = 4;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadSurfedges: funny lump size in %s",loadmodel->name);
@@ -3121,7 +3169,7 @@ static void Mod_Q1BSP_LoadPlanes(sizebuf_t *sb)
 {
 	int			i;
 	mplane_t	*out;
-	size_t structsize = 20;
+	int structsize = 20;
 
 	if (sb->cursize % structsize)
 		Host_Error("Mod_Q1BSP_LoadPlanes: funny lump size in %s", loadmodel->name);
@@ -3271,7 +3319,7 @@ static void Mod_Q1BSP_RecursiveRecalcNodeBBox(mnode_t *node)
 
 static void Mod_Q1BSP_FinalizePortals(void)
 {
-	int i, j, numportals, numpoints, portalindex, portalrange = Mem_ExpandableArray_IndexRange(&portalarray);
+	int i, j, numportals, numpoints, portalindex, portalrange = (int)Mem_ExpandableArray_IndexRange(&portalarray);
 	portal_t *p;
 	mportal_t *portal;
 	mvertex_t *point;
@@ -3753,7 +3801,7 @@ static int Mod_Q1BSP_CreateShadowMesh(dp_model_t *mod)
 	return numshadowmeshtriangles;
 }
 
-void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask);
+void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
 
 void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 {
@@ -3772,8 +3820,12 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 
 	mod->type = mod_brushq1;
 
-	mod->brush.isbsp2 = false;
 	mod->brush.ishlbsp = false;
+	mod->brush.isbsp2rmqe = false;
+	mod->brush.isbsp2 = false;
+	mod->brush.isq2bsp = false;
+	mod->brush.isq3bsp = false;
+	mod->brush.skymasking = true;
 	i = MSG_ReadLittleLong(&sb);
 	switch(i)
 	{
@@ -3902,6 +3954,7 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	// check if the map supports transparent water rendering
 	loadmodel->brush.supportwateralpha = Mod_Q1BSP_CheckWaterAlphaSupport();
 
+	// we don't need the compressed pvs data anymore
 	if (mod->brushq1.data_compressedpvs)
 		Mem_Free(mod->brushq1.data_compressedpvs);
 	mod->brushq1.data_compressedpvs = NULL;
@@ -4116,438 +4169,975 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	Con_DPrintf("Stats for q1bsp model \"%s\": %i faces, %i nodes, %i leafs, %i visleafs, %i visleafportals, mesh: %i vertices, %i triangles, %i surfaces\n", loadmodel->name, loadmodel->num_surfaces, loadmodel->brush.num_nodes, loadmodel->brush.num_leafs, mod->brush.num_pvsclusters, loadmodel->brush.num_portals, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->num_surfaces);
 }
 
-static void Mod_Q2BSP_LoadEntities(lump_t *l)
+int Mod_Q2BSP_SuperContentsFromNativeContents(dp_model_t *model, int nativecontents)
 {
+	int supercontents = 0;
+	if (nativecontents & CONTENTSQ2_SOLID)
+		supercontents |= SUPERCONTENTS_SOLID;
+	if (nativecontents & CONTENTSQ2_WATER)
+		supercontents |= SUPERCONTENTS_WATER;
+	if (nativecontents & CONTENTSQ2_SLIME)
+		supercontents |= SUPERCONTENTS_SLIME;
+	if (nativecontents & CONTENTSQ2_LAVA)
+		supercontents |= SUPERCONTENTS_LAVA;
+	if (nativecontents & CONTENTSQ2_MONSTER)
+		supercontents |= SUPERCONTENTS_BODY;
+	if (nativecontents & CONTENTSQ2_DEADMONSTER)
+		supercontents |= SUPERCONTENTS_CORPSE;
+	if (nativecontents & CONTENTSQ2_PLAYERCLIP)
+		supercontents |= SUPERCONTENTS_PLAYERCLIP;
+	if (nativecontents & CONTENTSQ2_MONSTERCLIP)
+		supercontents |= SUPERCONTENTS_MONSTERCLIP;
+	if (!(nativecontents & CONTENTSQ2_TRANSLUCENT))
+		supercontents |= SUPERCONTENTS_OPAQUE;
+	return supercontents;
 }
 
-static void Mod_Q2BSP_LoadPlanes(lump_t *l)
+int Mod_Q2BSP_NativeContentsFromSuperContents(dp_model_t *model, int supercontents)
 {
-/*
-	d_t *in;
-	m_t *out;
+	int nativecontents = 0;
+	if (supercontents & SUPERCONTENTS_SOLID)
+		nativecontents |= CONTENTSQ2_SOLID;
+	if (supercontents & SUPERCONTENTS_WATER)
+		nativecontents |= CONTENTSQ2_WATER;
+	if (supercontents & SUPERCONTENTS_SLIME)
+		nativecontents |= CONTENTSQ2_SLIME;
+	if (supercontents & SUPERCONTENTS_LAVA)
+		nativecontents |= CONTENTSQ2_LAVA;
+	if (supercontents & SUPERCONTENTS_BODY)
+		nativecontents |= CONTENTSQ2_MONSTER;
+	if (supercontents & SUPERCONTENTS_CORPSE)
+		nativecontents |= CONTENTSQ2_DEADMONSTER;
+	if (supercontents & SUPERCONTENTS_PLAYERCLIP)
+		nativecontents |= CONTENTSQ2_PLAYERCLIP;
+	if (supercontents & SUPERCONTENTS_MONSTERCLIP)
+		nativecontents |= CONTENTSQ2_MONSTERCLIP;
+	if (!(supercontents & SUPERCONTENTS_OPAQUE))
+		nativecontents |= CONTENTSQ2_TRANSLUCENT;
+	return nativecontents;
+}
+
+static void Mod_Q2BSP_LoadVisibility(sizebuf_t *sb)
+{
 	int i, count;
+	loadmodel->brushq1.num_compressedpvs = 0;
+	loadmodel->brushq1.data_compressedpvs = NULL;
+	loadmodel->brush.num_pvsclusters = 0;
+	loadmodel->brush.num_pvsclusterbytes = 0;
+	loadmodel->brush.data_pvsclusters = NULL;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadPlanes: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	if (!sb->cursize)
+		return;
 
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
+	count = MSG_ReadLittleLong(sb);
+	loadmodel->brush.num_pvsclusters = count;
+	loadmodel->brush.num_pvsclusterbytes = (count+7)>>3;
+	loadmodel->brush.data_pvsclusters = (unsigned char *)Mem_Alloc(loadmodel->mempool, count*loadmodel->brush.num_pvsclusterbytes);
+	for (i = 0;i < count;i++)
 	{
+		int pvsofs = MSG_ReadLittleLong(sb);
+		/*int phsofs = */MSG_ReadLittleLong(sb);
+		// decompress the vis data for this cluster
+		// (note this accesses the underlying data store of sb, which is kind of evil)
+		Mod_Q1BSP_DecompressVis(sb->data + pvsofs, sb->data + sb->cursize, loadmodel->brush.data_pvsclusters + i * loadmodel->brush.num_pvsclusterbytes, loadmodel->brush.data_pvsclusters + (i+1) * loadmodel->brush.num_pvsclusterbytes);
 	}
-*/
+	// hush the loading error check later - we had to do random access on this lump, so we didn't read to the end
+	sb->readcount = sb->cursize;
 }
 
-static void Mod_Q2BSP_LoadVertices(lump_t *l)
+static void Mod_Q2BSP_LoadNodes(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	int			i, j, count, p, child[2];
+	mnode_t 	*out;
+	int structsize = 28;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadVertices: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadVisibility(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadVisibility: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadNodes(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
+	if (sb->cursize % structsize)
 		Host_Error("Mod_Q2BSP_LoadNodes: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	count = sb->cursize / structsize;
+	if (count == 0)
+		Host_Error("Mod_Q2BSP_LoadNodes: missing BSP tree in %s",loadmodel->name);
+	out = (mnode_t *)Mem_Alloc(loadmodel->mempool, count*sizeof(*out));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
+	loadmodel->brush.data_nodes = out;
+	loadmodel->brush.num_nodes = count;
 
-	for (i = 0;i < count;i++, in++, out++)
+	for ( i=0 ; i<count ; i++, out++)
 	{
+		p = MSG_ReadLittleLong(sb);
+		out->plane = loadmodel->brush.data_planes + p;
+		child[0] = MSG_ReadLittleLong(sb);
+		child[1] = MSG_ReadLittleLong(sb);
+		out->mins[0] = MSG_ReadLittleShort(sb);
+		out->mins[1] = MSG_ReadLittleShort(sb);
+		out->mins[2] = MSG_ReadLittleShort(sb);
+		out->maxs[0] = MSG_ReadLittleShort(sb);
+		out->maxs[1] = MSG_ReadLittleShort(sb);
+		out->maxs[2] = MSG_ReadLittleShort(sb);
+		out->firstsurface = (unsigned short)MSG_ReadLittleShort(sb);
+		out->numsurfaces = (unsigned short)MSG_ReadLittleShort(sb);
+		if (out->firstsurface + out->numsurfaces > (unsigned int)loadmodel->num_surfaces)
+		{
+			Con_Printf("Mod_Q2BSP_LoadNodes: invalid surface index range %i+%i (file has only %i surfaces)\n", out->firstsurface, out->numsurfaces, loadmodel->num_surfaces);
+			out->firstsurface = 0;
+			out->numsurfaces = 0;
+		}
+		for (j=0 ; j<2 ; j++)
+		{
+			p = child[j];
+			if (p >= 0)
+			{
+				if (p < loadmodel->brush.num_nodes)
+					out->children[j] = loadmodel->brush.data_nodes + p;
+				else
+				{
+					Con_Printf("Mod_Q2BSP_LoadNodes: invalid node index %i (file has only %i nodes)\n", p, loadmodel->brush.num_nodes);
+					// map it to the solid leaf
+					out->children[j] = (mnode_t *)loadmodel->brush.data_leafs;
+				}
+			}
+			else
+			{
+				// get leaf index as a positive value starting at 0 (-1 becomes 0, -2 becomes 1, etc)
+				p = -(p+1);
+				if (p < loadmodel->brush.num_leafs)
+					out->children[j] = (mnode_t *)(loadmodel->brush.data_leafs + p);
+				else
+				{
+					Con_Printf("Mod_Q2BSP_LoadNodes: invalid leaf index %i (file has only %i leafs)\n", p, loadmodel->brush.num_leafs);
+					// map it to the solid leaf
+					out->children[j] = (mnode_t *)loadmodel->brush.data_leafs;
+				}
+			}
+		}
 	}
-*/
+
+	Mod_Q1BSP_LoadNodes_RecursiveSetParent(loadmodel->brush.data_nodes, NULL);	// sets nodes and leafs
 }
 
-static void Mod_Q2BSP_LoadTexInfo(lump_t *l)
+static void Mod_Q2BSP_LoadTexinfo(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	mtexinfo_t *out;
+	int i, l, count;
+	int structsize = 76;
+	int maxtextures = 1024; // hardcoded limit of quake2 engine, so we may as well use it as an upper bound
+	char filename[MAX_QPATH];
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadTexInfo: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	if (sb->cursize % structsize)
+		Host_Error("Mod_Q2BSP_LoadTexinfo: funny lump size in %s",loadmodel->name);
+	count = sb->cursize / structsize;
+	out = (mtexinfo_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	loadmodel->brushq1.texinfo = out;
+	loadmodel->brushq1.numtexinfo = count;
+	loadmodel->num_texturesperskin = 0;
+	loadmodel->data_textures = (texture_t*)Mem_Alloc(loadmodel->mempool, maxtextures * sizeof(texture_t));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
+	for (i = 0;i < count;i++, out++)
 	{
+		int j, k;
+		for (k = 0;k < 2;k++)
+			for (j = 0;j < 4;j++)
+				out->vecs[k][j] = MSG_ReadLittleFloat(sb);
+
+		out->q2flags = MSG_ReadLittleLong(sb);
+		out->q2value = MSG_ReadLittleLong(sb);
+		MSG_ReadBytes(sb, 32, (unsigned char*)out->q2texture);
+		out->q2texture[31] = 0; // make absolutely sure it is terminated
+		out->q2nexttexinfo = MSG_ReadLittleLong(sb);
+
+		// find an existing match for the texture if possible
+		dpsnprintf(filename, sizeof(filename), "textures/%s.wal", out->q2texture);
+		for (j = 0;j < loadmodel->num_texturesperskin;j++)
+			if (!strcmp(filename, loadmodel->data_textures[j].name)
+			 && out->q2flags == loadmodel->data_textures[j].q2flags
+			 && out->q2value == loadmodel->data_textures[j].q2value)
+				break;
+		// if we don't find the texture, store the new texture
+		if (j == loadmodel->num_texturesperskin)
+		{
+			if (loadmodel->num_texturesperskin < maxtextures)
+			{
+				texture_t *tx = loadmodel->data_textures + j;
+				int q2flags = out->q2flags;
+				unsigned char *walfile = NULL;
+				fs_offset_t walfilesize = 0;
+				Mod_LoadTextureFromQ3Shader(tx, filename, true, true, TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS);
+				// now read the .wal file to get metadata (even if a .tga was overriding it, we still need the wal data)
+				walfile = FS_LoadFile(filename, tempmempool, true, &walfilesize);
+				if (walfile)
+				{
+					int w, h;
+					LoadWAL_GetMetadata(walfile, (int)walfilesize, &w, &h, NULL, NULL, &tx->q2contents, NULL);
+					tx->width = w;
+					tx->height = h;
+					Mem_Free(walfile);
+				}
+				else
+				{
+					tx->width = 16;
+					tx->height = 16;
+				}
+				tx->q2flags = out->q2flags;
+				tx->q2value = out->q2value;
+				// also modify the texture to have the correct contents and such based on flags
+				// note that we create multiple texture_t structures if q2flags differs
+				if (q2flags & Q2SURF_LIGHT)
+				{
+					// doesn't mean anything to us
+				}
+				if (q2flags & Q2SURF_SLICK)
+				{
+					// would be nice to support...
+				}
+				if (q2flags & Q2SURF_SKY)
+				{
+					// sky is a rather specific thing
+					q2flags &= ~Q2SURF_NODRAW; // quake2 had a slightly different meaning than we have in mind here...
+					tx->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+					tx->supercontents = SUPERCONTENTS_SKY | SUPERCONTENTS_NODROP | SUPERCONTENTS_OPAQUE;
+					tx->surfaceflags = Q3SURFACEFLAG_SKY | Q3SURFACEFLAG_NOIMPACT | Q3SURFACEFLAG_NOMARKS | Q3SURFACEFLAG_NODLIGHT | Q3SURFACEFLAG_NOLIGHTMAP;
+				}
+				if (q2flags & Q2SURF_WARP)
+				{
+					// we use a scroll instead of a warp
+					tx->basematerialflags |= MATERIALFLAG_WATERSCROLL | MATERIALFLAG_FULLBRIGHT;
+					// if it's also transparent, we can enable the WATERSHADER
+					// but we do not set the WATERALPHA flag because we don't
+					// want to honor r_wateralpha in q2bsp
+					// (it would go against the artistic intent)
+					if (q2flags & (Q2SURF_TRANS33 | Q2SURF_TRANS66))
+						tx->basematerialflags |= MATERIALFLAG_WATERSHADER;
+				}
+				if (q2flags & Q2SURF_TRANS33)
+				{
+					tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED;
+					tx->basealpha = 1.0f / 3.0f;
+					tx->supercontents &= ~SUPERCONTENTS_OPAQUE;
+					if (tx->q2contents & Q2CONTENTS_SOLID)
+						tx->q2contents = (tx->q2contents & ~Q2CONTENTS_SOLID) | Q2CONTENTS_WINDOW;
+				}
+				if (q2flags & Q2SURF_TRANS66)
+				{
+					tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED;
+					tx->basealpha = 2.0f / 3.0f;
+					tx->supercontents &= ~SUPERCONTENTS_OPAQUE;
+					if (tx->q2contents & Q2CONTENTS_SOLID)
+						tx->q2contents = (tx->q2contents & ~Q2CONTENTS_SOLID) | Q2CONTENTS_WINDOW;
+				}
+				if (q2flags & Q2SURF_FLOWING)
+				{
+					tx->tcmods[0].tcmod = Q3TCMOD_SCROLL;
+					if (q2flags & Q2SURF_WARP)
+						tx->tcmods[0].parms[0] = -0.5f;
+					else
+						tx->tcmods[0].parms[0] = -1.6f;
+					tx->tcmods[0].parms[1] = 0.0f;
+				}
+				if (q2flags & Q2SURF_ALPHATEST)
+				{
+					// KMQUAKE2 and other modded engines added this flag for lit alpha tested surfaces
+					tx->basematerialflags |= MATERIALFLAG_ALPHATEST | MATERIALFLAG_NOSHADOW;
+				}
+				else if (q2flags & (Q2SURF_TRANS33 | Q2SURF_TRANS66 | Q2SURF_WARP))
+				{
+					if (!mod_q2bsp_littransparentsurfaces.integer)
+						tx->basematerialflags |= MATERIALFLAG_FULLBRIGHT;
+				}
+				if (q2flags & Q2SURF_NODRAW)
+				{
+					tx->basematerialflags = MATERIALFLAG_NODRAW | MATERIALFLAG_NOSHADOW;
+				}
+				if (tx->q2contents & (Q2CONTENTS_TRANSLUCENT | Q2CONTENTS_MONSTERCLIP | Q2CONTENTS_PLAYERCLIP))
+					tx->q2contents |= Q2CONTENTS_DETAIL;
+				if (!(tx->q2contents & (Q2CONTENTS_SOLID | Q2CONTENTS_WINDOW | Q2CONTENTS_AUX | Q2CONTENTS_LAVA | Q2CONTENTS_SLIME | Q2CONTENTS_WATER | Q2CONTENTS_MIST | Q2CONTENTS_PLAYERCLIP | Q2CONTENTS_MONSTERCLIP | Q2CONTENTS_MIST)))
+					tx->q2contents |= Q2CONTENTS_SOLID;
+				if (tx->q2flags & (Q2SURF_HINT | Q2SURF_SKIP))
+					tx->q2contents = 0;
+				tx->supercontents = Mod_Q2BSP_SuperContentsFromNativeContents(loadmodel, tx->q2contents);
+				// set the current values to the base values
+				tx->currentframe = tx;
+				tx->currentskinframe = tx->skinframes[0];
+				tx->currentmaterialflags = tx->basematerialflags;
+				loadmodel->num_texturesperskin++;
+				loadmodel->num_textures = loadmodel->num_texturesperskin;
+			}
+			else
+			{
+				Con_Printf("Mod_Q2BSP_LoadTexinfo: max textures reached (%i)\n", maxtextures);
+				j = 0; // use first texture and give up
+			}
+		}
+		// store the index we found for this texture
+		out->textureindex = j;
 	}
-*/
+
+	// realloc the textures array now that we know how many we actually need
+	loadmodel->data_textures = (texture_t*)Mem_Realloc(loadmodel->mempool, loadmodel->data_textures, loadmodel->num_texturesperskin * sizeof(texture_t));
+
+	// now assemble the texture chains
+	// if we encounter the textures out of order, the later ones won't mark the earlier ones in a sequence, so the earlier 
+	for (i = 0, out = loadmodel->brushq1.texinfo;i < count;i++, out++)
+	{
+		int j, k;
+		texture_t *t = loadmodel->data_textures + out->textureindex;
+		t->currentframe = t; // fix the reallocated pointer
+
+		// if this is not animated, skip it
+		// if this is already processed, skip it (part of an existing sequence)
+		if (out->q2nexttexinfo == 0 || t->animated)
+			continue;
+
+		// store the array of frames to use
+		t->animated = 2; // q2bsp animation
+		t->anim_total[0] = 0;
+		t->anim_total[1] = 0;
+		// gather up to 10 frames (we don't support more)
+		for (j = i;j >= 0 && t->anim_total[0] < (int)(sizeof(t->anim_frames[0])/sizeof(t->anim_frames[0][0]));j = loadmodel->brushq1.texinfo[j].q2nexttexinfo)
+		{
+			// detect looping and stop there
+			if (t->anim_total[0] && loadmodel->brushq1.texinfo[j].textureindex == out->textureindex)
+				break;
+			t->anim_frames[0][t->anim_total[0]++] = &loadmodel->data_textures[loadmodel->brushq1.texinfo[j].textureindex];
+		}
+		// we could look for the +a sequence here if this is the +0 sequence,
+		// but it seems that quake2 did not implement that (even though the
+		// files exist in the baseq2 content)
+
+		// write the frame sequence to all the textures involved (just like
+		// in the q1bsp loader)
+		//
+		// note that this can overwrite the rest of the sequence - so if the
+		// start of a sequence is found later than the other parts of the
+		// sequence, it will go back and rewrite them correctly.
+		for (k = 0;k < t->anim_total[0];k++)
+		{
+			texture_t *txk = t->anim_frames[0][k];
+			txk->animated = t->animated;
+			txk->anim_total[0] = t->anim_total[0];
+			for (l = 0;l < t->anim_total[0];l++)
+				txk->anim_frames[0][l] = t->anim_frames[0][l];
+		}
+	}
 }
 
-static void Mod_Q2BSP_LoadFaces(lump_t *l)
+static void Mod_Q2BSP_LoadLighting(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadFaces: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
+	// LordHavoc: this fits exactly the same format that we use in .lit files
+	loadmodel->brushq1.lightdata = (unsigned char *)Mem_Alloc(loadmodel->mempool, sb->cursize);
+	MSG_ReadBytes(sb, sb->cursize, loadmodel->brushq1.lightdata);
 }
 
-static void Mod_Q2BSP_LoadLighting(lump_t *l)
+static void Mod_Q2BSP_LoadLeafs(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	mleaf_t *out;
+	int i, j, count, firstmarksurface, nummarksurfaces, firstmarkbrush, nummarkbrushes;
+	int structsize = 28;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadLighting: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadLeafs(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
+	if (sb->cursize % structsize)
 		Host_Error("Mod_Q2BSP_LoadLeafs: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	count = sb->cursize / structsize;
+	out = (mleaf_t *)Mem_Alloc(loadmodel->mempool, count*sizeof(*out));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
+	loadmodel->brush.data_leafs = out;
+	loadmodel->brush.num_leafs = count;
 
-	for (i = 0;i < count;i++, in++, out++)
+	// FIXME: this function could really benefit from some error checking
+	for ( i=0 ; i<count ; i++, out++)
 	{
+		out->contents = MSG_ReadLittleLong(sb);
+		out->clusterindex = MSG_ReadLittleShort(sb);
+		out->areaindex = MSG_ReadLittleShort(sb);
+		out->mins[0] = MSG_ReadLittleShort(sb);
+		out->mins[1] = MSG_ReadLittleShort(sb);
+		out->mins[2] = MSG_ReadLittleShort(sb);
+		out->maxs[0] = MSG_ReadLittleShort(sb);
+		out->maxs[1] = MSG_ReadLittleShort(sb);
+		out->maxs[2] = MSG_ReadLittleShort(sb);
+	
+		firstmarksurface = (unsigned short)MSG_ReadLittleShort(sb);
+		nummarksurfaces  = (unsigned short)MSG_ReadLittleShort(sb);
+		firstmarkbrush = (unsigned short)MSG_ReadLittleShort(sb);
+		nummarkbrushes  = (unsigned short)MSG_ReadLittleShort(sb);
+
+		for (j = 0;j < 4;j++)
+			out->ambient_sound_level[j] = 0;
+
+		if (out->clusterindex >= loadmodel->brush.num_pvsclusters)
+		{
+			Con_Print("Mod_Q2BSP_LoadLeafs: invalid clusterindex\n");
+			out->clusterindex = -1;
+		}
+
+		if (firstmarksurface >= 0 && firstmarksurface + nummarksurfaces <= loadmodel->brush.num_leafsurfaces)
+		{
+			out->firstleafsurface = loadmodel->brush.data_leafsurfaces + firstmarksurface;
+			out->numleafsurfaces = nummarksurfaces;
+		}
+		else
+		{
+			Con_Printf("Mod_Q2BSP_LoadLeafs: invalid leafsurface range %i:%i outside range %i:%i\n", firstmarksurface, firstmarksurface+nummarksurfaces, 0, loadmodel->brush.num_leafsurfaces);
+			out->firstleafsurface = NULL;
+			out->numleafsurfaces = 0;
+		}
+
+		if (firstmarkbrush >= 0 && firstmarkbrush + nummarkbrushes <= loadmodel->brush.num_leafbrushes)
+		{
+			out->firstleafbrush = loadmodel->brush.data_leafbrushes + firstmarkbrush;
+			out->numleafbrushes = nummarkbrushes;
+		}
+		else
+		{
+			Con_Printf("Mod_Q2BSP_LoadLeafs: invalid leafbrush range %i:%i outside range %i:%i\n", firstmarkbrush, firstmarkbrush+nummarkbrushes, 0, loadmodel->brush.num_leafbrushes);
+			out->firstleafbrush = NULL;
+			out->numleafbrushes = 0;
+		}
 	}
-*/
 }
 
-static void Mod_Q2BSP_LoadLeafFaces(lump_t *l)
+static void Mod_Q2BSP_LoadLeafBrushes(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	int i, j;
+	int structsize = 2;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadLeafFaces: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadLeafBrushes(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
+	if (sb->cursize % structsize)
 		Host_Error("Mod_Q2BSP_LoadLeafBrushes: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	loadmodel->brush.num_leafbrushes = sb->cursize / structsize;
+	loadmodel->brush.data_leafbrushes = (int *)Mem_Alloc(loadmodel->mempool, loadmodel->brush.num_leafbrushes * sizeof(int));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
+	for (i = 0;i < loadmodel->brush.num_leafbrushes;i++)
 	{
+		j = (unsigned short) MSG_ReadLittleShort(sb);
+		if (j >= loadmodel->brush.num_brushes)
+			Host_Error("Mod_Q1BSP_LoadLeafBrushes: bad brush number");
+		loadmodel->brush.data_leafbrushes[i] = j;
 	}
-*/
 }
 
-static void Mod_Q2BSP_LoadEdges(lump_t *l)
+static void Mod_Q2BSP_LoadBrushSides(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	q3mbrushside_t *out;
+	int i, n, count;
+	int structsize = 4;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadEdges: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadSurfEdges(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadSurfEdges: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadBrushes(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadBrushes: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
-}
-
-static void Mod_Q2BSP_LoadBrushSides(lump_t *l)
-{
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
+	if (sb->cursize % structsize)
 		Host_Error("Mod_Q2BSP_LoadBrushSides: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	count = sb->cursize / structsize;
+	out = (q3mbrushside_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
+	loadmodel->brush.data_brushsides = out;
+	loadmodel->brush.num_brushsides = count;
 
-	for (i = 0;i < count;i++, in++, out++)
+	for (i = 0;i < count;i++, out++)
 	{
+		n = (unsigned short)MSG_ReadLittleShort(sb);
+		if (n < 0 || n >= loadmodel->brush.num_planes)
+			Host_Error("Mod_Q2BSP_LoadBrushSides: invalid planeindex %i (%i planes)", n, loadmodel->brush.num_planes);
+		out->plane = loadmodel->brush.data_planes + n;
+		n = MSG_ReadLittleShort(sb);
+		if (n >= 0)
+		{
+			if (n >= loadmodel->brushq1.numtexinfo)
+				Host_Error("Mod_Q2BSP_LoadBrushSides: invalid texinfo index %i (%i texinfos)", n, loadmodel->brushq1.numtexinfo);
+			out->texture = loadmodel->data_textures + loadmodel->brushq1.texinfo[n].textureindex;
+		}
+		else
+		{
+			//Con_Printf("Mod_Q2BSP_LoadBrushSides: brushside %i has texinfo index %i < 0, changing to generic texture!\n", i, n);
+			out->texture = &mod_q1bsp_texture_solid;
+		}
 	}
-*/
 }
 
-static void Mod_Q2BSP_LoadAreas(lump_t *l)
+static void Mod_Q2BSP_LoadBrushes(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	q3mbrush_t *out;
+	int i, j, firstside, numsides, contents, count, maxplanes, q3surfaceflags, supercontents;
+	colplanef_t *planes;
+	int structsize = 12;
+	qboolean brushmissingtextures;
+	int numbrushesmissingtextures = 0;
+	int numcreatedtextures = 0;
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadAreas: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+	if (sb->cursize % structsize)
+		Host_Error("Mod_Q2BSP_LoadBrushes: funny lump size in %s",loadmodel->name);
+	count = sb->cursize / structsize;
+	out = (q3mbrush_t *)Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
 
-	loadmodel-> = out;
-	loadmodel->num = count;
+	loadmodel->brush.data_brushes = out;
+	loadmodel->brush.num_brushes = count;
 
-	for (i = 0;i < count;i++, in++, out++)
+	maxplanes = 0;
+	planes = NULL;
+
+	for (i = 0; i < count; i++, out++)
 	{
+		firstside = MSG_ReadLittleLong(sb);
+		numsides = MSG_ReadLittleLong(sb);
+		contents = MSG_ReadLittleLong(sb);
+		if (firstside < 0 || firstside + numsides > loadmodel->brush.num_brushsides)
+			Host_Error("Mod_Q3BSP_LoadBrushes: invalid brushside range %i : %i (%i brushsides)", firstside, firstside + numsides, loadmodel->brush.num_brushsides);
+
+		out->firstbrushside = loadmodel->brush.data_brushsides + firstside;
+		out->numbrushsides = numsides;
+		// convert the contents to our values
+		supercontents = Mod_Q2BSP_SuperContentsFromNativeContents(loadmodel, contents);
+
+		// problem: q2bsp brushes have contents but not a texture
+		// problem: q2bsp brushsides *may* have a texture or may not
+		// problem: all brushsides and brushes must have a texture for trace_hittexture functionality to work, and the collision code is engineered around this assumption
+		// solution: nasty hacks
+		brushmissingtextures = false;
+		out->texture = NULL;
+		for (j = 0; j < out->numbrushsides; j++)
+		{
+			if (out->firstbrushside[j].texture == &mod_q1bsp_texture_solid)
+				brushmissingtextures = true;
+			else
+			{
+				// if we can find a matching texture on a brush side we can use it instead of creating one
+				if (out->firstbrushside[j].texture->supercontents == supercontents)
+					out->texture = out->firstbrushside[j].texture;
+			}
+		}
+		if (brushmissingtextures || out->texture == NULL)
+		{
+			numbrushesmissingtextures++;
+			// if we didn't find any appropriate texture (matching contents), we'll have to create one
+			// we could search earlier ones for a matching one but that can be slow
+			if (out->texture == NULL)
+			{
+				texture_t *validtexture;
+				validtexture = (texture_t *)Mem_Alloc(loadmodel->mempool, sizeof(texture_t));
+				dpsnprintf(validtexture->name, sizeof(validtexture->name), "brushcollision%i", numcreatedtextures);
+				validtexture->surfaceflags = 0;
+				validtexture->supercontents = supercontents;
+				numcreatedtextures++;
+				out->texture = validtexture;
+			}
+			// out->texture now contains a texture with appropriate contents, copy onto any missing sides
+			for (j = 0; j < out->numbrushsides; j++)
+				if (out->firstbrushside[j].texture == &mod_q1bsp_texture_solid)
+					out->firstbrushside[j].texture = out->texture;
+		}
+
+		// make a colbrush from the brush
+		q3surfaceflags = 0;
+		// make a list of mplane_t structs to construct a colbrush from
+		if (maxplanes < out->numbrushsides)
+		{
+			maxplanes = out->numbrushsides;
+			if (planes)
+				Mem_Free(planes);
+			planes = (colplanef_t *)Mem_Alloc(tempmempool, sizeof(colplanef_t) * maxplanes);
+		}
+		for (j = 0;j < out->numbrushsides;j++)
+		{
+			VectorCopy(out->firstbrushside[j].plane->normal, planes[j].normal);
+			planes[j].dist = out->firstbrushside[j].plane->dist;
+			planes[j].q3surfaceflags = out->firstbrushside[j].texture->surfaceflags;
+			planes[j].texture = out->firstbrushside[j].texture;
+			q3surfaceflags |= planes[j].q3surfaceflags;
+		}
+		out->colbrushf = Collision_NewBrushFromPlanes(loadmodel->mempool, out->numbrushsides, planes, out->texture->supercontents, q3surfaceflags, out->texture, true);
+
+		// this whole loop can take a while (e.g. on redstarrepublic4)
+		CL_KeepaliveMessage(false);
 	}
-*/
+	if (planes)
+		Mem_Free(planes);
+	if (numcreatedtextures)
+		Con_DPrintf("Mod_Q2BSP_LoadBrushes: %i brushes own sides that lack textures or have differing contents from the brush, %i textures have been created to describe these contents.\n", numbrushesmissingtextures, numcreatedtextures);
 }
 
-static void Mod_Q2BSP_LoadAreaPortals(lump_t *l)
+static void Mod_Q2BSP_LoadPOP(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
-
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadAreaPortals: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
-
-	loadmodel-> = out;
-	loadmodel->num = count;
-
-	for (i = 0;i < count;i++, in++, out++)
-	{
-	}
-*/
+	// this is probably a "proof of purchase" lump of some sort, it seems to be 0 size in most bsp files (but not q2dm1.bsp for instance)
+	sb->readcount = sb->cursize;
 }
 
-static void Mod_Q2BSP_LoadModels(lump_t *l)
+static void Mod_Q2BSP_LoadAreas(sizebuf_t *sb)
 {
-/*
-	d_t *in;
-	m_t *out;
-	int i, count;
+	// we currently don't use areas, they represent closable doors as vis blockers
+	sb->readcount = sb->cursize;
+}
 
-	in = (void *)(mod_base + l->fileofs);
-	if (l->filelen % sizeof(*in))
-		Host_Error("Mod_Q2BSP_LoadModels: funny lump size in %s",loadmodel->name);
-	count = l->filelen / sizeof(*in);
-	out = Mem_Alloc(loadmodel->mempool, count * sizeof(*out));
+static void Mod_Q2BSP_LoadAreaPortals(sizebuf_t *sb)
+{
+	// we currently don't use areas, they represent closable doors as vis blockers
+	sb->readcount = sb->cursize;
+}
 
-	loadmodel-> = out;
-	loadmodel->num = count;
+static void Mod_Q2BSP_LoadSubmodels(sizebuf_t *sb)
+{
+	mmodel_t	*out;
+	int			i, count;
+	int			structsize = 48;
 
-	for (i = 0;i < count;i++, in++, out++)
+	if (sb->cursize % structsize)
+		Host_Error ("Mod_Q2BSP_LoadSubmodels: funny lump size in %s", loadmodel->name);
+
+	count = sb->cursize / structsize;
+	out = (mmodel_t *)Mem_Alloc (loadmodel->mempool, count*sizeof(*out));
+
+	loadmodel->brushq1.submodels = out;
+	loadmodel->brush.numsubmodels = count;
+
+	// this is identical to the q1 submodel structure except for having 1 hull
+	for (i = 0; i < count; i++, out++)
 	{
+		// spread out the mins / maxs by a pixel
+		out->mins[0] = MSG_ReadLittleFloat(sb) - 1;
+		out->mins[1] = MSG_ReadLittleFloat(sb) - 1;
+		out->mins[2] = MSG_ReadLittleFloat(sb) - 1;
+		out->maxs[0] = MSG_ReadLittleFloat(sb) + 1;
+		out->maxs[1] = MSG_ReadLittleFloat(sb) + 1;
+		out->maxs[2] = MSG_ReadLittleFloat(sb) + 1;
+		out->origin[0] = MSG_ReadLittleFloat(sb);
+		out->origin[1] = MSG_ReadLittleFloat(sb);
+		out->origin[2] = MSG_ReadLittleFloat(sb);
+		out->headnode[0] = MSG_ReadLittleLong(sb);
+		out->firstface = MSG_ReadLittleLong(sb);
+		out->numfaces  = MSG_ReadLittleLong(sb);
 	}
-*/
+}
+
+static void Mod_Q2BSP_FindSubmodelBrushRange_r(dp_model_t *mod, mnode_t *node, int *first, int *last)
+{
+	int i;
+	mleaf_t *leaf;
+	while (node->plane)
+	{
+		Mod_Q2BSP_FindSubmodelBrushRange_r(mod, node->children[0], first, last);
+		node = node->children[1];
+	}
+	leaf = (mleaf_t*)node;
+	for (i = 0;i < leaf->numleafbrushes;i++)
+	{
+		int brushnum = leaf->firstleafbrush[i];
+		if (*first > brushnum)
+			*first = brushnum;
+		if (*last < brushnum)
+			*last = brushnum;
+	}
 }
 
 static void Mod_Q2BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 {
-	int i;
-	q2dheader_t *header;
+	int i, j, k;
+	sizebuf_t lumpsb[Q2HEADER_LUMPS];
+	mmodel_t *bm;
+	float dist, modelyawradius, modelradius;
+	msurface_t *surface;
+	int totalstylesurfaces, totalstyles, stylecounts[256], remapstyles[256];
+	model_brush_lightstyleinfo_t styleinfo[256];
+	unsigned char *datapointer;
+	sizebuf_t sb;
 
-	Host_Error("Mod_Q2BSP_Load: not yet implemented");
-
-	mod->modeldatatypestring = "Q2BSP";
+	MSG_InitReadBuffer(&sb, (unsigned char *)buffer, (unsigned char *)bufferend - (unsigned char *)buffer);
 
 	mod->type = mod_brushq2;
 
-	header = (q2dheader_t *)buffer;
+	mod->brush.ishlbsp = false;
+	mod->brush.isbsp2rmqe = false;
+	mod->brush.isbsp2 = false;
+	mod->brush.isq2bsp = true; // q1bsp loaders mostly work but we need a few tweaks
+	mod->brush.isq3bsp = false;
+	mod->brush.skymasking = true;
+	mod->modeldatatypestring = "Q2BSP";
 
-	i = LittleLong(header->version);
+	i = MSG_ReadLittleLong(&sb);
+	if (i != Q2BSPMAGIC)
+		Host_Error("Mod_Q2BSP_Load: %s has wrong version number (%i, should be %i)", mod->name, i, Q2BSPVERSION);
+
+	i = MSG_ReadLittleLong(&sb);
 	if (i != Q2BSPVERSION)
 		Host_Error("Mod_Q2BSP_Load: %s has wrong version number (%i, should be %i)", mod->name, i, Q2BSPVERSION);
 
-	mod_base = (unsigned char *)header;
+// read lumps
+	for (i = 0; i < Q2HEADER_LUMPS; i++)
+	{
+		int offset = MSG_ReadLittleLong(&sb);
+		int size = MSG_ReadLittleLong(&sb);
+		if (offset < 0 || offset + size > sb.cursize)
+			Host_Error("Mod_Q2BSP_Load: %s has invalid lump %i (offset %i, size %i, file size %i)\n", mod->name, i, offset, size, (int)sb.cursize);
+		MSG_InitReadBuffer(&lumpsb[i], sb.data + offset, size);
+	}
 
-	// swap all the lumps
-	for (i = 0;i < (int) sizeof(*header) / 4;i++)
-		((int *)header)[i] = LittleLong(((int *)header)[i]);
+	mod->soundfromcenter = true;
+	mod->TracePoint = Mod_CollisionBIH_TracePoint;
+	mod->TraceLine = Mod_CollisionBIH_TraceLine;
+	mod->TraceBox = Mod_CollisionBIH_TraceBox;
+	mod->TraceBrush = Mod_CollisionBIH_TraceBrush;
+	mod->PointSuperContents = Mod_CollisionBIH_PointSuperContents;
+	mod->TraceLineAgainstSurfaces = Mod_CollisionBIH_TraceLine;
+	mod->brush.TraceLineOfSight = Mod_Q3BSP_TraceLineOfSight;
+	mod->brush.SuperContentsFromNativeContents = Mod_Q2BSP_SuperContentsFromNativeContents;
+	mod->brush.NativeContentsFromSuperContents = Mod_Q2BSP_NativeContentsFromSuperContents;
+	mod->brush.GetPVS = Mod_Q1BSP_GetPVS;
+	mod->brush.FatPVS = Mod_Q1BSP_FatPVS;
+	mod->brush.BoxTouchingPVS = Mod_Q1BSP_BoxTouchingPVS;
+	mod->brush.BoxTouchingLeafPVS = Mod_Q1BSP_BoxTouchingLeafPVS;
+	mod->brush.BoxTouchingVisibleLeafs = Mod_Q1BSP_BoxTouchingVisibleLeafs;
+	mod->brush.FindBoxClusters = Mod_Q1BSP_FindBoxClusters;
+	mod->brush.LightPoint = Mod_Q1BSP_LightPoint;
+	mod->brush.FindNonSolidLocation = Mod_Q1BSP_FindNonSolidLocation;
+	mod->brush.AmbientSoundLevelsForPoint = NULL;
+	mod->brush.RoundUpToHullSize = NULL;
+	mod->brush.PointInLeaf = Mod_Q1BSP_PointInLeaf;
+	mod->Draw = R_Q1BSP_Draw;
+	mod->DrawDepth = R_Q1BSP_DrawDepth;
+	mod->DrawDebug = R_Q1BSP_DrawDebug;
+	mod->DrawPrepass = R_Q1BSP_DrawPrepass;
+	mod->GetLightInfo = R_Q1BSP_GetLightInfo;
+	mod->CompileShadowMap = R_Q1BSP_CompileShadowMap;
+	mod->DrawShadowMap = R_Q1BSP_DrawShadowMap;
+	mod->CompileShadowVolume = R_Q1BSP_CompileShadowVolume;
+	mod->DrawShadowVolume = R_Q1BSP_DrawShadowVolume;
+	mod->DrawLight = R_Q1BSP_DrawLight;
+
+// load into heap
 
 	mod->brush.qw_md4sum = 0;
 	mod->brush.qw_md4sum2 = 0;
 	for (i = 0;i < Q2HEADER_LUMPS;i++)
 	{
+		int temp;
 		if (i == Q2LUMP_ENTITIES)
 			continue;
-		mod->brush.qw_md4sum ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, header->lumps[i].filelen);
+		temp = Com_BlockChecksum(lumpsb[i].data, lumpsb[i].cursize);
+		mod->brush.qw_md4sum ^= LittleLong(temp);
 		if (i == Q2LUMP_VISIBILITY || i == Q2LUMP_LEAFS || i == Q2LUMP_NODES)
 			continue;
-		mod->brush.qw_md4sum2 ^= Com_BlockChecksum(mod_base + header->lumps[i].fileofs, header->lumps[i].filelen);
+		mod->brush.qw_md4sum2 ^= LittleLong(temp);
 	}
 
-	Mod_Q2BSP_LoadEntities(&header->lumps[Q2LUMP_ENTITIES]);
-	Mod_Q2BSP_LoadPlanes(&header->lumps[Q2LUMP_PLANES]);
-	Mod_Q2BSP_LoadVertices(&header->lumps[Q2LUMP_VERTEXES]);
-	Mod_Q2BSP_LoadVisibility(&header->lumps[Q2LUMP_VISIBILITY]);
-	Mod_Q2BSP_LoadNodes(&header->lumps[Q2LUMP_NODES]);
-	Mod_Q2BSP_LoadTexInfo(&header->lumps[Q2LUMP_TEXINFO]);
-	Mod_Q2BSP_LoadFaces(&header->lumps[Q2LUMP_FACES]);
-	Mod_Q2BSP_LoadLighting(&header->lumps[Q2LUMP_LIGHTING]);
-	Mod_Q2BSP_LoadLeafs(&header->lumps[Q2LUMP_LEAFS]);
-	Mod_Q2BSP_LoadLeafFaces(&header->lumps[Q2LUMP_LEAFFACES]);
-	Mod_Q2BSP_LoadLeafBrushes(&header->lumps[Q2LUMP_LEAFBRUSHES]);
-	Mod_Q2BSP_LoadEdges(&header->lumps[Q2LUMP_EDGES]);
-	Mod_Q2BSP_LoadSurfEdges(&header->lumps[Q2LUMP_SURFEDGES]);
-	Mod_Q2BSP_LoadBrushes(&header->lumps[Q2LUMP_BRUSHES]);
-	Mod_Q2BSP_LoadBrushSides(&header->lumps[Q2LUMP_BRUSHSIDES]);
-	Mod_Q2BSP_LoadAreas(&header->lumps[Q2LUMP_AREAS]);
-	Mod_Q2BSP_LoadAreaPortals(&header->lumps[Q2LUMP_AREAPORTALS]);
-	// LordHavoc: must go last because this makes the submodels
-	Mod_Q2BSP_LoadModels(&header->lumps[Q2LUMP_MODELS]);
+	// many of these functions are identical to Q1 loaders, so we use those where possible
+	Mod_Q1BSP_LoadEntities(&lumpsb[Q2LUMP_ENTITIES]);
+	Mod_Q1BSP_LoadVertexes(&lumpsb[Q2LUMP_VERTEXES]);
+	Mod_Q1BSP_LoadEdges(&lumpsb[Q2LUMP_EDGES]);
+	Mod_Q1BSP_LoadSurfedges(&lumpsb[Q2LUMP_SURFEDGES]);
+	Mod_Q2BSP_LoadLighting(&lumpsb[Q2LUMP_LIGHTING]);
+	Mod_Q1BSP_LoadPlanes(&lumpsb[Q2LUMP_PLANES]);
+	Mod_Q2BSP_LoadTexinfo(&lumpsb[Q2LUMP_TEXINFO]);
+	Mod_Q2BSP_LoadBrushSides(&lumpsb[Q2LUMP_BRUSHSIDES]);
+	Mod_Q2BSP_LoadBrushes(&lumpsb[Q2LUMP_BRUSHES]);
+	Mod_Q1BSP_LoadFaces(&lumpsb[Q2LUMP_FACES]);
+	Mod_Q1BSP_LoadLeaffaces(&lumpsb[Q2LUMP_LEAFFACES]);
+	Mod_Q2BSP_LoadLeafBrushes(&lumpsb[Q2LUMP_LEAFBRUSHES]);
+	Mod_Q2BSP_LoadVisibility(&lumpsb[Q2LUMP_VISIBILITY]);
+	Mod_Q2BSP_LoadPOP(&lumpsb[Q2LUMP_POP]);
+	Mod_Q2BSP_LoadAreas(&lumpsb[Q2LUMP_AREAS]);
+	Mod_Q2BSP_LoadAreaPortals(&lumpsb[Q2LUMP_AREAPORTALS]);
+	Mod_Q2BSP_LoadLeafs(&lumpsb[Q2LUMP_LEAFS]);
+	Mod_Q2BSP_LoadNodes(&lumpsb[Q2LUMP_NODES]);
+	Mod_Q2BSP_LoadSubmodels(&lumpsb[Q2LUMP_MODELS]);
+
+	for (i = 0; i < Q2HEADER_LUMPS; i++)
+		if (lumpsb[i].readcount != lumpsb[i].cursize)
+			Host_Error("Lump %i incorrectly loaded (readcount %i, size %i)\n", i, lumpsb[i].readcount, lumpsb[i].cursize);
+
+	// we don't actually set MATERIALFLAG_WATERALPHA on anything, so this
+	// doesn't enable the cvar, just indicates that transparent water is OK
+	loadmodel->brush.supportwateralpha = true;
+
+	// we don't need the compressed pvs data anymore
+	if (mod->brushq1.data_compressedpvs)
+		Mem_Free(mod->brushq1.data_compressedpvs);
+	mod->brushq1.data_compressedpvs = NULL;
+	mod->brushq1.num_compressedpvs = 0;
+
+	// the MakePortals code works fine on the q2bsp data as well
+	if (mod_bsp_portalize.integer)
+		Mod_Q1BSP_MakePortals();
+
+	mod->numframes = 0;		// q2bsp animations are kind of special, frame is unbounded...
+	mod->numskins = 1;
+
+	// make a single combined shadow mesh to allow optimized shadow volume creation
+	Mod_Q1BSP_CreateShadowMesh(loadmodel);
+
+	if (loadmodel->brush.numsubmodels)
+		loadmodel->brush.submodels = (dp_model_t **)Mem_Alloc(loadmodel->mempool, loadmodel->brush.numsubmodels * sizeof(dp_model_t *));
+
+	totalstylesurfaces = 0;
+	totalstyles = 0;
+	for (i = 0;i < mod->brush.numsubmodels;i++)
+	{
+		memset(stylecounts, 0, sizeof(stylecounts));
+		for (k = 0;k < mod->brushq1.submodels[i].numfaces;k++)
+		{
+			surface = mod->data_surfaces + mod->brushq1.submodels[i].firstface + k;
+			for (j = 0;j < MAXLIGHTMAPS;j++)
+				stylecounts[surface->lightmapinfo->styles[j]]++;
+		}
+		for (k = 0;k < 255;k++)
+		{
+			totalstyles++;
+			if (stylecounts[k])
+				totalstylesurfaces += stylecounts[k];
+		}
+	}
+	datapointer = (unsigned char *)Mem_Alloc(mod->mempool, mod->num_surfaces * sizeof(int) + totalstyles * sizeof(model_brush_lightstyleinfo_t) + totalstylesurfaces * sizeof(int *));
+	// set up the world model, then on each submodel copy from the world model
+	// and set up the submodel with the respective model info.
+	mod = loadmodel;
+	for (i = 0;i < loadmodel->brush.numsubmodels;i++)
+	{
+		mnode_t *rootnode = NULL;
+		int firstbrush = loadmodel->brush.num_brushes, lastbrush = 0;
+		if (i > 0)
+		{
+			char name[10];
+			// duplicate the basic information
+			dpsnprintf(name, sizeof(name), "*%i", i);
+			mod = Mod_FindName(name, loadmodel->name);
+			// copy the base model to this one
+			*mod = *loadmodel;
+			// rename the clone back to its proper name
+			strlcpy(mod->name, name, sizeof(mod->name));
+			mod->brush.parentmodel = loadmodel;
+			// textures and memory belong to the main model
+			mod->texturepool = NULL;
+			mod->mempool = NULL;
+			mod->brush.GetPVS = NULL;
+			mod->brush.FatPVS = NULL;
+			mod->brush.BoxTouchingPVS = NULL;
+			mod->brush.BoxTouchingLeafPVS = NULL;
+			mod->brush.BoxTouchingVisibleLeafs = NULL;
+			mod->brush.FindBoxClusters = NULL;
+			mod->brush.LightPoint = NULL;
+			mod->brush.AmbientSoundLevelsForPoint = NULL;
+		}
+		mod->brush.submodel = i;
+		if (loadmodel->brush.submodels)
+			loadmodel->brush.submodels[i] = mod;
+
+		bm = &mod->brushq1.submodels[i];
+
+		// we store the headnode (there's only one in Q2BSP) as if it were the first hull
+		mod->brushq1.hulls[0].firstclipnode = bm->headnode[0];
+
+		mod->firstmodelsurface = bm->firstface;
+		mod->nummodelsurfaces = bm->numfaces;
+
+		// set node/leaf parents for this submodel
+		// note: if the root of this submodel is a leaf (headnode[0] < 0) then there is nothing to do...
+		// (this happens in base3.bsp)
+		if (bm->headnode[0] >= 0)
+			rootnode = mod->brush.data_nodes + bm->headnode[0];
+		else
+			rootnode = (mnode_t*)(mod->brush.data_leafs + -1 - bm->headnode[0]);
+		Mod_Q1BSP_LoadNodes_RecursiveSetParent(rootnode, NULL);
+
+		// make the model surface list (used by shadowing/lighting)
+		mod->sortedmodelsurfaces = (int *)datapointer;datapointer += mod->nummodelsurfaces * sizeof(int);
+		Mod_Q2BSP_FindSubmodelBrushRange_r(mod, rootnode, &firstbrush, &lastbrush);
+		if (firstbrush <= lastbrush)
+		{
+			mod->firstmodelbrush = firstbrush;
+			mod->nummodelbrushes = lastbrush + 1 - firstbrush;
+		}
+		else
+		{
+			mod->firstmodelbrush = 0;
+			mod->nummodelbrushes = 0;
+		}
+		Mod_MakeSortedSurfaces(mod);
+
+		VectorCopy(bm->mins, mod->normalmins);
+		VectorCopy(bm->maxs, mod->normalmaxs);
+		dist = max(fabs(mod->normalmins[0]), fabs(mod->normalmaxs[0]));
+		modelyawradius = max(fabs(mod->normalmins[1]), fabs(mod->normalmaxs[1]));
+		modelyawradius = dist*dist+modelyawradius*modelyawradius;
+		modelradius = max(fabs(mod->normalmins[2]), fabs(mod->normalmaxs[2]));
+		modelradius = modelyawradius + modelradius * modelradius;
+		modelyawradius = sqrt(modelyawradius);
+		modelradius = sqrt(modelradius);
+		mod->yawmins[0] = mod->yawmins[1] = -modelyawradius;
+		mod->yawmins[2] = mod->normalmins[2];
+		mod->yawmaxs[0] = mod->yawmaxs[1] =  modelyawradius;
+		mod->yawmaxs[2] = mod->normalmaxs[2];
+		mod->rotatedmins[0] = mod->rotatedmins[1] = mod->rotatedmins[2] = -modelradius;
+		mod->rotatedmaxs[0] = mod->rotatedmaxs[1] = mod->rotatedmaxs[2] =  modelradius;
+		mod->radius = modelradius;
+		mod->radius2 = modelradius * modelradius;
+
+		// this gets altered below if sky or water is used
+		mod->DrawSky = NULL;
+		mod->DrawAddWaterPlanes = NULL;
+
+		// scan surfaces for sky and water and flag the submodel as possessing these features or not
+		// build lightstyle lists for quick marking of dirty lightmaps when lightstyles flicker
+		if (mod->nummodelsurfaces)
+		{
+			for (j = 0, surface = &mod->data_surfaces[mod->firstmodelsurface];j < mod->nummodelsurfaces;j++, surface++)
+				if (surface->texture->basematerialflags & MATERIALFLAG_SKY)
+					break;
+			if (j < mod->nummodelsurfaces)
+				mod->DrawSky = R_Q1BSP_DrawSky;
+
+			for (j = 0, surface = &mod->data_surfaces[mod->firstmodelsurface];j < mod->nummodelsurfaces;j++, surface++)
+				if (surface->texture->basematerialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION | MATERIALFLAG_CAMERA))
+					break;
+			if (j < mod->nummodelsurfaces)
+				mod->DrawAddWaterPlanes = R_Q1BSP_DrawAddWaterPlanes;
+
+			// build lightstyle update chains
+			// (used to rapidly mark lightmapupdateflags on many surfaces
+			// when d_lightstylevalue changes)
+			memset(stylecounts, 0, sizeof(stylecounts));
+			for (k = 0;k < mod->nummodelsurfaces;k++)
+			{
+				surface = mod->data_surfaces + mod->firstmodelsurface + k;
+				for (j = 0;j < MAXLIGHTMAPS;j++)
+					stylecounts[surface->lightmapinfo->styles[j]]++;
+			}
+			mod->brushq1.num_lightstyles = 0;
+			for (k = 0;k < 255;k++)
+			{
+				if (stylecounts[k])
+				{
+					styleinfo[mod->brushq1.num_lightstyles].style = k;
+					styleinfo[mod->brushq1.num_lightstyles].value = 0;
+					styleinfo[mod->brushq1.num_lightstyles].numsurfaces = 0;
+					styleinfo[mod->brushq1.num_lightstyles].surfacelist = (int *)datapointer;datapointer += stylecounts[k] * sizeof(int);
+					remapstyles[k] = mod->brushq1.num_lightstyles;
+					mod->brushq1.num_lightstyles++;
+				}
+			}
+			for (k = 0;k < mod->nummodelsurfaces;k++)
+			{
+				surface = mod->data_surfaces + mod->firstmodelsurface + k;
+				for (j = 0;j < MAXLIGHTMAPS;j++)
+				{
+					if (surface->lightmapinfo->styles[j] != 255)
+					{
+						int r = remapstyles[surface->lightmapinfo->styles[j]];
+						styleinfo[r].surfacelist[styleinfo[r].numsurfaces++] = mod->firstmodelsurface + k;
+					}
+				}
+			}
+			mod->brushq1.data_lightstyleinfo = (model_brush_lightstyleinfo_t *)datapointer;datapointer += mod->brushq1.num_lightstyles * sizeof(model_brush_lightstyleinfo_t);
+			memcpy(mod->brushq1.data_lightstyleinfo, styleinfo, mod->brushq1.num_lightstyles * sizeof(model_brush_lightstyleinfo_t));
+		}
+		else
+		{
+			Con_Printf("warning: empty submodel *%i in %s\n", i+1, loadmodel->name);
+		}
+		//mod->brushq1.num_visleafs = bm->visleafs;
+
+		// build a Bounding Interval Hierarchy for culling triangles in light rendering
+		Mod_MakeCollisionBIH(mod, false, &mod->collision_bih);
+
+		// build a Bounding Interval Hierarchy for culling brushes in collision detection
+		Mod_MakeCollisionBIH(mod, true, &mod->render_bih);
+
+		// generate VBOs and other shared data before cloning submodels
+		if (i == 0)
+			Mod_BuildVBOs();
+	}
+	mod = loadmodel;
+
+	Con_DPrintf("Stats for q2bsp model \"%s\": %i faces, %i nodes, %i leafs, %i clusters, %i clusterportals, mesh: %i vertices, %i triangles, %i surfaces\n", loadmodel->name, loadmodel->num_surfaces, loadmodel->brush.num_nodes, loadmodel->brush.num_leafs, mod->brush.num_pvsclusters, loadmodel->brush.num_portals, loadmodel->surfmesh.num_vertices, loadmodel->surfmesh.num_triangles, loadmodel->num_surfaces);
 }
 
 static int Mod_Q3BSP_SuperContentsFromNativeContents(dp_model_t *model, int nativecontents);
@@ -4638,10 +5228,9 @@ static void Mod_Q3BSP_LoadTextures(lump_t *l)
 
 	for (i = 0;i < count;i++)
 	{
-		strlcpy (out[i].name, in[i].name, sizeof (out[i].name));
 		out[i].surfaceflags = LittleLong(in[i].surfaceflags);
 		out[i].supercontents = Mod_Q3BSP_SuperContentsFromNativeContents(loadmodel, LittleLong(in[i].contents));
-		Mod_LoadTextureFromQ3Shader(out + i, out[i].name, true, true, TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS);
+		Mod_LoadTextureFromQ3Shader(out + i, in[i].name, true, true, TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS);
 		// restore the surfaceflags and supercontents
 		out[i].surfaceflags = LittleLong(in[i].surfaceflags);
 		out[i].supercontents = Mod_Q3BSP_SuperContentsFromNativeContents(loadmodel, LittleLong(in[i].contents));
@@ -6195,7 +6784,7 @@ static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t s
 	if (model->brush.submodel || mod_q3bsp_tracelineofsight_brushes.integer)
 	{
 		trace_t trace;
-		model->TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK);
+		model->TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
 		return trace.fraction == 1;
 	}
 	else
@@ -6207,7 +6796,7 @@ static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t s
 	}
 }
 
-void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask)
+void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	const bih_t *bih;
 	const bih_leaf_t *leaf;
@@ -6220,8 +6809,8 @@ void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameble
 
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 
 	bih = &model->collision_bih;
 	if(!bih->nodes)
@@ -6272,7 +6861,7 @@ void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameble
 	}
 }
 
-static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, const bih_t *bih)
+static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, const bih_t *bih)
 {
 	const bih_leaf_t *leaf;
 	const bih_node_t *node;
@@ -6288,7 +6877,7 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 
 	if (VectorCompare(start, end))
 	{
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
@@ -6296,8 +6885,8 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 
 	// push first node
 	nodestackline[nodestackpos][0] = start[0];
@@ -6313,7 +6902,12 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 		node = bih->nodes + nodenum;
 		VectorCopy(nodestackline[nodestackpos], nodestart);
 		VectorCopy(nodestackline[nodestackpos] + 3, nodeend);
-		sweepnodemins[0] = min(nodestart[0], nodeend[0]); sweepnodemins[1] = min(nodestart[1], nodeend[1]); sweepnodemins[2] = min(nodestart[2], nodeend[2]); sweepnodemaxs[0] = max(nodestart[0], nodeend[0]); sweepnodemaxs[1] = max(nodestart[1], nodeend[1]); sweepnodemaxs[2] = max(nodestart[2], nodeend[2]);
+		sweepnodemins[0] = min(nodestart[0], nodeend[0]) - 1;
+		sweepnodemins[1] = min(nodestart[1], nodeend[1]) - 1;
+		sweepnodemins[2] = min(nodestart[2], nodeend[2]) - 1;
+		sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + 1;
+		sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + 1;
+		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
 			continue;
 		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
@@ -6356,7 +6950,12 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 			axis = 2; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
 			// some of the line intersected the enlarged node box
 			// calculate sweep bounds for this node
-			sweepnodemins[0] = min(nodestart[0], nodeend[0]); sweepnodemins[1] = min(nodestart[1], nodeend[1]); sweepnodemins[2] = min(nodestart[2], nodeend[2]); sweepnodemaxs[0] = max(nodestart[0], nodeend[0]); sweepnodemaxs[1] = max(nodestart[1], nodeend[1]); sweepnodemaxs[2] = max(nodestart[2], nodeend[2]);
+			sweepnodemins[0] = min(nodestart[0], nodeend[0]) - 1;
+			sweepnodemins[1] = min(nodestart[1], nodeend[1]) - 1;
+			sweepnodemins[2] = min(nodestart[2], nodeend[2]) - 1;
+			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + 1;
+			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + 1;
+			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
 				leaf = bih->leafs + node->children[axis];
@@ -6386,17 +6985,17 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 	}
 }
 
-void Mod_CollisionBIH_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+void Mod_CollisionBIH_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	if (VectorCompare(start, end))
 	{
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
-	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, &model->collision_bih);
+	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, &model->collision_bih);
 }
 
-void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *thisbrush_start, colbrushf_t *thisbrush_end, int hitsupercontentsmask)
+void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *thisbrush_start, colbrushf_t *thisbrush_end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	const bih_t *bih;
 	const bih_leaf_t *leaf;
@@ -6412,9 +7011,9 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	if (mod_q3bsp_optimizedtraceline.integer && VectorCompare(thisbrush_start->mins, thisbrush_start->maxs) && VectorCompare(thisbrush_end->mins, thisbrush_end->maxs))
 	{
 		if (VectorCompare(thisbrush_start->mins, thisbrush_end->mins))
-			Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, thisbrush_start->mins, hitsupercontentsmask);
+			Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, thisbrush_start->mins, hitsupercontentsmask, skipsupercontentsmask);
 		else
-			Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, thisbrush_start->mins, thisbrush_end->mins, hitsupercontentsmask);
+			Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, thisbrush_start->mins, thisbrush_end->mins, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
@@ -6426,8 +7025,8 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	// box trace, performed as brush trace
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 
 	// calculate tracebox-like parameters for efficient culling
 	VectorMAM(0.5f, thisbrush_start->mins, 0.5f, thisbrush_start->maxs, start);
@@ -6457,7 +7056,12 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 		node = bih->nodes + nodenum;
 		VectorCopy(nodestackline[nodestackpos], nodestart);
 		VectorCopy(nodestackline[nodestackpos] + 3, nodeend);
-		sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0]; sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1]; sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2]; sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0]; sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1]; sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2];
+		sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0] - 1;
+		sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1] - 1;
+		sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2] - 1;
+		sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0] + 1;
+		sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1] + 1;
+		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
 			continue;
 		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
@@ -6500,7 +7104,12 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 			axis = 2; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
 			// some of the line intersected the enlarged node box
 			// calculate sweep bounds for this node
-			sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0]; sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1]; sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2]; sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0]; sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1]; sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2];
+			sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0] - 1;
+			sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1] - 1;
+			sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2] - 1;
+			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0] + 1;
+			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1] + 1;
+			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
 				leaf = bih->leafs + node->children[axis];
@@ -6530,7 +7139,7 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	}
 }
 
-void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask)
+void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	colboxbrushf_t thisbrush_start, thisbrush_end;
 	vec3_t boxstartmins, boxstartmaxs, boxendmins, boxendmaxs;
@@ -6542,18 +7151,25 @@ void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend
 	VectorAdd(end, boxmaxs, boxendmaxs);
 	Collision_BrushForBox(&thisbrush_start, boxstartmins, boxstartmaxs, 0, 0, NULL);
 	Collision_BrushForBox(&thisbrush_end, boxendmins, boxendmaxs, 0, 0, NULL);
-	Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask);
+	Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask);
 }
 
 
-static int Mod_CollisionBIH_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
+int Mod_CollisionBIH_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
 {
 	trace_t trace;
-	Mod_CollisionBIH_TracePoint(model, NULL, NULL, &trace, point, 0);
+	Mod_CollisionBIH_TracePoint(model, NULL, NULL, &trace, point, 0, 0);
 	return trace.startsupercontents;
 }
 
-void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask)
+qboolean Mod_CollisionBIH_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
+{
+	trace_t trace;
+	Mod_CollisionBIH_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
+	return trace.fraction == 1;
+}
+
+void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 #if 0
 	// broken - needs to be modified to count front faces and backfaces to figure out if it is in solid
@@ -6563,15 +7179,15 @@ void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *fra
 #endif
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 #if 0
-	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 	hitsupercontents = trace->hitsupercontents;
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	trace->startsupercontents = hitsupercontents;
 #endif
 }
@@ -6585,9 +7201,9 @@ int Mod_CollisionBIH_PointSuperContents_Mesh(struct model_s *model, int frame, c
 	VectorSet(end, start[0], start[1], model->normalmins[2]);
 	memset(&trace, 0, sizeof(trace));
 	trace.fraction = 1;
-	trace.realfraction = 1;
-	trace.hitsupercontentsmask = 0;
-	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+	trace.hitsupercontentsmask = hitsupercontentsmask;
+	trace.skipsupercontentsmask = skipsupercontentsmask;
+	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 	return trace.hitsupercontents;
 #else
 	return 0;
@@ -6667,7 +7283,7 @@ static void Mod_Q3BSP_TraceLine_RecursiveBSPNode(trace_t *trace, dp_model_t *mod
 			Mod_Q3BSP_TraceLine_RecursiveBSPNode(trace, model, node->children[startside], start, mid, startfrac, midfrac, linestart, lineend, markframe, segmentmins, segmentmaxs);
 			// if we found an impact on the front side, don't waste time
 			// exploring the far side
-			if (midfrac <= trace->realfraction)
+			if (midfrac <= trace->fraction)
 				Mod_Q3BSP_TraceLine_RecursiveBSPNode(trace, model, node->children[endside], mid, end, midfrac, endfrac, linestart, lineend, markframe, segmentmins, segmentmaxs);
 			return;
 		}
@@ -6809,16 +7425,16 @@ static void Mod_Q3BSP_TraceBrush_RecursiveBSPNode(trace_t *trace, dp_model_t *mo
 
 static int markframe = 0;
 
-static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask)
+static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	int i;
 	q3mbrush_t *brush;
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -6829,7 +7445,7 @@ static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameble
 		Mod_Q3BSP_TracePoint_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, ++markframe);
 }
 
-static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	int i;
 	float segmentmins[3], segmentmaxs[3];
@@ -6838,14 +7454,14 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 
 	if (VectorCompare(start, end))
 	{
-		Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask);
+		Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	segmentmins[0] = min(start[0], end[0]) - 1;
 	segmentmins[1] = min(start[1], end[1]) - 1;
 	segmentmins[2] = min(start[2], end[2]) - 1;
@@ -6853,7 +7469,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 	segmentmaxs[1] = max(start[1], end[1]) + 1;
 	segmentmaxs[2] = max(start[2], end[2]) + 1;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+		Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -6868,7 +7484,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 		Mod_Q3BSP_TraceLine_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, 0, 1, start, end, ++markframe, segmentmins, segmentmaxs);
 }
 
-static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *start, colbrushf_t *end, int hitsupercontentsmask)
+static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *start, colbrushf_t *end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	float segmentmins[3], segmentmaxs[3];
 	int i;
@@ -6878,25 +7494,25 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	if (mod_q3bsp_optimizedtraceline.integer && VectorCompare(start->mins, start->maxs) && VectorCompare(end->mins, end->maxs))
 	{
 		if (VectorCompare(start->mins, end->mins))
-			Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start->mins, hitsupercontentsmask);
+			Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start->mins, hitsupercontentsmask, skipsupercontentsmask);
 		else
-			Mod_Q3BSP_TraceLine(model, frameblend, skeleton, trace, start->mins, end->mins, hitsupercontentsmask);
+			Mod_Q3BSP_TraceLine(model, frameblend, skeleton, trace, start->mins, end->mins, hitsupercontentsmask, skipsupercontentsmask);
 		return;
 	}
 
 	// box trace, performed as brush trace
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
-	segmentmins[0] = min(start->mins[0], end->mins[0]);
-	segmentmins[1] = min(start->mins[1], end->mins[1]);
-	segmentmins[2] = min(start->mins[2], end->mins[2]);
-	segmentmaxs[0] = max(start->maxs[0], end->maxs[0]);
-	segmentmaxs[1] = max(start->maxs[1], end->maxs[1]);
-	segmentmaxs[2] = max(start->maxs[2], end->maxs[2]);
+	trace->skipsupercontentsmask = skipsupercontentsmask;
+	segmentmins[0] = min(start->mins[0], end->mins[0]) - 1;
+	segmentmins[1] = min(start->mins[1], end->mins[1]) - 1;
+	segmentmins[2] = min(start->mins[2], end->mins[2]) - 1;
+	segmentmaxs[0] = max(start->maxs[0], end->maxs[0]) + 1;
+	segmentmaxs[1] = max(start->maxs[1], end->maxs[1]) + 1;
+	segmentmaxs[2] = max(start->maxs[2], end->maxs[2]) + 1;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask);
+		Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -6911,7 +7527,7 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 		Mod_Q3BSP_TraceBrush_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, ++markframe, segmentmins, segmentmaxs);
 }
 
-static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask)
+static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	colboxbrushf_t thisbrush_start, thisbrush_end;
 	vec3_t boxstartmins, boxstartmaxs, boxendmins, boxendmaxs;
@@ -6923,7 +7539,7 @@ static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend
 	VectorAdd(end, boxmaxs, boxendmaxs);
 	Collision_BrushForBox(&thisbrush_start, boxstartmins, boxstartmaxs, 0, 0, NULL);
 	Collision_BrushForBox(&thisbrush_end, boxendmins, boxendmaxs, 0, 0, NULL);
-	Mod_Q3BSP_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask);
+	Mod_Q3BSP_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask);
 }
 
 static int Mod_Q3BSP_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
@@ -6962,9 +7578,9 @@ static int Mod_Q3BSP_PointSuperContents(struct model_s *model, int frame, const 
 	return supercontents;
 }
 
-void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
-	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, &model->render_bih);
+	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, &model->render_bih);
 }
 
 
@@ -7185,6 +7801,11 @@ static void Mod_Q3BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	mod->modeldatatypestring = "Q3BSP";
 
 	mod->type = mod_brushq3;
+	mod->brush.ishlbsp = false;
+	mod->brush.isbsp2rmqe = false;
+	mod->brush.isbsp2 = false;
+	mod->brush.isq2bsp = false;
+	mod->brush.isq3bsp = true;
 	mod->numframes = 2; // although alternate textures are not supported it is annoying to complain about no such frame 1
 	mod->numskins = 1;
 
@@ -7489,9 +8110,9 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	int maxvn = 0, numvn = 1;
 	char *texturenames = NULL;
 	float dist, modelradius, modelyawradius, yawradius;
-	float *v = NULL;
-	float *vt = NULL;
-	float *vn = NULL;
+	float *obj_v = NULL;
+	float *obj_vt = NULL;
+	float *obj_vn = NULL;
 	float mins[3];
 	float maxs[3];
 	float corner[3];
@@ -7505,7 +8126,7 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	skinfile_t *skinfiles = NULL;
 	unsigned char *data = NULL;
 	int *submodelfirstsurface;
-	msurface_t *surface;
+	msurface_t *tempsurface;
 	msurface_t *tempsurfaces;
 
 	memset(&vfirst, 0, sizeof(vfirst));
@@ -7611,19 +8232,19 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			if (maxv <= numv)
 			{
 				maxv = max(maxv * 2, 1024);
-				v = (float *)Mem_Realloc(tempmempool, v, maxv * sizeof(float[3]));
+				obj_v = (float *)Mem_Realloc(tempmempool, obj_v, maxv * sizeof(float[3]));
 			}
 			if(mod_obj_orientation.integer)
 			{
-				v[numv*3+0] = atof(argv[1]);
-				v[numv*3+2] = atof(argv[2]);
-				v[numv*3+1] = atof(argv[3]);
+				obj_v[numv*3+0] = atof(argv[1]);
+				obj_v[numv*3+2] = atof(argv[2]);
+				obj_v[numv*3+1] = atof(argv[3]);
 			}
 			else
 			{
-				v[numv*3+0] = atof(argv[1]);
-				v[numv*3+1] = atof(argv[2]);
-				v[numv*3+2] = atof(argv[3]);
+				obj_v[numv*3+0] = atof(argv[1]);
+				obj_v[numv*3+1] = atof(argv[2]);
+				obj_v[numv*3+2] = atof(argv[3]);
 			}
 			numv++;
 		}
@@ -7632,10 +8253,10 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			if (maxvt <= numvt)
 			{
 				maxvt = max(maxvt * 2, 1024);
-				vt = (float *)Mem_Realloc(tempmempool, vt, maxvt * sizeof(float[2]));
+				obj_vt = (float *)Mem_Realloc(tempmempool, obj_vt, maxvt * sizeof(float[2]));
 			}
-			vt[numvt*2+0] = atof(argv[1]);
-			vt[numvt*2+1] = 1-atof(argv[2]);
+			obj_vt[numvt*2+0] = atof(argv[1]);
+			obj_vt[numvt*2+1] = 1-atof(argv[2]);
 			numvt++;
 		}
 		else if (!strcmp(argv[0], "vn"))
@@ -7643,19 +8264,19 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			if (maxvn <= numvn)
 			{
 				maxvn = max(maxvn * 2, 1024);
-				vn = (float *)Mem_Realloc(tempmempool, vn, maxvn * sizeof(float[3]));
+				obj_vn = (float *)Mem_Realloc(tempmempool, obj_vn, maxvn * sizeof(float[3]));
 			}
 			if(mod_obj_orientation.integer)
 			{
-				vn[numvn*3+0] = atof(argv[1]);
-				vn[numvn*3+2] = atof(argv[2]);
-				vn[numvn*3+1] = atof(argv[3]);
+				obj_vn[numvn*3+0] = atof(argv[1]);
+				obj_vn[numvn*3+2] = atof(argv[2]);
+				obj_vn[numvn*3+1] = atof(argv[3]);
 			}
 			else
 			{
-				vn[numvn*3+0] = atof(argv[1]);
-				vn[numvn*3+1] = atof(argv[2]);
-				vn[numvn*3+2] = atof(argv[3]);
+				obj_vn[numvn*3+0] = atof(argv[1]);
+				obj_vn[numvn*3+1] = atof(argv[2]);
+				obj_vn[numvn*3+2] = atof(argv[3]);
 			}
 			numvn++;
 		}
@@ -7696,12 +8317,12 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 				vcurrent.nextindex = -1;
 				vcurrent.textureindex = textureindex;
 				vcurrent.submodelindex = submodelindex;
-				if (v && index1 >= 0 && index1 < numv)
-					VectorCopy(v + 3*index1, vcurrent.v);
-				if (vt && index2 >= 0 && index2 < numvt)
-					Vector2Copy(vt + 2*index2, vcurrent.vt);
-				if (vn && index3 >= 0 && index3 < numvn)
-					VectorCopy(vn + 3*index3, vcurrent.vn);
+				if (obj_v && index1 >= 0 && index1 < numv)
+					VectorCopy(obj_v + 3*index1, vcurrent.v);
+				if (obj_vt && index2 >= 0 && index2 < numvt)
+					Vector2Copy(obj_vt + 2*index2, vcurrent.vt);
+				if (obj_vn && index3 >= 0 && index3 < numvn)
+					VectorCopy(obj_vn + 3*index3, vcurrent.vn);
 				if (numtriangles == 0)
 				{
 					VectorCopy(vcurrent.v, mins);
@@ -7805,7 +8426,7 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	// allocate storage for the worst case number of surfaces, later we resize
 	tempsurfaces = (msurface_t *)Mem_Alloc(loadmodel->mempool, numtextures * loadmodel->brush.numsubmodels * sizeof(msurface_t));
 	submodelfirstsurface = (int *)Mem_Alloc(loadmodel->mempool, (loadmodel->brush.numsubmodels+1) * sizeof(int));
-	surface = tempsurfaces;
+	tempsurface = tempsurfaces;
 	for (submodelindex = 0;submodelindex < loadmodel->brush.numsubmodels;submodelindex++)
 	{
 		submodelfirstsurface[submodelindex] = loadmodel->num_surfaces;
@@ -7824,10 +8445,10 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 			surfacevertices = 0;
 			surfaceelements = 0;
 			// we hack in a texture index in the surface to be fixed up later...
-			surface->texture = (texture_t *)((size_t)textureindex);
+			tempsurface->texture = (texture_t *)((size_t)textureindex);
 			// calculate bounds as we go
-			VectorCopy(thisvertex->v, surface->mins);
-			VectorCopy(thisvertex->v, surface->maxs);
+			VectorCopy(thisvertex->v, tempsurface->mins);
+			VectorCopy(thisvertex->v, tempsurface->maxs);
 			for (;vertexindex < numtriangles*3;vertexindex++)
 			{
 				thisvertex = vertices + vertexindex;
@@ -7836,12 +8457,12 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 				if (thisvertex->textureindex != textureindex)
 					continue;
 				// add vertex to surface bounds
-				surface->mins[0] = min(surface->mins[0], thisvertex->v[0]);
-				surface->mins[1] = min(surface->mins[1], thisvertex->v[1]);
-				surface->mins[2] = min(surface->mins[2], thisvertex->v[2]);
-				surface->maxs[0] = max(surface->maxs[0], thisvertex->v[0]);
-				surface->maxs[1] = max(surface->maxs[1], thisvertex->v[1]);
-				surface->maxs[2] = max(surface->maxs[2], thisvertex->v[2]);
+				tempsurface->mins[0] = min(tempsurface->mins[0], thisvertex->v[0]);
+				tempsurface->mins[1] = min(tempsurface->mins[1], thisvertex->v[1]);
+				tempsurface->mins[2] = min(tempsurface->mins[2], thisvertex->v[2]);
+				tempsurface->maxs[0] = max(tempsurface->maxs[0], thisvertex->v[0]);
+				tempsurface->maxs[1] = max(tempsurface->maxs[1], thisvertex->v[1]);
+				tempsurface->maxs[2] = max(tempsurface->maxs[2], thisvertex->v[2]);
 				// add the vertex if it is not found in the merged set, and
 				// get its index (triangle element) for the surface
 				vertexhashindex = (unsigned int)(thisvertex->v[0] * 3571 + thisvertex->v[0] * 1777 + thisvertex->v[0] * 457) % (unsigned int)vertexhashsize;
@@ -7864,13 +8485,13 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 				surfaceelements++;
 			}
 			surfacetriangles = surfaceelements / 3;
-			surface->num_vertices = surfacevertices;
-			surface->num_triangles = surfacetriangles;
-			surface->num_firstvertex = firstvertex;
-			surface->num_firsttriangle = firsttriangle;
-			firstvertex += surface->num_vertices;
-			firsttriangle += surface->num_triangles;
-			surface++;
+			tempsurface->num_vertices = surfacevertices;
+			tempsurface->num_triangles = surfacetriangles;
+			tempsurface->num_firstvertex = firstvertex;
+			tempsurface->num_firsttriangle = firsttriangle;
+			firstvertex += tempsurface->num_vertices;
+			firsttriangle += tempsurface->num_triangles;
+			tempsurface++;
 			loadmodel->num_surfaces++;
 		}
 	}
@@ -7917,9 +8538,9 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	// free data
 	Mem_Free(vertices);
 	Mem_Free(texturenames);
-	Mem_Free(v);
-	Mem_Free(vt);
-	Mem_Free(vn);
+	Mem_Free(obj_v);
+	Mem_Free(obj_vt);
+	Mem_Free(obj_vn);
 	Mem_Free(vertexhashtable);
 	Mem_Free(vertexhashdata);
 
@@ -8009,24 +8630,24 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 		for (j = 0;j < mod->nummodelsurfaces;j++)
 		{
 			const msurface_t *surface = mod->data_surfaces + j + mod->firstmodelsurface;
-			const float *v = mod->surfmesh.data_vertex3f + 3 * surface->num_firstvertex;
+			const float *v3f = mod->surfmesh.data_vertex3f + 3 * surface->num_firstvertex;
 			int k;
 			if (!surface->num_vertices)
 				continue;
 			if (!l)
 			{
 				l = true;
-				VectorCopy(v, mod->normalmins);
-				VectorCopy(v, mod->normalmaxs);
+				VectorCopy(v3f, mod->normalmins);
+				VectorCopy(v3f, mod->normalmaxs);
 			}
-			for (k = 0;k < surface->num_vertices;k++, v += 3)
+			for (k = 0;k < surface->num_vertices;k++, v3f += 3)
 			{
-				mod->normalmins[0] = min(mod->normalmins[0], v[0]);
-				mod->normalmins[1] = min(mod->normalmins[1], v[1]);
-				mod->normalmins[2] = min(mod->normalmins[2], v[2]);
-				mod->normalmaxs[0] = max(mod->normalmaxs[0], v[0]);
-				mod->normalmaxs[1] = max(mod->normalmaxs[1], v[1]);
-				mod->normalmaxs[2] = max(mod->normalmaxs[2], v[2]);
+				mod->normalmins[0] = min(mod->normalmins[0], v3f[0]);
+				mod->normalmins[1] = min(mod->normalmins[1], v3f[1]);
+				mod->normalmins[2] = min(mod->normalmins[2], v3f[2]);
+				mod->normalmaxs[0] = max(mod->normalmaxs[0], v3f[0]);
+				mod->normalmaxs[1] = max(mod->normalmaxs[1], v3f[1]);
+				mod->normalmaxs[2] = max(mod->normalmaxs[2], v3f[2]);
 			}
 		}
 		corner[0] = max(fabs(mod->normalmins[0]), fabs(mod->normalmaxs[0]));

@@ -41,7 +41,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #pragma warning(disable : 4310) // LordHavoc: MSVC++ 2008 x86: cast truncates constant value
 #pragma warning(disable : 4245) // LordHavoc: MSVC++ 2008 x86: 'initializing' : conversion from 'int' to 'unsigned char', signed/unsigned mismatch
 #pragma warning(disable : 4204) // LordHavoc: MSVC++ 2008 x86: nonstandard extension used : non-constant aggregate initializer
-#pragma warning(disable : 4267) // LordHavoc: MSVC++ 2008 x64, conversion from 'size_t' to 'int', possible loss of data
+//#pragma warning(disable : 4267) // LordHavoc: MSVC++ 2008 x64, conversion from 'size_t' to 'int', possible loss of data
 //#pragma warning(disable : 4244)     // LordHavoc: MSVC++ 4 x86, double/float
 //#pragma warning(disable : 4305)		// LordHavoc: MSVC++ 6 x86, double/float
 //#pragma warning(disable : 4706)		// LordHavoc: MSVC++ 2008 x86, assignment within conditional expression
@@ -658,6 +658,12 @@ extern void (GLAPIENTRY *qglDrawBuffersARB)(GLsizei n, const GLenum *bufs);
 #define GL_LUMINANCE_ALPHA16F_ARB                            0x881F
 #endif
 
+// GL_ARB_half_float_pixel
+#ifndef GL_HALF_FLOAT_ARB
+typedef unsigned short GLhalfARB;
+#define GL_HALF_FLOAT_ARB                                    0x140B
+#endif
+
 // GL_EXT_texture_sRGB
 #ifndef GL_SRGB_EXT
 #define GL_SRGB_EXT                                          0x8C40
@@ -1071,6 +1077,14 @@ extern void (GLAPIENTRY *qglGetQueryObjectuivARB)(GLuint qid, GLenum pname, GLui
 #define GL_QUERY_RESULT_AVAILABLE_ARB                     0x8867
 #endif
 
+// GL_ARB_query_buffer_object
+#ifndef GL_QUERY_BUFFER_ARB
+#define GL_QUERY_BUFFER_ARB                               0x9192
+#define GL_QUERY_BUFFER_BINDING_ARB                       0x9193
+#define GL_QUERY_RESULT_NO_WAIT_ARB                       0x9194
+#define GL_QUERY_BUFFER_BARRIER_BIT_ARB                   0x00008000
+#endif
+
 // GL_EXT_bgr
 #define GL_BGR					0x80E0
 
@@ -1115,11 +1129,11 @@ extern void (GLAPIENTRY *qglBlendFuncSeparate)(GLenum sfactorRGB, GLenum dfactor
 
 #ifdef DEBUGGL
 #ifdef USE_GLES2
-#define CHECKGLERROR {if (gl_paranoid.integer){if (gl_printcheckerror.integer) Con_Printf("CHECKGLERROR at %s:%d\n", __FILE__, __LINE__);errornumber = glGetError();if (errornumber) GL_PrintError(errornumber, __FILE__, __LINE__);}}
+#define CHECKGLERROR {if (gl_paranoid.integer){if (gl_printcheckerror.integer) Con_Printf("CHECKGLERROR at %s:%d\n", __FILE__, __LINE__);gl_errornumber = glGetError();if (gl_errornumber) GL_PrintError(gl_errornumber, __FILE__, __LINE__);}}
 #else
-#define CHECKGLERROR {if (gl_paranoid.integer){if (gl_printcheckerror.integer) Con_Printf("CHECKGLERROR at %s:%d\n", __FILE__, __LINE__);errornumber = qglGetError ? qglGetError() : 0;if (errornumber) GL_PrintError(errornumber, __FILE__, __LINE__);}}
+#define CHECKGLERROR {if (gl_paranoid.integer){if (gl_printcheckerror.integer) Con_Printf("CHECKGLERROR at %s:%d\n", __FILE__, __LINE__);gl_errornumber = qglGetError ? qglGetError() : 0;if (gl_errornumber) GL_PrintError(gl_errornumber, __FILE__, __LINE__);}}
 #endif
-extern int errornumber;
+extern int gl_errornumber;
 void GL_PrintError(int errornumber, const char *filename, int linenumber);
 #else
 #define CHECKGLERROR

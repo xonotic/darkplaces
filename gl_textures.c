@@ -96,8 +96,8 @@ static textypeinfo_t textype_depth16                     = {"depth16",          
 static textypeinfo_t textype_depth24                     = {"depth24",                  TEXTYPE_DEPTHBUFFER24        ,  2,  2,  2.0f, GL_DEPTH_COMPONENT16              , GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT};
 static textypeinfo_t textype_depth24stencil8             = {"depth24stencil8",          TEXTYPE_DEPTHBUFFER24STENCIL8,  2,  2,  2.0f, GL_DEPTH_COMPONENT16              , GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT};
 static textypeinfo_t textype_colorbuffer                 = {"colorbuffer",              TEXTYPE_COLORBUFFER          ,  2,  2,  2.0f, GL_RGB565                         , GL_RGBA           , GL_UNSIGNED_SHORT_5_6_5};
-static textypeinfo_t textype_colorbuffer16f              = {"colorbuffer16f",           TEXTYPE_COLORBUFFER16F       ,  2,  2,  2.0f, GL_RGB565                         , GL_RGBA           , GL_UNSIGNED_SHORT_5_6_5};
-static textypeinfo_t textype_colorbuffer32f              = {"colorbuffer32f",           TEXTYPE_COLORBUFFER32F       ,  2,  2,  2.0f, GL_RGB565                         , GL_RGBA           , GL_UNSIGNED_SHORT_5_6_5};
+static textypeinfo_t textype_colorbuffer16f              = {"colorbuffer16f",           TEXTYPE_COLORBUFFER16F       ,  2,  2,  2.0f, GL_RGBA16F                        , GL_RGBA           , GL_HALF_FLOAT_ARB};
+static textypeinfo_t textype_colorbuffer32f              = {"colorbuffer32f",           TEXTYPE_COLORBUFFER32F       ,  2,  2,  2.0f, GL_RGBA32F                        , GL_RGBA           , GL_FLOAT};
 
 // image formats:
 static textypeinfo_t textype_alpha                       = {"alpha",                    TEXTYPE_ALPHA         ,  1,  4,  4.0f, GL_ALPHA                              , GL_ALPHA          , GL_UNSIGNED_BYTE };
@@ -120,7 +120,7 @@ static textypeinfo_t textype_depth16                     = {"depth16",          
 static textypeinfo_t textype_depth24                     = {"depth24",                  TEXTYPE_DEPTHBUFFER24        ,  4,  4,  4.0f, GL_DEPTH_COMPONENT24_ARB          , GL_DEPTH_COMPONENT, GL_UNSIGNED_INT  };
 static textypeinfo_t textype_depth24stencil8             = {"depth24stencil8",          TEXTYPE_DEPTHBUFFER24STENCIL8,  4,  4,  4.0f, GL_DEPTH24_STENCIL8_EXT           , GL_DEPTH_STENCIL_EXT, GL_UNSIGNED_INT_24_8_EXT};
 static textypeinfo_t textype_colorbuffer                 = {"colorbuffer",              TEXTYPE_COLORBUFFER          ,  4,  4,  4.0f, GL_RGBA                               , GL_BGRA           , GL_UNSIGNED_BYTE };
-static textypeinfo_t textype_colorbuffer16f              = {"colorbuffer16f",           TEXTYPE_COLORBUFFER16F       ,  8,  8,  8.0f, GL_RGBA16F_ARB                        , GL_RGBA           , GL_FLOAT         };
+static textypeinfo_t textype_colorbuffer16f              = {"colorbuffer16f",           TEXTYPE_COLORBUFFER16F       ,  8,  8,  8.0f, GL_RGBA16F_ARB                        , GL_RGBA           , GL_HALF_FLOAT_ARB};
 static textypeinfo_t textype_colorbuffer32f              = {"colorbuffer32f",           TEXTYPE_COLORBUFFER32F       , 16, 16, 16.0f, GL_RGBA32F_ARB                        , GL_RGBA           , GL_FLOAT         };
 
 // image formats:
@@ -209,7 +209,7 @@ typedef struct gltexture_s
 
 	// dynamic texture stuff [11/22/2007 Black]
 	updatecallback_t updatecallback;
-	void *updatacallback_data;
+	void *updatecallback_data;
 	// --- [11/22/2007 Black]
 
 	// stores backup copy of texture for deferred texture updates (gl_nopartialtextureupdates cvar)
@@ -353,13 +353,13 @@ void R_MakeTextureDynamic(rtexture_t *rt, updatecallback_t updatecallback, void 
 
 	glt->flags |= GLTEXF_DYNAMIC;
 	glt->updatecallback = updatecallback;
-	glt->updatacallback_data = data;
+	glt->updatecallback_data = data;
 }
 
 static void R_UpdateDynamicTexture(gltexture_t *glt) {
 	glt->dirty = false;
 	if( glt->updatecallback ) {
-		glt->updatecallback( (rtexture_t*) glt, glt->updatacallback_data );
+		glt->updatecallback( (rtexture_t*) glt, glt->updatecallback_data );
 	}
 }
 
@@ -855,7 +855,7 @@ static void r_textures_devicelost(void)
 {
 	int i, endindex;
 	gltexture_t *glt;
-	endindex = Mem_ExpandableArray_IndexRange(&texturearray);
+	endindex = (int)Mem_ExpandableArray_IndexRange(&texturearray);
 	for (i = 0;i < endindex;i++)
 	{
 		glt = (gltexture_t *) Mem_ExpandableArray_RecordAtIndex(&texturearray, i);
@@ -899,7 +899,7 @@ static void r_textures_devicerestored(void)
 {
 	int i, endindex;
 	gltexture_t *glt;
-	endindex = Mem_ExpandableArray_IndexRange(&texturearray);
+	endindex = (int)Mem_ExpandableArray_IndexRange(&texturearray);
 	for (i = 0;i < endindex;i++)
 	{
 		glt = (gltexture_t *) Mem_ExpandableArray_RecordAtIndex(&texturearray, i);
@@ -1803,7 +1803,7 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 	glt->gltexturetypeenum = gltexturetypeenums[glt->texturetype];
 	// init the dynamic texture attributes, too [11/22/2007 Black]
 	glt->updatecallback = NULL;
-	glt->updatacallback_data = NULL;
+	glt->updatecallback_data = NULL;
 
 	GL_Texture_CalcImageSize(glt->texturetype, glt->flags, glt->miplevel, glt->inputwidth, glt->inputheight, glt->inputdepth, &glt->tilewidth, &glt->tileheight, &glt->tiledepth, &glt->miplevels);
 
@@ -1971,11 +1971,11 @@ rtexture_t *R_LoadTextureRenderBuffer(rtexturepool_t *rtexturepool, const char *
 	glt->sides = glt->texturetype == GLTEXTURETYPE_CUBEMAP ? 6 : 1;
 	glt->texnum = 0;
 	glt->dirty = false;
-	glt->glisdepthstencil = glt->texturetype == TEXTYPE_DEPTHBUFFER24STENCIL8;
-	glt->gltexturetypeenum = gltexturetypeenums[glt->texturetype];
+	glt->glisdepthstencil = textype == TEXTYPE_DEPTHBUFFER24STENCIL8;
+	glt->gltexturetypeenum = GL_TEXTURE_2D;
 	// init the dynamic texture attributes, too [11/22/2007 Black]
 	glt->updatecallback = NULL;
-	glt->updatacallback_data = NULL;
+	glt->updatecallback_data = NULL;
 
 	GL_Texture_CalcImageSize(glt->texturetype, glt->flags, glt->miplevel, glt->inputwidth, glt->inputheight, glt->inputdepth, &glt->tilewidth, &glt->tileheight, &glt->tiledepth, &glt->miplevels);
 

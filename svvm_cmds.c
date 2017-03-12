@@ -168,6 +168,7 @@ const char *vm_sv_extensions =
 "DP_SV_CLIENTNAME "
 "DP_SV_CMD "
 "DP_SV_CUSTOMIZEENTITYFORCLIENT "
+"DP_SV_DISABLECLIENTPREDICTION "
 "DP_SV_DISCARDABLEDEMO "
 "DP_SV_DRAWONLYTOCLIENT "
 "DP_SV_DROPCLIENT "
@@ -210,6 +211,7 @@ const char *vm_sv_extensions =
 "DP_TE_SPARK "
 "DP_TE_STANDARDEFFECTBUILTINS "
 "DP_TRACE_HITCONTENTSMASK_SURFACEINFO "
+"DP_USERMOVETYPES "
 "DP_VIEWZOOM "
 "EXT_BITSHIFT "
 "FRIK_FILE "
@@ -522,7 +524,7 @@ static void VM_SV_sound(prvm_prog_t *prog)
 	const char	*sample;
 	int			channel;
 	prvm_edict_t		*entity;
-	int 		volume;
+	int 		nvolume;
 	int flags;
 	float attenuation;
 	float pitchchange;
@@ -532,7 +534,7 @@ static void VM_SV_sound(prvm_prog_t *prog)
 	entity = PRVM_G_EDICT(OFS_PARM0);
 	channel = (int)PRVM_G_FLOAT(OFS_PARM1);
 	sample = PRVM_G_STRING(OFS_PARM2);
-	volume = (int)(PRVM_G_FLOAT(OFS_PARM3) * 255);
+	nvolume = (int)(PRVM_G_FLOAT(OFS_PARM3) * 255);
 	if (prog->argc < 5)
 	{
 		Con_DPrintf("VM_SV_sound: given only 4 parameters, expected 5, assuming attenuation = ATTN_NORMAL\n");
@@ -560,7 +562,7 @@ static void VM_SV_sound(prvm_prog_t *prog)
 		flags = (int)PRVM_G_FLOAT(OFS_PARM6) & (CHANNELFLAG_RELIABLE | CHANNELFLAG_FORCELOOP | CHANNELFLAG_PAUSED);
 	}
 
-	if (volume < 0 || volume > 255)
+	if (nvolume < 0 || nvolume > 255)
 	{
 		VM_Warning(prog, "SV_StartSound: volume must be in range 0-1\n");
 		return;
@@ -580,7 +582,7 @@ static void VM_SV_sound(prvm_prog_t *prog)
 		return;
 	}
 
-	SV_StartSound (entity, channel, sample, volume, attenuation, flags & CHANNELFLAG_RELIABLE, pitchchange);
+	SV_StartSound (entity, channel, sample, nvolume, attenuation, flags & CHANNELFLAG_RELIABLE, pitchchange);
 }
 
 /*
@@ -596,7 +598,7 @@ is omitted (since no entity is being tracked).
 static void VM_SV_pointsound(prvm_prog_t *prog)
 {
 	const char	*sample;
-	int 		volume;
+	int 		nvolume;
 	float		attenuation;
 	float		pitchchange;
 	vec3_t		org;
@@ -605,11 +607,11 @@ static void VM_SV_pointsound(prvm_prog_t *prog)
 
 	VectorCopy(PRVM_G_VECTOR(OFS_PARM0), org);
 	sample = PRVM_G_STRING(OFS_PARM1);
-	volume = (int)(PRVM_G_FLOAT(OFS_PARM2) * 255);
+	nvolume = (int)(PRVM_G_FLOAT(OFS_PARM2) * 255);
 	attenuation = PRVM_G_FLOAT(OFS_PARM3);
 	pitchchange = prog->argc < 5 ? 0 : PRVM_G_FLOAT(OFS_PARM4) * 0.01f;
 
-	if (volume < 0 || volume > 255)
+	if (nvolume < 0 || nvolume > 255)
 	{
 		VM_Warning(prog, "SV_StartPointSound: volume must be in range 0-1\n");
 		return;
@@ -621,7 +623,7 @@ static void VM_SV_pointsound(prvm_prog_t *prog)
 		return;
 	}
 
-	SV_StartPointSound (org, sample, volume, attenuation, pitchchange);
+	SV_StartPointSound (org, sample, nvolume, attenuation, pitchchange);
 }
 
 /*
@@ -654,7 +656,7 @@ static void VM_SV_traceline(prvm_prog_t *prog)
 	if (VEC_IS_NAN(v1[0]) || VEC_IS_NAN(v1[1]) || VEC_IS_NAN(v1[2]) || VEC_IS_NAN(v2[0]) || VEC_IS_NAN(v2[1]) || VEC_IS_NAN(v2[2]))
 		prog->error_cmd("%s: NAN errors detected in traceline('%f %f %f', '%f %f %f', %i, entity %i)\n", prog->name, v1[0], v1[1], v1[2], v2[0], v2[1], v2[2], move, PRVM_EDICT_TO_PROG(ent));
 
-	trace = SV_TraceLine(v1, v2, move, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceLine(v1, v2, move, ent, SV_GenericHitSuperContentsMask(ent), 0, collision_extendtracelinelength.value);
 
 	VM_SetTraceGlobals(prog, &trace);
 }
@@ -693,7 +695,7 @@ static void VM_SV_tracebox(prvm_prog_t *prog)
 	if (VEC_IS_NAN(v1[0]) || VEC_IS_NAN(v1[1]) || VEC_IS_NAN(v1[2]) || VEC_IS_NAN(v2[0]) || VEC_IS_NAN(v2[1]) || VEC_IS_NAN(v2[2]))
 		prog->error_cmd("%s: NAN errors detected in tracebox('%f %f %f', '%f %f %f', '%f %f %f', '%f %f %f', %i, entity %i)\n", prog->name, v1[0], v1[1], v1[2], m1[0], m1[1], m1[2], m2[0], m2[1], m2[2], v2[0], v2[1], v2[2], move, PRVM_EDICT_TO_PROG(ent));
 
-	trace = SV_TraceBox(v1, m1, m2, v2, move, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceBox(v1, m1, m2, v2, move, ent, SV_GenericHitSuperContentsMask(ent), 0, collision_extendtraceboxlength.value);
 
 	VM_SetTraceGlobals(prog, &trace);
 }
@@ -729,7 +731,7 @@ static trace_t SV_Trace_Toss(prvm_prog_t *prog, prvm_edict_t *tossent, prvm_edic
 		VectorCopy(PRVM_serveredictvector(tossent, origin), tossentorigin);
 		VectorCopy(PRVM_serveredictvector(tossent, mins), tossentmins);
 		VectorCopy(PRVM_serveredictvector(tossent, maxs), tossentmaxs);
-		trace = SV_TraceBox(tossentorigin, tossentmins, tossentmaxs, end, MOVE_NORMAL, tossent, SV_GenericHitSuperContentsMask(tossent));
+		trace = SV_TraceBox(tossentorigin, tossentmins, tossentmaxs, end, MOVE_NORMAL, tossent, SV_GenericHitSuperContentsMask(tossent), 0, collision_extendmovelength.value);
 		VectorCopy (trace.endpos, PRVM_serveredictvector(tossent, origin));
 		PRVM_serveredictvector(tossent, velocity)[2] -= gravity;
 
@@ -1157,13 +1159,13 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 	VectorCopy(PRVM_serveredictvector(ent, origin), entorigin);
 	VectorCopy(PRVM_serveredictvector(ent, mins), entmins);
 	VectorCopy(PRVM_serveredictvector(ent, maxs), entmaxs);
-	trace = SV_TraceBox(entorigin, entmins, entmaxs, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent));
+	trace = SV_TraceBox(entorigin, entmins, entmaxs, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent), 0, collision_extendmovelength.value);
 	if (trace.startsolid && sv_gameplayfix_droptofloorstartsolid.integer)
 	{
 		vec3_t offset, org;
 		VectorSet(offset, 0.5f * (PRVM_serveredictvector(ent, mins)[0] + PRVM_serveredictvector(ent, maxs)[0]), 0.5f * (PRVM_serveredictvector(ent, mins)[1] + PRVM_serveredictvector(ent, maxs)[1]), PRVM_serveredictvector(ent, mins)[2]);
 		VectorAdd(PRVM_serveredictvector(ent, origin), offset, org);
-		trace = SV_TraceLine(org, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent));
+		trace = SV_TraceLine(org, end, MOVE_NORMAL, ent, SV_GenericHitSuperContentsMask(ent), 0, collision_extendmovelength.value);
 		VectorSubtract(trace.endpos, offset, trace.endpos);
 		if (trace.startsolid)
 		{
@@ -1311,7 +1313,7 @@ static void VM_SV_aim(prvm_prog_t *prog)
 // try sending a trace straight
 	VectorCopy (PRVM_serverglobalvector(v_forward), dir);
 	VectorMA (start, 2048, dir, end);
-	tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY);
+	tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, 0, collision_extendmovelength.value);
 	if (tr.ent && PRVM_serveredictfloat(((prvm_edict_t *)tr.ent), takedamage) == DAMAGE_AIM
 	&& (!teamplay.integer || PRVM_serveredictfloat(ent, team) <=0 || PRVM_serveredictfloat(ent, team) != PRVM_serveredictfloat(((prvm_edict_t *)tr.ent), team)) )
 	{
@@ -1343,7 +1345,7 @@ static void VM_SV_aim(prvm_prog_t *prog)
 		dist = DotProduct (dir, PRVM_serverglobalvector(v_forward));
 		if (dist < bestdist)
 			continue;	// to far to turn
-		tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY);
+		tr = SV_TraceLine(start, end, MOVE_NORMAL, ent, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, 0, collision_extendmovelength.value);
 		if (tr.ent == check)
 		{	// can shoot at this one
 			bestdist = dist;
@@ -1496,8 +1498,8 @@ static void VM_SV_WritePicture(prvm_prog_t *prog)
 	if(Image_Compress(imgname, size, &buf, &size))
 	{
 		// actual picture
-		MSG_WriteShort(WriteDest(prog), size);
-		SZ_Write(WriteDest(prog), (unsigned char *) buf, size);
+		MSG_WriteShort(WriteDest(prog), (int)size);
+		SZ_Write(WriteDest(prog), (unsigned char *) buf, (int)size);
 	}
 	else
 	{

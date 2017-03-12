@@ -141,9 +141,8 @@ typedef struct server_s
 	server_floodaddress_t connectfloodaddresses[MAX_CONNECTFLOODADDRESSES];
 	server_floodaddress_t getstatusfloodaddresses[MAX_GETSTATUSFLOODADDRESSES];
 
-#define SV_MAX_PARTICLEEFFECTNAME 256
 	qboolean particleeffectnamesloaded;
-	char particleeffectname[SV_MAX_PARTICLEEFFECTNAME][MAX_QPATH];
+	char particleeffectname[MAX_PARTICLEEFFECTNAME][MAX_QPATH];
 
 	int writeentitiestoclient_stats_culled_pvs;
 	int writeentitiestoclient_stats_culled_trace;
@@ -215,9 +214,9 @@ typedef struct client_s
 	/// communications handle
 	netconn_t *netconnection;
 
-	int movesequence;
+	unsigned int movesequence;
 	signed char movement_count[NETGRAPH_PACKETS];
-	int movement_highestsequence_seen; // not the same as movesequence if prediction is off
+	unsigned int movement_highestsequence_seen; // not the same as movesequence if prediction is off
 	/// movement
 	usercmd_t cmd;
 	/// intended motion calced from cmd
@@ -313,7 +312,7 @@ typedef struct client_s
 
 	// last sent move sequence
 	// if the move sequence changed, an empty entity frame is sent
-	int lastmovesequence;
+	unsigned int lastmovesequence;
 } client_t;
 
 
@@ -336,6 +335,8 @@ typedef struct client_s
 #define MOVETYPE_FAKEPUSH		13		///< tenebrae's push that doesn't push
 #define MOVETYPE_PHYSICS		32		///< indicates this object is physics controlled
 #define MOVETYPE_FLY_WORLDONLY		33		///< like MOVETYPE_FLY, but uses MOVE_WORLDONLY for all its traces; objects of this movetype better be SOLID_NOT or SOLID_TRIGGER please, or else...
+#define MOVETYPE_USER_FIRST		128		///< user defined movetypes
+#define MOVETYPE_USER_LAST		191
 
 // edict->solid values
 #define	SOLID_NOT				0		///< no interaction with other objects
@@ -576,9 +577,9 @@ qboolean SV_NudgeOutOfSolid(prvm_edict_t *ent);
 /// calculates hitsupercontentsmask for a generic qc entity
 int SV_GenericHitSuperContentsMask(const prvm_edict_t *edict);
 /// traces a box move against worldmodel and all entities in the specified area
-trace_t SV_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int type, prvm_edict_t *passedict, int hitsupercontentsmask);
-trace_t SV_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_t *passedict, int hitsupercontentsmask);
-trace_t SV_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int hitsupercontentsmask);
+trace_t SV_TraceBox(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int type, prvm_edict_t *passedict, int hitsupercontentsmask, int skipsupercontentsmask, float extend);
+trace_t SV_TraceLine(const vec3_t start, const vec3_t end, int type, prvm_edict_t *passedict, int hitsupercontentsmask, int skipsupercontentsmask, float extend);
+trace_t SV_TracePoint(const vec3_t start, int type, prvm_edict_t *passedict, int hitsupercontentsmask, int skipsupercontentsmask);
 int SV_EntitiesInBox(const vec3_t mins, const vec3_t maxs, int maxedicts, prvm_edict_t **resultedicts);
 
 qboolean SV_CanSeeBox(int numsamples, vec_t enlarge, vec3_t eye, vec3_t entboxmins, vec3_t entboxmaxs);

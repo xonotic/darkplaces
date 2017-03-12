@@ -227,6 +227,7 @@ static void CSQC_SetGlobals (double frametime)
 	prvm_prog_t *prog = CLVM_prog;
 	CSQC_BEGIN
 		PRVM_clientglobalfloat(time) = cl.time;
+		PRVM_clientglobalfloat(cltime) = realtime; // Spike named it that way.
 		PRVM_clientglobalfloat(frametime) = frametime;
 		PRVM_clientglobalfloat(servercommandframe) = cls.servermovesequence;
 		PRVM_clientglobalfloat(clientcommandframe) = cl.movecmd[0].sequence;
@@ -716,7 +717,7 @@ void CL_VM_UpdateShowingScoresState (int showingscores)
 		CSQC_END
 	}
 }
-qboolean CL_VM_Event_Sound(int sound_num, float volume, int channel, float attenuation, int ent, vec3_t pos, int flags, float speed)
+qboolean CL_VM_Event_Sound(int sound_num, float fvolume, int channel, float attenuation, int ent, vec3_t pos, int flags, float speed)
 {
 	prvm_prog_t *prog = CLVM_prog;
 	qboolean r = false;
@@ -730,7 +731,7 @@ qboolean CL_VM_Event_Sound(int sound_num, float volume, int channel, float atten
 			PRVM_G_FLOAT(OFS_PARM0) = ent;
 			PRVM_G_FLOAT(OFS_PARM1) = CHAN_ENGINE2USER(channel);
 			PRVM_G_INT(OFS_PARM2) = PRVM_SetTempString(prog, cl.sound_name[sound_num] );
-			PRVM_G_FLOAT(OFS_PARM3) = volume;
+			PRVM_G_FLOAT(OFS_PARM3) = fvolume;
 			PRVM_G_FLOAT(OFS_PARM4) = attenuation;
 			VectorCopy(pos, PRVM_G_VECTOR(OFS_PARM5) );
 			PRVM_G_FLOAT(OFS_PARM6) = speed * 100.0f;
@@ -941,7 +942,7 @@ static qboolean CLVM_load_edict(prvm_prog_t *prog, prvm_edict_t *ent)
 qboolean MakeDownloadPacket(const char *filename, unsigned char *data, size_t len, int crc, int cnt, sizebuf_t *buf, int protocol)
 {
 	int packetsize = buf->maxsize - 7; // byte short long
-	int npackets = (len + packetsize - 1) / (packetsize);
+	int npackets = ((int)len + packetsize - 1) / (packetsize);
 	char vabuf[1024];
 
 	if(protocol == PROTOCOL_QUAKEWORLD)
@@ -957,7 +958,7 @@ qboolean MakeDownloadPacket(const char *filename, unsigned char *data, size_t le
 	else if(cnt >= 1 && cnt <= npackets)
 	{
 		unsigned long thispacketoffset = (cnt - 1) * packetsize;
-		int thispacketsize = len - thispacketoffset;
+		int thispacketsize = (int)len - thispacketoffset;
 		if(thispacketsize > packetsize)
 			thispacketsize = packetsize;
 
@@ -1144,6 +1145,9 @@ void CL_VM_Init (void)
 	// call the prog init
 	prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Init), "QC function CSQC_Init is missing");
 
+	// Once CSQC_Init was called, we consider csqc code fully initialized.
+	prog->inittime = realtime;
+
 	cl.csqc_loaded = true;
 
 	cl.csqc_vidvars.drawcrosshair = false;
@@ -1220,7 +1224,7 @@ qboolean CL_VM_TransformView(int entnum, matrix4x4_t *viewmatrix, mplane_t *clip
 		if(PRVM_clientedictfunction(ed, camera_transform))
 		{
 			ret = true;
-			if(viewmatrix || clipplane || visorigin)
+			if(viewmatrix && clipplane && visorigin)
 			{
 				Matrix4x4_ToVectors(viewmatrix, forward, left, up, origin);
 				AnglesFromVectors(ang, forward, up, false);
@@ -1241,7 +1245,7 @@ qboolean CL_VM_TransformView(int entnum, matrix4x4_t *viewmatrix, mplane_t *clip
 				Matrix4x4_Invert_Full(&mat, viewmatrix);
 				Matrix4x4_FromVectors(viewmatrix, forward, left, up, origin);
 				Matrix4x4_Concat(&matq, viewmatrix, &mat);
-				Matrix4x4_TransformPositivePlane(&matq, clipplane->normal[0], clipplane->normal[1], clipplane->normal[2], clipplane->dist, &clipplane->normal[0]);
+				Matrix4x4_TransformPositivePlane(&matq, clipplane->normal[0], clipplane->normal[1], clipplane->normal[2], clipplane->dist, clipplane->normal_and_dist);
 			}
 		}
 	CSQC_END

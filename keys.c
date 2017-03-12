@@ -116,7 +116,7 @@ static void Key_History_Push(void)
 	if(strncmp(key_line, "]quit ", 6)) // putting these into the history just sucks
 	if(strcmp(key_line, "]rcon_password")) // putting these into the history just sucks
 	if(strncmp(key_line, "]rcon_password ", 15)) // putting these into the history just sucks
-		ConBuffer_AddLine(&history, key_line + 1, strlen(key_line) - 1, 0);
+		ConBuffer_AddLine(&history, key_line + 1, (int)strlen(key_line) - 1, 0);
 	Con_Printf("%s\n", key_line); // don't mark empty lines as history
 	history_line = -1;
 	if (history_matchfound)
@@ -128,7 +128,7 @@ static qboolean Key_History_Get_foundCommand(void)
 	if (!history_matchfound)
 		return false;
 	strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
-	key_linepos = strlen(key_line);
+	key_linepos = (int)strlen(key_line);
 	history_matchfound = false;
 	return true;
 }
@@ -147,14 +147,14 @@ static void Key_History_Up(void)
 		if(history_line != -1)
 		{
 			strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
-			key_linepos = strlen(key_line);
+			key_linepos = (int)strlen(key_line);
 		}
 	}
 	else if(history_line > 0)
 	{
 		--history_line; // this also does -1 -> 0, so it is good
 		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
-		key_linepos = strlen(key_line);
+		key_linepos = (int)strlen(key_line);
 	}
 }
 
@@ -177,7 +177,7 @@ static void Key_History_Down(void)
 		strlcpy(key_line + 1, history_savedline, sizeof(key_line) - 1);
 	}
 
-	key_linepos = strlen(key_line);
+	key_linepos = (int)strlen(key_line);
 }
 
 static void Key_History_First(void)
@@ -189,7 +189,7 @@ static void Key_History_First(void)
 	{
 		history_line = 0;
 		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
-		key_linepos = strlen(key_line);
+		key_linepos = (int)strlen(key_line);
 	}
 }
 
@@ -202,7 +202,7 @@ static void Key_History_Last(void)
 	{
 		history_line = CONBUFFER_LINES_COUNT(&history) - 1;
 		strlcpy(key_line + 1, ConBuffer_GetLine(&history, history_line), sizeof(key_line) - 1);
-		key_linepos = strlen(key_line);
+		key_linepos = (int)strlen(key_line);
 	}
 }
 
@@ -753,21 +753,6 @@ Key_Console (int key, int unicode)
 				i= MAX_INPUTLINE - key_linepos - 1;
 			if (i > 0)
 			{
-				// terencehill: insert the clipboard text between the characters of the line
-				/*
-				char *temp = (char *) Z_Malloc(MAX_INPUTLINE);
-				cbd[i]=0;
-				temp[0]=0;
-				if ( key_linepos < (int)strlen(key_line) )
-					strlcpy(temp, key_line + key_linepos, (int)strlen(key_line) - key_linepos +1);
-				key_line[key_linepos] = 0;
-				strlcat(key_line, cbd, sizeof(key_line));
-				if (temp[0])
-					strlcat(key_line, temp, sizeof(key_line));
-				Z_Free(temp);
-				key_linepos += i;
-				*/
-				// blub: I'm changing this to use memmove() like the rest of the code does.
 				cbd[i] = 0;
 				memmove(key_line + key_linepos + i, key_line + key_linepos, sizeof(key_line) - key_linepos - i);
 				memcpy(key_line + key_linepos, cbd, i);
@@ -851,12 +836,12 @@ Key_Console (int key, int unicode)
 			
 			// save the content of the variable in cvar_str
 			cvar_str = Cvar_VariableString(cvar);
-			cvar_str_len = strlen(cvar_str);
+			cvar_str_len = (int)strlen(cvar_str);
 			if (cvar_str_len==0)
 				return;
 			
 			// insert space and cvar_str in key_line
-			chars_to_move = strlen(&key_line[key_linepos]);
+			chars_to_move = (int)strlen(&key_line[key_linepos]);
 			if (key_linepos + 1 + cvar_str_len + chars_to_move < MAX_INPUTLINE)
 			{
 				if (chars_to_move)
@@ -914,7 +899,7 @@ Key_Console (int key, int unicode)
 		{
 			int		pos;
 			size_t          inchar = 0;
-			pos = u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
+			pos = (int)u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
 			while (pos)
 				if(pos-1 > 0 && key_line[pos-1] == STRING_COLOR_TAG && isdigit(key_line[pos]))
 					pos-=2;
@@ -930,11 +915,11 @@ Key_Console (int key, int unicode)
 				}
 			// we need to move to the beginning of the character when in a wide character:
 			u8_charidx(key_line, pos + 1, &inchar);
-			key_linepos = pos + 1 - inchar;
+			key_linepos = (int)(pos + 1 - inchar);
 		}
 		else
 		{
-			key_linepos = u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
+			key_linepos = (int)u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
 		}
 		return;
 	}
@@ -944,7 +929,7 @@ Key_Console (int key, int unicode)
 	{
 		if (key_linepos > 1)
 		{
-			int newpos = u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
+			int newpos = (int)u8_prevbyte(key_line+1, key_linepos-1) + 1; // do NOT give the ']' to u8_prevbyte
 			strlcpy(key_line + newpos, key_line + key_linepos, sizeof(key_line) + 1 - key_linepos);
 			key_linepos = newpos;
 		}
@@ -1011,7 +996,7 @@ Key_Console (int key, int unicode)
 			// skip the char
 			if (key_line[pos] == STRING_COLOR_TAG && key_line[pos+1] == STRING_COLOR_TAG) // consider ^^ as a character
 				pos++;
-			pos += u8_bytelen(key_line + pos, 1);
+			pos += (int)u8_bytelen(key_line + pos, 1);
 			
 			// now go beyond all next consecutive color tags, if any
 			if(pos < len)
@@ -1027,7 +1012,7 @@ Key_Console (int key, int unicode)
 			key_linepos = pos;
 		}
 		else
-			key_linepos += u8_bytelen(key_line + key_linepos, 1);
+			key_linepos += (int)u8_bytelen(key_line + key_linepos, 1);
 		return;
 	}
 
@@ -1050,7 +1035,6 @@ Key_Console (int key, int unicode)
 		Key_History_Down();
 		return;
 	}
-	// ~1.0795 = 82/76  using con_textsize 64 76 is height of the char, 6 is the distance between 2 lines
 
 	if (keydown[K_CTRL])
 	{
@@ -1186,16 +1170,21 @@ Key_Console (int key, int unicode)
 		// check insert mode, or always insert if at end of line
 		if (key_insert || len == 0)
 		{
+			if (key_linepos + len + blen >= MAX_INPUTLINE)
+				return;
 			// can't use strcpy to move string to right
 			len++;
-			//memmove(&key_line[key_linepos + u8_bytelen(key_line + key_linepos, 1)], &key_line[key_linepos], len);
+			if (key_linepos + blen + len >= MAX_INPUTLINE)
+				return;
 			memmove(&key_line[key_linepos + blen], &key_line[key_linepos], len);
 		}
+		else if (key_linepos + len + blen - u8_bytelen(key_line + key_linepos, 1) >= MAX_INPUTLINE)
+			return;
 		memcpy(key_line + key_linepos, buf, blen);
+		if (blen > len)
+			key_line[key_linepos + blen] = 0;
+		// END OF FIXME
 		key_linepos += blen;
-		//key_linepos += u8_fromchar(unicode, key_line + key_linepos, sizeof(key_line) - key_linepos - 1);
-		//key_line[key_linepos] = ascii;
-		//key_linepos++;
 	}
 }
 
@@ -1255,7 +1244,7 @@ Key_Message (int key, int ascii, qboolean down)
     if(down == false) // Izy's Patch
         return;
 
-	if (key == K_ENTER || ascii == 10 || ascii == 13)
+	if (key == K_ENTER || key == K_KP_ENTER || ascii == 10 || ascii == 13)
 	{
         
         switch(chat_mode)
@@ -1287,21 +1276,17 @@ Key_Message (int key, int ascii, qboolean down)
 		return;
 	}
 
-	// delete char before cursor
-	if (key == K_BACKSPACE) // Added by Izy (izy from izysoftware.com)
-    {
+	if (key == K_BACKSPACE)
+	{
 		if(chat_cursor > 0)
-        {
-            // Backspace is always equivalent to K_LEFTARROW + K_DEL
-            #if 1 // ok, allow the quick fast case
-            if(chat_cursor == chat_bufferlen)
-            {
-			    chat_bufferlen = chat_cursor = u8_prevbyte(chat_buffer, chat_bufferlen);
-			    chat_buffer[chat_bufferlen] = 0;
-		        return;
-            }
-            #endif
-            Key_Message_SendFakeKeys(fake_backspace, sizeof(fake_backspace)/sizeof(fake_backspace[0]));
+		{
+			if (chat_cursor == chat_bufferlen)
+			{
+				chat_bufferlen = chat_cursor = (unsigned int)u8_prevbyte(chat_buffer, chat_bufferlen);
+				chat_buffer[chat_bufferlen] = 0;
+				return;
+			}
+			Key_Message_SendFakeKeys(fake_backspace, sizeof(fake_backspace)/sizeof(fake_backspace[0]));
 		}
 		return;
 	}
@@ -1980,11 +1965,6 @@ Key_Event (int key, int ascii, qboolean down)
 		return;
 	}
 
-	if (ascii == 0x80 && utf8_enable.integer) // pressing AltGr-5 (or AltGr-e) and for some reason we get windows-1252 encoding?
-		ascii = 0x20AC; // we want the Euro currency sign
-		// TODO find out which vid_ drivers do it and fix it there
-		// but catching U+0080 here is no loss as that char is not useful anyway
-
 	// get key binding
 	bind = keybindings[key_bmap][key];
 	if (!bind)
@@ -1995,7 +1975,7 @@ Key_Event (int key, int ascii, qboolean down)
 
 	if(key_consoleactive)
 		keydest = key_console;
-	
+
 	if (down)
 	{
 		// increment key repeat count each time a down is received so that things
@@ -2019,7 +1999,7 @@ Key_Event (int key, int ascii, qboolean down)
 
 	if(keydest == key_void)
 		return;
-	
+
 	// key_consoleactive is a flag not a key_dest because the console is a
 	// high priority overlay ontop of the normal screen (designed as a safety
 	// feature so that developers and users can rescue themselves from a bad
@@ -2146,7 +2126,7 @@ Key_Event (int key, int ascii, qboolean down)
 	{
 		if (down && con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && ascii != STRING_COLOR_TAG)
 		{
-			Con_ToggleConsole_f ();
+			Cbuf_AddText("toggleconsole\n");  // Deferred to next frame so we're not sending the text event to the console.
 			tbl_keydest[key] = key_void; // key release should go nowhere (especially not to key_menu or key_game)
 			return;
 		}

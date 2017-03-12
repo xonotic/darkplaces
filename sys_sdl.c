@@ -1,9 +1,5 @@
 
 #ifdef WIN32
-#ifdef _MSC_VER
-#pragma comment(lib, "sdl.lib")
-#pragma comment(lib, "sdlmain.lib")
-#endif
 #include <io.h>
 #include "conio.h"
 #else
@@ -23,6 +19,18 @@
 #include <signal.h>
 
 #include <SDL.h>
+
+#ifdef WIN32
+#ifdef _MSC_VER
+#if SDL_MAJOR_VERSION == 1
+#pragma comment(lib, "sdl.lib")
+#pragma comment(lib, "sdlmain.lib")
+#else
+#pragma comment(lib, "sdl2.lib")
+#pragma comment(lib, "sdl2main.lib")
+#endif
+#endif
+#endif
 
 #include "quakedef.h"
 
@@ -59,6 +67,10 @@ void Sys_Error (const char *error, ...)
 
 	Con_Printf ("Quake Error: %s\n", string);
 
+#ifdef WIN32
+	MessageBox(NULL, string, "Quake Error", MB_OK | MB_SETFOREGROUND | MB_ICONSTOP);
+#endif
+
 	Host_Shutdown ();
 	exit (1);
 }
@@ -86,7 +98,7 @@ void Sys_PrintToTerminal(const char *text)
 #endif
 		while(*text)
 		{
-			fs_offset_t written = (fs_offset_t)write(outfd, text, strlen(text));
+			fs_offset_t written = (fs_offset_t)write(outfd, text, (int)strlen(text));
 			if(written <= 0)
 				break; // sorry, I cannot do anything about this error - without an output
 			text += written;
@@ -161,7 +173,21 @@ char *Sys_ConsoleInput(void)
 
 char *Sys_GetClipboardData (void)
 {
-#ifdef WIN32
+#if SDL_MAJOR_VERSION != 1
+	char *data = NULL;
+	char *cliptext;
+
+	cliptext = SDL_GetClipboardText();
+	if (cliptext != NULL) {
+		size_t allocsize;
+		allocsize = strlen(cliptext) + 1;
+		data = (char *)Z_Malloc (allocsize);
+		strlcpy (data, cliptext, allocsize);
+		SDL_free(cliptext);
+	}
+
+	return data;
+#elif defined(WIN32)
 	char *data = NULL;
 	char *cliptext;
 

@@ -48,6 +48,10 @@ cvar_t cl_bobmodel = {CVAR_SAVE, "cl_bobmodel", "1", "enables gun bobbing"};
 cvar_t cl_bobmodel_side = {CVAR_SAVE, "cl_bobmodel_side", "0.15", "gun bobbing sideways sway amount"};
 cvar_t cl_bobmodel_up = {CVAR_SAVE, "cl_bobmodel_up", "0.06", "gun bobbing upward movement amount"};
 cvar_t cl_bobmodel_speed = {CVAR_SAVE, "cl_bobmodel_speed", "7", "gun bobbing speed"};
+cvar_t cl_bob_limit = {CVAR_SAVE, "cl_bob_limit", "7", "limits bobbing to this much distance from view_ofs"};
+cvar_t cl_bob_limit_heightcheck = {CVAR_SAVE, "cl_bob_limit_heightcheck", "0", "check ceiling and floor height against cl_bob_limit and scale down all view bobbing if could result in camera being in solid"};
+cvar_t cl_bob_limit_heightcheck_dontcrosswatersurface = {CVAR_SAVE, "cl_bob_limit_heightcheck_dontcrosswatersurface", "1", "limit cl_bob_limit to not crossing liquid surfaces also"};
+cvar_t cl_bob_velocity_limit = {CVAR_SAVE, "cl_bob_velocity_limit", "400", "limits the xyspeed value in the bobbing code"};
 
 cvar_t cl_leanmodel = {CVAR_SAVE, "cl_leanmodel", "0", "enables gun leaning"};
 cvar_t cl_leanmodel_side_speed = {CVAR_SAVE, "cl_leanmodel_side_speed", "0.7", "gun leaning sideways speed"};
@@ -109,6 +113,8 @@ cvar_t v_deathtiltangle = {0, "v_deathtiltangle", "80", "what roll angle to use 
 
 // Prophecy camera pitchangle by Alexander "motorsep" Zubov
 cvar_t chase_pitchangle = {CVAR_SAVE, "chase_pitchangle", "55", "chase cam pitch angle"};
+
+cvar_t v_yshearing = {0, "v_yshearing", "0", "be all out of gum (set this to the maximum angle to allow Y shearing for - try values like 75)"};
 
 float	v_dmg_time, v_dmg_roll, v_dmg_pitch;
 
@@ -493,6 +499,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	cl.oldonground = clonground;
 	cl.calcrefdef_prevtime = max(cl.calcrefdef_prevtime, cl.oldtime);
 
+	VectorClear(gunangles);
 	VectorClear(gunorg);
 	viewmodelmatrix_nobob = identitymatrix;
 	viewmodelmatrix_withbob = identitymatrix;
@@ -521,6 +528,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 			r_refdef.view.matrix = *entrendermatrix;
 			Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, clstatsviewheight);
 		}
+		if (v_yshearing.value > 0)
+			Matrix4x4_QuakeToDuke3D(&r_refdef.view.matrix, &r_refdef.view.matrix, v_yshearing.value);
 		Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
 		Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
 		Matrix4x4_Copy(&viewmodelmatrix_withbob, &viewmodelmatrix_nobob);
@@ -580,20 +589,20 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup;
 #if 0
 #if 1
-				//trace = CL_TraceLine(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
-				trace = CL_TraceLine(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+				//trace = CL_TraceLine(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				trace = CL_TraceLine(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
 #else
-				//trace = CL_TraceBox(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+				//trace = CL_TraceBox(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
 #endif
 				VectorCopy(trace.endpos, vieworg);
 				vieworg[2] -= 8;
 #else
 				// trace from first person view location to our chosen third person view location
 #if 1
-				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
+				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
 #else
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false);
 #endif
 				VectorCopy(trace.endpos, bestvieworg);
 				offset[2] = 0;
@@ -606,9 +615,9 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup + offset[1];
 						chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup + offset[2];
 #if 1
-						trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
+						trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
 #else
-						trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false);
+						trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false);
 #endif
 						if (bestvieworg[2] > trace.endpos[2])
 							bestvieworg[2] = trace.endpos[2];
@@ -634,7 +643,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				chase_dest[0] = vieworg[0] + forward[0] * dist;
 				chase_dest[1] = vieworg[1] + forward[1] * dist;
 				chase_dest[2] = vieworg[2] + forward[2] * dist + camup;
-				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, true, false, NULL, false, true);
+				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
 				VectorMAMAM(1, trace.endpos, 8, forward, 4, trace.plane.normal, vieworg);
 			}
 		}
@@ -656,7 +665,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 			if (!cldead)
 			{
 				double xyspeed, bob, bobfall;
-				float cycle;
+				double cycle; // double-precision because cl.time can be a very large number, where float would get stuttery at high time values
 				vec_t frametime;
 
 				frametime = (cl.time - cl.calcrefdef_prevtime) * cl.movevars_timescale;
@@ -707,11 +716,36 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				VectorAdd(viewangles, gunangles, gunangles);
 
 				// bounded XY speed, used by several effects below
-				xyspeed = bound (0, sqrt(clvelocity[0]*clvelocity[0] + clvelocity[1]*clvelocity[1]), 400);
+				xyspeed = bound (0, sqrt(clvelocity[0]*clvelocity[0] + clvelocity[1]*clvelocity[1]), cl_bob_velocity_limit.value);
 
 				// vertical view bobbing code
 				if (cl_bob.value && cl_bobcycle.value)
 				{
+					float bob_limit = cl_bob_limit.value;
+
+					if (cl_bob_limit_heightcheck.integer)
+					{
+						// use traces to determine what range the view can bob in, and scale down the bob as needed
+						float trace1fraction;
+						float trace2fraction;
+						vec3_t bob_height_check_dest;
+
+						// these multipliers are expanded a bit (the actual bob sin range is from -0.4 to 1.0) to reduce nearclip issues, especially on water surfaces
+						bob_height_check_dest[0] = vieworg[0];
+						bob_height_check_dest[1] = vieworg[1];
+						bob_height_check_dest[2] = vieworg[2] + cl_bob_limit.value * 1.1f;
+						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, collision_extendmovelength.value, true, false, NULL, false, true);
+						trace1fraction = trace.fraction;
+
+						bob_height_check_dest[0] = vieworg[0];
+						bob_height_check_dest[1] = vieworg[1];
+						bob_height_check_dest[2] = vieworg[2] + cl_bob_limit.value * -0.5f;
+						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, collision_extendmovelength.value, true, false, NULL, false, true);
+						trace2fraction = trace.fraction;
+
+						bob_limit *= min(trace1fraction, trace2fraction);
+					}
+
 					// LordHavoc: this code is *weird*, but not replacable (I think it
 					// should be done in QC on the server, but oh well, quake is quake)
 					// LordHavoc: figured out bobup: the time at which the sin is at 180
@@ -724,7 +758,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						cycle = sin(M_PI + M_PI * (cycle-cl_bobup.value)/(1.0 - cl_bobup.value));
 					// bob is proportional to velocity in the xy plane
 					// (don't count Z, or jumping messes it up)
-					bob = xyspeed * bound(0, cl_bob.value, 0.05);
+					bob = xyspeed * cl_bob.value;
+					bob = bound(0, bob, bob_limit);
 					bob = bob*0.3 + bob*0.7*cycle;
 					vieworg[2] += bob;
 					// we also need to adjust gunorg, or this appears like pushing the gun!
@@ -747,7 +782,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						cycle = cos(M_PI * cycle / 0.5); // cos looks better here with the other view bobbing using sin
 					else
 						cycle = cos(M_PI + M_PI * (cycle-0.5)/0.5);
-					bob = bound(0, cl_bob2.value, 0.05) * cycle;
+					bob = cl_bob2.value * cycle;
 
 					// this value slowly decreases from 1 to 0 when we stop touching the ground.
 					// The cycle is later multiplied with it so the view smooths back to normal
@@ -764,8 +799,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 					// calculate the front and side of the player between the X and Y axes
 					AngleVectors(viewangles, forward, right, up);
 					// now get the speed based on those angles. The bounds should match the same value as xyspeed's
-					side = bound(-400, DotProduct (clvelocity, right) * cl.bob2_smooth, 400);
-					front = bound(-400, DotProduct (clvelocity, forward) * cl.bob2_smooth, 400);
+					side = bound(-cl_bob_velocity_limit.value, DotProduct (clvelocity, right) * cl.bob2_smooth, cl_bob_velocity_limit.value);
+					front = bound(-cl_bob_velocity_limit.value, DotProduct (clvelocity, forward) * cl.bob2_smooth, cl_bob_velocity_limit.value);
 					VectorScale(forward, bob, forward);
 					VectorScale(right, bob, right);
 					// we use side with forward and front with right, so the bobbing goes
@@ -854,12 +889,17 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 			viewangles[2] += v_idlescale.value * sin(cl.time*v_iroll_cycle.value) * v_iroll_level.value;
 		}
 		Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, vieworg[0], vieworg[1], vieworg[2], viewangles[0], viewangles[1], viewangles[2], 1);
+		if (v_yshearing.value > 0)
+			Matrix4x4_QuakeToDuke3D(&r_refdef.view.matrix, &r_refdef.view.matrix, v_yshearing.value);
 
 		// calculate a viewmodel matrix for use in view-attached entities
 		Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
 		Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
 
 		Matrix4x4_CreateFromQuakeEntity(&viewmodelmatrix_withbob, gunorg[0], gunorg[1], gunorg[2], gunangles[0], gunangles[1], gunangles[2], cl_viewmodel_scale.value);
+		if (v_yshearing.value > 0)
+			Matrix4x4_QuakeToDuke3D(&viewmodelmatrix_withbob, &viewmodelmatrix_withbob, v_yshearing.value);
+
 		VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
 		VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
 
@@ -1094,6 +1134,10 @@ void V_Init (void)
 	Cvar_RegisterVariable (&cl_bobmodel_side);
 	Cvar_RegisterVariable (&cl_bobmodel_up);
 	Cvar_RegisterVariable (&cl_bobmodel_speed);
+	Cvar_RegisterVariable (&cl_bob_limit);
+	Cvar_RegisterVariable (&cl_bob_limit_heightcheck);
+	Cvar_RegisterVariable (&cl_bob_limit_heightcheck_dontcrosswatersurface);
+	Cvar_RegisterVariable (&cl_bob_velocity_limit);
 
 	Cvar_RegisterVariable (&cl_leanmodel);
 	Cvar_RegisterVariable (&cl_leanmodel_side_speed);
@@ -1138,5 +1182,7 @@ void V_Init (void)
 
 	Cvar_RegisterVariable (&v_deathtilt);
 	Cvar_RegisterVariable (&v_deathtiltangle);
+
+	Cvar_RegisterVariable (&v_yshearing);
 }
 

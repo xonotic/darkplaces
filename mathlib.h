@@ -181,9 +181,10 @@ int PointInfrontOfTriangle(const float *p, const float *a, const float *b, const
 }
 #endif
 
-#define lhcheeserand() (seed = (seed * 987211u) ^ (seed >> 13u) ^ 914867)
-#define lhcheeserandom(MIN,MAX) ((double)(lhcheeserand() + 0.5) / ((double)4096.0*1024.0*1024.0) * ((MAX)-(MIN)) + (MIN))
-#define VectorCheeseRandom(v) do{(v)[0] = lhcheeserandom(-1, 1);(v)[1] = lhcheeserandom(-1, 1);(v)[2] = lhcheeserandom(-1, 1);}while(DotProduct(v, v) > 1)
+#define lhcheeserand(seed) ((seed) = ((seed) * 987211u) ^ ((seed) >> 13u) ^ 914867)
+#define lhcheeserandom(seed,MIN,MAX) ((double)(lhcheeserand(seed) + 0.5) / ((double)4096.0*1024.0*1024.0) * ((MAX)-(MIN)) + (MIN))
+#define VectorCheeseRandom(seed,v) do{(v)[0] = lhcheeserandom(seed,-1, 1);(v)[1] = lhcheeserandom(seed,-1, 1);(v)[2] = lhcheeserandom(seed,-1, 1);}while(DotProduct(v, v) > 1)
+#define VectorLehmerRandom(seed,v) do{(v)[0] = Math_crandomf(seed);(v)[1] = Math_crandomf(seed);(v)[2] = Math_crandomf(seed);}while(DotProduct(v, v) > 1)
 
 /*
 // LordHavoc: quaternion math, untested, don't know if these are correct,
@@ -252,6 +253,8 @@ void R_ConcatTransforms (const float in1[3*4], const float in2[3*4], float out[3
 void AngleVectors (const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 /// LordHavoc: proper matrix version of AngleVectors
 void AngleVectorsFLU (const vec3_t angles, vec3_t forward, vec3_t left, vec3_t up);
+/// divVerent: improper matrix version of AngleVectors
+void AngleVectorsDuke3DFLU (const vec3_t angles, vec3_t forward, vec3_t left, vec3_t up, double maxShearAngle);
 /// LordHavoc: builds a [3][4] matrix
 void AngleMatrix (const vec3_t angles, const vec3_t translate, vec_t matrix[][4]);
 /// LordHavoc: calculates pitch/yaw/roll angles from forward and up vectors
@@ -298,6 +301,22 @@ int Math_atov(const char *s, prvm_vec3_t out);
 void BoxFromPoints(vec3_t mins, vec3_t maxs, int numpoints, vec_t *point3f);
 
 int LoopingFrameNumberFromDouble(double t, int loopframes);
+
+// implementation of 128bit Lehmer Random Number Generator with 2^126 period
+// https://en.wikipedia.org/Lehmer_random_number_generator
+typedef struct randomseed_s
+{
+	unsigned int s[4];
+}
+randomseed_t;
+
+void Math_RandomSeed_Reset(randomseed_t *r);
+void Math_RandomSeed_FromInt(randomseed_t *r, unsigned int n);
+unsigned long long Math_rand64(randomseed_t *r);
+float Math_randomf(randomseed_t *r);
+float Math_crandomf(randomseed_t *r);
+float Math_randomrangef(randomseed_t *r, float minf, float maxf);
+int Math_randomrangei(randomseed_t *r, int mini, int maxi);
 
 void Mathlib_Init(void);
 

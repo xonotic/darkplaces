@@ -26,10 +26,24 @@ endif  # ifneq ($(filter %BSD,$(DP_ARCH)),)
 endif  # ifdef windir
 endif  # ifndef DP_MAKE_TARGET
 
-# If we're not on compiling for Win32, we need additional information
-ifneq ($(DP_MAKE_TARGET), mingw)
-	DP_ARCH:=$(shell uname)
+# If we're targeting an x86 CPU we want to enable DP_SSE (CFLAGS_SSE and SSE2)
+ifeq ($(DP_MAKE_TARGET), mingw)
+	DP_SSE:=1
+else
 	DP_MACHINE:=$(shell uname -m)
+	ifeq ($(DP_MACHINE),x86_64)
+		DP_SSE:=1
+	else
+	ifeq ($(DP_MACHINE),i686)
+		DP_SSE:=1
+	else
+	ifeq ($(DP_MACHINE),i386)
+		DP_SSE:=1
+	else
+		DP_SSE:=0
+	endif # ifeq ($(DP_MACHINE),i386)
+	endif # ifeq ($(DP_MACHINE),i686)
+	endif # ifeq ($(DP_MACHINE),x86_64)
 endif
 
 # Makefile name
@@ -143,7 +157,7 @@ ifeq ($(DP_MAKE_TARGET), macosx)
 	endif
 
 	DP_LINK_ZLIB?=shared
-	DP_LINK_JPEG?=shared
+	DP_LINK_JPEG?=dlopen
 	DP_LINK_ODE?=dlopen
 	DP_LINK_CRYPTO?=dlopen
 	DP_LINK_CRYPTO_RIJNDAEL?=dlopen
@@ -230,7 +244,7 @@ ifeq ($(WIN32RELEASE), 1)
 #	TARGET=i686-pc-mingw32
 #	CC=$(TARGET)-g++
 #	WINDRES=$(TARGET)-windres
-	CPUOPTIMIZATIONS=-march=i686 -fno-math-errno -ffinite-math-only -fno-rounding-math -fno-signaling-nans -fno-trapping-math
+	CPUOPTIMIZATIONS=-march=pentium3 -mfpmath=sse -fno-math-errno -ffinite-math-only -fno-rounding-math -fno-signaling-nans -fno-trapping-math
 #       CPUOPTIMIZATIONS+=-DUSE_WSPIAPI_H -DSUPPORTIPV6
 	LDFLAGS_WINCOMMON=-Wl,--large-address-aware
 else
@@ -401,6 +415,10 @@ ifdef DP_PRELOAD_DEPENDENCIES
 	CFLAGS_PRELOAD=$(CFLAGS_UNIX_PRELOAD)
 endif
 endif
+
+CFLAGS_NET=
+# Systems without IPv6 support should uncomment this:
+#CFLAGS_NET+=-DNOSUPPORTIPV6
 
 ##### GNU Make specific definitions #####
 

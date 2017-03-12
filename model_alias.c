@@ -94,37 +94,37 @@ void Mod_Skeletal_BuildTransforms(const dp_model_t * RESTRICT model, const frame
 		for (i = 0;i < model->num_bones;i++)
 		{
 			// blend by transform each quaternion/translation into a dual-quaternion first, then blending
-			const short * RESTRICT pose7s = model->data_poses7s + 7 * (frameblend[0].subframe * model->num_bones + i);
-			float lerp = frameblend[0].lerp,
-				tx = pose7s[0], ty = pose7s[1], tz = pose7s[2],
-				rx = pose7s[3] * lerp,
-				ry = pose7s[4] * lerp,
-				rz = pose7s[5] * lerp,
-				rw = pose7s[6] * lerp,
-				dx = tx*rw + ty*rz - tz*ry,
-				dy = -tx*rz + ty*rw + tz*rx,
-				dz = tx*ry - ty*rx + tz*rw,
-				dw = -tx*rx - ty*ry - tz*rz,
+			const short * RESTRICT firstpose7s = model->data_poses7s + 7 * (frameblend[0].subframe * model->num_bones + i);
+			float firstlerp = frameblend[0].lerp,
+				firsttx = firstpose7s[0], firstty = firstpose7s[1], firsttz = firstpose7s[2],
+				rx = firstpose7s[3] * firstlerp,
+				ry = firstpose7s[4] * firstlerp,
+				rz = firstpose7s[5] * firstlerp,
+				rw = firstpose7s[6] * firstlerp,
+				dx = firsttx*rw + firstty*rz - firsttz*ry,
+				dy = -firsttx*rz + firstty*rw + firsttz*rx,
+				dz = firsttx*ry - firstty*rx + firsttz*rw,
+				dw = -firsttx*rx - firstty*ry - firsttz*rz,
 				scale, sx, sy, sz, sw;
 			for (blends = 1;blends < MAX_FRAMEBLENDS && frameblend[blends].lerp > 0;blends++)
 			{
-				const short * RESTRICT pose7s = model->data_poses7s + 7 * (frameblend[blends].subframe * model->num_bones + i);
-				float lerp = frameblend[blends].lerp,
-					tx = pose7s[0], ty = pose7s[1], tz = pose7s[2],
-					qx = pose7s[3], qy = pose7s[4], qz = pose7s[5], qw = pose7s[6];
-				if(rx*qx + ry*qy + rz*qz + rw*qw < 0) lerp = -lerp;
-				qx *= lerp;
-				qy *= lerp;
-				qz *= lerp;
-				qw *= lerp;
+				const short * RESTRICT blendpose7s = model->data_poses7s + 7 * (frameblend[blends].subframe * model->num_bones + i);
+				float blendlerp = frameblend[blends].lerp,
+					blendtx = blendpose7s[0], blendty = blendpose7s[1], blendtz = blendpose7s[2],
+					qx = blendpose7s[3], qy = blendpose7s[4], qz = blendpose7s[5], qw = blendpose7s[6];
+				if(rx*qx + ry*qy + rz*qz + rw*qw < 0) blendlerp = -blendlerp;
+				qx *= blendlerp;
+				qy *= blendlerp;
+				qz *= blendlerp;
+				qw *= blendlerp;
 				rx += qx;
 				ry += qy;
 				rz += qz;
 				rw += qw;
-				dx += tx*qw + ty*qz - tz*qy;
-				dy += -tx*qz + ty*qw + tz*qx;
-				dz += tx*qy - ty*qx + tz*qw;
-				dw += -tx*qx - ty*qy - tz*qz;
+				dx += blendtx*qw + blendty*qz - blendtz*qy;
+				dy += -blendtx*qz + blendty*qw + blendtz*qx;
+				dz += blendtx*qy - blendty*qx + blendtz*qw;
+				dw += -blendtx*qx - blendty*qy - blendtz*qz;
 			}
 			// generate a matrix from the dual-quaternion, implicitly normalizing it in the process
 			scale = 1.0f / (rx*rx + ry*ry + rz*rz + rw*rw);
@@ -752,7 +752,7 @@ static void Mod_Alias_MorphMesh_CompileFrames(void)
 	}
 }
 
-static void Mod_MDLMD2MD3_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask)
+static void Mod_MDLMD2MD3_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	int i;
 	float segmentmins[3], segmentmaxs[3];
@@ -761,8 +761,8 @@ static void Mod_MDLMD2MD3_TraceLine(dp_model_t *model, const frameblend_t *frame
 	float *vertex3f = vertex3fbuf;
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	if (model->surfmesh.num_vertices > 1024)
 		vertex3f = (float *)Mem_Alloc(tempmempool, model->surfmesh.num_vertices * sizeof(float[3]));
 	segmentmins[0] = min(start[0], end[0]) - 1;
@@ -778,7 +778,7 @@ static void Mod_MDLMD2MD3_TraceLine(dp_model_t *model, const frameblend_t *frame
 		Mem_Free(vertex3f);
 }
 
-static void Mod_MDLMD2MD3_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask)
+static void Mod_MDLMD2MD3_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
 {
 	int i;
 	vec3_t shiftstart, shiftend;
@@ -793,7 +793,7 @@ static void Mod_MDLMD2MD3_TraceBox(dp_model_t *model, const frameblend_t *frameb
 	{
 		VectorAdd(start, boxmins, shiftstart);
 		VectorAdd(end, boxmins, shiftend);
-		Mod_MDLMD2MD3_TraceLine(model, frameblend, skeleton, trace, shiftstart, shiftend, hitsupercontentsmask);
+		Mod_MDLMD2MD3_TraceLine(model, frameblend, skeleton, trace, shiftstart, shiftend, hitsupercontentsmask, skipsupercontentsmask);
 		VectorSubtract(trace->endpos, boxmins, trace->endpos);
 		return;
 	}
@@ -801,8 +801,8 @@ static void Mod_MDLMD2MD3_TraceBox(dp_model_t *model, const frameblend_t *frameb
 	// box trace, performed as brush trace
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
-	trace->realfraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
+	trace->skipsupercontentsmask = skipsupercontentsmask;
 	if (model->surfmesh.num_vertices > 1024)
 		vertex3f = (float *)Mem_Alloc(tempmempool, model->surfmesh.num_vertices * sizeof(float[3]));
 	segmentmins[0] = min(start[0], end[0]) + boxmins[0] - 1;
@@ -924,6 +924,7 @@ static void Mod_BuildAliasSkinFromSkinFrame(texture_t *texture, skinframe_t *ski
 	//texture->textureflags = 0;
 
 	texture->basematerialflags = MATERIALFLAG_WALL;
+	texture->basealpha = 1.0f;
 	if (texture->currentskinframe->hasalpha)
 		texture->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
 	texture->currentmaterialflags = texture->basematerialflags;

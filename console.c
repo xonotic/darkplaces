@@ -714,7 +714,7 @@ static void Con_MessageMode_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
+		chat_bufferlen = chat_cursor = (unsigned int)strlen(chat_buffer); // Izy's patch
 	}
 }
 
@@ -731,7 +731,7 @@ static void Con_MessageMode2_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
+		chat_bufferlen = chat_cursor = (unsigned int)strlen(chat_buffer); // Izy's patch
 	}
 }
 
@@ -746,7 +746,7 @@ static void Con_CommandMode_f (void)
 	if(Cmd_Argc() > 1)
 	{
 		dpsnprintf(chat_buffer, sizeof(chat_buffer), "%s ", Cmd_Args());
-		chat_bufferlen = chat_cursor = strlen(chat_buffer); // Izy's patch
+		chat_bufferlen = chat_cursor = (unsigned int)strlen(chat_buffer); // Izy's patch
 	}
 	chat_mode = DP_CHAT_MODE_COMMAND; // command
 }
@@ -983,7 +983,7 @@ void Con_Rcon_Redirect_Init(lhnetsocket_t *sock, lhnetaddress_t *dest, qboolean 
 		rcon_redirect_buffer[2] = 0;
 		rcon_redirect_buffer[3] = 0;
 		// this is a reply to a CCREQ_RCON
-		rcon_redirect_buffer[4] = (char)CCREP_RCON;
+		rcon_redirect_buffer[4] = (unsigned char)CCREP_RCON;
 	}
 	else
 		memcpy(rcon_redirect_buffer, "\377\377\377\377n", 5); // QW rcon print
@@ -1506,12 +1506,11 @@ The input line scrolls horizontally if typing goes beyond the right edge
 Modified by EvilTypeGuy eviltypeguy@qeradiant.com
 ================
 */
-extern cvar_t r_font_disable_freetype;
 static void Con_DrawInput (void)
 {
 	int		y;
 	int		i;
-	char editlinecopy[MAX_INPUTLINE+1], *text;
+	char text[sizeof(key_line)+5+1]; // space for ^^xRGB too
 	float x, xo;
 	size_t len_out;
 	int col_out;
@@ -1519,47 +1518,45 @@ static void Con_DrawInput (void)
 	if (!key_consoleactive)
 		return;		// don't draw anything
 
-	strlcpy(editlinecopy, key_line, sizeof(editlinecopy));
-	text = editlinecopy;
+	strlcpy(text, key_line, sizeof(text));
 
 	// Advanced Console Editing by Radix radix@planetquake.com
 	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
-	// use strlen of edit_line instead of key_linepos to allow editing
-	// of early characters w/o erasing
 
 	y = (int)strlen(text);
 
-	// append enoug nul-bytes to cover the utf8-versions of the cursor too
-	for (i = y; i < y + 4 && i < (int)sizeof(editlinecopy); ++i)
-		text[i] = 0;
-
-	// add the cursor frame
-	if (r_font_disable_freetype.integer)
+	// make the color code visible when the cursor is inside it
+	if(text[key_linepos] != 0)
 	{
-		// this code is freetype incompatible!
-		if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
-		{
-			if (!utf8_enable.integer)
-				text[key_linepos] = 11 + 130 * key_insert;	// either solid or triangle facing right
-			else if (y + 3 < (int)sizeof(editlinecopy)-1)
+		for(i=1; i < 5 && key_linepos - i > 0; ++i)
+			if(text[key_linepos-i] == STRING_COLOR_TAG)
 			{
-				int ofs = u8_bytelen(text + key_linepos, 1);
-				size_t len;
-				const char *curbuf;
-				char charbuf16[16];
-				curbuf = u8_encodech(0xE000 + 11 + 130 * key_insert, &len, charbuf16);
-
-				if (curbuf)
+				int caret_pos, ofs = 0;
+				caret_pos = key_linepos - i;
+				if(i == 1 && text[caret_pos+1] == STRING_COLOR_TAG)
+					ofs = 1;
+				else if(i == 1 && isdigit(text[caret_pos+1]))
+					ofs = 2;
+				else if(text[caret_pos+1] == STRING_COLOR_RGB_TAG_CHAR && isxdigit(text[caret_pos+2]) && isxdigit(text[caret_pos+3]) && isxdigit(text[caret_pos+4]))
+					ofs = 5;
+				if(ofs && (size_t)(y + ofs + 1) < sizeof(text))
 				{
-					memmove(text + key_linepos + len, text + key_linepos + ofs, sizeof(editlinecopy) - key_linepos - len);
-					memcpy(text + key_linepos, curbuf, len);
+					int carets = 1;
+					while(caret_pos - carets >= 1 && text[caret_pos - carets] == STRING_COLOR_TAG)
+						++carets;
+					if(carets & 1)
+					{
+						// str^2ing (displayed as string) --> str^2^^2ing (displayed as str^2ing)
+						// str^^ing (displayed as str^ing) --> str^^^^ing (displayed as str^^ing)
+						memmove(&text[caret_pos + ofs + 1], &text[caret_pos], y - caret_pos);
+						text[caret_pos + ofs] = STRING_COLOR_TAG;
+						y += ofs + 1;
+						text[y] = 0;
+					}
 				}
-			} else
-				text[key_linepos] = '-' + ('+' - '-') * key_insert;
-		}
+				break;
+			}
 	}
-
-//	text[key_linepos + 1] = 0;
 
 	len_out = key_linepos;
 	col_out = -1;
@@ -1571,31 +1568,25 @@ static void Con_DrawInput (void)
 	// draw it
 	DrawQ_String(x, con_vislines - con_textsize.value*2, text, y + 3, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, FONT_CONSOLE );
 
-	// add a cursor on top of this (when using freetype)
-	if (!r_font_disable_freetype.integer)
+	// draw a cursor on top of this
+	if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
 	{
-		if ((int)(realtime*con_cursorspeed) & 1)		// cursor is visible
+		if (!utf8_enable.integer)
 		{
-			if (!utf8_enable.integer)
-			{
-				text[0] = 11 + 130 * key_insert;	// either solid or triangle facing right
-				text[1] = 0;
-			}
-			else
-			{
-				size_t len;
-				const char *curbuf;
-				char charbuf16[16];
-				curbuf = u8_encodech(0xE000 + 11 + 130 * key_insert, &len, charbuf16);
-				memcpy(text, curbuf, len);
-				text[len] = 0;
-			}
-			DrawQ_String(x + xo, con_vislines - con_textsize.value*2, text, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
+			text[0] = 11 + 130 * key_insert;	// either solid or triangle facing right
+			text[1] = 0;
 		}
+		else
+		{
+			size_t len;
+			const char *curbuf;
+			char charbuf16[16];
+			curbuf = u8_encodech(0xE000 + 11 + 130 * key_insert, &len, charbuf16);
+			memcpy(text, curbuf, len);
+			text[len] = 0;
+		}
+		DrawQ_String(x + xo, con_vislines - con_textsize.value*2, text, 0, con_textsize.value, con_textsize.value, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, FONT_CONSOLE);
 	}
-
-	// remove cursor
-//	key_line[key_linepos] = 0;
 }
 
 typedef struct
@@ -1673,7 +1664,7 @@ static int Con_DrawNotifyRect(int mask_must, int mask_mustnot, float maxage, flo
 	int startidx;
 	int nskip = 0;
 	int continuationWidth = 0;
-	size_t l;
+	size_t len;
 	double t = cl.time; // saved so it won't change
 	con_text_info_t ti;
 
@@ -1685,10 +1676,10 @@ static int Con_DrawNotifyRect(int mask_must, int mask_mustnot, float maxage, flo
 	ti.ymax = y + height;
 	ti.continuationString = continuationString;
 
-	l = 0;
-	Con_WordWidthFunc(&ti, NULL, &l, -1);
-	l = strlen(continuationString);
-	continuationWidth = (int) Con_WordWidthFunc(&ti, continuationString, &l, -1);
+	len = 0;
+	Con_WordWidthFunc(&ti, NULL, &len, -1);
+	len = strlen(continuationString);
+	continuationWidth = (int) Con_WordWidthFunc(&ti, continuationString, &len, -1);
 
 	// first find the first line to draw by backwards iterating and word wrapping to find their length...
 	startidx = CON_LINES_COUNT;
@@ -1823,7 +1814,7 @@ void Con_DrawNotify (void)
 
 	if(numChatlines)
 	{
-		Con_DrawNotifyRect(CON_MASK_CHAT, CON_MASK_INPUT, con_chattime.value, x, v, vid_conwidth.value * con_chatwidth.value, height, con_chatsize.value, 0.0, 1.0, (utf8_enable.integer ? "^3\xee\x80\x8c\xee\x80\x8c\xee\x80\x8c " : "^3\014\014\014 ")); // 015 is ·> character in conchars.tga
+		Con_DrawNotifyRect(CON_MASK_CHAT, CON_MASK_INPUT, con_chattime.value, x, v, vid_conwidth.value * con_chatwidth.value, height, con_chatsize.value, 0.0, 1.0, "^3 ... ");
 		v += height;
 	}
 	if (key_dest == key_message)
@@ -1897,7 +1888,6 @@ static int Con_LineHeight(int lineno)
 	{
 		float width = vid_conwidth.value;
 		con_text_info_t ti;
-		con_lineinfo_t *li = &CON_LINES(lineno);
 		ti.fontsize = con_textsize.value;
 		ti.font = FONT_CONSOLE;
 		li->height = COM_Wordwrap(li->start, li->len, 0, width, Con_WordWidthFunc, &ti, Con_CountLineFunc, NULL);
@@ -2490,10 +2480,10 @@ static void Nicks_CutMatchesNormal(int count)
 	// cut match 0 down to the longest possible completion
 	int i;
 	unsigned int c, l;
-	c = strlen(Nicks_sanlist[0]) - 1;
+	c = (unsigned int)strlen(Nicks_sanlist[0]) - 1;
 	for(i = 1; i < count; ++i)
 	{
-		l = strlen(Nicks_sanlist[i]) - 1;
+		l = (unsigned int)strlen(Nicks_sanlist[i]) - 1;
 		if(l < c)
 			c = l;
 
@@ -2532,7 +2522,7 @@ static void Nicks_CutMatchesAlphaNumeric(int count)
 	char *a, *b;
 	char space_char = (con_nickcompletion_flags.integer & NICKS_NO_SPACES) ? 'a' : ' '; // yes this is correct, we want NO spaces when no spaces
 
-	c = strlen(Nicks_sanlist[0]);
+	c = (unsigned int)strlen(Nicks_sanlist[0]);
 	for(i = 0, l = 0; i < (int)c; ++i)
 	{
 		if( (Nicks_sanlist[0][i] >= 'a' && Nicks_sanlist[0][i] <= 'z') ||
@@ -2590,7 +2580,7 @@ static void Nicks_CutMatchesNoSpaces(int count)
 	char tempstr[sizeof(Nicks_sanlist[0])];
 	char *a, *b;
 
-	c = strlen(Nicks_sanlist[0]);
+	c = (unsigned int)strlen(Nicks_sanlist[0]);
 	for(i = 0, l = 0; i < (int)c; ++i)
 	{
 		if(Nicks_sanlist[0][i] != ' ') // here it's what's NOT copied
@@ -2745,10 +2735,10 @@ int Nicks_CompleteChatLine(char *buffer, size_t size, unsigned int pos)
 		len = min(size - Nicks_matchpos - 3, strlen(msg));
 		memcpy(&buffer[Nicks_matchpos], msg, len);
 		if( len < (size - 7) ) // space for color (^[0-9] or ^xrgb) and space and \0
-			len = Nicks_AddLastColor(buffer, Nicks_matchpos+len);
+			len = (int)Nicks_AddLastColor(buffer, Nicks_matchpos+(int)len);
 		buffer[len++] = ' ';
 		buffer[len] = 0;
-		return len;
+		return (int)len;
 	} else if(n > 1)
 	{
 		int len;
@@ -2759,7 +2749,7 @@ int Nicks_CompleteChatLine(char *buffer, size_t size, unsigned int pos)
 		Nicks_CutMatches(n);
 
 		msg = Nicks_sanlist[0];
-		len = min(size - Nicks_matchpos, strlen(msg));
+		len = (int)min(size - Nicks_matchpos, strlen(msg));
 		memcpy(&buffer[Nicks_matchpos], msg, len);
 		buffer[Nicks_matchpos + len] = 0;
 		//pos += len;
@@ -3053,7 +3043,7 @@ done:
 			if(n)
 			{ // was a nick, might have an offset, and needs colors ;) --blub
 				key_linepos = pos - Nicks_offset[0];
-				cmd_len = strlen(Nicks_list[0]);
+				cmd_len = (int)strlen(Nicks_list[0]);
 				cmd_len = min(cmd_len, (int)sizeof(key_line) - 3 - pos);
 
 				memcpy(&key_line[key_linepos] , Nicks_list[0], cmd_len);

@@ -25,16 +25,16 @@ CC?=gcc
 CPUOPTIMIZATIONS?=-fno-math-errno -ffinite-math-only -fno-rounding-math -fno-signaling-nans -fno-trapping-math
 # NOTE: *never* *ever* use the -ffast-math or -funsafe-math-optimizations flag
 
-SDL_CONFIG?=sdl-config
+SDL_CONFIG?=sdl2-config
 SDLCONFIG_UNIXCFLAGS?=`$(SDL_CONFIG) --cflags`
 SDLCONFIG_UNIXCFLAGS_X11?=
 SDLCONFIG_UNIXLIBS?=`$(SDL_CONFIG) --libs`
 SDLCONFIG_UNIXLIBS_X11?=-lX11
 SDLCONFIG_UNIXSTATICLIBS?=`$(SDL_CONFIG) --static-libs`
 SDLCONFIG_UNIXSTATICLIBS_X11?=-lX11
-SDLCONFIG_MACOSXCFLAGS=-I/Library/Frameworks/SDL.framework/Headers -I$(HOME)/Library/Frameworks/SDL.framework/Headers
-SDLCONFIG_MACOSXLIBS=-F$(HOME)/Library/Frameworks/ -framework SDL -framework Cocoa $(SDLCONFIG_MACOSXCFLAGS)
-SDLCONFIG_MACOSXSTATICLIBS=-F$(HOME)/Library/Frameworks/ -framework SDL -framework Cocoa $(SDLCONFIG_MACOSXCFLAGS)
+SDLCONFIG_MACOSXCFLAGS=-I/Library/Frameworks/SDL2.framework/Headers -I$(HOME)/Library/Frameworks/SDL2.framework/Headers
+SDLCONFIG_MACOSXLIBS=-F$(HOME)/Library/Frameworks/ -framework SDL2 -framework Cocoa $(SDLCONFIG_MACOSXCFLAGS)
+SDLCONFIG_MACOSXSTATICLIBS=-F$(HOME)/Library/Frameworks/ -framework SDL2 -framework Cocoa $(SDLCONFIG_MACOSXCFLAGS)
 STRIP?=strip
 
 
@@ -171,17 +171,22 @@ OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMM
 
 
 # Compilation
-CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
+CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
 CFLAGS_CLIENT=-DCONFIG_MENU -DCONFIG_CD $(CFLAGS_VIDEO_CAPTURE)
 CFLAGS_SERVER=
 CFLAGS_DEBUG=-ggdb
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs
 CFLAGS_RELEASE=
 CFLAGS_RELEASE_PROFILE=-fbranch-probabilities
-CFLAGS_SDL=$(SDLCONFIG_CFLAGS)
+CFLAGS_SDL=
 
-CFLAGS_SSE=-msse
-CFLAGS_SSE2=-msse2
+ifeq ($(DP_SSE),1)
+	CFLAGS_SSE=-msse
+	CFLAGS_SSE2=-msse2
+else
+	CFLAGS_SSE=
+	CFLAGS_SSE2=
+endif # ifeq ($(DP_SSE),1)
 
 OPTIM_DEBUG=$(CPUOPTIMIZATIONS)
 #OPTIM_RELEASE=-O2 -fno-strict-aliasing -ffast-math -funroll-loops $(CPUOPTIMIZATIONS)
@@ -300,36 +305,36 @@ VPATH := ../../../
 help:
 	@echo
 	@echo "===== Choose one ====="
-	@echo "* $(MAKE) clean               : delete all files produced by the build except"
-	@echo "                             profiling information"
-	@echo "* $(MAKE) clean-profile       : delete all files produced by the build, including"
-	@echo "                             profiling informaiton"
-	@echo "* $(MAKE) help                : this help"
-	@echo "* $(MAKE) debug               : make client and server binaries (debug versions)"
-	@echo "* $(MAKE) profile             : make client and server binaries (profile versions)"
-	@echo "* $(MAKE) release             : make client and server binaries (release versions)"
-	@echo "* $(MAKE) release-profile     : make client and server binaries (release versions)"
-	@echo "                             with profileing optomizations) The profiled"
-	@echo "                             version of the program must have been"
-	@echo "                             previously compiled"
-	@echo "* $(MAKE) nexuiz              : make client and server binaries with nexuiz icon"
-	@echo "                             (release versions)"
-	@echo "* $(MAKE) cl-debug            : make client (debug version)"
-	@echo "* $(MAKE) cl-profile          : make client (profile version)"
-	@echo "* $(MAKE) cl-release          : make client (release version)"
-	@echo "* $(MAKE) cl-release-profile  : make client (release version)"
-	@echo "* $(MAKE) cl-nexuiz           : make client with nexuiz icon (release version)"
-	@echo "* $(MAKE) sv-debug            : make dedicated server (debug version)"
-	@echo "* $(MAKE) sv-profile          : make dedicated server (profile version)"
-	@echo "* $(MAKE) sv-release          : make dedicated server (release version)"
-	@echo "* $(MAKE) sv-release-profile  : make dedicated server (release version)"
-	@echo "* $(MAKE) sv-nexuiz           : make dedicated server with nexuiz icon"
-	@echo "                             (release version)"
-	@echo "* $(MAKE) sdl-debug           : make SDL client (debug version)"
-	@echo "* $(MAKE) sdl-profile         : make SDL client (profile version)"
-	@echo "* $(MAKE) sdl-profile-profile : make SDL client (profile version)"
-	@echo "* $(MAKE) sdl-release         : make SDL client (release version)"
-	@echo "* $(MAKE) sdl-nexuiz          : make SDL client with nexuiz icon (release version)"
+	@echo "* $(MAKE) clean                : delete all files produced by the build except"
+	@echo "                              profiling information"
+	@echo "* $(MAKE) clean-profile        : delete all files produced by the build, including"
+	@echo "                              profiling informaiton"
+	@echo "* $(MAKE) help                 : this help"
+	@echo "* $(MAKE) debug                : make client and server binaries (debug versions)"
+	@echo "* $(MAKE) profile              : make client and server binaries (profile versions)"
+	@echo "* $(MAKE) release              : make client and server binaries (release versions)"
+	@echo "* $(MAKE) release-profile      : make client and server binaries (release versions)"
+	@echo "                              (with profiling optimizations) The profiled"
+	@echo "                              version of the program must have been"
+	@echo "                              previously compiled"
+	@echo "* $(MAKE) nexuiz               : make client and server binaries with nexuiz icon"
+	@echo "                              (release versions)"
+	@echo "* $(MAKE) cl-debug             : make client (debug version)"
+	@echo "* $(MAKE) cl-profile           : make client (profile version)"
+	@echo "* $(MAKE) cl-release-profile   : make client (release profile version)"
+	@echo "* $(MAKE) cl-release           : make client (release version)"
+	@echo "* $(MAKE) cl-nexuiz            : make client with nexuiz icon (release version)"
+	@echo "* $(MAKE) sv-debug             : make dedicated server (debug version)"
+	@echo "* $(MAKE) sv-profile           : make dedicated server (profile version)"
+	@echo "* $(MAKE) sv-release-profile   : make dedicated server (release profile version)"
+	@echo "* $(MAKE) sv-release           : make dedicated server (release version)"
+	@echo "* $(MAKE) sv-nexuiz            : make dedicated server with nexuiz icon"
+	@echo "                              (release version)"
+	@echo "* $(MAKE) sdl-debug            : make SDL client (debug version)"
+	@echo "* $(MAKE) sdl-profile          : make SDL client (profile version)"
+	@echo "* $(MAKE) sdl-release-profile  : make SDL client (release version)"
+	@echo "* $(MAKE) sdl-release          : make SDL client (release version)"
+	@echo "* $(MAKE) sdl-nexuiz           : make SDL client with nexuiz icon (release version)"
 	@echo
 
 debug :
@@ -395,32 +400,32 @@ sv-release-profile :
 sv-nexuiz :
 	$(MAKE) bin-release \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SVNEXUIZ)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SV)' LEVEL=1
+		EXE='$(EXE_SVNEXUIZ)' CFLAGS_FEATURES='$(CFLAGS_SERVER)' LDFLAGS_COMMON='$(LDFLAGS_SV)' LEVEL=1
 
 sdl-debug :
 	$(MAKE) bin-debug \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
+		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' CFLAGS_SDL='$(SDLCONFIG_CFLAGS)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
 
 sdl-profile :
 	$(MAKE) bin-profile \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
+		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' CFLAGS_SDL='$(SDLCONFIG_CFLAGS)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
 
 sdl-release :
 	$(MAKE) bin-release \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
+		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' CFLAGS_SDL='$(SDLCONFIG_CFLAGS)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
 
 sdl-release-profile :
 	$(MAKE) bin-release-profile \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
+		EXE='$(EXE_SDL)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' CFLAGS_SDL='$(SDLCONFIG_CFLAGS)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
 
 sdl-nexuiz :
 	$(MAKE) bin-release \
 		DP_MAKE_TARGET=$(DP_MAKE_TARGET) DP_SOUND_API=$(DP_SOUND_API) \
-		EXE='$(EXE_SDLNEXUIZ)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
+		EXE='$(EXE_SDLNEXUIZ)' CFLAGS_FEATURES='$(CFLAGS_CLIENT)' CFLAGS_SDL='$(SDLCONFIG_CFLAGS)' LDFLAGS_COMMON='$(LDFLAGS_SDL)' LEVEL=1
 
 bin-debug :
 	$(CHECKLEVEL1)
@@ -485,30 +490,6 @@ vid_glx.o: vid_glx.c
 keysym2ucs.o: keysym2ucs.c
 	$(CHECKLEVEL2)
 	$(DO_CC) -I/usr/X11R6/include
-
-vid_sdl.o: vid_sdl.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SDL)
-
-sys_sdl.o: sys_sdl.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SDL)
-
-snd_sdl.o: snd_sdl.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SDL)
-
-thread_sdl.o: thread_sdl.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SDL)
-
-snd_3dras.o: snd_3dras.c
-	$(CHECKLEVEL2)
-	$(DO_CC)
-
-cd_sdl.o: cd_sdl.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SDL)
 
 crypto.o: crypto.c
 	$(CHECKLEVEL2)

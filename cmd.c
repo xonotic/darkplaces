@@ -142,7 +142,7 @@ static void Cmd_Centerprint_f (void)
 			strlcat(msg, " ", sizeof(msg));
 			strlcat(msg, Cmd_Argv(i), sizeof(msg));
 		}
-		c = strlen(msg);
+		c = (unsigned int)strlen(msg);
 		for(p = 0, i = 0; i < c; ++i)
 		{
 			if(msg[i] == '\\')
@@ -219,7 +219,7 @@ void Cbuf_InsertText (const char *text)
 	{
 		// we don't have a SZ_Prepend, so...
 		memmove(cmd_text.data + l, cmd_text.data, cmd_text.cursize);
-		cmd_text.cursize += l;
+		cmd_text.cursize += (int)l;
 		memcpy(cmd_text.data, text, l);
 	}
 	Cbuf_UnlockThreadMutex();
@@ -461,7 +461,9 @@ static void Cmd_Exec(const char *filename)
 {
 	char *f;
 	size_t filenameLen = strlen(filename);
-	qboolean isdefaultcfg = filenameLen >= 11 && !strcmp(filename + filenameLen - 11, "default.cfg");
+	qboolean isdefaultcfg =
+		!strcmp(filename, "default.cfg") ||
+		(filenameLen >= 12 && !strcmp(filename + filenameLen - 12, "/default.cfg"));
 
 	if (!strcmp(filename, "config.cfg"))
 	{
@@ -974,7 +976,7 @@ static const char *Cmd_GetDirectCvarValue(const char *varname, cmdalias_t *alias
 	cvar_t *cvar;
 	long argno;
 	char *endptr;
-	char vabuf[1024];
+	static char vabuf[1024]; // cmd_mutex
 
 	if(is_multiple)
 		*is_multiple = false;
@@ -2106,7 +2108,7 @@ void Cmd_ForwardStringToServer (const char *s)
 					break;
 				}
 				// write the resulting text
-				SZ_Write(&cls.netcon->message, (unsigned char *)temp, strlen(temp));
+				SZ_Write(&cls.netcon->message, (unsigned char *)temp, (int)strlen(temp));
 				s += 2;
 				continue;
 			}

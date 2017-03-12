@@ -1475,6 +1475,7 @@ static const gamemode_info_t gamemode_info [GAME_COUNT] =
 { GAME_STEELSTORM,				GAME_STEELSTORM,			"steelstorm",			"-steelstorm",				"Steel-Storm",				"Steel-Storm",				"gamedata",	NULL,			"ss",				"steelstorm"			}, // COMMANDLINEOPTION: Game: -steelstorm runs the game Steel Storm
 { GAME_STEELSTORM2,				GAME_STEELSTORM2,			"steelstorm2",			"-steelstorm2",				"Steel Storm 2",			"Steel_Storm_2",			"gamedata",	NULL,			"ss2",				"steelstorm2"			}, // COMMANDLINEOPTION: Game: -steelstorm2 runs the game Steel Storm 2
 { GAME_SSAMMO,					GAME_SSAMMO,				"steelstorm-ammo",		"-steelstormammo",			"Steel Storm A.M.M.O.",		"Steel_Storm_A.M.M.O.",		"gamedata", NULL,			"ssammo",			"steelstorm-ammo"		}, // COMMANDLINEOPTION: Game: -steelstormammo runs the game Steel Storm A.M.M.O.
+{ GAME_STEELSTORMREVENANTS,		GAME_STEELSTORMREVENANTS,	"steelstorm-revenants", "-steelstormrev",			"Steel Storm: Revenants",	"Steel_Storm_Revenants",	"base", NULL,				"ssrev",			"steelstorm-revenants"	}, // COMMANDLINEOPTION: Game: -steelstormrev runs the game Steel Storm: Revenants
 { GAME_TOMESOFMEPHISTOPHELES,	GAME_TOMESOFMEPHISTOPHELES,	"tomesofmephistopheles","-tomesofmephistopheles",	"Tomes of Mephistopheles",	"Tomes_of_Mephistopheles",	"gamedata",	NULL,			"tom",				"tomesofmephistopheles"	}, // COMMANDLINEOPTION: Game: -tomesofmephistopheles runs the game Tomes of Mephistopheles
 { GAME_STRAPBOMB,				GAME_STRAPBOMB,				"strapbomb",			"-strapbomb",				"Strap-on-bomb Car",		"Strap-on-bomb_Car",		"id1",		NULL,			"strap",			"strapbomb"				}, // COMMANDLINEOPTION: Game: -strapbomb runs the game Strap-on-bomb Car
 { GAME_MOONHELM,				GAME_MOONHELM,				"moonhelm",				"-moonhelm",				"MoonHelm",					"MoonHelm",					"data",		NULL,			"mh",				"moonhelm"				}, // COMMANDLINEOPTION: Game: -moonhelm runs the game MoonHelm
@@ -1619,13 +1620,22 @@ void COM_Init_Commands (void)
 		if (strstr(com_argv[j], " "))
 		{
 			// arg contains whitespace, store quotes around it
+			// This condition checks whether we can allow to put
+			// in two quote characters.
+			if (n >= ((int)sizeof(com_cmdline) - 2))
+				break;
 			com_cmdline[n++] = '\"';
-			while ((n < ((int)sizeof(com_cmdline) - 1)) && com_argv[j][i])
+			// This condition checks whether we can allow one
+			// more character and a quote character.
+			while ((n < ((int)sizeof(com_cmdline) - 2)) && com_argv[j][i])
+				// FIXME: Doesn't quote special characters.
 				com_cmdline[n++] = com_argv[j][i++];
 			com_cmdline[n++] = '\"';
 		}
 		else
 		{
+			// This condition checks whether we can allow one
+			// more character.
 			while ((n < ((int)sizeof(com_cmdline) - 1)) && com_argv[j][i])
 				com_cmdline[n++] = com_argv[j][i++];
 		}
@@ -2084,7 +2094,7 @@ void InfoString_SetValue(char *buffer, size_t bufferlength, const char *key, con
 		Con_Printf("InfoString_SetValue: no room for \"%s\" \"%s\" in infostring\n", key, value);
 		return;
 	}
-	if (value && value[0])
+	if (value[0])
 	{
 		// set the key/value and append the remaining text
 		char tempbuffer[MAX_INPUTLINE];
@@ -2287,7 +2297,7 @@ size_t base64_encode(unsigned char *buf, size_t buflen, size_t outbuflen)
 	for(i = blocks; i > 0; )
 	{
 		--i;
-		base64_3to4(buf + 3*i, buf + 4*i, buflen - 3*i);
+		base64_3to4(buf + 3*i, buf + 4*i, (int)(buflen - 3*i));
 	}
 	return blocks * 4;
 }

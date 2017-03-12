@@ -51,24 +51,24 @@ static const speakerlayout_t snd_speakerlayouts[] =
 	{
 		"surround71", 8,
 		{
-			{0, 45, 0.2, 0.2, 0.5}, // front left
-			{1, 315, 0.2, 0.2, 0.5}, // front right
-			{2, 135, 0.2, 0.2, 0.5}, // rear left
-			{3, 225, 0.2, 0.2, 0.5}, // rear right
-			{4, 0, 0.2, 0.2, 0.5}, // front center
+			{0, 45, 0.2f, 0.2f, 0.5f}, // front left
+			{1, 315, 0.2f, 0.2f, 0.5f}, // front right
+			{2, 135, 0.2f, 0.2f, 0.5f}, // rear left
+			{3, 225, 0.2f, 0.2f, 0.5f}, // rear right
+			{4, 0, 0.2f, 0.2f, 0.5f}, // front center
 			{5, 0, 0, 0, 0}, // lfe (we don't have any good lfe sound sources and it would take some filtering work to generate them (and they'd probably still be wrong), so...  no lfe)
-			{6, 90, 0.2, 0.2, 0.5}, // side left
-			{7, 180, 0.2, 0.2, 0.5}, // side right
+			{6, 90, 0.2f, 0.2f, 0.5f}, // side left
+			{7, 180, 0.2f, 0.2f, 0.5f}, // side right
 		}
 	},
 	{
 		"surround51", 6,
 		{
-			{0, 45, 0.2, 0.2, 0.5}, // front left
-			{1, 315, 0.2, 0.2, 0.5}, // front right
-			{2, 135, 0.2, 0.2, 0.5}, // rear left
-			{3, 225, 0.2, 0.2, 0.5}, // rear right
-			{4, 0, 0.2, 0.2, 0.5}, // front center
+			{0, 45, 0.2f, 0.2f, 0.5f}, // front left
+			{1, 315, 0.2f, 0.2f, 0.5f}, // front right
+			{2, 135, 0.2f, 0.2f, 0.5f}, // rear left
+			{3, 225, 0.2f, 0.2f, 0.5f}, // rear right
+			{4, 0, 0.2f, 0.2f, 0.5f}, // front center
 			{5, 0, 0, 0, 0}, // lfe (we don't have any good lfe sound sources and it would take some filtering work to generate them (and they'd probably still be wrong), so...  no lfe)
 			{0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0},
@@ -79,10 +79,10 @@ static const speakerlayout_t snd_speakerlayouts[] =
 		// channel of its own
 		"surround40", 4,
 		{
-			{0, 45, 0.3, 0.3, 0.8}, // front left
-			{1, 315, 0.3, 0.3, 0.8}, // front right
-			{2, 135, 0.3, 0.3, 0.8}, // rear left
-			{3, 225, 0.3, 0.3, 0.8}, // rear right
+			{0, 45, 0.3f, 0.3f, 0.8f}, // front left
+			{1, 315, 0.3f, 0.3f, 0.8f}, // front right
+			{2, 135, 0.3f, 0.3f, 0.8f}, // rear left
+			{3, 225, 0.3f, 0.3f, 0.8f}, // rear right
 			{0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0},
@@ -94,8 +94,8 @@ static const speakerlayout_t snd_speakerlayouts[] =
 		// channel of its own
 		"stereo", 2,
 		{
-			{0, 90, 0.5, 0.5, 1}, // side left
-			{1, 270, 0.5, 0.5, 1}, // side right
+			{0, 90, 0.5f, 0.5f, 1}, // side left
+			{1, 270, 0.5f, 0.5f, 1}, // side right
 			{0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0},
 			{0, 0, 0, 0, 0},
@@ -327,7 +327,7 @@ static void S_SoundList_f (void)
 		{
 			unsigned int size;
 
-			size = sfx->memsize;
+			size = (unsigned int)sfx->memsize;
 			Con_Printf ("%c%c%c(%5iHz %2db %6s) %8i : %s\n",
 						(sfx->loopstart < sfx->total_length) ? 'L' : ' ',
 						(sfx->flags & SFXFLAG_STREAMED) ? 'S' : ' ',
@@ -1493,7 +1493,7 @@ static void SND_Spatialize_WithSfx(channel_t *ch, qboolean isstatic, sfx_t *sfx)
 			if (snd_spatialization_occlusion.integer)
 			{
 				if(snd_spatialization_occlusion.integer & 1)
-					if(listener_pvs)
+					if(listener_pvs && cl.worldmodel)
 					{
 						int cluster = cl.worldmodel->brush.PointInLeaf(cl.worldmodel, ch->origin)->clusterindex;
 						if(cluster >= 0 && cluster < 8 * listener_pvsbytes && !CHECKPVSBIT(listener_pvs, cluster))

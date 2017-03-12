@@ -153,10 +153,11 @@ static qboolean vid_isfullscreen;
 //void VID_MenuDraw (void);
 //void VID_MenuKey (int key);
 
-//LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-//void AppActivate(BOOL fActive, BOOL minimize);
-//void ClearAllStates (void);
-//void VID_UpdateWindowStatus (void);
+LONG WINAPI MainWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+void AppActivate(BOOL fActive, BOOL minimize);
+static void ClearAllStates(void);
+qboolean VID_InitModeGL(viddef_mode_t *mode);
+qboolean VID_InitModeSOFT(viddef_mode_t *mode);
 
 //====================================
 
@@ -215,7 +216,7 @@ static HINSTANCE hInstDI;
 
 // forward-referenced functions
 static void IN_StartupMouse (void);
-
+static void AdjustWindowBounds(int fullscreen, int *width, int *height, viddef_mode_t *mode, DWORD WindowStyle, RECT *rect);
 
 //====================================
 
@@ -326,19 +327,17 @@ void VID_Finish (void)
 //==========================================================================
 
 
-
-
 static unsigned char scantokey[128] =
 {
-//  0           1       2    3     4     5       6       7      8         9      A          B           C       D           E           F
-	0          ,27    ,'1'  ,'2'  ,'3'  ,'4'    ,'5'    ,'6'   ,'7'      ,'8'   ,'9'       ,'0'        ,'-'   ,'='         ,K_BACKSPACE,9    ,//0
-	'q'        ,'w'   ,'e'  ,'r'  ,'t'  ,'y'    ,'u'    ,'i'   ,'o'      ,'p'   ,'['       ,']'        ,13    ,K_CTRL      ,'a'        ,'s'  ,//1
-	'd'        ,'f'   ,'g'  ,'h'  ,'j'  ,'k'    ,'l'    ,';'   ,'\''     ,'`'   ,K_SHIFT   ,'\\'       ,'z'   ,'x'         ,'c'        ,'v'  ,//2
-	'b'        ,'n'   ,'m'  ,','  ,'.'  ,'/'    ,K_SHIFT,'*'   ,K_ALT    ,' '   ,0         ,K_F1       ,K_F2  ,K_F3        ,K_F4       ,K_F5 ,//3
-	K_F6       ,K_F7  ,K_F8 ,K_F9 ,K_F10,K_PAUSE,0      ,K_HOME,K_UPARROW,K_PGUP,K_KP_MINUS,K_LEFTARROW,K_KP_5,K_RIGHTARROW,K_KP_PLUS  ,K_END,//4
-	K_DOWNARROW,K_PGDN,K_INS,K_DEL,0    ,0      ,0      ,K_F11 ,K_F12    ,0     ,0         ,0          ,0     ,0           ,0          ,0    ,//5
-	0          ,0     ,0    ,0    ,0    ,0      ,0      ,0     ,0        ,0     ,0         ,0          ,0     ,0           ,0          ,0    ,//6
-	0          ,0     ,0    ,0    ,0    ,0      ,0      ,0     ,0        ,0     ,0         ,0          ,0     ,0           ,0          ,0     //7
+//  0           1        2     3     4     5       6           7      8         9      A          B           C       D            E           F
+	0          ,K_ESCAPE,'1'  ,'2'  ,'3'  ,'4'    ,'5'        ,'6'   ,'7'      ,'8'   ,'9'       ,'0'        ,'-'    ,'='         ,K_BACKSPACE,K_TAB,//0
+	'q'        ,'w'     ,'e'  ,'r'  ,'t'  ,'y'    ,'u'        ,'i'   ,'o'      ,'p'   ,'['       ,']'        ,K_ENTER,K_CTRL      ,'a'        ,'s'  ,//1
+	'd'        ,'f'     ,'g'  ,'h'  ,'j'  ,'k'    ,'l'        ,';'   ,'\''     ,'`'   ,K_SHIFT   ,'\\'       ,'z'    ,'x'         ,'c'        ,'v'  ,//2
+	'b'        ,'n'     ,'m'  ,','  ,'.'  ,'/'    ,K_SHIFT    ,'*'   ,K_ALT    ,' '   ,K_CAPSLOCK,K_F1       ,K_F2   ,K_F3        ,K_F4       ,K_F5 ,//3
+	K_F6       ,K_F7    ,K_F8 ,K_F9 ,K_F10,K_PAUSE,K_SCROLLOCK,K_HOME,K_UPARROW,K_PGUP,K_KP_MINUS,K_LEFTARROW,K_KP_5 ,K_RIGHTARROW,K_KP_PLUS  ,K_END,//4
+	K_DOWNARROW,K_PGDN  ,K_INS,K_DEL,0    ,0      ,0          ,K_F11 ,K_F12    ,0     ,0         ,0          ,0      ,0           ,0          ,0    ,//5
+	0          ,0       ,0    ,0    ,0    ,0      ,0          ,0     ,0        ,0     ,0         ,0          ,0      ,0           ,0          ,0    ,//6
+	0          ,0       ,0    ,0    ,0    ,0      ,0          ,0     ,0        ,0     ,0         ,0          ,0      ,0           ,0          ,0     //7
 };
 
 
@@ -368,6 +367,9 @@ static int MapKey (int key, int virtualkey)
 
 	if ( !is_extended )
 	{
+		if(((GetKeyState(VK_NUMLOCK)) & 0xffff) == 0)
+			return result;
+
 		switch ( result )
 		{
 		case K_HOME:
@@ -396,6 +398,9 @@ static int MapKey (int key, int virtualkey)
 	}
 	else
 	{
+		if(virtualkey == VK_NUMLOCK)
+			return K_NUMLOCK;
+
 		switch ( result )
 		{
 		case 0x0D:
@@ -542,7 +547,8 @@ LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam)
 	LONG    lRet = 1;
 	int		fActive, fMinimized, temp;
 	unsigned char state[256];
-	unsigned char asciichar[4];
+	const unsigned int UNICODE_BUFFER_LENGTH = 4;
+	WCHAR unicode[UNICODE_BUFFER_LENGTH];
 	int		vkey;
 	int		charlength;
 	qboolean down = false;
@@ -575,14 +581,13 @@ LONG WINAPI MainWndProc (HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lParam)
 			GetKeyboardState (state);
 			// alt/ctrl/shift tend to produce funky ToAscii values,
 			// and if it's not a single character we don't know care about it
-			charlength = ToAscii (wParam, lParam >> 16, state, (LPWORD)asciichar, 0);
-			if (vkey == K_ALT || vkey == K_CTRL || vkey == K_SHIFT || charlength == 0)
-				asciichar[0] = 0;
-			else if( charlength == 2 ) {
-				asciichar[0] = asciichar[1];
-			}
+			charlength = ToUnicode(wParam, lParam >> 16, state, unicode, UNICODE_BUFFER_LENGTH, 0);
+			if(vkey == K_ALT || vkey == K_CTRL || vkey == K_SHIFT || charlength == 0)
+				unicode[0] = 0;
+			else if(charlength == 2)
+				unicode[0] = unicode[1];
 			if (!VID_JoyBlockEmulatedKeys(vkey))
-				Key_Event (vkey, asciichar[0], down);
+				Key_Event(vkey, unicode[0], down);
 			break;
 
 		case WM_SYSCHAR:
@@ -908,7 +913,6 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	int pixelformat, newpixelformat;
 	UINT numpixelformats;
 	DWORD WindowStyle, ExWindowStyle;
-	int CenterX, CenterY;
 	const char *gldrivername;
 	int depth;
 	DEVMODE thismode;
@@ -1162,32 +1166,7 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 		ExWindowStyle = 0;
 	}
 
-	rect.top = 0;
-	rect.left = 0;
-	rect.right = width;
-	rect.bottom = height;
-	AdjustWindowRectEx(&rect, WindowStyle, false, 0);
-
-	if (fullscreen)
-	{
-		CenterX = 0;
-		CenterY = 0;
-	}
-	else
-	{
-		CenterX = (GetSystemMetrics(SM_CXSCREEN) - (rect.right - rect.left)) / 2;
-		CenterY = (GetSystemMetrics(SM_CYSCREEN) - (rect.bottom - rect.top)) / 2;
-	}
-	CenterX = max(0, CenterX);
-	CenterY = max(0, CenterY);
-
-	// x and y may be changed by WM_MOVE messages
-	window_x = CenterX;
-	window_y = CenterY;
-	rect.left += CenterX;
-	rect.right += CenterX;
-	rect.top += CenterY;
-	rect.bottom += CenterY;
+	AdjustWindowBounds(fullscreen, &width, &height, mode, WindowStyle, &rect);
 
 	pixelformat = 0;
 	newpixelformat = 0;
@@ -1345,6 +1324,56 @@ qboolean VID_InitModeGL(viddef_mode_t *mode)
 	return true;
 }
 
+static void AdjustWindowBounds(int fullscreen, int *width, int *height, viddef_mode_t *mode, DWORD WindowStyle, RECT *rect)
+{
+	int CenterX, CenterY;
+
+	rect->top = 0;
+	rect->left = 0;
+	rect->right = *width;
+	rect->bottom = *height;
+	AdjustWindowRectEx(rect, WindowStyle, false, 0);
+
+	if (fullscreen)
+	{
+		CenterX = 0;
+		CenterY = 0;
+	}
+	else
+	{
+		RECT workArea;
+		SystemParametersInfo(SPI_GETWORKAREA, NULL, &workArea, 0);
+		int workWidth = workArea.right - workArea.left;
+		int workHeight = workArea.bottom - workArea.top;
+
+		// if height/width matches physical screen height/width, adjust it to available desktop size
+		// and allow 2 pixels on top for the title bar so the window can be moved
+		const int titleBarPixels = 2;
+		if (*width == GetSystemMetrics(SM_CXSCREEN) && (*height == GetSystemMetrics(SM_CYSCREEN) || *height == workHeight - titleBarPixels))
+		{
+			rect->right -= *width - workWidth;
+			*width = mode->width = workWidth;
+			rect->bottom -= *height - (workHeight - titleBarPixels);
+			*height = mode->height = workHeight - titleBarPixels;
+			CenterX = 0;
+			CenterY = titleBarPixels;
+		}
+		else
+		{
+			CenterX = max(0, (workWidth - *width) / 2);
+			CenterY = max(0, (workHeight - *height) / 2);
+		}
+	}
+
+	// x and y may be changed by WM_MOVE messages
+	window_x = CenterX;
+	window_y = CenterY;
+	rect->left += CenterX;
+	rect->right += CenterX;
+	rect->top += CenterY;
+	rect->bottom += CenterY;
+}
+
 #ifdef SUPPORTD3D
 static D3DADAPTER_IDENTIFIER9 d3d9adapteridentifier;
 
@@ -1360,7 +1389,6 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	RECT rect;
 	MSG msg;
 	DWORD WindowStyle, ExWindowStyle;
-	int CenterX, CenterY;
 	int bpp = mode->bitsperpixel;
 	int width = mode->width;
 	int height = mode->height;
@@ -1385,32 +1413,7 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 		ExWindowStyle = 0;
 	}
 
-	rect.top = 0;
-	rect.left = 0;
-	rect.right = width;
-	rect.bottom = height;
-	AdjustWindowRectEx(&rect, WindowStyle, false, 0);
-
-	if (fullscreen)
-	{
-		CenterX = 0;
-		CenterY = 0;
-	}
-	else
-	{
-		CenterX = (GetSystemMetrics(SM_CXSCREEN) - (rect.right - rect.left)) / 2;
-		CenterY = (GetSystemMetrics(SM_CYSCREEN) - (rect.bottom - rect.top)) / 2;
-	}
-	CenterX = max(0, CenterX);
-	CenterY = max(0, CenterY);
-
-	// x and y may be changed by WM_MOVE messages
-	window_x = CenterX;
-	window_y = CenterY;
-	rect.left += CenterX;
-	rect.right += CenterX;
-	rect.top += CenterY;
-	rect.bottom += CenterY;
+	AdjustWindowBounds(fullscreen, &width, &height, mode, WindowStyle, &rect);
 
 	gl_extensions = "";
 	gl_platformextensions = "";
@@ -1520,6 +1523,7 @@ qboolean VID_InitModeDX(viddef_mode_t *mode, int version)
 	vid.support.arb_depth_texture = true;
 	vid.support.arb_draw_buffers = vid_d3d9caps.NumSimultaneousRTs > 1;
 	vid.support.arb_occlusion_query = true; // can't find a cap for this
+	vid.support.arb_query_buffer_object = true;
 	vid.support.arb_shadow = true;
 	vid.support.arb_texture_compression = true;
 	vid.support.arb_texture_cube_map = true;
@@ -1593,7 +1597,6 @@ qboolean VID_InitModeSOFT(viddef_mode_t *mode)
 	MSG msg;
 	int pixelformat, newpixelformat;
 	DWORD WindowStyle, ExWindowStyle;
-	int CenterX, CenterY;
 	int depth;
 	DEVMODE thismode;
 	qboolean foundmode, foundgoodmode;
@@ -1745,32 +1748,7 @@ qboolean VID_InitModeSOFT(viddef_mode_t *mode)
 		ExWindowStyle = 0;
 	}
 
-	rect.top = 0;
-	rect.left = 0;
-	rect.right = width;
-	rect.bottom = height;
-	AdjustWindowRectEx(&rect, WindowStyle, false, 0);
-
-	if (fullscreen)
-	{
-		CenterX = 0;
-		CenterY = 0;
-	}
-	else
-	{
-		CenterX = (GetSystemMetrics(SM_CXSCREEN) - (rect.right - rect.left)) / 2;
-		CenterY = (GetSystemMetrics(SM_CYSCREEN) - (rect.bottom - rect.top)) / 2;
-	}
-	CenterX = max(0, CenterX);
-	CenterY = max(0, CenterY);
-
-	// x and y may be changed by WM_MOVE messages
-	window_x = CenterX;
-	window_y = CenterY;
-	rect.left += CenterX;
-	rect.right += CenterX;
-	rect.top += CenterY;
-	rect.bottom += CenterY;
+	AdjustWindowBounds(fullscreen, &width, &height, mode, WindowStyle, &rect);
 
 	pixelformat = 0;
 	newpixelformat = 0;

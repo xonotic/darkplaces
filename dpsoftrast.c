@@ -1318,25 +1318,25 @@ void DPSOFTRAST_SetTexture(int unitnum, int index)
 void DPSOFTRAST_SetVertexPointer(const float *vertex3f, size_t stride)
 {
 	dpsoftrast.pointer_vertex3f = vertex3f;
-	dpsoftrast.stride_vertex = stride;
+	dpsoftrast.stride_vertex = (int)stride;
 }
 void DPSOFTRAST_SetColorPointer(const float *color4f, size_t stride)
 {
 	dpsoftrast.pointer_color4f = color4f;
 	dpsoftrast.pointer_color4ub = NULL;
-	dpsoftrast.stride_color = stride;
+	dpsoftrast.stride_color = (int)stride;
 }
 void DPSOFTRAST_SetColorPointer4ub(const unsigned char *color4ub, size_t stride)
 {
 	dpsoftrast.pointer_color4f = NULL;
 	dpsoftrast.pointer_color4ub = color4ub;
-	dpsoftrast.stride_color = stride;
+	dpsoftrast.stride_color = (int)stride;
 }
 void DPSOFTRAST_SetTexCoordPointer(int unitnum, int numcomponents, size_t stride, const float *texcoordf)
 {
 	dpsoftrast.pointer_texcoordf[unitnum] = texcoordf;
 	dpsoftrast.components_texcoord[unitnum] = numcomponents;
-	dpsoftrast.stride_texcoord[unitnum] = stride;
+	dpsoftrast.stride_texcoord[unitnum] = (int)stride;
 }
 
 DEFCOMMAND(18, SetShader, int mode; int permutation; int exactspecularmath;)
@@ -1664,10 +1664,10 @@ static void DPSOFTRAST_Fill4f(float *dst, const float *src, int size)
 static void DPSOFTRAST_Vertex_Transform(float *out4f, const float *in4f, int numitems, const float *inmatrix16f)
 {
 #ifdef SSE_POSSIBLE
-	static const float identitymatrix[4][4] = {{1,0,0,0},{0,1,0,0},{0,0,1,0},{0,0,0,1}};
+	static const float identitymatrix16f[4][4] = {{1,0,0,0},{0,1,0,0},{0,0,1,0},{0,0,0,1}};
 	__m128 m0, m1, m2, m3;
 	float *end;
-	if (!memcmp(identitymatrix, inmatrix16f, sizeof(float[16])))
+	if (!memcmp(identitymatrix16f, inmatrix16f, sizeof(float[16])))
 	{
 		// fast case for identity matrix
 		if (out4f != in4f) memcpy(out4f, in4f, numitems * sizeof(float[4]));
@@ -1810,7 +1810,7 @@ static int DPSOFTRAST_Vertex_BoundY(int *starty, int *endy, const float *minposf
 	
 static int DPSOFTRAST_Vertex_Project(float *out4f, float *screen4f, int *starty, int *endy, const float *in4f, int numitems)
 {
-	static const float identitymatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+	static const float identitymatrix16f[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
 	float *end = out4f + numitems*4;
 	__m128 viewportcenter = _mm_load_ps(dpsoftrast.fb_viewportcenter), viewportscale = _mm_load_ps(dpsoftrast.fb_viewportscale);
 	__m128 minpos, maxpos;
@@ -1852,17 +1852,17 @@ static int DPSOFTRAST_Vertex_Project(float *out4f, float *screen4f, int *starty,
 		ALIGN(float maxposf[4]);
 		_mm_store_ps(minposf, minpos);
 		_mm_store_ps(maxposf, maxpos);
-		return DPSOFTRAST_Vertex_BoundY(starty, endy, minposf, maxposf, identitymatrix);
+		return DPSOFTRAST_Vertex_BoundY(starty, endy, minposf, maxposf, identitymatrix16f);
 	}
 	return 0;
 }
 
 static int DPSOFTRAST_Vertex_TransformProject(float *out4f, float *screen4f, int *starty, int *endy, const float *in4f, int numitems, const float *inmatrix16f)
 {
-	static const float identitymatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+	static const float identitymatrix16f[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
 	__m128 m0, m1, m2, m3, viewportcenter, viewportscale, minpos, maxpos;
 	float *end;
-	if (!memcmp(identitymatrix, inmatrix16f, sizeof(float[16])))
+	if (!memcmp(identitymatrix16f, inmatrix16f, sizeof(float[16])))
 		return DPSOFTRAST_Vertex_Project(out4f, screen4f, starty, endy, in4f, numitems);
 	end = out4f + numitems*4;
 	viewportcenter = _mm_load_ps(dpsoftrast.fb_viewportcenter);
@@ -2294,12 +2294,12 @@ static void DPSOFTRAST_Texture2DBGRA8(DPSOFTRAST_Texture *texture, int mip, floa
 	pixelbase = (unsigned char *)texture->bytes + texture->mipmap[mip][0] + texture->mipmap[mip][1] - 4*width;
 	if(texture->filter & DPSOFTRAST_TEXTURE_FILTER_LINEAR)
 	{
-		unsigned int tc[2] = { x * (width<<12) - 2048, y * (height<<12) - 2048};
+		unsigned int tc[2] = { (unsigned int)floor(x) * (width<<12) - 2048, (unsigned int)floor(y) * (height<<12) - 2048};
 		unsigned int frac[2] = { tc[0]&0xFFF, tc[1]&0xFFF };
 		unsigned int ifrac[2] = { 0x1000 - frac[0], 0x1000 - frac[1] };
 		unsigned int lerp[4] = { ifrac[0]*ifrac[1], frac[0]*ifrac[1], ifrac[0]*frac[1], frac[0]*frac[1] };
-		int tci[2] = { tc[0]>>12, tc[1]>>12 };
-		int tci1[2] = { tci[0] + 1, tci[1] + 1 };
+		int tci[2] = { (int)tc[0]>>12, (int)tc[1]>>12 };
+		int tci1[2] = { (int)tci[0] + 1, (int)tci[1] + 1 };
 		if (texture->flags & DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE)
 		{
 			tci[0] = tci[0] >= 0 ? (tci[0] <= wrapmask[0] ? tci[0] : wrapmask[0]) : 0;
@@ -2325,7 +2325,7 @@ static void DPSOFTRAST_Texture2DBGRA8(DPSOFTRAST_Texture *texture, int mip, floa
 	}
 	else
 	{
-		int tci[2] = { x * width, y * height };
+		int tci[2] = { (int)floor(x) * width, (int)floor(y) * height };
 		if (texture->flags & DPSOFTRAST_TEXTURE_FLAG_CLAMPTOEDGE)
 		{
 			tci[0] = tci[0] >= 0 ? (tci[0] <= wrapmask[0] ? tci[0] : wrapmask[0]) : 0;
@@ -4739,23 +4739,23 @@ DPSOFTRAST_ShaderModeInfo;
 
 static const DPSOFTRAST_ShaderModeInfo DPSOFTRAST_ShaderModeTable[SHADERMODE_COUNT] =
 {
-	{2, DPSOFTRAST_VertexShader_Generic,                        DPSOFTRAST_PixelShader_Generic,                        {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, ~0}, {GL20TU_FIRST, GL20TU_SECOND, ~0}},
-	{2, DPSOFTRAST_VertexShader_PostProcess,                    DPSOFTRAST_PixelShader_PostProcess,                    {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, ~0}, {GL20TU_FIRST, GL20TU_SECOND, ~0}},
-	{2, DPSOFTRAST_VertexShader_Depth_Or_Shadow,                DPSOFTRAST_PixelShader_Depth_Or_Shadow,                {~0}, {~0}},
-	{2, DPSOFTRAST_VertexShader_FlatColor,                      DPSOFTRAST_PixelShader_FlatColor,                      {DPSOFTRAST_ARRAY_TEXCOORD0, ~0}, {GL20TU_COLOR, ~0}},
-	{2, DPSOFTRAST_VertexShader_VertexColor,                    DPSOFTRAST_PixelShader_VertexColor,                    {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, ~0}, {GL20TU_COLOR, ~0}},
-	{2, DPSOFTRAST_VertexShader_Lightmap,                       DPSOFTRAST_PixelShader_Lightmap,                       {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, ~0}, {GL20TU_COLOR, GL20TU_LIGHTMAP, GL20TU_GLOW, ~0}},
-	{2, DPSOFTRAST_VertexShader_FakeLight,                      DPSOFTRAST_PixelShader_FakeLight,                      {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, ~0}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, ~0}},
-	{2, DPSOFTRAST_VertexShader_LightDirectionMap_ModelSpace,   DPSOFTRAST_PixelShader_LightDirectionMap_ModelSpace,   {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, ~0}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_LIGHTMAP, GL20TU_DELUXEMAP, ~0}},
-	{2, DPSOFTRAST_VertexShader_LightDirectionMap_TangentSpace, DPSOFTRAST_PixelShader_LightDirectionMap_TangentSpace, {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, ~0}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_LIGHTMAP, GL20TU_DELUXEMAP, ~0}},
-	{2, DPSOFTRAST_VertexShader_Lightmap,                       DPSOFTRAST_PixelShader_Lightmap,                       {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, ~0}, {GL20TU_COLOR, GL20TU_LIGHTMAP, GL20TU_GLOW, ~0}},
-	{2, DPSOFTRAST_VertexShader_VertexColor,	                DPSOFTRAST_PixelShader_VertexColor,                    {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, ~0}, {GL20TU_COLOR, ~0}},
-	{2, DPSOFTRAST_VertexShader_LightDirection,                 DPSOFTRAST_PixelShader_LightDirection,                 {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, ~0}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, ~0}},
-	{2, DPSOFTRAST_VertexShader_LightSource,                    DPSOFTRAST_PixelShader_LightSource,                    {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, ~0}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_CUBE, ~0}},
-	{2, DPSOFTRAST_VertexShader_Refraction,                     DPSOFTRAST_PixelShader_Refraction,                     {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, ~0}, {GL20TU_NORMAL, GL20TU_REFRACTION, ~0}},
-	{2, DPSOFTRAST_VertexShader_Water,                          DPSOFTRAST_PixelShader_Water,                          {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD6, ~0}, {GL20TU_NORMAL, GL20TU_REFLECTION, GL20TU_REFRACTION, ~0}},
-	{2, DPSOFTRAST_VertexShader_DeferredGeometry,               DPSOFTRAST_PixelShader_DeferredGeometry,               {~0}},
-	{2, DPSOFTRAST_VertexShader_DeferredLightSource,            DPSOFTRAST_PixelShader_DeferredLightSource,            {~0}},
+	{2, DPSOFTRAST_VertexShader_Generic,                        DPSOFTRAST_PixelShader_Generic,                        {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, 0xFF}, {GL20TU_FIRST, GL20TU_SECOND, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_PostProcess,                    DPSOFTRAST_PixelShader_PostProcess,                    {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, 0xFF}, {GL20TU_FIRST, GL20TU_SECOND, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_Depth_Or_Shadow,                DPSOFTRAST_PixelShader_Depth_Or_Shadow,                {0xFF}, {0xFF}},
+	{2, DPSOFTRAST_VertexShader_FlatColor,                      DPSOFTRAST_PixelShader_FlatColor,                      {DPSOFTRAST_ARRAY_TEXCOORD0, 0xFF}, {GL20TU_COLOR, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_VertexColor,                    DPSOFTRAST_PixelShader_VertexColor,                    {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, 0xFF}, {GL20TU_COLOR, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_Lightmap,                       DPSOFTRAST_PixelShader_Lightmap,                       {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, 0xFF}, {GL20TU_COLOR, GL20TU_LIGHTMAP, GL20TU_GLOW, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_FakeLight,                      DPSOFTRAST_PixelShader_FakeLight,                      {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, 0xFF}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_LightDirectionMap_ModelSpace,   DPSOFTRAST_PixelShader_LightDirectionMap_ModelSpace,   {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, 0xFF}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_LIGHTMAP, GL20TU_DELUXEMAP, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_LightDirectionMap_TangentSpace, DPSOFTRAST_PixelShader_LightDirectionMap_TangentSpace, {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, 0xFF}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_LIGHTMAP, GL20TU_DELUXEMAP, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_Lightmap,                       DPSOFTRAST_PixelShader_Lightmap,                       {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, 0xFF}, {GL20TU_COLOR, GL20TU_LIGHTMAP, GL20TU_GLOW, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_VertexColor,	                DPSOFTRAST_PixelShader_VertexColor,                    {DPSOFTRAST_ARRAY_COLOR, DPSOFTRAST_ARRAY_TEXCOORD0, 0xFF}, {GL20TU_COLOR, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_LightDirection,                 DPSOFTRAST_PixelShader_LightDirection,                 {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD5, DPSOFTRAST_ARRAY_TEXCOORD6, 0xFF}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_LightSource,                    DPSOFTRAST_PixelShader_LightSource,                    {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, 0xFF}, {GL20TU_COLOR, GL20TU_PANTS, GL20TU_SHIRT, GL20TU_GLOW, GL20TU_NORMAL, GL20TU_GLOSS, GL20TU_CUBE, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_Refraction,                     DPSOFTRAST_PixelShader_Refraction,                     {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD4, 0xFF}, {GL20TU_NORMAL, GL20TU_REFRACTION, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_Water,                          DPSOFTRAST_PixelShader_Water,                          {DPSOFTRAST_ARRAY_TEXCOORD0, DPSOFTRAST_ARRAY_TEXCOORD1, DPSOFTRAST_ARRAY_TEXCOORD2, DPSOFTRAST_ARRAY_TEXCOORD3, DPSOFTRAST_ARRAY_TEXCOORD4, DPSOFTRAST_ARRAY_TEXCOORD6, 0xFF}, {GL20TU_NORMAL, GL20TU_REFLECTION, GL20TU_REFRACTION, 0xFF}},
+	{2, DPSOFTRAST_VertexShader_DeferredGeometry,               DPSOFTRAST_PixelShader_DeferredGeometry,               {0xFF}},
+	{2, DPSOFTRAST_VertexShader_DeferredLightSource,            DPSOFTRAST_PixelShader_DeferredLightSource,            {0xFF}},
 };
 
 static void DPSOFTRAST_Draw_DepthTest(DPSOFTRAST_State_Thread *thread, DPSOFTRAST_State_Span *span)

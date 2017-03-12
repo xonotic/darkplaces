@@ -208,7 +208,7 @@ static void CL_ParseStartSoundPacket(int largesoundindex)
 	vec3_t  pos;
 	int 	channel, ent;
 	int 	sound_num;
-	int 	volume;
+	int 	nvolume;
 	int 	field_mask;
 	float 	attenuation;
 	float	speed;
@@ -219,15 +219,15 @@ static void CL_ParseStartSoundPacket(int largesoundindex)
 		channel = MSG_ReadShort(&cl_message);
 
 		if (channel & (1<<15))
-			volume = MSG_ReadByte(&cl_message);
+			nvolume = MSG_ReadByte(&cl_message);
 		else
-			volume = DEFAULT_SOUND_PACKET_VOLUME;
+			nvolume = DEFAULT_SOUND_PACKET_VOLUME;
 
 		if (channel & (1<<14))
 			attenuation = MSG_ReadByte(&cl_message) / 64.0;
 		else
 			attenuation = DEFAULT_SOUND_PACKET_ATTENUATION;
-	
+
 		speed = 1.0f;
 
 		ent = (channel>>3)&1023;
@@ -240,9 +240,9 @@ static void CL_ParseStartSoundPacket(int largesoundindex)
 		field_mask = MSG_ReadByte(&cl_message);
 
 		if (field_mask & SND_VOLUME)
-			volume = MSG_ReadByte(&cl_message);
+			nvolume = MSG_ReadByte(&cl_message);
 		else
-			volume = DEFAULT_SOUND_PACKET_VOLUME;
+			nvolume = DEFAULT_SOUND_PACKET_VOLUME;
 
 		if (field_mask & SND_ATTENUATION)
 			attenuation = MSG_ReadByte(&cl_message) / 64.0;
@@ -276,7 +276,7 @@ static void CL_ParseStartSoundPacket(int largesoundindex)
 
 	MSG_ReadVector(&cl_message, pos, cls.protocol);
 
-	if (sound_num >= MAX_SOUNDS)
+	if (sound_num < 0 || sound_num >= MAX_SOUNDS)
 	{
 		Con_Printf("CL_ParseStartSoundPacket: sound_num (%i) >= MAX_SOUNDS (%i)\n", sound_num, MAX_SOUNDS);
 		return;
@@ -291,8 +291,8 @@ static void CL_ParseStartSoundPacket(int largesoundindex)
 	if (ent >= cl.max_entities)
 		CL_ExpandEntities(ent);
 
-	if( !CL_VM_Event_Sound(sound_num, volume / 255.0f, channel, attenuation, ent, pos, fflags, speed) )
-		S_StartSound_StartPosition_Flags (ent, channel, cl.sound_precache[sound_num], pos, volume/255.0f, attenuation, 0, fflags, speed);
+	if( !CL_VM_Event_Sound(sound_num, nvolume / 255.0f, channel, attenuation, ent, pos, fflags, speed) )
+		S_StartSound_StartPosition_Flags (ent, channel, cl.sound_precache[sound_num], pos, nvolume/255.0f, attenuation, 0, fflags, speed);
 }
 
 /*
@@ -380,6 +380,7 @@ void CL_KeepaliveMessage (qboolean readmessages)
 
 void CL_ParseEntityLump(char *entdata)
 {
+	qboolean loadedsky = false;
 	const char *data;
 	char key[128], value[MAX_INPUTLINE];
 	FOG_clear(); // LordHavoc: no fog until set
@@ -408,11 +409,20 @@ void CL_ParseEntityLump(char *entdata)
 			return; // error
 		strlcpy (value, com_token, sizeof (value));
 		if (!strcmp("sky", key))
+		{
+			loadedsky = true;
 			R_SetSkyBox(value);
+		}
 		else if (!strcmp("skyname", key)) // non-standard, introduced by QuakeForge... sigh.
+		{
+			loadedsky = true;
 			R_SetSkyBox(value);
+		}
 		else if (!strcmp("qlsky", key)) // non-standard, introduced by QuakeLives (EEK)
+		{
+			loadedsky = true;
 			R_SetSkyBox(value);
+		}
 		else if (!strcmp("fog", key))
 		{
 			FOG_clear(); // so missing values get good defaults
@@ -455,6 +465,9 @@ void CL_ParseEntityLump(char *entdata)
 			r_refdef.fog_height_texturename[63] = 0;
 		}
 	}
+
+	if (!loadedsky && cl.worldmodel->brush.isq2bsp)
+		R_SetSkyBox("unit1_");
 }
 
 static const vec3_t defaultmins = {-4096, -4096, -4096};
@@ -572,6 +585,12 @@ static void QW_CL_RequestNextDownload(void)
 
 	// clear name of file that just finished
 	cls.qw_downloadname[0] = 0;
+
+	// skip the download fragment if playing a demo
+	if (!cls.netcon)
+	{
+		return;
+	}
 
 	switch (cls.qw_downloadtype)
 	{
@@ -1026,7 +1045,7 @@ static void QW_CL_ParseNails(void)
 	{
 		for (j = 0;j < 6;j++)
 			bits[j] = MSG_ReadByte(&cl_message);
-		if (cl.qw_num_nails > 255)
+		if (cl.qw_num_nails >= 255)
 			continue;
 		v = cl.qw_nails[cl.qw_num_nails++];
 		v[0] = ( ( bits[0] + ((bits[1]&15)<<8) ) <<1) - 4096;
@@ -1377,7 +1396,7 @@ static void CL_StopDownload(int size, int crc)
 			{
 				Con_Printf("Inflated download: new size: %u (%g%%)\n", (unsigned)inflated_size, 100.0 - 100.0*(cls.qw_downloadmemorycursize / (float)inflated_size));
 				cls.qw_downloadmemory = out;
-				cls.qw_downloadmemorycursize = inflated_size;
+				cls.qw_downloadmemorycursize = (int)inflated_size;
 			}
 			else
 			{
@@ -2292,6 +2311,13 @@ static void CL_ParseStaticSound (int large)
 		sound_num = (unsigned short) MSG_ReadShort(&cl_message);
 	else
 		sound_num = MSG_ReadByte(&cl_message);
+
+	if (sound_num < 0 || sound_num >= MAX_SOUNDS)
+	{
+		Con_Printf("CL_ParseStaticSound: sound_num(%i) >= MAX_SOUNDS (%i)\n", sound_num, MAX_SOUNDS);
+		return;
+	}
+
 	vol = MSG_ReadByte(&cl_message);
 	atten = MSG_ReadByte(&cl_message);
 
@@ -2867,6 +2893,8 @@ static void CL_ParseTempEntity(void)
 			CL_FindNonSolidLocation(pos, pos, 10);
 			colorStart = MSG_ReadByte(&cl_message);
 			colorLength = MSG_ReadByte(&cl_message);
+			if (colorLength == 0)
+				colorLength = 1;
 			CL_ParticleExplosion2(pos, colorStart, colorLength);
 			tempcolor = palette_rgb[(rand()%colorLength) + colorStart];
 			color[0] = tempcolor[0] * (2.0f / 255.0f);
@@ -3434,8 +3462,8 @@ void CL_ParseServerMessage(void)
 			if (!cmdlogname[cmdindex])
 			{
 				// LordHavoc: fix for bizarre problem in MSVC that I do not understand (if I assign the string pointer directly it ends up storing a NULL pointer)
-				temp = "<unknown>";
-				cmdlogname[cmdindex] = temp;
+				const char *d = "<unknown>";
+				cmdlogname[cmdindex] = d;
 			}
 
 			// other commands
@@ -3443,7 +3471,7 @@ void CL_ParseServerMessage(void)
 			{
 			default:
 				{
-					char description[32*64], temp[64];
+					char description[32*64], logtemp[64];
 					int count;
 					strlcpy(description, "packet dump: ", sizeof(description));
 					i = cmdcount - 32;
@@ -3453,8 +3481,8 @@ void CL_ParseServerMessage(void)
 					i &= 31;
 					while(count > 0)
 					{
-						dpsnprintf(temp, sizeof(temp), "%3i:%s ", cmdlog[i], cmdlogname[i]);
-						strlcat(description, temp, sizeof(description));
+						dpsnprintf(logtemp, sizeof(logtemp), "%3i:%s ", cmdlog[i], cmdlogname[i]);
+						strlcat(description, logtemp, sizeof(description));
 						count--;
 						i++;
 						i &= 31;
@@ -3799,8 +3827,8 @@ void CL_ParseServerMessage(void)
 			if (!cmdlogname[cmdindex])
 			{
 				// LordHavoc: fix for bizarre problem in MSVC that I do not understand (if I assign the string pointer directly it ends up storing a NULL pointer)
-				temp = "<unknown>";
-				cmdlogname[cmdindex] = temp;
+				const char *d = "<unknown>";
+				cmdlogname[cmdindex] = d;
 			}
 
 			// other commands
@@ -3808,7 +3836,7 @@ void CL_ParseServerMessage(void)
 			{
 			default:
 				{
-					char description[32*64], temp[64];
+					char description[32*64], tempdesc[64];
 					int count;
 					strlcpy (description, "packet dump: ", sizeof(description));
 					i = cmdcount - 32;
@@ -3818,8 +3846,8 @@ void CL_ParseServerMessage(void)
 					i &= 31;
 					while(count > 0)
 					{
-						dpsnprintf (temp, sizeof (temp), "%3i:%s ", cmdlog[i], cmdlogname[i]);
-						strlcat (description, temp, sizeof (description));
+						dpsnprintf (tempdesc, sizeof (tempdesc), "%3i:%s ", cmdlog[i], cmdlogname[i]);
+						strlcat (description, tempdesc, sizeof (description));
 						count--;
 						i++;
 						i &= 31;
@@ -3970,8 +3998,9 @@ void CL_ParseServerMessage(void)
 				}
 				else
 				{
-					int i = (unsigned short)MSG_ReadShort(&cl_message);
-					char *s = MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring));
+					char *s;
+					i = (unsigned short)MSG_ReadShort(&cl_message);
+					s = MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring));
 					if (i < 32768)
 					{
 						if (i >= 1 && i < MAX_MODELS)

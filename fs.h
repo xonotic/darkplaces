@@ -111,6 +111,7 @@ fssearch_t *FS_Search(const char *pattern, int caseinsensitive, int quiet);
 void FS_FreeSearch(fssearch_t *search);
 
 unsigned char *FS_LoadFile (const char *path, mempool_t *pool, qboolean quiet, fs_offset_t *filesizepointer);
+unsigned char *FS_SysLoadFile (const char *path, mempool_t *pool, qboolean quiet, fs_offset_t *filesizepointer);
 qboolean FS_WriteFileInBlocks (const char *filename, const void *const *data, const fs_offset_t *len, size_t count);
 qboolean FS_WriteFile (const char *filename, const void *data, fs_offset_t len);
 
@@ -128,8 +129,6 @@ int FS_SysFileType (const char *filename);		// only look for files outside of pa
 
 qboolean FS_FileExists (const char *filename);		// the file can be into a package
 qboolean FS_SysFileExists (const char *filename);	// only look for files outside of packages
-
-void FS_mkdir (const char *path);
 
 unsigned char *FS_Deflate(const unsigned char *data, size_t size, size_t *deflated_size, int level, mempool_t *mempool);
 unsigned char *FS_Inflate(const unsigned char *data, size_t size, size_t *inflated_size, mempool_t *mempool);

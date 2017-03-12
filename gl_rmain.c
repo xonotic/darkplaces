@@ -34,6 +34,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 extern LPDIRECT3DDEVICE9 vid_d3d9dev;
 #endif
 
+#ifdef WIN32
+// Enable NVIDIA High Performance Graphics while using Integrated Graphics.
+#ifdef __cplusplus
+extern "C" {
+#endif
+__declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+#ifdef __cplusplus
+}
+#endif
+#endif
+
 mempool_t *r_main_mempool;
 rtexturepool_t *r_main_texturepool;
 
@@ -184,6 +195,7 @@ cvar_t r_glsl_postprocess_uservec3_enable = {CVAR_SAVE, "r_glsl_postprocess_user
 cvar_t r_glsl_postprocess_uservec4_enable = {CVAR_SAVE, "r_glsl_postprocess_uservec4_enable", "1", "enables postprocessing uservec4 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
 
 cvar_t r_water = {CVAR_SAVE, "r_water", "0", "whether to use reflections and refraction on water surfaces (note: r_wateralpha must be set below 1)"};
+cvar_t r_water_cameraentitiesonly = {CVAR_SAVE, "r_water_cameraentitiesonly", "0", "whether to only show QC-defined reflections/refractions (typically used for camera- or portal-like effects)"};
 cvar_t r_water_clippingplanebias = {CVAR_SAVE, "r_water_clippingplanebias", "1", "a rather technical setting which avoids black pixels around water edges"};
 cvar_t r_water_resolutionmultiplier = {CVAR_SAVE, "r_water_resolutionmultiplier", "0.5", "multiplier for screen resolution when rendering refracted/reflected scenes, 1 is full quality, lower values are faster"};
 cvar_t r_water_refractdistort = {CVAR_SAVE, "r_water_refractdistort", "0.01", "how much water refractions shimmer"};
@@ -678,7 +690,8 @@ shaderpermutationinfo_t shaderpermutationinfo[SHADERPERMUTATION_COUNT] =
 	{"#define USETRIPPY\n", " trippy"},
 	{"#define USEDEPTHRGB\n", " depthrgb"},
 	{"#define USEALPHAGENVERTEX\n", " alphagenvertex"},
-	{"#define USESKELETAL\n", " skeletal"}
+	{"#define USESKELETAL\n", " skeletal"},
+	{"#define USEOCCLUDE\n", " occlude"}
 };
 
 // NOTE: MUST MATCH ORDER OF SHADERMODE_* ENUMS!
@@ -895,7 +908,7 @@ extern qboolean r_shadow_shadowmapsampler;
 extern int r_shadow_shadowmappcf;
 qboolean R_CompileShader_CheckStaticParms(void)
 {
-	static int r_compileshader_staticparms_save[1];
+	static int r_compileshader_staticparms_save[(SHADERSTATICPARMS_COUNT + 0x1F) >> 5];
 	memcpy(r_compileshader_staticparms_save, r_compileshader_staticparms, sizeof(r_compileshader_staticparms));
 	memset(r_compileshader_staticparms, 0, sizeof(r_compileshader_staticparms));
 
@@ -1629,7 +1642,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 					vsresult = qD3DXCompileShaderFromFileA(va(vabuf, sizeof(vabuf), "%s/%s_vs.fx", fs_gamedir, cachename), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
 				}
 				else
-					vsresult = qD3DXCompileShader(vertstring, strlen(vertstring), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
+					vsresult = qD3DXCompileShader(vertstring, (unsigned int)strlen(vertstring), NULL, NULL, "main", vsversion, shaderflags, &vsbuffer, &vslog, &vsconstanttable);
 				if (vsbuffer)
 				{
 					vsbinsize = ID3DXBuffer_GetBufferSize(vsbuffer);
@@ -1652,7 +1665,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 					psresult = qD3DXCompileShaderFromFileA(va(vabuf, sizeof(vabuf), "%s/%s_ps.fx", fs_gamedir, cachename), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
 				}
 				else
-					psresult = qD3DXCompileShader(fragstring, strlen(fragstring), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
+					psresult = qD3DXCompileShader(fragstring, (unsigned int)strlen(fragstring), NULL, NULL, "main", psversion, shaderflags, &psbuffer, &pslog, &psconstanttable);
 				if (psbuffer)
 				{
 					psbinsize = ID3DXBuffer_GetBufferSize(psbuffer);
@@ -1780,23 +1793,23 @@ static void R_HLSL_CompilePermutation(r_hlsl_permutation_t *p, unsigned int mode
 
 	vertstring_length = 0;
 	for (i = 0;i < vertstrings_count;i++)
-		vertstring_length += strlen(vertstrings_list[i]);
+		vertstring_length += (int)strlen(vertstrings_list[i]);
 	vertstring = t = (char *)Mem_Alloc(tempmempool, vertstring_length + 1);
-	for (i = 0;i < vertstrings_count;t += strlen(vertstrings_list[i]), i++)
+	for (i = 0;i < vertstrings_count;t += (int)strlen(vertstrings_list[i]), i++)
 		memcpy(t, vertstrings_list[i], strlen(vertstrings_list[i]));
 
 	geomstring_length = 0;
 	for (i = 0;i < geomstrings_count;i++)
-		geomstring_length += strlen(geomstrings_list[i]);
+		geomstring_length += (int)strlen(geomstrings_list[i]);
 	geomstring = t = (char *)Mem_Alloc(tempmempool, geomstring_length + 1);
-	for (i = 0;i < geomstrings_count;t += strlen(geomstrings_list[i]), i++)
+	for (i = 0;i < geomstrings_count;t += (int)strlen(geomstrings_list[i]), i++)
 		memcpy(t, geomstrings_list[i], strlen(geomstrings_list[i]));
 
 	fragstring_length = 0;
 	for (i = 0;i < fragstrings_count;i++)
-		fragstring_length += strlen(fragstrings_list[i]);
+		fragstring_length += (int)strlen(fragstrings_list[i]);
 	fragstring = t = (char *)Mem_Alloc(tempmempool, fragstring_length + 1);
-	for (i = 0;i < fragstrings_count;t += strlen(fragstrings_list[i]), i++)
+	for (i = 0;i < fragstrings_count;t += (int)strlen(fragstrings_list[i]), i++)
 		memcpy(t, fragstrings_list[i], strlen(fragstrings_list[i]));
 
 	// try to load the cached shader, or generate one
@@ -1900,7 +1913,7 @@ void R_GLSL_Restart_f(void)
 		{
 			r_hlsl_permutation_t *p;
 			r_hlsl_permutation = NULL;
-			limit = Mem_ExpandableArray_IndexRange(&r_hlsl_permutationarray);
+			limit = (unsigned int)Mem_ExpandableArray_IndexRange(&r_hlsl_permutationarray);
 			for (i = 0;i < limit;i++)
 			{
 				if ((p = (r_hlsl_permutation_t*)Mem_ExpandableArray_RecordAtIndex(&r_hlsl_permutationarray, i)))
@@ -1927,7 +1940,7 @@ void R_GLSL_Restart_f(void)
 		{
 			r_glsl_permutation_t *p;
 			r_glsl_permutation = NULL;
-			limit = Mem_ExpandableArray_IndexRange(&r_glsl_permutationarray);
+			limit = (unsigned int)Mem_ExpandableArray_IndexRange(&r_glsl_permutationarray);
 			for (i = 0;i < limit;i++)
 			{
 				if ((p = (r_glsl_permutation_t*)Mem_ExpandableArray_RecordAtIndex(&r_glsl_permutationarray, i)))
@@ -2130,7 +2143,6 @@ extern rtexture_t *r_shadow_shadowmap2ddepthbuffer;
 extern rtexture_t *r_shadow_shadowmap2ddepthtexture;
 extern rtexture_t *r_shadow_shadowmapvsdcttexture;
 extern matrix4x4_t r_shadow_shadowmapmatrix;
-extern int r_shadow_shadowmaplod; // changes for each light based on distance
 extern int r_shadow_prepass_width;
 extern int r_shadow_prepass_height;
 extern rtexture_t *r_shadow_prepassgeometrydepthbuffer;
@@ -2202,6 +2214,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		permutation |= SHADERPERMUTATION_TRIPPY;
 	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST)
 		permutation |= SHADERPERMUTATION_ALPHAKILL;
+	if (rsurface.texture->currentmaterialflags & MATERIALFLAG_OCCLUDE)
+		permutation |= SHADERPERMUTATION_OCCLUDE;
 	if (rsurface.texture->r_water_waterscroll[0] && rsurface.texture->r_water_waterscroll[1])
 		permutation |= SHADERPERMUTATION_NORMALMAPSCROLLBLEND; // todo: make generic
 	if (rsurfacepass == RSURFPASS_BACKGROUND)
@@ -2400,10 +2414,10 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_DEFERREDLIGHTMAP;
 		if (rsurface.texture->reflectmasktexture)
 			permutation |= SHADERPERMUTATION_REFLECTCUBE;
-		if (r_shadow_bouncegridtexture && cl.csqc_vidvars.drawworld)
+		if (r_shadow_bouncegrid_state.texture && cl.csqc_vidvars.drawworld)
 		{
 			permutation |= SHADERPERMUTATION_BOUNCEGRID;
-			if (r_shadow_bouncegriddirectional)
+			if (r_shadow_bouncegrid_state.directional)
 				permutation |= SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL;
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
@@ -2458,10 +2472,10 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			permutation |= SHADERPERMUTATION_DEFERREDLIGHTMAP;
 		if (rsurface.texture->reflectmasktexture)
 			permutation |= SHADERPERMUTATION_REFLECTCUBE;
-		if (r_shadow_bouncegridtexture && cl.csqc_vidvars.drawworld)
+		if (r_shadow_bouncegrid_state.texture && cl.csqc_vidvars.drawworld)
 		{
 			permutation |= SHADERPERMUTATION_BOUNCEGRID;
-			if (r_shadow_bouncegriddirectional)
+			if (r_shadow_bouncegrid_state.directional)
 				permutation |= SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL;
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
@@ -2555,10 +2569,10 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 			// ordinary vertex coloring (q3bsp)
 			mode = SHADERMODE_VERTEXCOLOR;
 		}
-		if (r_shadow_bouncegridtexture && cl.csqc_vidvars.drawworld)
+		if (r_shadow_bouncegrid_state.texture && cl.csqc_vidvars.drawworld)
 		{
 			permutation |= SHADERPERMUTATION_BOUNCEGRID;
-			if (r_shadow_bouncegriddirectional)
+			if (r_shadow_bouncegrid_state.directional)
 				permutation |= SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL;
 		}
 		GL_BlendFunc(rsurface.texture->currentlayers[0].blendfunc1, rsurface.texture->currentlayers[0].blendfunc2);
@@ -2856,8 +2870,8 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 		if (r_glsl_permutation->loc_OffsetMapping_Bias >= 0) qglUniform1f(r_glsl_permutation->loc_OffsetMapping_Bias, rsurface.texture->offsetbias);
 		if (r_glsl_permutation->loc_ScreenToDepth >= 0) qglUniform2f(r_glsl_permutation->loc_ScreenToDepth, r_refdef.view.viewport.screentodepth[0], r_refdef.view.viewport.screentodepth[1]);
 		if (r_glsl_permutation->loc_PixelToScreenTexCoord >= 0) qglUniform2f(r_glsl_permutation->loc_PixelToScreenTexCoord, 1.0f/vid.width, 1.0f/vid.height);
-		if (r_glsl_permutation->loc_BounceGridMatrix >= 0) {Matrix4x4_Concat(&tempmatrix, &r_shadow_bouncegridmatrix, &rsurface.matrix);Matrix4x4_ToArrayFloatGL(&tempmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_BounceGridMatrix, 1, false, m16f);}
-		if (r_glsl_permutation->loc_BounceGridIntensity >= 0) qglUniform1f(r_glsl_permutation->loc_BounceGridIntensity, r_shadow_bouncegridintensity*r_refdef.view.colorscale);
+		if (r_glsl_permutation->loc_BounceGridMatrix >= 0) {Matrix4x4_Concat(&tempmatrix, &r_shadow_bouncegrid_state.matrix, &rsurface.matrix);Matrix4x4_ToArrayFloatGL(&tempmatrix, m16f);qglUniformMatrix4fv(r_glsl_permutation->loc_BounceGridMatrix, 1, false, m16f);}
+		if (r_glsl_permutation->loc_BounceGridIntensity >= 0) qglUniform1f(r_glsl_permutation->loc_BounceGridIntensity, r_shadow_bouncegrid_state.intensity*r_refdef.view.colorscale);
 
 		if (r_glsl_permutation->tex_Texture_First           >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_First            , r_texture_white                                     );
 		if (r_glsl_permutation->tex_Texture_Second          >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_Second           , r_texture_white                                     );
@@ -2901,7 +2915,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 				if (r_glsl_permutation->tex_Texture_CubeProjection  >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_CubeProjection    , r_shadow_shadowmapvsdcttexture                      );
 			}
 		}
-		if (r_glsl_permutation->tex_Texture_BounceGrid  >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_BounceGrid, r_shadow_bouncegridtexture);
+		if (r_glsl_permutation->tex_Texture_BounceGrid  >= 0) R_Mesh_TexBind(r_glsl_permutation->tex_Texture_BounceGrid, r_shadow_bouncegrid_state.texture);
 		CHECKGLERROR
 		break;
 	case RENDERPATH_GL11:
@@ -3085,7 +3099,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 		GL_AlphaToCoverage(false);
 	Matrix4x4_Transform(&r_refdef.view.viewport.viewmatrix, rtlight->shadoworigin, viewlightorigin);
 	Matrix4x4_Concat(&lighttoview, &r_refdef.view.viewport.viewmatrix, &rtlight->matrix_lighttoworld);
-	Matrix4x4_Invert_Simple(&viewtolight, &lighttoview);
+	Matrix4x4_Invert_Full(&viewtolight, &lighttoview);
 	Matrix4x4_ToArrayFloatGL(&viewtolight, viewtolight16f);
 	switch(vid.renderpath)
 	{
@@ -3166,7 +3180,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 
 typedef struct
 {
-	int loadsequence; // incremented each level change
+	unsigned int loadsequence; // incremented each level change
 	memexpandablearray_t array;
 	skinframe_t *hash[SKINFRAME_HASH];
 }
@@ -3400,6 +3414,7 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 	skinframe->fog = NULL;
 	skinframe->reflect = NULL;
 	skinframe->hasalpha = false;
+	// we could store the q2animname here too
 
 	if (ddsbase)
 	{
@@ -3565,7 +3580,6 @@ skinframe_t *R_SkinFrame_LoadExternal(const char *name, int textureflags, qboole
 skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, const unsigned char *skindata, int width, int height, qboolean sRGB)
 {
 	int i;
-	unsigned char *temp1, *temp2;
 	skinframe_t *skinframe;
 	char vabuf[1024];
 
@@ -3599,11 +3613,11 @@ skinframe_t *R_SkinFrame_LoadInternalBGRA(const char *name, int textureflags, co
 
 	if (r_loadnormalmap && r_shadow_bumpscale_basetexture.value > 0)
 	{
-		temp1 = (unsigned char *)Mem_Alloc(tempmempool, width * height * 8);
-		temp2 = temp1 + width * height * 4;
-		Image_HeightmapToNormalmap_BGRA(skindata, temp2, width, height, false, r_shadow_bumpscale_basetexture.value);
-		skinframe->nmap = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_nmap", skinframe->basename), width, height, temp2, TEXTYPE_BGRA, (textureflags | TEXF_ALPHA) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP), -1, NULL);
-		Mem_Free(temp1);
+		unsigned char *a = (unsigned char *)Mem_Alloc(tempmempool, width * height * 8);
+		unsigned char *b = a + width * height * 4;
+		Image_HeightmapToNormalmap_BGRA(skindata, b, width, height, false, r_shadow_bumpscale_basetexture.value);
+		skinframe->nmap = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_nmap", skinframe->basename), width, height, b, TEXTYPE_BGRA, (textureflags | TEXF_ALPHA) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP), -1, NULL);
+		Mem_Free(a);
 	}
 	skinframe->base = skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, sRGB ? TEXTYPE_SRGB_BGRA : TEXTYPE_BGRA, textureflags, -1, NULL);
 	if (textureflags & TEXF_ALPHA)
@@ -3678,6 +3692,9 @@ skinframe_t *R_SkinFrame_LoadInternalQuake(const char *name, int textureflags, i
 		featuresmask |= palette_featureflags[skindata[i]];
 
 	skinframe->hasalpha = false;
+	// fence textures
+	if (name[0] == '{')
+		skinframe->hasalpha = true;
 	skinframe->qhascolormapping = loadpantsandshirt && (featuresmask & (PALETTEFEATURE_PANTS | PALETTEFEATURE_SHIRT));
 	skinframe->qgeneratenmap = r_shadow_bumpscale_basetexture.value > 0;
 	skinframe->qgeneratemerged = true;
@@ -3720,21 +3737,24 @@ static void R_SkinFrame_GenerateTexturesFromQPixels(skinframe_t *skinframe, qboo
 
 	if (skinframe->qgeneratenmap)
 	{
-		unsigned char *temp1, *temp2;
+		unsigned char *a, *b;
 		skinframe->qgeneratenmap = false;
-		temp1 = (unsigned char *)Mem_Alloc(tempmempool, width * height * 8);
-		temp2 = temp1 + width * height * 4;
+		a = (unsigned char *)Mem_Alloc(tempmempool, width * height * 8);
+		b = a + width * height * 4;
 		// use either a custom palette or the quake palette
-		Image_Copy8bitBGRA(skindata, temp1, width * height, palette_bgra_complete);
-		Image_HeightmapToNormalmap_BGRA(temp1, temp2, width, height, false, r_shadow_bumpscale_basetexture.value);
-		skinframe->nmap = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_nmap", skinframe->basename), width, height, temp2, TEXTYPE_BGRA, (skinframe->textureflags | TEXF_ALPHA) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP), -1, NULL);
-		Mem_Free(temp1);
+		Image_Copy8bitBGRA(skindata, a, width * height, palette_bgra_complete);
+		Image_HeightmapToNormalmap_BGRA(a, b, width, height, false, r_shadow_bumpscale_basetexture.value);
+		skinframe->nmap = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_nmap", skinframe->basename), width, height, b, TEXTYPE_BGRA, (skinframe->textureflags | TEXF_ALPHA) & (r_mipnormalmaps.integer ? ~0 : ~TEXF_MIPMAP), -1, NULL);
+		Mem_Free(a);
 	}
 
 	if (skinframe->qgenerateglow)
 	{
 		skinframe->qgenerateglow = false;
-		skinframe->glow = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_glow", skinframe->basename), width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags, -1, palette_bgra_onlyfullbrights); // glow
+		if (skinframe->hasalpha) // fence textures
+			skinframe->glow = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_glow", skinframe->basename), width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags | TEXF_ALPHA, -1, palette_bgra_onlyfullbrights_transparent); // glow
+		else
+			skinframe->glow = R_LoadTexture2D(r_main_texturepool, va(vabuf, sizeof(vabuf), "%s_glow", skinframe->basename), width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags, -1, palette_bgra_onlyfullbrights); // glow
 	}
 
 	if (colormapped)
@@ -3747,7 +3767,10 @@ static void R_SkinFrame_GenerateTexturesFromQPixels(skinframe_t *skinframe, qboo
 	else
 	{
 		skinframe->qgeneratemerged = false;
-		skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags, -1, skinframe->glow ? palette_bgra_nofullbrights : palette_bgra_complete);
+		if (skinframe->hasalpha) // fence textures
+			skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags | TEXF_ALPHA, -1, skinframe->glow ? palette_bgra_nofullbrights_transparent : palette_bgra_transparent);
+		else
+			skinframe->merged = R_LoadTexture2D(r_main_texturepool, skinframe->basename, width, height, skindata, vid.sRGB3D ? TEXTYPE_SRGB_PALETTE : TEXTYPE_PALETTE, skinframe->textureflags, -1, skinframe->glow ? palette_bgra_nofullbrights : palette_bgra_complete);
 	}
 
 	if (!skinframe->qgeneratemerged && !skinframe->qgeneratebase)
@@ -4371,6 +4394,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_celoutlines);
 
 	Cvar_RegisterVariable(&r_water);
+	Cvar_RegisterVariable(&r_water_cameraentitiesonly);
 	Cvar_RegisterVariable(&r_water_resolutionmultiplier);
 	Cvar_RegisterVariable(&r_water_clippingplanebias);
 	Cvar_RegisterVariable(&r_water_refractdistort);
@@ -4493,9 +4517,6 @@ int R_CullBox(const vec3_t mins, const vec3_t maxs)
 		return false;
 	for (i = 0;i < r_refdef.view.numfrustumplanes;i++)
 	{
-		// skip nearclip plane, it often culls portals when you are very close, and is almost never useful
-		if (i == 4)
-			continue;
 		p = r_refdef.view.frustum + i;
 		switch(p->signbits)
 		{
@@ -4661,7 +4682,13 @@ void *R_FrameData_Alloc(size_t size)
 	while (!r_framedata_mem || r_framedata_mem->current + size > r_framedata_mem->size)
 	{
 		// emergency - we ran out of space, allocate more memory
-		newvalue = bound(0.25f, r_framedatasize.value * 2.0f, 256.0f);
+		// note: this has no upper-bound, we'll fail to allocate memory eventually and just die
+		newvalue = r_framedatasize.value * 2.0f;
+		// upper bound based on architecture - if we try to allocate more than this we could overflow, better to loop until we error out on allocation failure
+		if (sizeof(size_t) >= 8)
+			newvalue = bound(0.25f, newvalue, (float)(1ll << 42));
+		else
+			newvalue = bound(0.25f, newvalue, (float)(1 << 10));
 		// this might not be a growing it, but we'll allocate another buffer every time
 		Cvar_SetValueQuick(&r_framedatasize, newvalue);
 		R_FrameData_Resize(true);
@@ -4835,7 +4862,7 @@ r_meshbuffer_t *R_BufferData_Store(size_t datasize, const void *data, r_bufferda
 		Sys_Error("R_BufferData_Store: failed to create a new buffer of sufficient size\n");
 
 	mem = r_bufferdata_buffer[r_bufferdata_cycle][type];
-	offset = mem->current;
+	offset = (int)mem->current;
 	mem->current += padsize;
 
 	// upload the data to the buffer at the chosen offset
@@ -5213,18 +5240,20 @@ static void R_View_UpdateEntityVisible (void)
 	int samples;
 	entity_render_t *ent;
 
-	renderimask = r_refdef.envmap                                    ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL)
-		: r_fb.water.hideplayer                                      ? (RENDER_EXTERIORMODEL | RENDER_VIEWMODEL)
-		: (chase_active.integer || r_fb.water.renderingscene)  ? RENDER_VIEWMODEL
-		:                                                          RENDER_EXTERIORMODEL;
+	if (r_refdef.envmap || r_fb.water.hideplayer)
+		renderimask = RENDER_EXTERIORMODEL | RENDER_VIEWMODEL;
+	else if (chase_active.integer || r_fb.water.renderingscene)
+		renderimask = RENDER_VIEWMODEL;
+	else
+		renderimask = RENDER_EXTERIORMODEL;
 	if (!r_drawviewmodel.integer)
 		renderimask |= RENDER_VIEWMODEL;
 	if (!r_drawexteriormodel.integer)
 		renderimask |= RENDER_EXTERIORMODEL;
+	memset(r_refdef.viewcache.entityvisible, 0, r_refdef.scene.numentities);
 	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs)
 	{
 		// worldmodel can check visibility
-		memset(r_refdef.viewcache.entityvisible, 0, r_refdef.scene.numentities);
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			ent = r_refdef.scene.entities[i];
@@ -5240,10 +5269,12 @@ static void R_View_UpdateEntityVisible (void)
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			ent = r_refdef.scene.entities[i];
-			r_refdef.viewcache.entityvisible[i] = !(ent->flags & renderimask) && ((ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)) || !R_CullBox(ent->mins, ent->maxs));
+			if (!(ent->flags & renderimask))
+			if (!R_CullBox(ent->mins, ent->maxs) || (ent->model && ent->model->type == mod_sprite && (ent->model->sprite.sprnum_type == SPR_LABEL || ent->model->sprite.sprnum_type == SPR_LABEL_SCALE)))
+				r_refdef.viewcache.entityvisible[i] = true;
 		}
 	}
-	if(r_cullentities_trace.integer && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane && !r_trippy.integer)
+	if(r_cullentities_trace.integer && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane && !r_trippy.integer)
 		// sorry, this check doesn't work for portal/reflection/refraction renders as the view origin is not useful for culling
 	{
 		for (i = 0;i < r_refdef.scene.numentities;i++)
@@ -5822,7 +5853,7 @@ void R_RenderView_UpdateViewVectors(void)
 	Matrix4x4_ToVectors(&r_refdef.view.matrix, r_refdef.view.forward, r_refdef.view.left, r_refdef.view.up, r_refdef.view.origin);
 	VectorNegate(r_refdef.view.left, r_refdef.view.right);
 	// make an inverted copy of the view matrix for tracking sprites
-	Matrix4x4_Invert_Simple(&r_refdef.view.inverse_matrix, &r_refdef.view.matrix);
+	Matrix4x4_Invert_Full(&r_refdef.view.inverse_matrix, &r_refdef.view.matrix);
 }
 
 void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture);
@@ -5996,25 +6027,33 @@ void R_Water_AddWaterPlane(msurface_t *surface, int entno)
 		}
 	}
 	planeindex = bestplaneindex;
-	p = r_fb.water.waterplanes + planeindex;
 
 	// if this surface does not fit any known plane rendered this frame, add one
-	if ((planeindex < 0 || bestplanescore > 0.001f) && r_fb.water.numwaterplanes < r_fb.water.maxwaterplanes)
+	if (planeindex < 0 || bestplanescore > 0.001f)
 	{
-		// store the new plane
-		planeindex = r_fb.water.numwaterplanes++;
-		p = r_fb.water.waterplanes + planeindex;
-		p->plane = plane;
-		// clear materialflags and pvs
-		p->materialflags = 0;
-		p->pvsvalid = false;
-		p->camera_entity = t->camera_entity;
-		VectorCopy(mins, p->mins);
-		VectorCopy(maxs, p->maxs);
+		if (r_fb.water.numwaterplanes < r_fb.water.maxwaterplanes)
+		{
+			// store the new plane
+			planeindex = r_fb.water.numwaterplanes++;
+			p = r_fb.water.waterplanes + planeindex;
+			p->plane = plane;
+			// clear materialflags and pvs
+			p->materialflags = 0;
+			p->pvsvalid = false;
+			p->camera_entity = t->camera_entity;
+			VectorCopy(mins, p->mins);
+			VectorCopy(maxs, p->maxs);
+		}
+		else
+		{
+			// We're totally screwed.
+			return;
+		}
 	}
 	else
 	{
 		// merge mins/maxs when we're adding this surface to the plane
+		p = r_fb.water.waterplanes + planeindex;
 		p->mins[0] = min(p->mins[0], mins[0]);
 		p->mins[1] = min(p->mins[1], mins[1]);
 		p->mins[2] = min(p->mins[2], mins[2]);
@@ -6027,7 +6066,7 @@ void R_Water_AddWaterPlane(msurface_t *surface, int entno)
 	if(!(p->materialflags & MATERIALFLAG_CAMERA))
 	{
 		// merge this surface's PVS into the waterplane
-		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION | MATERIALFLAG_CAMERA) && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.FatPVS
+		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION) && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.FatPVS
 		 && r_refdef.scene.worldmodel->brush.PointInLeaf && r_refdef.scene.worldmodel->brush.PointInLeaf(r_refdef.scene.worldmodel, center)->clusterindex >= 0)
 		{
 			r_refdef.scene.worldmodel->brush.FatPVS(r_refdef.scene.worldmodel, center, 2, p->pvsbits, sizeof(p->pvsbits), p->pvsvalid);
@@ -6079,6 +6118,8 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 	// make sure enough textures are allocated
 	for (planeindex = 0, p = r_fb.water.waterplanes;planeindex < r_fb.water.numwaterplanes;planeindex++, p++)
 	{
+		if (r_water_cameraentitiesonly.value != 0 && !p->camera_entity)
+			continue;
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION))
 		{
 			if (!p->texture_refraction)
@@ -6134,6 +6175,8 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 	r_fb.water.renderingscene = true;
 	for (planeindex = 0, p = r_fb.water.waterplanes;planeindex < r_fb.water.numwaterplanes;planeindex++, p++)
 	{
+		if (r_water_cameraentitiesonly.value != 0 && !p->camera_entity)
+			continue;
 		if (p->materialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFLECTION))
 		{
 			r_refdef.view = myview;
@@ -6411,7 +6454,7 @@ static void R_Bloom_StartFrame(void)
 		Cvar_SetValueQuick(&r_damageblur, 0);
 	}
 
-	if (!(r_glsl_postprocess.integer || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial))
+	if (!((r_glsl_postprocess.integer || r_fxaa.integer) || (!R_Stereo_ColorMasking() && r_glsl_saturation.value != 1) || (v_glslgamma.integer && !vid_gammatables_trivial))
 	 && !r_bloom.integer
 	 && (R_Stereo_Active() || (r_motionblur.value <= 0 && r_damageblur.value <= 0))
 	 && !useviewfbo
@@ -8142,7 +8185,9 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		{
 			// use an alternate animation if the entity's frame is not 0,
 			// and only if the texture has an alternate animation
-			if (rsurface.ent_alttextures && t->anim_total[1])
+			if (t->animated == 2) // q2bsp
+				t = t->anim_frames[0][ent->framegroupblend[0].frame % t->anim_total[0]];
+			else if (rsurface.ent_alttextures && t->anim_total[1])
 				t = t->anim_frames[1][(t->anim_total[1] >= 2) ? ((int)(rsurface.shadertime * 5.0f) % t->anim_total[1]) : 0];
 			else
 				t = t->anim_frames[0][(t->anim_total[0] >= 2) ? ((int)(rsurface.shadertime * 5.0f) % t->anim_total[0]) : 0];
@@ -8173,7 +8218,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		t->backgroundcurrentskinframe = t->backgroundskinframes[LoopingFrameNumberFromDouble(rsurface.shadertime * t->backgroundskinframerate, t->backgroundnumskinframes)];
 
 	t->currentmaterialflags = t->basematerialflags;
-	t->currentalpha = rsurface.colormod[3];
+	t->currentalpha = rsurface.colormod[3] * t->basealpha;
 	if (t->basematerialflags & MATERIALFLAG_WATERALPHA && (model->brush.supportwateralpha || r_novis.integer || r_trippy.integer))
 		t->currentalpha *= r_wateralpha.value;
 	if(t->basematerialflags & MATERIALFLAG_WATERSHADER && r_fb.water.enabled && !r_refdef.view.isoverlay)
@@ -8416,7 +8461,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		}
 	}
 
-	return t->currentframe;
+	return t;
 }
 
 rsurfacestate_t rsurface;
@@ -9025,7 +9070,6 @@ void RSurf_PrepareVerticesForBatch(int batchneed, int texturenumsurfaces, const 
 	qboolean dynamicvertex;
 	float amplitude;
 	float animpos;
-	float scale;
 	float center[3], forward[3], right[3], up[3], v[3], newforward[3], newright[3], newup[3];
 	float waveparms[4];
 	unsigned char *ub;
@@ -9823,6 +9867,7 @@ void RSurf_PrepareVerticesForBatch(int batchneed, int texturenumsurfaces, const 
 	// in place
 	for (deformindex = 0, deform = rsurface.texture->deforms;deformindex < Q3MAXDEFORMS && deform->deform && r_deformvertexes.integer;deformindex++, deform++)
 	{
+		float scale;
 		switch (deform->deform)
 		{
 		default:
@@ -10657,7 +10702,7 @@ static void R_DrawTextureSurfaceList_Sky(int texturenumsurfaces, const msurface_
 	// in Quake3 maps as it causes problems with q3map2 sky tricks,
 	// and skymasking also looks very bad when noclipping outside the
 	// level, so don't use it then either.
-	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->type == mod_brushq1 && r_q1bsp_skymasking.integer && !r_refdef.viewcache.world_novis && !r_trippy.integer)
+	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.skymasking && r_q1bsp_skymasking.integer && !r_refdef.viewcache.world_novis && !r_trippy.integer)
 	{
 		R_Mesh_ResetTextureState();
 		if (skyrendermasked)
@@ -11098,9 +11143,9 @@ static void R_DrawTextureSurfaceList_ShowSurfaces(int texturenumsurfaces, const 
 		batchvertex = R_Mesh_PrepareVertices_Generic_Lock(rsurface.batchnumvertices);
 		for (j = 0, vi = 0;j < rsurface.batchnumvertices;j++, vi++)
 		{
-			unsigned char c = (vi << 3) * (1.0f / 256.0f);
+			unsigned char d = (vi << 3) * (1.0f / 256.0f);
 			VectorCopy(rsurface.batchvertex3f + 3*vi, batchvertex[vi].vertex3f);
-			Vector4Set(batchvertex[vi].color4f, c, c, c, 1);
+			Vector4Set(batchvertex[vi].color4f, d, d, d, 1);
 		}
 		R_Mesh_PrepareVertices_Generic_Unlock();
 		RSurf_DrawBatch();
@@ -11112,13 +11157,13 @@ static void R_DrawTextureSurfaceList_ShowSurfaces(int texturenumsurfaces, const 
 		batchvertex = R_Mesh_PrepareVertices_Generic_Lock(3*rsurface.batchnumtriangles);
 		for (j = 0, e = rsurface.batchelement3i + 3 * rsurface.batchfirsttriangle;j < rsurface.batchnumtriangles;j++, e += 3)
 		{
-			unsigned char c = ((j + rsurface.batchfirsttriangle) << 3) * (1.0f / 256.0f);
+			unsigned char d = ((j + rsurface.batchfirsttriangle) << 3) * (1.0f / 256.0f);
 			VectorCopy(rsurface.batchvertex3f + 3*e[0], batchvertex[j*3+0].vertex3f);
 			VectorCopy(rsurface.batchvertex3f + 3*e[1], batchvertex[j*3+1].vertex3f);
 			VectorCopy(rsurface.batchvertex3f + 3*e[2], batchvertex[j*3+2].vertex3f);
-			Vector4Set(batchvertex[j*3+0].color4f, c, c, c, 1);
-			Vector4Set(batchvertex[j*3+1].color4f, c, c, c, 1);
-			Vector4Set(batchvertex[j*3+2].color4f, c, c, c, 1);
+			Vector4Set(batchvertex[j*3+0].color4f, d, d, d, 1);
+			Vector4Set(batchvertex[j*3+1].color4f, d, d, d, 1);
+			Vector4Set(batchvertex[j*3+2].color4f, d, d, d, 1);
 		}
 		R_Mesh_PrepareVertices_Generic_Unlock();
 		R_Mesh_Draw(0, rsurface.batchnumtriangles*3, 0, rsurface.batchnumtriangles, NULL, NULL, 0, NULL, NULL, 0);
@@ -11619,7 +11664,7 @@ void R_DecalSystem_Reset(decalsystem_t *decalsystem)
 	memset(decalsystem, 0, sizeof(*decalsystem));
 }
 
-static void R_DecalSystem_SpawnTriangle(decalsystem_t *decalsystem, const float *v0, const float *v1, const float *v2, const float *t0, const float *t1, const float *t2, const float *c0, const float *c1, const float *c2, int triangleindex, int surfaceindex, int decalsequence)
+static void R_DecalSystem_SpawnTriangle(decalsystem_t *decalsystem, const float *v0, const float *v1, const float *v2, const float *t0, const float *t1, const float *t2, const float *c0, const float *c1, const float *c2, int triangleindex, int surfaceindex, unsigned int decalsequence)
 {
 	tridecal_t *decal;
 	tridecal_t *decals;
@@ -11699,7 +11744,7 @@ extern cvar_t cl_decals_bias;
 extern cvar_t cl_decals_models;
 extern cvar_t cl_decals_newsystem_intensitymultiplier;
 // baseparms, parms, temps
-static void R_DecalSystem_SplatTriangle(decalsystem_t *decalsystem, float r, float g, float b, float a, float s1, float t1, float s2, float t2, int decalsequence, qboolean dynamic, float (*planes)[4], matrix4x4_t *projection, int triangleindex, int surfaceindex)
+static void R_DecalSystem_SplatTriangle(decalsystem_t *decalsystem, float r, float g, float b, float a, float s1, float t1, float s2, float t2, unsigned int decalsequence, qboolean dynamic, float (*planes)[4], matrix4x4_t *projection, int triangleindex, int surfaceindex)
 {
 	int cornerindex;
 	int index;
@@ -11792,7 +11837,7 @@ static void R_DecalSystem_SplatTriangle(decalsystem_t *decalsystem, float r, flo
 		for (cornerindex = 0;cornerindex < numpoints-2;cornerindex++)
 			R_DecalSystem_SpawnTriangle(decalsystem, v[0], v[cornerindex+1], v[cornerindex+2], tc[0], tc[cornerindex+1], tc[cornerindex+2], c[0], c[cornerindex+1], c[cornerindex+2], -1, surfaceindex, decalsequence);
 }
-static void R_DecalSystem_SplatEntity(entity_render_t *ent, const vec3_t worldorigin, const vec3_t worldnormal, float r, float g, float b, float a, float s1, float t1, float s2, float t2, float worldsize, int decalsequence)
+static void R_DecalSystem_SplatEntity(entity_render_t *ent, const vec3_t worldorigin, const vec3_t worldnormal, float r, float g, float b, float a, float s1, float t1, float s2, float t2, float worldsize, unsigned int decalsequence)
 {
 	matrix4x4_t projection;
 	decalsystem_t *decalsystem;
@@ -11953,7 +11998,7 @@ static void R_DecalSystem_SplatEntity(entity_render_t *ent, const vec3_t worldor
 }
 
 // do not call this outside of rendering code - use R_DecalSystem_SplatEntities instead
-static void R_DecalSystem_ApplySplatEntities(const vec3_t worldorigin, const vec3_t worldnormal, float r, float g, float b, float a, float s1, float t1, float s2, float t2, float worldsize, int decalsequence)
+static void R_DecalSystem_ApplySplatEntities(const vec3_t worldorigin, const vec3_t worldnormal, float r, float g, float b, float a, float s1, float t1, float s2, float t2, float worldsize, unsigned int decalsequence)
 {
 	int renderentityindex;
 	float worldmins[3];
@@ -11989,7 +12034,7 @@ typedef struct r_decalsystem_splatqueue_s
 	float color[4];
 	float tcrange[4];
 	float worldsize;
-	int decalsequence;
+	unsigned int decalsequence;
 }
 r_decalsystem_splatqueue_t;
 
@@ -12028,7 +12073,7 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 	int i;
 	decalsystem_t *decalsystem = &ent->decalsystem;
 	int numdecals;
-	int killsequence;
+	unsigned int killsequence;
 	tridecal_t *decal;
 	float frametime;
 	float lifetime;
@@ -12045,7 +12090,7 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 		return;
 	}
 
-	killsequence = cl.decalsequence - max(1, cl_decals_max.integer);
+	killsequence = cl.decalsequence - bound(1, (unsigned int) cl_decals_max.integer, cl.decalsequence);
 	lifetime = cl_decals_time.value + cl_decals_fadetime.value;
 
 	if (decalsystem->lastupdatetime)
@@ -12060,7 +12105,7 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 		if (decal->color4f[0][3])
 		{
 			decal->lived += frametime;
-			if (killsequence - decal->decalsequence > 0 || decal->lived >= lifetime)
+			if (killsequence > decal->decalsequence || decal->lived >= lifetime)
 			{
 				memset(decal, 0, sizeof(*decal));
 				if (decalsystem->freedecal > i)
@@ -12720,6 +12765,7 @@ void R_DrawCustomSurface(skinframe_t *skinframe, const matrix4x4_t *texmatrix, i
 
 	texture.update_lastrenderframe = -1; // regenerate this texture
 	texture.basematerialflags = materialflags | MATERIALFLAG_CUSTOMSURFACE | MATERIALFLAG_WALL;
+	texture.basealpha = 1.0f;
 	texture.currentskinframe = skinframe;
 	texture.currenttexmatrix = *texmatrix; // requires MATERIALFLAG_CUSTOMSURFACE
 	texture.offsetmapping = OFFSETMAPPING_OFF;

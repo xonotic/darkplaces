@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "quakedef.h"
 #include "image.h"
 #include "dpsoftrast.h"
+#include "utf8lib.h"
 
 #ifndef __IPHONEOS__
 #ifdef MACOSX
@@ -83,10 +84,10 @@ static int win_half_height = 50;
 static int video_bpp;
 
 #if SDL_MAJOR_VERSION == 1
-static SDL_Surface *screen;
+static SDL_Surface *video_screen;
 static int video_flags;
 #else
-static SDL_GLContext *context;
+static SDL_GLContext context;
 static SDL_Window *window;
 static int window_flags;
 #endif
@@ -100,6 +101,7 @@ static vid_mode_t desktop_mode;
 
 #ifndef SDLK_PERCENT
 #define SDLK_PERCENT '%'
+#if SDL_MAJOR_VERSION == 1
 #define SDLK_PRINTSCREEN SDLK_PRINT
 #define SDLK_SCROLLLOCK SDLK_SCROLLOCK
 #define SDLK_NUMLOCKCLEAR SDLK_NUMLOCK
@@ -113,6 +115,7 @@ static vid_mode_t desktop_mode;
 #define SDLK_KP_8 SDLK_KP8
 #define SDLK_KP_9 SDLK_KP9
 #define SDLK_KP_0 SDLK_KP0
+#endif
 #endif
 
 static int MapKey( unsigned int sdlkey )
@@ -203,10 +206,8 @@ static int MapKey( unsigned int sdlkey )
 	case SDLK_F10:                return K_F10;
 	case SDLK_F11:                return K_F11;
 	case SDLK_F12:                return K_F12;
-#if SDL_MAJOR_VERSION == 1
 	case SDLK_PRINTSCREEN:        return K_PRINTSCREEN;
 	case SDLK_SCROLLLOCK:         return K_SCROLLOCK;
-#endif
 	case SDLK_PAUSE:              return K_PAUSE;
 	case SDLK_INSERT:             return K_INS;
 	case SDLK_HOME:               return K_HOME;
@@ -222,27 +223,23 @@ static int MapKey( unsigned int sdlkey )
 	case SDLK_LEFT:               return K_LEFTARROW;
 	case SDLK_DOWN:               return K_DOWNARROW;
 	case SDLK_UP:                 return K_UPARROW;
-#if SDL_MAJOR_VERSION == 1
 	case SDLK_NUMLOCKCLEAR:       return K_NUMLOCK;
-#endif
 	case SDLK_KP_DIVIDE:          return K_KP_DIVIDE;
 	case SDLK_KP_MULTIPLY:        return K_KP_MULTIPLY;
 	case SDLK_KP_MINUS:           return K_KP_MINUS;
 	case SDLK_KP_PLUS:            return K_KP_PLUS;
 	case SDLK_KP_ENTER:           return K_KP_ENTER;
-#if SDL_MAJOR_VERSION == 1
-	case SDLK_KP_1:               return K_KP_1;
-	case SDLK_KP_2:               return K_KP_2;
-	case SDLK_KP_3:               return K_KP_3;
-	case SDLK_KP_4:               return K_KP_4;
+	case SDLK_KP_1:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_1 : K_END);
+	case SDLK_KP_2:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_2 : K_DOWNARROW);
+	case SDLK_KP_3:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_3 : K_PGDN);
+	case SDLK_KP_4:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_4 : K_LEFTARROW);
 	case SDLK_KP_5:               return K_KP_5;
-	case SDLK_KP_6:               return K_KP_6;
-	case SDLK_KP_7:               return K_KP_7;
-	case SDLK_KP_8:               return K_KP_8;
-	case SDLK_KP_9:               return K_KP_9;
-	case SDLK_KP_0:               return K_KP_0;
-#endif
-	case SDLK_KP_PERIOD:          return K_KP_PERIOD;
+	case SDLK_KP_6:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_6 : K_RIGHTARROW);
+	case SDLK_KP_7:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_7 : K_HOME);
+	case SDLK_KP_8:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_8 : K_UPARROW);
+	case SDLK_KP_9:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_9 : K_PGUP);
+	case SDLK_KP_0:               return ((SDL_GetModState() & KMOD_NUM) ? K_KP_0 : K_INS);
+	case SDLK_KP_PERIOD:          return ((SDL_GetModState() & KMOD_NUM) ? K_KP_PERIOD : K_DEL);
 //	case SDLK_APPLICATION:        return K_APPLICATION;
 //	case SDLK_POWER:              return K_POWER;
 	case SDLK_KP_EQUALS:          return K_KP_EQUALS;
@@ -790,7 +787,6 @@ static void IN_Move_TouchScreen_SteelStorm(void)
 	float move[3], aim[3];
 	static qboolean oldbuttons[128];
 	static qboolean buttons[128];
-	static keydest_t oldkeydest;
 	keydest_t keydest = (key_consoleactive & KEY_CONSOLEACTIVE_USER) ? key_console : key_dest;
 	memcpy(oldbuttons, buttons, sizeof(oldbuttons));
 	memset(multitouchs, 0, sizeof(multitouchs));
@@ -813,17 +809,6 @@ static void IN_Move_TouchScreen_SteelStorm(void)
 		multitouch[MAXFINGERS-1][0] = 0;
 	}*/
 
-	if (oldkeydest != keydest)
-	{
-		switch(keydest)
-		{
-		case key_game: VID_ShowKeyboard(false);break;
-		case key_console: VID_ShowKeyboard(true);break;
-		case key_message: VID_ShowKeyboard(true);break;
-		default: break; /* qc extensions control the other cases */
-		}
-	}
-	oldkeydest = keydest;
 	// TODO: make touchscreen areas controlled by a config file or the VMs. THIS IS A MESS!
 	// TODO: can't just clear buttons[] when entering a new keydest, some keys would remain pressed
 	// SS:BR menuqc has many peculiarities, including that it can't accept more than one command per frame and pressing and releasing on the same frame
@@ -982,10 +967,26 @@ void IN_Move( void )
 {
 	static int old_x = 0, old_y = 0;
 	static int stuck = 0;
+	static keydest_t oldkeydest;
+	static qboolean oldshowkeyboard;
 	int x, y;
 	vid_joystate_t joystate;
+	keydest_t keydest = (key_consoleactive & KEY_CONSOLEACTIVE_USER) ? key_console : key_dest;
 
 	scr_numtouchscreenareas = 0;
+
+	// Only apply the new keyboard state if the input changes.
+	if (keydest != oldkeydest || !!vid_touchscreen_showkeyboard.integer != oldshowkeyboard)
+	{
+		switch(keydest)
+		{
+			case key_console: VID_ShowKeyboard(true);break;
+			case key_message: VID_ShowKeyboard(true);break;
+			default: VID_ShowKeyboard(!!vid_touchscreen_showkeyboard.integer); break;
+		}
+	}
+	oldkeydest = keydest;
+	oldshowkeyboard = !!vid_touchscreen_showkeyboard.integer;
 
 	if (vid_touchscreen.integer)
 	{
@@ -1113,7 +1114,16 @@ void Sys_SendKeyEvents( void )
 			case SDL_KEYUP:
 				keycode = MapKey(event.key.keysym.sym);
 				if (!VID_JoyBlockEmulatedKeys(keycode))
+				{
+					if(keycode == K_NUMLOCK || keycode == K_CAPSLOCK)
+					{
+						// simulate down followed by up
+						Key_Event(keycode, event.key.keysym.unicode, true);
+						Key_Event(keycode, event.key.keysym.unicode, false);
+						break;
+					}
 					Key_Event(keycode, event.key.keysym.unicode, (event.key.state == SDL_PRESSED));
+				}
 				break;
 			case SDL_ACTIVEEVENT:
 				if( event.active.state & SDL_APPACTIVE )
@@ -1144,13 +1154,13 @@ void Sys_SendKeyEvents( void )
 					vid.width = event.resize.w;
 					vid.height = event.resize.h;
 					if (!vid_isfullscreen)
-						screen = SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
+						video_screen = SDL_SetVideoMode(vid.width, vid.height, video_bpp, video_flags);
 					if (vid_softsurface)
 					{
 						SDL_FreeSurface(vid_softsurface);
 						vid_softsurface = SDL_CreateRGBSurface(SDL_SWSURFACE, vid.width, vid.height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-						vid.softpixels = (unsigned int *)vid_softsurface->pixels;
 						SDL_SetAlpha(vid_softsurface, 0, 255);
+						vid.softpixels = (unsigned int *)vid_softsurface->pixels;
 						if (vid.softdepthpixels)
 							free(vid.softdepthpixels);
 						vid.softdepthpixels = (unsigned int*)calloc(1, vid.width * vid.height * 4);
@@ -1208,8 +1218,7 @@ void Sys_SendKeyEvents( void )
 	static qboolean sound_active = true;
 	int keycode;
 	int i;
-	int j;
-	int unicode;
+	Uchar unicode;
 	SDL_Event event;
 
 	VID_EnableJoystick(true);
@@ -1226,9 +1235,9 @@ void Sys_SendKeyEvents( void )
 			case SDL_KEYUP:
 #ifdef DEBUGSDLEVENTS
 				if (event.type == SDL_KEYDOWN)
-					Con_DPrintf("SDL_Event: SDL_KEYDOWN %i unicode %i\n", event.key.keysym.sym, event.key.keysym.unicode);
+					Con_DPrintf("SDL_Event: SDL_KEYDOWN %i\n", event.key.keysym.sym);
 				else
-					Con_DPrintf("SDL_Event: SDL_KEYUP %i unicode %i\n", event.key.keysym.sym, event.key.keysym.unicode);
+					Con_DPrintf("SDL_Event: SDL_KEYUP %i\n", event.key.keysym.sym);
 #endif
 				keycode = MapKey(event.key.keysym.sym);
 				if (!VID_JoyBlockEmulatedKeys(keycode))
@@ -1299,6 +1308,7 @@ void Sys_SendKeyEvents( void )
 							{
 								SDL_FreeSurface(vid_softsurface);
 								vid_softsurface = SDL_CreateRGBSurface(SDL_SWSURFACE, vid.width, vid.height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+								SDL_SetSurfaceBlendMode(vid_softsurface, SDL_BLENDMODE_NONE);
 								vid.softpixels = (unsigned int *)vid_softsurface->pixels;
 								if (vid.softdepthpixels)
 									free(vid.softdepthpixels);
@@ -1347,30 +1357,11 @@ void Sys_SendKeyEvents( void )
 #ifdef DEBUGSDLEVENTS
 				Con_DPrintf("SDL_Event: SDL_TEXTINPUT - text: %s\n", event.text.text);
 #endif
-				// we have some characters to parse
-				{
-					unicode = 0;
-					for (i = 0;event.text.text[i];)
-					{
-						unicode = event.text.text[i++];
-						if (unicode & 0x80)
-						{
-							// UTF-8 character
-							// strip high bits (we could count these to validate character length but we don't)
-							for (j = 0x80;unicode & j;j >>= 1)
-								unicode ^= j;
-							for (;(event.text.text[i] & 0xC0) == 0x80;i++)
-								unicode = (unicode << 6) | (event.text.text[i] & 0x3F);
-							// low characters are invalid and could be bad, so replace them
-							if (unicode < 0x80)
-								unicode = '?'; // we could use 0xFFFD instead, the unicode substitute character
-						}
-						//Con_DPrintf("SDL_TEXTINPUT: K_TEXT %i \n", unicode);
-
-						Key_Event(K_TEXT, unicode, true);
-						Key_Event(K_TEXT, unicode, false);
-					}
-				}
+				// convert utf8 string to char
+				// NOTE: this code is supposed to run even if utf8enable is 0
+				unicode = u8_getchar_utf8_enabled(event.text.text + (int)u8_bytelen(event.text.text, 0), NULL);
+				Key_Event(K_TEXT, unicode, true);
+				Key_Event(K_TEXT, unicode, false);
 				break;
 			case SDL_MOUSEMOTION:
 				break;
@@ -1942,6 +1933,7 @@ void GLES_Init(void)
 	vid.support.arb_draw_buffers = false;
 	vid.support.arb_multitexture = false;
 	vid.support.arb_occlusion_query = false;
+	vid.support.arb_query_buffer_object = false;
 	vid.support.arb_shadow = false;
 	vid.support.arb_texture_compression = false; // different (vendor-specific) formats than on desktop OpenGL...
 	vid.support.arb_texture_cube_map = SDL_GL_ExtensionSupported("GL_OES_texture_cube_map") != 0;
@@ -1969,6 +1961,9 @@ void GLES_Init(void)
 	vid.support.ext_texture_edge_clamp = true; // GLES2 core
 	vid.support.ext_texture_filter_anisotropic = false; // probably don't want to use it...
 	vid.support.ext_texture_srgb = false;
+	vid.support.arb_texture_float = SDL_GL_ExtensionSupported("GL_OES_texture_float") != 0;
+	vid.support.arb_half_float_pixel = SDL_GL_ExtensionSupported("GL_OES_texture_half_float") != 0;
+	vid.support.arb_half_float_vertex = SDL_GL_ExtensionSupported("GL_OES_vertex_half_float") != 0;
 
 	// NOTE: On some devices, a value of 512 gives better FPS than the maximum.
 	qglGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_2d);
@@ -2426,6 +2421,50 @@ static void VID_OutputVersion(void)
 					version.major, version.minor, version.patch );
 }
 
+#ifdef WIN32
+static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
+{
+	LONG width = mode->width; // vid_width
+	LONG height = mode->height; // vid_height
+
+	// adjust width and height for the space occupied by window decorators (title bar, borders)
+	rect->top = 0;
+	rect->left = 0;
+	rect->right = width;
+	rect->bottom = height;
+	AdjustWindowRectEx(rect, WS_CAPTION|WS_THICKFRAME, false, 0);
+
+	RECT workArea;
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+	int workWidth = workArea.right - workArea.left;
+	int workHeight = workArea.bottom - workArea.top;
+
+	// SDL forces the window height to be <= screen height - 27px (on Win8.1 - probably intended for the title bar) 
+	// If the task bar is docked to the the left screen border and we move the window to negative y,
+	// there would be some part of the regular desktop visible on the bottom of the screen.
+	int titleBarPixels = 2;
+	int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	if (screenHeight == workHeight)
+		titleBarPixels = -rect->top;
+
+	//Con_Printf("window mode: %dx%d, workArea: %d/%d-%d/%d (%dx%d), title: %d\n", width, height, workArea.left, workArea.top, workArea.right, workArea.bottom, workArea.right - workArea.left, workArea.bottom - workArea.top, titleBarPixels);
+
+	// if height and width matches the physical or previously adjusted screen height and width, adjust it to available desktop area
+	if ((width == GetSystemMetrics(SM_CXSCREEN) || width == workWidth) && (height == screenHeight || height == workHeight - titleBarPixels))
+	{
+		rect->left = workArea.left;
+		mode->width = workWidth;
+		rect->top = workArea.top + titleBarPixels;
+		mode->height = workHeight - titleBarPixels;
+	}
+	else 
+	{
+		rect->left = workArea.left + max(0, (workWidth - width) / 2);
+		rect->top = workArea.top + max(0, (workHeight - height) / 2);
+	}
+}
+#endif
+
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
 #if SDL_MAJOR_VERSION == 1
@@ -2433,6 +2472,8 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	int flags = SDL_OPENGL;
 #else
 	int windowflags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
+	int xPos = SDL_WINDOWPOS_UNDEFINED;
+	int yPos = SDL_WINDOWPOS_UNDEFINED;
 #endif
 #ifndef USE_GLES2
 	int i;
@@ -2518,10 +2559,23 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	{
 		if (mode->fullscreen) {
 			if (vid_desktopfullscreen.integer)
+			{
+				vid_mode_t *m = VID_GetDesktopMode();
+				mode->width = m->width;
+				mode->height = m->height;
 				windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+			}
 			else
 				windowflags |= SDL_WINDOW_FULLSCREEN;
 			vid_isfullscreen = true;
+		}
+		else {
+#ifdef WIN32
+			RECT rect;
+			AdjustWindowBounds(mode, &rect);
+			xPos = rect.left;
+			yPos = rect.top;
+#endif
 		}
 	}
 #endif
@@ -2568,18 +2622,18 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	video_bpp = mode->bitsperpixel;
 #if SDL_MAJOR_VERSION == 1
 	video_flags = flags;
-	screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
-	if (screen == NULL)
+	video_screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
+	if (video_screen == NULL)
 	{
 		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
 		VID_Shutdown();
 		return false;
 	}
-	mode->width = screen->w;
-	mode->height = screen->h;
+	mode->width = video_screen->w;
+	mode->height = video_screen->h;
 #else
 	window_flags = windowflags;
-	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, mode->width, mode->height, windowflags);
+	window = SDL_CreateWindow(gamename, xPos, yPos, mode->width, mode->height, windowflags);
 	if (window == NULL)
 	{
 		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
@@ -2680,15 +2734,15 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 	video_bpp = mode->bitsperpixel;
 #if SDL_MAJOR_VERSION == 1
 	video_flags = flags;
-	screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
-	if (screen == NULL)
+	video_screen = VID_WrapSDL_SetVideoMode(mode->width, mode->height, mode->bitsperpixel, flags);
+	if (video_screen == NULL)
 	{
 		Con_Printf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
 		VID_Shutdown();
 		return false;
 	}
-	mode->width = screen->w;
-	mode->height = screen->h;
+	mode->width = video_screen->w;
+	mode->height = video_screen->h;
 #else
 	window_flags = windowflags;
 	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, mode->width, mode->height, windowflags);
@@ -2711,6 +2765,8 @@ static qboolean VID_InitModeSoft(viddef_mode_t *mode)
 	}
 #if SDL_MAJOR_VERSION == 1
 	SDL_SetAlpha(vid_softsurface, 0, 255);
+#else
+	SDL_SetSurfaceBlendMode(vid_softsurface, SDL_BLENDMODE_NONE);
 #endif
 
 	vid.softpixels = (unsigned int *)vid_softsurface->pixels;
@@ -2852,6 +2908,7 @@ void VID_Finish (void)
 	vid_usevsync = (vid_vsync.integer && !cls.timedemo);
 	if (vid_usingvsync != vid_usevsync)
 	{
+		vid_usingvsync = vid_usevsync;
 		if (SDL_GL_SetSwapInterval(vid_usevsync != 0) >= 0)
 			Con_DPrintf("Vsync %s\n", vid_usevsync ? "activated" : "deactivated");
 		else
@@ -2870,8 +2927,8 @@ void VID_Finish (void)
 #if SDL_MAJOR_VERSION == 1
 //		if (!r_test.integer)
 		{
-			SDL_BlitSurface(vid_softsurface, NULL, screen, NULL);
-			SDL_Flip(screen);
+			SDL_BlitSurface(vid_softsurface, NULL, video_screen, NULL);
+			SDL_Flip(video_screen);
 		}
 #else
 			{
@@ -2918,8 +2975,13 @@ size_t VID_ListModes(vid_mode_t *modes, size_t maxcount)
 #if SDL_MAJOR_VERSION == 1
 	SDL_Rect **vidmodes;
 	int bpp = SDL_GetVideoInfo()->vfmt->BitsPerPixel;
+#ifdef WIN64
+	SDL_Rect **ENDRECT = (SDL_Rect**)-1LL;
+#else
+	SDL_Rect **ENDRECT = (SDL_Rect**)-1;
+#endif
 
-	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); vidmodes && vidmodes != (SDL_Rect**)(-1) && *vidmodes; ++vidmodes)
+	for(vidmodes = SDL_ListModes(NULL, SDL_FULLSCREEN|SDL_HWSURFACE); vidmodes && vidmodes != ENDRECT && *vidmodes; ++vidmodes)
 	{
 		if(k >= maxcount)
 			break;

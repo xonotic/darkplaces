@@ -1,9 +1,6 @@
 
 //DarkPlaces supported extension list, draft version 1.04
 
-//things that don't have extensions yet:
-.float disableclientprediction;
-
 //definitions that id Software left out:
 //these are passed as the 'nomonsters' parameter to traceline/tracebox (yes really this was supported in all quake engines, nomonsters is misnamed)
 float MOVE_NORMAL = 0; // same as FALSE
@@ -899,10 +896,10 @@ vector gettaginfo_up;
 //idea: tZork
 //darkplaces implementation: tZork, divVerent
 //constant definitions:
-float GETTIME_FRAMESTART = 0; // time of start of frame
-float GETTIME_REALTIME = 1; // current time (may be OS specific)
+float GETTIME_FRAMESTART = 0; // time of start of frame relative to an arbitrary point in time
+float GETTIME_REALTIME = 1; // current absolute time (OS specific)
 float GETTIME_HIRES = 2; // like REALTIME, but may reset between QC invocations and thus can be higher precision
-float GETTIME_UPTIME = 3; // time since start of the engine
+float GETTIME_UPTIME = 3; // time of start of frame since start of the engine
 //builtin definitions:
 float(float tmr) gettime = #519;
 //description:
@@ -1022,16 +1019,16 @@ string(string format, ...) sprintf = #627;
 //you know sprintf :P
 //supported stuff:
 //  %
-//  optional: <argpos>$ for the argument to format
+//  optional: <argpos>$ for the argument to format (the arg counter then is not increased)
 //  flags: #0- +
-//  optional: <width>, *, or *<argpos>$ for the field width
-//  optional: .<precision>, .*, or .*<argpos>$ for the precision
-//  length modifiers: h for forcing a float, l for forcing an int/entity (by default, %d etc. cast a float to int)
+//  optional: <width>, *, or *<argpos>$ for the field width (width is read before value and precision)
+//  optional: .<precision>, .*, or .*<argpos>$ for the precision (precision is read before value)
+//  length modifiers: h for forcing a float, l for forcing an entity (by default, %d etc. cast a float to int), ll for forcing an int
 //  conversions:
-//    d takes a float if no length is specified or h is, and an int/entity if l is specified as length, and cast it to an int
-//    i takes an int/entity if no length is specified or i is, and a float if h is specified as length, and cast it to an int
-//    ouxXc take a float if no length is specified or h is, and an int/entity if l is specified as length, and cast it to an unsigned int
-//    eEfFgG take a float if no length is specified or h is, and an int/entity if l is specified as length, and cast it to a double
+//    d takes a float if no length is specified or h is, and an entity if l is specified as length, and an int if ll is specified as length, and cast it to an int
+//    i takes an entity if no length is specified or l is, and a float if h is specified as length, and an int if ll is specified as length, and cast it to an int
+//    ouxXc take a float if no length is specified or h is, and an entity if l is specified as length, and an int if ll is specified as length, and cast it to an unsigned int
+//    eEfFgG take a float if no length is specified or h is, and an entity if l is specified as length, and an int if ll is specified as length, and cast it to a double
 //    s takes a string
 //    vV takes a vector, and processes the three components as if it were a gG for all three components, separated by space
 //    For conversions s and c, the flag # makes precision and width interpreted
@@ -1183,7 +1180,9 @@ void(vector dir) vectorvectors = #432;
 //builtin definitions:
 string(string filename) whichpack = #503;
 //description:
-//returns the name of the pak/pk3/whatever containing the given file, in the same path space as FRIK_FILE functions use (that is, possibly with a path name prefix)
+//for files in a pak/pk3/whatever, returns the pack's file name in FRIK_FILE name space.
+//for physical files, returns "".
+//in case of error, returns string_null.
 
 //DP_QC_URI_ESCAPE
 //idea: divVerent
@@ -1481,6 +1480,37 @@ float(entity clent) clienttype = #455; // returns one of the CLIENTTYPE_* consta
 //making explosion models that face the viewer (does not work well with chase_active).  for example: float() explosion_customizeentityforclient = {self.angles = vectoangles(other.origin + other.view_ofs - self.origin);self.angles_x = 0 - self.angles_x;};
 //implementation notes:
 //entity customization is done before per-client culling (visibility for instance) because the entity may be doing setorigin to display itself in different locations on different clients, may be altering its .modelindex, .effects and other fields important to culling, so customized entities increase cpu usage (non-customized entities can use all the early culling they want however, as they are not changing on a per client basis).
+
+//DP_SV_DISABLECLIENTPREDICTION
+//idea: LordHavoc, Mario
+//darkplaces implementation: LordHavoc, Mario
+//field definitions:
+.float disableclientprediction;
+//description:
+//By default, player entities are enabled for prediction by the engine if the
+//engine assumes the client can sensibly predict them. As the NQ and DarkPlaces
+//protocol does not network movetype, this in particular allows for client
+//prediction only if movetype == MOVETYPE_WALK.
+//Setting this field to 1 disables prediction in any case - this is useful when
+//the client cannot sensibly predict the server's idea of how the player moves
+//(common in case of pure serverside grappling hook or jetpack
+//implementations).
+//Setting this field to -1 forces prediction even if the server assumes the
+//client cannot predict the current movetype of a player entity (obviously,
+//this then requires matching client-side prediction code in CSQC, as the
+//engine's own client prediction will sure not handle these cases right due to
+//not knowing the serverside value of movetype). This is allowed in combination
+//with the following movetypes:
+// MOVETYPE_NONE (useful to have full QC control over movement)
+// MOVETYPE_WALK (redundant but harmless)
+// MOVETYPE_STEP
+// MOVETYPE_FLY (useful for spectators)
+// MOVETYPE_TOSS
+// MOVETYPE_NOCLIP (useful for spectators)
+// MOVETYPE_FLYMISSILE
+// MOVETYPE_BOUNCE
+// MOVETYPE_BOUNCEMISSILE
+// MOVETYPE_FLY_WORLDONLY (useful for spectators)
 
 //DP_SV_DISCARDABLEDEMO
 //idea: parasti
@@ -2426,6 +2456,7 @@ string(float ccase, float calpha, float cnum, string s, ...) strconv = #224; // 
 string(float chars, string s, ...) strpad = #225; // pad string with spaces to a specified length, < 0 = left padding, > 0 = right padding
 string(string info, string key, string value, ...) infoadd = #226; // sets or adds a key/value pair to an infostring - note: forbidden characters are \ and "
 string(string info, string key) infoget = #227; // gets a key/value pair in an infostring, returns value or null if not found
+float(string s1, string s2) strcmp = #228; // compare two strings
 float(string s1, string s2, float len) strncmp = #228; // compare two strings up to the specified number of characters, if their length differs and is within the specified limit the result will be negative, otherwise it is the difference in value of their first non-matching character.
 float(string s1, string s2) strcasecmp = #229; // compare two strings with case-insensitive matching, characters a-z are considered equivalent to the matching A-Z character, no other differences, and this does not consider special characters equal even if they look similar
 float(string s1, string s2, float len) strncasecmp = #230; // same as strcasecmp but with a length limit, see strncmp
@@ -2557,9 +2588,10 @@ void coverage() = #642;  // Reports a coverage event. The engine counts for each
 //idea: divVerent
 //darkplaces implementation: divVerent
 //field definitions: (SVQC)
-.string crypto_keyfp; // fingerprint of CA key the player used to authenticate, or string_null if not verified
-.string crypto_mykeyfp; // fingerprint of CA key the server used to authenticate to the player, or string_null if not verified
+.string crypto_keyfp; // fingerprint of CA key the player used to authenticate
+.string crypto_mykeyfp; // fingerprint of CA key the server used to authenticate to the player
 .string crypto_idfp; // fingerprint of ID used by the player entity, or string_null if not identified
+.float crypto_idfp_signed; // set if the player's ID has been signed
 .string crypto_encryptmethod; // the string "AES128" if encrypting, and string_null if plaintext
 .string crypto_signmethod; // the string "HMAC-SHA256" if signing, and string_null if plaintext
 // there is no field crypto_myidfp, as that info contains no additional information the QC may have a use for
@@ -2567,3 +2599,12 @@ void coverage() = #642;  // Reports a coverage event. The engine counts for each
 float(string url, float id, string content_type, string delim, float buf, float keyid) crypto_uri_postbuf = #513;
 //description:
 //use -1 as buffer handle to justs end delim as postdata
+
+//DP_USERMOVETYPES
+//idea: divVerent
+//darkplaces implementation: Mario
+//movetype definitions:
+float MOVETYPE_USER_FIRST = 128;
+float MOVETYPE_USER_LAST = 191;
+//description:
+//user defined movetypes can be added between the start and end points, without producing unknown movetype warnings

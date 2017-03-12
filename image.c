@@ -355,6 +355,19 @@ qboolean LoadPCX_QWSkin(const unsigned char *f, int filesize, unsigned char *pix
 }
 
 /*
+============
+LoadPCX
+============
+*/
+qboolean LoadPCX_PaletteOnly(const unsigned char *f, int filesize, unsigned char *palette768b)
+{
+	if (filesize < 768)
+		return false;
+	memcpy(palette768b, f + filesize - 768, 768);
+	return true;
+}
+
+/*
 =========================================================
 
 TARGA LOADING
@@ -422,6 +435,8 @@ unsigned char *LoadTGA_BGRA (const unsigned char *f, int filesize, int *miplevel
 		PrintTargaHeader(&targa_header);
 		return NULL;
 	}
+
+	memset(palettei, 0, sizeof(palettei));
 
 	// advance to end of header
 	fin = f + 18;
@@ -763,7 +778,7 @@ static unsigned char *LoadWAL_BGRA (const unsigned char *f, int filesize, int *m
 		return NULL;
 	}
 
-	if (filesize < (int) sizeof(q2wal_t) + (int) LittleLong(inwal->offsets[0]) + image_width * image_height)
+	if (filesize < (int) LittleLong(inwal->offsets[0]) + image_width * image_height)
 	{
 		Con_Print("LoadWAL: invalid WAL file\n");
 		return NULL;
@@ -775,8 +790,48 @@ static unsigned char *LoadWAL_BGRA (const unsigned char *f, int filesize, int *m
 		Con_Printf("LoadWAL: not enough memory for %i by %i image\n", image_width, image_height);
 		return NULL;
 	}
-	Image_Copy8bitBGRA(f + LittleLong(inwal->offsets[0]), image_buffer, image_width * image_height, palette_bgra_complete);
+	Image_Copy8bitBGRA(f + LittleLong(inwal->offsets[0]), image_buffer, image_width * image_height, q2palette_bgra_complete);
 	return image_buffer;
+}
+
+qboolean LoadWAL_GetMetadata(const unsigned char *f, int filesize, int *retwidth, int *retheight, int *retflags, int *retvalue, int *retcontents, char *retanimname32c)
+{
+	const q2wal_t *inwal = (const q2wal_t *)f;
+
+	if (filesize < (int) sizeof(q2wal_t))
+	{
+		Con_Print("LoadWAL: invalid WAL file\n");
+		if (retwidth)
+			*retwidth = 16;
+		if (retheight)
+			*retheight = 16;
+		if (retflags)
+			*retflags = 0;
+		if (retvalue)
+			*retvalue = 0;
+		if (retcontents)
+			*retcontents = 0;
+		if (retanimname32c)
+			memset(retanimname32c, 0, 32);
+		return false;
+	}
+
+	if (retwidth)
+		*retwidth = LittleLong(inwal->width);
+	if (retheight)
+		*retheight = LittleLong(inwal->height);
+	if (retflags)
+		*retflags = LittleLong(inwal->flags);
+	if (retvalue)
+		*retvalue = LittleLong(inwal->value);
+	if (retcontents)
+		*retcontents = LittleLong(inwal->contents);
+	if (retanimname32c)
+	{
+		memcpy(retanimname32c, inwal->animname, 32);
+		retanimname32c[31] = 0;
+	}
+	return true;
 }
 
 
@@ -788,7 +843,7 @@ void Image_StripImageExtension (const char *in, char *out, size_t size_out)
 		return;
 
 	ext = FS_FileExtension(in);
-	if (ext && (!strcmp(ext, "tga") || !strcmp(ext, "pcx") || !strcmp(ext, "lmp") || !strcmp(ext, "png") || !strcmp(ext, "jpg")))
+	if (ext && (!strcmp(ext, "tga") || !strcmp(ext, "pcx") || !strcmp(ext, "lmp") || !strcmp(ext, "png") || !strcmp(ext, "jpg") || !strcmp(ext, "wal")))
 		FS_StripExtension(in, out, size_out);
 	else
 		strlcpy(out, in, size_out);
@@ -952,6 +1007,8 @@ unsigned char *loadimagepixelsbgra (const char *filename, qboolean complain, qbo
 		if (f)
 		{
 			int mymiplevel = miplevel ? *miplevel : 0;
+			image_width = 0;
+			image_height = 0;
 			data = format->loadfunc(f, (int)filesize, &mymiplevel);
 			Mem_Free(f);
 			if (data)
@@ -963,11 +1020,15 @@ unsigned char *loadimagepixelsbgra (const char *filename, qboolean complain, qbo
 					if(f)
 					{
 						int mymiplevel2 = miplevel ? *miplevel : 0;
+						int image_width_save = image_width;
+						int image_height_save = image_height;
 						data2 = format->loadfunc(f, (int)filesize, &mymiplevel2);
-						if(data2 && mymiplevel == mymiplevel2)
+						if(data2 && mymiplevel == mymiplevel2 && image_width == image_width_save && image_height == image_height_save)
 							Image_CopyAlphaFromBlueBGRA(data, data2, image_width, image_height);
 						else
 							Con_Printf("loadimagepixelsrgba: corrupt or invalid alpha image %s_alpha\n", basename);
+						image_width = image_width_save;
+						image_height = image_height_save;
 						if(data2)
 							Mem_Free(data2);
 						Mem_Free(f);

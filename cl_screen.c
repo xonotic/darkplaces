@@ -108,6 +108,8 @@ cvar_t r_speeds_graph_x = {CVAR_SAVE, "r_speeds_graph_x", "0", "position of grap
 cvar_t r_speeds_graph_y = {CVAR_SAVE, "r_speeds_graph_y", "0", "position of graph"};
 cvar_t r_speeds_graph_width = {CVAR_SAVE, "r_speeds_graph_width", "256", "size of graph"};
 cvar_t r_speeds_graph_height = {CVAR_SAVE, "r_speeds_graph_height", "128", "size of graph"};
+cvar_t r_speeds_graph_maxtimedelta = {CVAR_SAVE, "r_speeds_graph_maxtimedelta", "16667", "maximum timedelta to display in the graph (this value will be the top line)"};
+cvar_t r_speeds_graph_maxdefault = {CVAR_SAVE, "r_speeds_graph_maxdefault", "100", "if the minimum and maximum observed values are closer than this, use this value as the graph range (keeps small numbers from being big graphs)"};
 
 
 
@@ -952,7 +954,8 @@ void R_TimeReport(const char *desc)
 	t = (int) ((r_timereport_current - r_timereport_temp) * 1000000.0 + 0.5);
 
 	length = dpsnprintf(tempbuf, sizeof(tempbuf), "%8i %s", t, desc);
-	length = min(length, (int)sizeof(tempbuf) - 1);
+	if (length < 0)
+		length = (int)sizeof(tempbuf) - 1;
 	if (r_speeds_longestitem < length)
 		r_speeds_longestitem = length;
 	for (;length < r_speeds_longestitem;length++)
@@ -998,7 +1001,7 @@ extern cvar_t r_viewscale;
 extern float viewscalefpsadjusted;
 static void R_TimeReport_EndFrame(void)
 {
-	int i, j, lines, y;
+	int j, lines;
 	cl_locnode_t *loc;
 	char string[1024+4096];
 	mleaf_t *viewleaf;
@@ -1062,6 +1065,7 @@ static void R_TimeReport_EndFrame(void)
 
 	if (string[0])
 	{
+		int i, y;
 		if (string[strlen(string)-1] == '\n')
 			string[strlen(string)-1] = 0;
 		lines = 1;
@@ -1093,12 +1097,13 @@ static void R_TimeReport_EndFrame(void)
 	if (r_speeds_graph.integer)
 	{
 		// if we currently have no graph data, reset the graph data entirely
+		int i;
 		if (!cls.r_speeds_graph_data)
 			for (i = 0;i < r_stat_count;i++)
-				cls.r_speeds_graph_datamin[i] = cls.r_speeds_graph_datamax[i] = r_refdef.stats[i];
+				cls.r_speeds_graph_datamin[i] = cls.r_speeds_graph_datamax[i] = 0;
 		if (cls.r_speeds_graph_length != r_speeds_graph_length.integer)
 		{
-			int i, stat, index, d, graph_length, *graph_data;
+			int stat, index, d, graph_length, *graph_data;
 			cls.r_speeds_graph_length = r_speeds_graph_length.integer;
 			cls.r_speeds_graph_current = 0;
 			if (cls.r_speeds_graph_data)
@@ -1133,9 +1138,10 @@ static void R_TimeReport_EndFrame(void)
 	{
 		char legend[128];
 		r_vertexgeneric_t *v;
-		int numlines;
+		int i, numlines;
 		const int *data;
 		float x, y, width, height, scalex, scaley;
+		int range_default = max(r_speeds_graph_maxdefault.integer, 1);
 		int color, stat, stats, index, range_min, range_max;
 		int graph_current, graph_length, *graph_data;
 		int statindex[R_SPEEDS_GRAPH_COLORS];
@@ -1224,13 +1230,11 @@ static void R_TimeReport_EndFrame(void)
 					continue;
 				// prefer to graph stats with 0 base, but if they are
 				// negative we have no choice
-				range_min = min(cls.r_speeds_graph_datamin[stat], 0);
-				range_max = cls.r_speeds_graph_datamax[stat];
+				range_min = cls.r_speeds_graph_datamin[stat];
+				range_max = max(cls.r_speeds_graph_datamax[stat], range_min + range_default);
 				// some stats we specifically override the graph scale on
 				if (stat == r_stat_timedelta)
-					range_max = 100000;
-				if (range_max == range_min)
-					range_max++;
+					range_max = r_speeds_graph_maxtimedelta.integer;
 				scaley = height / (range_max - range_min);
 				// generate lines (2 vertices each)
 				// to deal with incomplete data we walk right to left
@@ -1402,6 +1406,8 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable(&r_speeds_graph_y);
 	Cvar_RegisterVariable(&r_speeds_graph_width);
 	Cvar_RegisterVariable(&r_speeds_graph_height);
+	Cvar_RegisterVariable(&r_speeds_graph_maxtimedelta);
+	Cvar_RegisterVariable(&r_speeds_graph_maxdefault);
 
 	// if we want no console, turn it off here too
 	if (COM_CheckParm ("-noconsole"))
@@ -1773,7 +1779,7 @@ static void SCR_CaptureVideo_VideoFrame(int newframestepframenum)
 
 void SCR_CaptureVideo_SoundFrame(const portable_sampleframe_t *paintbuffer, size_t length)
 {
-	cls.capturevideo.soundsampleframe += length;
+	cls.capturevideo.soundsampleframe += (int)length;
 	cls.capturevideo.soundframe(paintbuffer, length);
 }
 
@@ -1954,10 +1960,12 @@ void SHOWLMP_decodeshow(void)
 		showlmp_t *oldshowlmps = cl.showlmps;
 		cl.max_showlmps += 16;
 		cl.showlmps = (showlmp_t *) Mem_Alloc(cls.levelmempool, cl.max_showlmps * sizeof(showlmp_t));
-		if (cl.num_showlmps)
-			memcpy(cl.showlmps, oldshowlmps, cl.num_showlmps * sizeof(showlmp_t));
 		if (oldshowlmps)
+		{
+			if (cl.num_showlmps)
+				memcpy(cl.showlmps, oldshowlmps, cl.num_showlmps * sizeof(showlmp_t));
 			Mem_Free(oldshowlmps);
+		}
 	}
 	for (k = 0;k < cl.max_showlmps;k++)
 		if (cl.showlmps[k].isactive && !strcmp(cl.showlmps[k].label, lmplabel))
@@ -2070,7 +2078,7 @@ static void SCR_DrawTouchscreenOverlay(void)
 	cachepic_t *pic;
 	for (i = 0, a = scr_touchscreenareas;i < scr_numtouchscreenareas;i++, a++)
 	{
-		if (developer.integer && vid_touchscreen_outlinealpha.value > 0 && a->rect[0] >= 0 && a->rect[1] >= 0 && a->rect[2] >= 4 && a->rect[3] >= 4)
+		if (vid_touchscreen_outlinealpha.value > 0 && a->rect[0] >= 0 && a->rect[1] >= 0 && a->rect[2] >= 4 && a->rect[3] >= 4)
 		{
 			DrawQ_Fill(a->rect[0] +              2, a->rect[1]                 , a->rect[2] - 4,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);
 			DrawQ_Fill(a->rect[0] +              1, a->rect[1] +              1, a->rect[2] - 2,          1    , 1, 1, 1, vid_touchscreen_outlinealpha.value * (0.5f + 0.5f * a->active), 0);

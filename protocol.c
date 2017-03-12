@@ -6,8 +6,8 @@
 #define ENTITYSIZEPROFILING_END(msg, num, flags) \
 	if(developer_networkentities.integer >= 2) \
 	{ \
-		prvm_edict_t *ed = prog->edicts + num; \
-		Con_Printf("sent entity update of size %u for %d classname %s flags %d\n", (msg->cursize - entityprofiling_startsize), num, PRVM_serveredictstring(ed, classname) ? PRVM_GetString(prog, PRVM_serveredictstring(ed, classname)) : "(no classname)", flags); \
+		prvm_edict_t *edict = prog->edicts + num; \
+		Con_Printf("sent entity update of size %u for %d classname %s flags %d\n", (msg->cursize - entityprofiling_startsize), num, PRVM_serveredictstring(edict, classname) ? PRVM_GetString(prog, PRVM_serveredictstring(edict, classname)) : "(no classname)", flags); \
 	}
 
 // CSQC entity scope values. Bitflags!
@@ -2540,8 +2540,8 @@ static void EntityState5_ReadUpdate(entity_state_t *s, int number)
 			if (!skeleton->relativetransforms || skeleton->model != model)
 			{
 				skeleton->model = model;
-				skeleton->relativetransforms = (matrix4x4_t *) Mem_Realloc(cls.levelmempool, skeleton->relativetransforms, sizeof(*skeleton->relativetransforms) * skeleton->model->num_bones);
-				for (bonenum = 0;bonenum < model->num_bones;bonenum++)
+				skeleton->relativetransforms = (matrix4x4_t *) Mem_Realloc(cls.levelmempool, skeleton->relativetransforms, sizeof(*skeleton->relativetransforms) * numbones);
+				for (bonenum = 0;bonenum < numbones;bonenum++)
 					skeleton->relativetransforms[bonenum] = identitymatrix;
 			}
 			for (bonenum = 0;bonenum < numbones;bonenum++)
@@ -2832,7 +2832,7 @@ void EntityFrame5_AckFrame(entityframe5_database_t *d, int framenum)
 			d->packetlog[i].packetnumber = 0;
 }
 
-qboolean EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_database_t *d, int numstates, const entity_state_t **states, int viewentnum, int movesequence, qboolean need_empty)
+qboolean EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_database_t *d, int numstates, const entity_state_t **states, int viewentnum, unsigned int movesequence, qboolean need_empty)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	const entity_state_t *n;

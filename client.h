@@ -213,7 +213,7 @@ typedef struct tridecal_s
 	// for visibility culling
 	int				surfaceindex;
 	// old decals are killed to obey cl_decals_max
-	int				decalsequence;
+	unsigned int	decalsequence;
 }
 tridecal_t;
 
@@ -638,7 +638,7 @@ typedef struct usercmd_s
 	int msec; // for predicted moves
 	int buttons;
 	int impulse;
-	int sequence;
+	unsigned int sequence;
 	qboolean applied; // if false we're still accumulating a move
 	qboolean predicted; // if true the sequence should be sent as 0
 
@@ -834,6 +834,7 @@ typedef struct client_static_s
 	double connect_nextsendtime;
 	lhnetsocket_t *connect_mysocket;
 	lhnetaddress_t connect_address;
+	lhnetaddress_t rcon_address;
 	// protocol version of the server we're connected to
 	// (kept outside client_state_t because it's used between levels)
 	protocolversion_t protocol;
@@ -856,16 +857,15 @@ typedef struct client_static_s
 	cl_downloadack_t dp_downloadack[CL_MAX_DOWNLOADACKS];
 
 	// input sequence numbers are not reset on level change, only connect
-	int movesequence;
-	int servermovesequence;
+	unsigned int servermovesequence;
 
 	// quakeworld stuff below
 
 	// value of "qport" cvar at time of connection
 	int qw_qport;
 	// copied from cls.netcon->qw. variables every time they change, or set by demos (which have no cls.netcon)
-	int qw_incoming_sequence;
-	int qw_outgoing_sequence;
+	unsigned int qw_incoming_sequence;
+	unsigned int qw_outgoing_sequence;
 
 	// current file download buffer (only saved when file is completed)
 	char qw_downloadname[MAX_QPATH];
@@ -921,19 +921,6 @@ client_static_t;
 
 extern client_static_t	cls;
 
-typedef struct client_movementqueue_s
-{
-	double time;
-	float frametime;
-	int sequence;
-	float viewangles[3];
-	float move[3];
-	qboolean jump;
-	qboolean crouch;
-	qboolean canjump;
-}
-client_movementqueue_t;
-
 //[515]: csqc
 typedef struct
 {
@@ -981,7 +968,7 @@ typedef struct decal_s
 	// fields used by rendering:  (44 bytes)
 	unsigned short	typeindex;
 	unsigned short	texnum;
-	int				decalsequence;
+	unsigned int	decalsequence;
 	vec3_t			org;
 	vec3_t			normal;
 	float			size;
@@ -1288,7 +1275,7 @@ typedef struct client_state_s
 #define LATESTFRAMENUMS 32
 	int latestframenumsposition;
 	int latestframenums[LATESTFRAMENUMS];
-	int latestsendnums[LATESTFRAMENUMS];
+	unsigned int latestsendnums[LATESTFRAMENUMS];
 	entityframe_database_t *entitydatabase;
 	entityframe4_database_t *entitydatabase4;
 	entityframeqw_database_t *entitydatabaseqw;
@@ -1304,7 +1291,7 @@ typedef struct client_state_s
 	vec3_t playercrouchmaxs;
 
 	// old decals are killed based on this
-	int decalsequence;
+	unsigned int decalsequence;
 
 	int max_entities;
 	int max_csqcrenderentities;
@@ -1430,9 +1417,9 @@ typedef struct client_state_s
 
 	float qw_weaponkick;
 
-	int qw_validsequence;
+	unsigned int qw_validsequence;
 
-	int qw_deltasequence[QW_UPDATE_BACKUP];
+	unsigned int qw_deltasequence[QW_UPDATE_BACKUP];
 
 	// csqc stuff:
 	// server entity number corresponding to a clientside entity
