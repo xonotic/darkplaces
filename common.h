@@ -298,12 +298,13 @@ typedef enum gamemode_e
 	GAME_STRAPBOMB, // added by motorsep for Urre
 	GAME_MOONHELM,
 	GAME_VORETOURNAMENT,
+	GAME_SUPERMECHANICALBROS,
 	GAME_COUNT
 }
 gamemode_t;
 
 // Master switch for some hacks/changes that eventually should become cvars.
-#define IS_NEXUIZ_DERIVED(g) ((g) == GAME_NEXUIZ || (g) == GAME_XONOTIC || (g) == GAME_VORETOURNAMENT)
+#define IS_NEXUIZ_DERIVED(g) ((g) == GAME_NEXUIZ || (g) == GAME_XONOTIC || (g) == GAME_VORETOURNAMENT || (g) == GAME_SUPERMECHANICALBROS)
 // Pre-csqcmodels era.
 #define IS_OLDNEXUIZ_DERIVED(g) ((g) == GAME_NEXUIZ || (g) == GAME_VORETOURNAMENT)
 
