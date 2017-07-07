@@ -1745,6 +1745,7 @@ Key_Event (int key, int ascii, qboolean down)
 	qboolean q;
 	keydest_t keydest = key_dest;
 	char vabuf[1024];
+	static qboolean wait_toggleconsole_up;
 
 	if (key < 0 || key >= MAX_KEYS)
 		return;
@@ -1788,6 +1789,12 @@ Key_Event (int key, int ascii, qboolean down)
 	}
 
 	if(keydest == key_void)
+	{
+		wait_toggleconsole_up = false;
+		return;
+	}
+
+	if(wait_toggleconsole_up)
 		return;
 
 	// key_consoleactive is a flag not a key_dest because the console is a
@@ -1902,6 +1909,8 @@ Key_Event (int key, int ascii, qboolean down)
 		if (con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && (key_consoleactive & KEY_CONSOLEACTIVE_USER) && (con_closeontoggleconsole.integer >= ((ascii != STRING_COLOR_TAG) ? 2 : 3) || key_linepos == 1))
 		{
 			Con_ToggleConsole_f ();
+			tbl_keydest[key] = key_void; // key release should go nowhere (especially not to key_menu or key_game)
+			wait_toggleconsole_up = true;
 			return;
 		}
 
@@ -1917,8 +1926,9 @@ Key_Event (int key, int ascii, qboolean down)
 	{
 		if (down && con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && ascii != STRING_COLOR_TAG)
 		{
-			Cbuf_AddText("toggleconsole\n");  // Deferred to next frame so we're not sending the text event to the console.
+			Con_ToggleConsole_f ();
 			tbl_keydest[key] = key_void; // key release should go nowhere (especially not to key_menu or key_game)
+			wait_toggleconsole_up = true;
 			return;
 		}
 	}
