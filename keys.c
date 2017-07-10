@@ -1917,7 +1917,7 @@ Key_Event (int key, int ascii, qboolean down)
 	{
 		if (down && con_closeontoggleconsole.integer && bind && !strncmp(bind, "toggleconsole", strlen("toggleconsole")) && ascii != STRING_COLOR_TAG)
 		{
-			Cbuf_AddText("toggleconsole\n");  // Deferred to next frame so we're not sending the text event to the console.
+			Con_ToggleConsole_f ();
 			tbl_keydest[key] = key_void; // key release should go nowhere (especially not to key_menu or key_game)
 			return;
 		}
