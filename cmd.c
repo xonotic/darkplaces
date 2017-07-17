@@ -1502,6 +1502,7 @@ void Cmd_Init_Commands (void)
 	Cmd_AddCommand ("cvarlist", Cvar_List_f, "lists all console variables beginning with the specified prefix or matching the specified wildcard pattern");
 	Cmd_AddCommand ("apropos", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
 
+	Cmd_AddCommand ("cvar_unlockdefaults", Cvar_UnlockDefaults, "unlocks the default state of all cvars, so that they may be given new default values");
 	Cmd_AddCommand ("cvar_lockdefaults", Cvar_LockDefaults_f, "stores the current values of all cvars into their default values, only used once during startup after parsing default.cfg");
 	Cmd_AddCommand ("cvar_resettodefaults_all", Cvar_ResetToDefaults_All_f, "sets all cvars to their locked default values");
 	Cmd_AddCommand ("cvar_resettodefaults_nosaveonly", Cvar_ResetToDefaults_NoSaveOnly_f, "sets all non-saved cvars to their locked default values (variables that will not be saved to config.cfg)");
