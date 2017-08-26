@@ -27,7 +27,7 @@ for os in "$@"; do
         CC="${CC} -m32 -march=i686 -g1 -I../../../${deps}/include -L../../../${deps}/lib -DSUPPORTIPV6"
         SDL_CONFIG=$USRLOCAL/bin/sdl2-config
         DP_LINK_CRYPTO=shared
-          LIB_CRYPTO="../../../${deps}/lib/libd0_blind_id.a ../../../${deps}/lib/libgmp.a"
+          LIB_CRYPTO="../../../${deps}/lib/libd0_blind_id.a"
         DP_LINK_CRYPTO_RIJNDAEL=dlopen
         DP_LINK_JPEG=shared
           LIB_JPEG=../../../${deps}/lib/libjpeg.a
@@ -44,7 +44,7 @@ for os in "$@"; do
         CC="${CC} -m64 -g1 -I../../../${deps}/include -L../../../${deps}/lib -DSUPPORTIPV6"
         SDL_CONFIG=$USRLOCAL/bin/sdl2-config
         DP_LINK_CRYPTO=shared
-          LIB_CRYPTO="../../../${deps}/lib/libd0_blind_id.a ../../../${deps}/lib/libgmp.a"
+          LIB_CRYPTO="../../../${deps}/lib/libd0_blind_id.a"
         DP_LINK_CRYPTO_RIJNDAEL=dlopen
         DP_LINK_JPEG=shared
           LIB_JPEG="../../../${deps}/lib/libjpeg.a"

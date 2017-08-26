@@ -11,6 +11,7 @@ matrix:
           - libxpm-dev:i386
           - libsdl1.2-dev:i386
           - libxxf86vm-dev:i386
+          - libgmp-dev:i386
           - gcc-multilib
           - g++-multilib
           # Workaround packages to install to fix dependency hell.
@@ -29,6 +30,7 @@ matrix:
           - libxpm-dev
           - libsdl1.2-dev
           - libxxf86vm-dev
+          - libgmp-dev
   - os: linux
     env: PROJECT=xonotic OS="win32"
     compiler: gcc
