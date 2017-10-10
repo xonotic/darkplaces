@@ -3,7 +3,7 @@ CHECKLEVEL1 = @if [ "$(LEVEL)" != 1 ]; then $(MAKE) help; false; fi
 CHECKLEVEL2 = @if [ "$(LEVEL)" != 2 ]; then $(MAKE) help; false; fi
 
 # Choose the compiler you want to use
-CC?=gcc
+CC?=~/LLVM/LLVM_pure/stage_2/build/bin/clang
 
 # athlon optimizations
 #CPUOPTIMIZATIONS?=-march=athlon
@@ -22,8 +22,12 @@ CC?=gcc
 # Experimental
 #CPUOPTIMIZATIONS?=-fno-math-errno -ffinite-math-only -fno-rounding-math -fno-signaling-nans -fassociative-math -freciprocal-math -fno-signed-zeros -fno-trapping-math
 # Normal
-CPUOPTIMIZATIONS?=-fno-math-errno -ffinite-math-only -fno-rounding-math -fno-signaling-nans -fno-trapping-math
+
+#holy trinity
+CPUOPTIMIZATIONS?=-O3 -flto -march=native
 # NOTE: *never* *ever* use the -ffast-math or -funsafe-math-optimizations flag
+
+
 
 SDL_CONFIG?=sdl2-config
 SDLCONFIG_UNIXCFLAGS?=`$(SDL_CONFIG) --cflags`
@@ -174,7 +178,7 @@ OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMM
 CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
 CFLAGS_CLIENT=-DCONFIG_MENU -DCONFIG_CD $(CFLAGS_VIDEO_CAPTURE)
 CFLAGS_SERVER=
-CFLAGS_DEBUG=-ggdb
+CFLAGS_DEBUG=
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs
 CFLAGS_RELEASE=
 CFLAGS_RELEASE_PROFILE=-fbranch-probabilities
@@ -200,7 +204,7 @@ DO_CC=$(CC) $(CFLAGS) -c $< -o $@
 
 
 # Link
-LDFLAGS_DEBUG=-g -ggdb $(OPTIM_DEBUG) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=debug
+LDFLAGS_DEBUG= $(OPTIM_DEBUG) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=debug
 LDFLAGS_PROFILE=-g -pg -fprofile-arcs $(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=profile
 LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } || { test -d .git && git describe --always; } || echo -` -DBUILDTYPE=release
 
@@ -209,7 +213,7 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 OBJ_GLX= builddate.c sys_linux.o vid_glx.o thread_pthread.o keysym2ucs.o $(OBJ_MENU) $(OBJ_SOUND) $(OBJ_CD) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
-LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL)
+LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) -fuse-ld=/home/matthias/LLVM/LLVM_dev/stage_2/build/bin/ld.lld
 LDFLAGS_UNIXCL=-L$(UNIX_X11LIBPATH) -lX11 -lXpm -lXext -lXxf86vm -pthread $(LIB_SOUND)
 LDFLAGS_UNIXCL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl
 LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
