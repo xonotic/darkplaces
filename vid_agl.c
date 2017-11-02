@@ -419,7 +419,6 @@ void VID_Shutdown(void)
 	vid_isfullscreen = false;
 
 	GL_CloseLibrary();
-	Key_ClearStates ();
 }
 
 // Since the event handler can be called at any time, we store the events for later processing

@@ -887,7 +887,6 @@ void VID_Shutdown(void)
 	ctx = NULL;
 
 	GL_CloseLibrary();
-	Key_ClearStates ();
 }
 
 static void signal_handler(int sig)
