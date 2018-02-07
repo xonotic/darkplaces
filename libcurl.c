@@ -55,6 +55,7 @@ typedef enum
 	CINIT(URL,  OBJECTPOINT, 2),
 	CINIT(ERRORBUFFER, OBJECTPOINT, 10),
 	CINIT(WRITEFUNCTION, FUNCTIONPOINT, 11),
+	CINIT(TIMEOUT, LONG, 13),
 	CINIT(POSTFIELDS, OBJECTPOINT, 15),
 	CINIT(REFERER, OBJECTPOINT, 16),
 	CINIT(USERAGENT, OBJECTPOINT, 18),
@@ -65,9 +66,14 @@ typedef enum
 	CINIT(POST, LONG, 47),         /* HTTP POST method */
 	CINIT(FOLLOWLOCATION, LONG, 52),  /* use Location: Luke! */
 	CINIT(POSTFIELDSIZE, LONG, 60),
+	CINIT(CONNECTTIMEOUT, LONG, 78),
+	CINIT(DNS_CACHE_TIMEOUT, LONG, 92),
 	CINIT(PRIVATE, OBJECTPOINT, 103),
+	CINIT(FTP_RESPONSE_TIMEOUT, LONG, 112),
 	CINIT(PROTOCOLS, LONG, 181),
-	CINIT(REDIR_PROTOCOLS, LONG, 182)
+	CINIT(REDIR_PROTOCOLS, LONG, 182),
+	CINIT(ACCEPTTIMEOUT_MS, LONG, 212),
+	CINIT(EXPECT_100_TIMEOUT_MS, LONG, 227),
 }
 CURLoption;
 #define CURLPROTO_HTTP   (1<<0)
@@ -711,7 +717,7 @@ static void CheckPendingDownloads(void)
 				}
 				else
 				{
-					Con_DPrintf("Downloading %s -> memory\n", CleanURL(di->url, urlbuf, sizeof(urlbuf)));
+					Con_Printf("Downloading %s -> memory\n", CleanURL(di->url, urlbuf, sizeof(urlbuf)));
 					di->startpos = 0;
 				}
 
@@ -745,6 +751,15 @@ static void CheckPendingDownloads(void)
 				qcurl_easy_setopt(di->curle, CURLOPT_WRITEFUNCTION, CURL_fwrite);
 				qcurl_easy_setopt(di->curle, CURLOPT_LOW_SPEED_LIMIT, (long) 256);
 				qcurl_easy_setopt(di->curle, CURLOPT_LOW_SPEED_TIME, (long) 45);
+
+				Con_Printf(">>> SETTING TIMEOUTS HERE %s <<<\n", urlbuf);
+				qcurl_easy_setopt(di->curle, CURLOPT_TIMEOUT, (long) 5);
+				qcurl_easy_setopt(di->curle, CURLOPT_CONNECTTIMEOUT, (long) 5);
+				qcurl_easy_setopt(di->curle, CURLOPT_DNS_CACHE_TIMEOUT, (long) 5);
+				qcurl_easy_setopt(di->curle, CURLOPT_FTP_RESPONSE_TIMEOUT, (long) 5);
+				qcurl_easy_setopt(di->curle, CURLOPT_ACCEPTTIMEOUT_MS, (long) 5000);
+				qcurl_easy_setopt(di->curle, CURLOPT_EXPECT_100_TIMEOUT_MS, (long) 5000);
+
 				qcurl_easy_setopt(di->curle, CURLOPT_WRITEDATA, (void *) di);
 				qcurl_easy_setopt(di->curle, CURLOPT_PRIVATE, (void *) di);
 				qcurl_easy_setopt(di->curle, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS | CURLPROTO_FTP);
@@ -783,7 +798,7 @@ static void CheckPendingDownloads(void)
 				}
 
 				qcurl_easy_setopt(di->curle, CURLOPT_HTTPHEADER, di->slist);
-				
+
 				qcurl_multi_add_handle(curlm, di->curle);
 				di->started = true;
 				++numdownloads;
