@@ -129,7 +129,7 @@
 				prog->xstatement = st + 1 - cached_statements;
 				PRVM_Watchpoint(prog, 1, "Global watchpoint hit by engine", prog->watch_global_type, &prog->watch_global_value, g);
 			}
-			if (prog->watch_field_type != ev_void && prog->watch_edict < prog->max_edicts)
+			if (prog->watch_field_type != ev_void && prog->watch_edict >= -SPAWN2_LIMIT && prog->watch_edict < prog->max_edicts)
 			{
 				prvm_eval_t *g = PRVM_EDICTFIELDVALUE(prog->edicts + prog->watch_edict, prog->watch_field);
 				prog->xstatement = st + 1 - cached_statements;
@@ -298,13 +298,13 @@
 			HANDLE_OPCODE(OP_STOREP_FNC):		// pointers
 				if ((prvm_uint_t)OPB->_int - cached_entityfields >= cached_entityfieldsarea_entityfields)
 				{
-					if ((prvm_uint_t)OPB->_int >= cached_entityfieldsarea)
+					if ((prvm_int_t)OPB->_int < -(prvm_int_t)prog->edictsfields_offset || (prvm_int_t)OPB->_int >= cached_entityfieldsarea)
 					{
 						PRE_ERROR();
 						prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, (int)OPB->_int);
 						goto cleanup;
 					}
-					if ((prvm_uint_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
+					if ((prvm_int_t)OPB->_int >= 0 && (prvm_int_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
 					{
 						PRE_ERROR();
 						VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
@@ -316,13 +316,13 @@
 			HANDLE_OPCODE(OP_STOREP_V):
 				if ((prvm_uint_t)OPB->_int - cached_entityfields > (prvm_uint_t)cached_entityfieldsarea_entityfields_3)
 				{
-					if ((prvm_uint_t)OPB->_int > cached_entityfieldsarea_3)
+					if ((prvm_int_t)OPB->_int < -(prvm_int_t)prog->edictsfields_offset || (prvm_int_t)OPB->_int >= cached_entityfieldsarea_3)
 					{
 						PRE_ERROR();
 						prog->error_cmd("%s attempted to write to an out of bounds edict (%i)", prog->name, (int)OPB->_int);
 						goto cleanup;
 					}
-					if ((prvm_uint_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
+					if ((prvm_int_t)OPB->_int >= 0 && (prvm_int_t)OPB->_int < cached_entityfields && !cached_allowworldwrites)
 					{
 						PRE_ERROR();
 						VM_Warning(prog, "assignment to world.%s (field %i) in %s\n", PRVM_GetString(prog, PRVM_ED_FieldAtOfs(prog, OPB->_int)->s_name), (int)OPB->_int, prog->name);
@@ -335,7 +335,7 @@
 				DISPATCH_OPCODE();
 
 			HANDLE_OPCODE(OP_ADDRESS):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if ((prvm_uint_t)OPA->edict < -SPAWN2_LIMIT && (prvm_uint_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to address an out of bounds edict number", prog->name);
@@ -363,7 +363,7 @@
 			HANDLE_OPCODE(OP_LOAD_ENT):
 			HANDLE_OPCODE(OP_LOAD_S):
 			HANDLE_OPCODE(OP_LOAD_FNC):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if ((prvm_int_t)OPA->edict < -SPAWN2_LIMIT && (prvm_int_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to read an out of bounds edict number", prog->name);
@@ -380,7 +380,7 @@
 				DISPATCH_OPCODE();
 
 			HANDLE_OPCODE(OP_LOAD_V):
-				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
+				if ((prvm_int_t)OPA->edict < -SPAWN2_LIMIT && (prvm_int_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
 					prog->error_cmd("%s Progs attempted to read an out of bounds edict number", prog->name);
@@ -844,7 +844,7 @@
 					prog->xstatement = st - cached_statements;
 					PRVM_Watchpoint(prog, 0, "Global watchpoint hit", prog->watch_global_type, &prog->watch_global_value, g);
 				}
-				if (prog->watch_field_type != ev_void && prog->watch_edict < prog->max_edicts)
+				if (prog->watch_field_type != ev_void && prog->watch_edict >= -SPAWN2_LIMIT && prog->watch_edict < prog->max_edicts)
 				{
 					prvm_eval_t *g = PRVM_EDICTFIELDVALUE(prog->edicts + prog->watch_edict, prog->watch_field);
 					prog->xstatement = st - cached_statements;

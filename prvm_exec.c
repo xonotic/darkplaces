@@ -747,11 +747,11 @@ void MVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessag
 	prvm_vec_t tempfloat;
 	// these may become out of date when a builtin is called, and are updated accordingly
 	prvm_vec_t *cached_edictsfields = prog->edictsfields;
-	unsigned int cached_entityfields = prog->entityfields;
+	int cached_entityfields = prog->entityfields;
 	unsigned int cached_entityfields_3 = prog->entityfields - 3;
-	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	int cached_entityfieldsarea = prog->entityfieldsarea;
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
-	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
 	unsigned int cached_max_edicts = prog->max_edicts;
 	// these do not change
@@ -854,11 +854,11 @@ void CLVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	prvm_vec_t tempfloat;
 	// these may become out of date when a builtin is called, and are updated accordingly
 	prvm_vec_t *cached_edictsfields = prog->edictsfields;
-	unsigned int cached_entityfields = prog->entityfields;
+	int cached_entityfields = prog->entityfields;
 	unsigned int cached_entityfields_3 = prog->entityfields - 3;
-	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	int cached_entityfieldsarea = prog->entityfieldsarea;
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
-	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
 	unsigned int cached_max_edicts = prog->max_edicts;
 	// these do not change
@@ -965,11 +965,11 @@ void PRVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 	prvm_vec_t tempfloat;
 	// these may become out of date when a builtin is called, and are updated accordingly
 	prvm_vec_t *cached_edictsfields = prog->edictsfields;
-	unsigned int cached_entityfields = prog->entityfields;
+	int cached_entityfields = prog->entityfields;
 	unsigned int cached_entityfields_3 = prog->entityfields - 3;
-	unsigned int cached_entityfieldsarea = prog->entityfieldsarea;
+	int cached_entityfieldsarea = prog->entityfieldsarea;
 	unsigned int cached_entityfieldsarea_entityfields = prog->entityfieldsarea - prog->entityfields;
-	unsigned int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
+	int cached_entityfieldsarea_3 = prog->entityfieldsarea - 3;
 	unsigned int cached_entityfieldsarea_entityfields_3 = prog->entityfieldsarea - prog->entityfields - 3;
 	unsigned int cached_max_edicts = prog->max_edicts;
 	// these do not change

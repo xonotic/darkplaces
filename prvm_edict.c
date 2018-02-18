@@ -59,6 +59,9 @@ PRVM_MEM_Alloc
 static void PRVM_MEM_Alloc(prvm_prog_t *prog)
 {
 	int i;
+	unsigned int edicts_offset;
+	unsigned int edictprivate_offset;
+	unsigned int edictsfields_offset;
 
 	// reserve space for the null entity aka world
 	// check bound of max_edicts
@@ -69,20 +72,33 @@ static void PRVM_MEM_Alloc(prvm_prog_t *prog)
 	prog->edictprivate_size = max(prog->edictprivate_size,(int)sizeof(prvm_edict_private_t));
 
 	// alloc edicts
-	prog->edicts = (prvm_edict_t *)Mem_Alloc(prog->progs_mempool,prog->limit_edicts * sizeof(prvm_edict_t));
+	edicts_offset = (unsigned int) SPAWN2_LIMIT;
+	prog->edicts = (prvm_edict_t *)Mem_Alloc(prog->progs_mempool, (edicts_offset + prog->limit_edicts) * sizeof(prvm_edict_t));
+	prog->edicts += (prog->edicts_offset = edicts_offset);
 
 	// alloc edict private space
-	prog->edictprivate = Mem_Alloc(prog->progs_mempool, prog->max_edicts * prog->edictprivate_size);
+	edictprivate_offset = (unsigned int) SPAWN2_LIMIT * prog->edictprivate_size;
+	prog->edictprivate = Mem_Alloc(prog->progs_mempool, edictprivate_offset + prog->max_edicts * prog->edictprivate_size);
+	prog->edictprivate += (prog->edictprivate_offset = edictprivate_offset);
 
 	// alloc edict fields
-	prog->entityfieldsarea = prog->entityfields * prog->max_edicts;
+	edictsfields_offset = (unsigned int) SPAWN2_LIMIT * prog->entityfields;
+	prog->entityfieldsarea = edictsfields_offset + prog->max_edicts * prog->entityfields;
 	prog->edictsfields = (prvm_vec_t *)Mem_Alloc(prog->progs_mempool, prog->entityfieldsarea * sizeof(prvm_vec_t));
+	prog->edictsfields += (prog->edictsfields_offset = edictsfields_offset);
 
 	// set edict pointers
-	for(i = 0; i < prog->max_edicts; i++)
+	for(i = -SPAWN2_LIMIT; i < prog->max_edicts; i++)
 	{
 		prog->edicts[i].priv.required = (prvm_edict_private_t *)((unsigned char  *)prog->edictprivate + i * prog->edictprivate_size);
 		prog->edicts[i].fields.fp = prog->edictsfields + i * prog->entityfields;
+	}
+
+	// todo(TimePath): allow pure entities to be spawned, this little part is a hack
+	for(i = -SPAWN2_LIMIT; i < 0; ++i)
+	{
+		prog->edicts[i].priv.required->free = true;
+		prog->edicts[i].priv.required->freetime = -1337;
 	}
 }
 
@@ -94,6 +110,8 @@ PRVM_MEM_IncreaseEdicts
 void PRVM_MEM_IncreaseEdicts(prvm_prog_t *prog)
 {
 	int		i;
+	unsigned int edictsfields_offset;
+	unsigned int edictprivate_offset;
 
 	if(prog->max_edicts >= prog->limit_edicts)
 		return;
@@ -103,14 +121,19 @@ void PRVM_MEM_IncreaseEdicts(prvm_prog_t *prog)
 	// increase edicts
 	prog->max_edicts = min(prog->max_edicts + 256, prog->limit_edicts);
 
-	prog->entityfieldsarea = prog->entityfields * prog->max_edicts;
-	prog->edictsfields = (prvm_vec_t*)Mem_Realloc(prog->progs_mempool, (void *)prog->edictsfields, prog->entityfieldsarea * sizeof(prvm_vec_t));
-	prog->edictprivate = (void *)Mem_Realloc(prog->progs_mempool, (void *)prog->edictprivate, prog->max_edicts * prog->edictprivate_size);
+	edictsfields_offset = (unsigned int) SPAWN2_LIMIT * prog->entityfields;
+	prog->entityfieldsarea = edictsfields_offset + prog->max_edicts * prog->entityfields;
+	prog->edictsfields = (prvm_vec_t*)Mem_Realloc(prog->progs_mempool, (void *)(prog->edictsfields - prog->edictsfields_offset), prog->entityfieldsarea * sizeof(prvm_vec_t));
+	prog->edictsfields += (prog->edictsfields_offset = edictsfields_offset);
+
+	edictprivate_offset = (unsigned int) SPAWN2_LIMIT * prog->edictprivate_size;
+	prog->edictprivate = Mem_Realloc(prog->progs_mempool, (void *)(prog->edictprivate - prog->edictprivate_offset), edictprivate_offset + prog->max_edicts * prog->edictprivate_size);
+	prog->edictprivate += (prog->edictprivate_offset = edictprivate_offset);
 
 	//set e and v pointers
-	for(i = 0; i < prog->max_edicts; i++)
+	for(i = -SPAWN2_LIMIT; i < prog->max_edicts; i++)
 	{
-		prog->edicts[i].priv.required  = (prvm_edict_private_t *)((unsigned char  *)prog->edictprivate + i * prog->edictprivate_size);
+		prog->edicts[i].priv.required = (prvm_edict_private_t *)((unsigned char  *)prog->edictprivate + i * prog->edictprivate_size);
 		prog->edicts[i].fields.fp = prog->edictsfields + i * prog->entityfields;
 	}
 
@@ -205,6 +228,10 @@ void PRVM_ED_ClearEdict(prvm_prog_t *prog, prvm_edict_t *e)
 		Mem_Free((char *)e->priv.required->allocation_origin);
 	e->priv.required->allocation_origin = PRVM_AllocationOrigin(prog);
 
+	if (PRVM_NUM_FOR_EDICT(e) < 0)
+	{
+		return;
+	}
 	// AK: Let the init_edict function determine if something needs to be initialized
 	prog->init_edict(prog, e);
 }
@@ -285,6 +312,24 @@ prvm_edict_t *PRVM_ED_Alloc(prvm_prog_t *prog)
 
 	PRVM_ED_ClearEdict(prog, e);
 	return e;
+}
+
+prvm_edict_t *PRVM_ED_Alloc2(prvm_prog_t *prog)
+{
+	int i;
+	prvm_edict_t *e;
+
+	for (i = -1; i >= -SPAWN2_LIMIT; --i)
+	{
+		e = PRVM_EDICT_NUM(i);
+		if (PRVM_ED_CanAlloc(prog, e))
+		{
+			PRVM_ED_ClearEdict(prog, e);
+			return e;
+		}
+	}
+	prog->error_cmd("%s: PRVM_ED_Alloc2: no free edicts", prog->name);
+	return NULL;
 }
 
 /*
@@ -2949,7 +2994,7 @@ void PRVM_Prog_Init(prvm_prog_t *prog)
 }
 
 // LordHavoc: turned PRVM_EDICT_NUM into a #define for speed reasons
-unsigned int PRVM_EDICT_NUM_ERROR(prvm_prog_t *prog, unsigned int n, const char *filename, int fileline)
+int PRVM_EDICT_NUM_ERROR(prvm_prog_t *prog, unsigned int n, const char *filename, int fileline)
 {
 	prog->error_cmd("PRVM_EDICT_NUM: %s: bad number %i (called at %s:%i)", prog->name, n, filename, fileline);
 	return 0;

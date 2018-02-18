@@ -1766,6 +1766,10 @@ static void VM_SV_copyentity(prvm_prog_t *prog)
 		return;
 	}
 	memcpy(out->fields.fp, in->fields.fp, prog->entityfields * sizeof(prvm_vec_t));
+	if (PRVM_NUM_FOR_EDICT(out) < 0)
+	{
+		return;
+	}
 	SV_LinkEdict(out);
 }
 
@@ -3785,7 +3789,7 @@ NULL,							// #596
 NULL,							// #597
 NULL,							// #598
 NULL,							// #599
-NULL,							// #600
+VM_spawn2,						// #600
 NULL,							// #601
 NULL,							// #602
 NULL,							// #603

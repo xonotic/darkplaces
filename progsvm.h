@@ -648,8 +648,11 @@ typedef struct prvm_prog_s
 	// number of reserved edicts (allocated from 1)
 	int					reserved_edicts; // [INIT]
 
+	size_t edicts_offset;
 	prvm_edict_t		*edicts;
+	size_t edictsfields_offset;
 	prvm_vec_t		*edictsfields;
+	size_t edictprivate_offset;
 	void				*edictprivate;
 
 	// size of the engine private struct
@@ -810,6 +813,8 @@ void PRVM_MEM_IncreaseEdicts(prvm_prog_t *prog);
 
 qboolean PRVM_ED_CanAlloc(prvm_prog_t *prog, prvm_edict_t *e);
 prvm_edict_t *PRVM_ED_Alloc(prvm_prog_t *prog);
+#define SPAWN2_LIMIT 8192
+prvm_edict_t *PRVM_ED_Alloc2(prvm_prog_t *prog);
 void PRVM_ED_Free(prvm_prog_t *prog, prvm_edict_t *ed);
 void PRVM_ED_ClearEdict(prvm_prog_t *prog, prvm_edict_t *e);
 
@@ -823,9 +828,9 @@ void PRVM_ED_ParseGlobals(prvm_prog_t *prog, const char *data);
 
 void PRVM_ED_LoadFromFile(prvm_prog_t *prog, const char *data);
 
-unsigned int PRVM_EDICT_NUM_ERROR(prvm_prog_t *prog, unsigned int n, const char *filename, int fileline);
-#define	PRVM_EDICT(n) (((unsigned)(n) < (unsigned int)prog->max_edicts) ? (unsigned int)(n) : PRVM_EDICT_NUM_ERROR(prog, (unsigned int)(n), __FILE__, __LINE__))
-#define	PRVM_EDICT_NUM(n) (prog->edicts + PRVM_EDICT(n))
+int PRVM_EDICT_NUM_ERROR(prvm_prog_t *prog, unsigned int n, const char *filename, int fileline);
+#define	PRVM_EDICT(n) ((((n) >= -SPAWN2_LIMIT) && ((n) < prog->max_edicts)) ? (n) : PRVM_EDICT_NUM_ERROR(prog, (n), __FILE__, __LINE__))
+#define	PRVM_EDICT_NUM(n) (prog->edicts + PRVM_EDICT((int)(n)))
 
 //int NUM_FOR_EDICT_ERROR(prvm_edict_t *e);
 #define PRVM_NUM_FOR_EDICT(e) ((int)((prvm_edict_t *)(e) - prog->edicts))

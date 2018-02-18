@@ -893,7 +893,7 @@ void VM_ftoe(prvm_prog_t *prog)
 	VM_SAFEPARMCOUNT(1, VM_ftoe);
 
 	ent = (prvm_int_t)PRVM_G_FLOAT(OFS_PARM0);
-	if (ent < 0 || ent >= prog->max_edicts || PRVM_PROG_TO_EDICT(ent)->priv.required->free)
+	if (ent < -SPAWN2_LIMIT || ent >= prog->max_edicts || PRVM_PROG_TO_EDICT(ent)->priv.required->free)
 		ent = 0; // return world instead of a free or invalid entity
 
 	PRVM_G_INT(OFS_RETURN) = ent;
@@ -972,6 +972,15 @@ void VM_spawn(prvm_prog_t *prog)
 	VM_SAFEPARMCOUNT(0, VM_spawn);
 	prog->xfunction->builtinsprofile += 20;
 	ed = PRVM_ED_Alloc(prog);
+	VM_RETURN_EDICT(ed);
+}
+
+void VM_spawn2(prvm_prog_t *prog)
+{
+	prvm_edict_t	*ed;
+	VM_SAFEPARMCOUNT(0, VM_spawn2);
+	prog->xfunction->builtinsprofile += 20;
+	ed = PRVM_ED_Alloc2(prog);
 	VM_RETURN_EDICT(ed);
 }
 

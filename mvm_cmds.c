@@ -1558,7 +1558,7 @@ NULL,									// #596
 NULL,									// #597
 NULL,									// #598
 NULL,									// #599
-NULL,									// #600
+VM_spawn2,								// #600
 VM_M_setkeydest,					// #601 void setkeydest(float dest)
 VM_M_getkeydest,					// #602 float getkeydest(void)
 VM_M_setmousetarget,				// #603 void setmousetarget(float trg)
