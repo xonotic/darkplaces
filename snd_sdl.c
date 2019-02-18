@@ -68,9 +68,17 @@ static void Buffer_Callback (void *userdata, Uint8 *stream, int len)
 
 			PartialLength2 = FrameCount * factor - PartialLength1;
 			memcpy(&stream[PartialLength1], &snd_renderbuffer->ring[0], PartialLength2);
+
+			// As of SDL 2.0 buffer needs to be fully initialized, so fill leftover part with silence
+			memset(&stream[PartialLength1 + PartialLength2], snd_renderbuffer->format.width == 1 ? 0x80 : 0, len - (PartialLength1 + PartialLength2));
 		}
 		else
+		{
 			memcpy(stream, &snd_renderbuffer->ring[StartOffset * factor], FrameCount * factor);
+
+			// As of SDL 2.0 buffer needs to be fully initialized, so fill leftover part with silence
+			memset(&stream[FrameCount * factor], snd_renderbuffer->format.width == 1 ? 0x80 : 0, len - (FrameCount * factor));
+		}
 
 		snd_renderbuffer->startframe += FrameCount;
 
