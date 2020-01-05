@@ -1218,12 +1218,14 @@ void Sys_SendKeyEvents( void )
 	static qboolean sound_active = true;
 	int keycode;
 	int i;
+	qboolean isdown;
 	Uchar unicode;
 	SDL_Event event;
 
 	VID_EnableJoystick(true);
 
 	while( SDL_PollEvent( &event ) )
+		loop_start:
 		switch( event.type ) {
 			case SDL_QUIT:
 #ifdef DEBUGSDLEVENTS
@@ -1240,8 +1242,31 @@ void Sys_SendKeyEvents( void )
 					Con_DPrintf("SDL_Event: SDL_KEYUP %i\n", event.key.keysym.sym);
 #endif
 				keycode = MapKey(event.key.keysym.sym);
+				isdown = (event.key.state == SDL_PRESSED);
+				unicode = 0;
+				if(isdown)
+				{
+					if(SDL_PollEvent(&event))
+					{
+						if(event.type == SDL_TEXTINPUT)
+						{
+							// combine key code from SDL_KEYDOWN event and character
+							// from SDL_TEXTINPUT event in a single Key_Event call
+#ifdef DEBUGSDLEVENTS
+							Con_DPrintf("SDL_Event: SDL_TEXTINPUT - text: %s\n", event.text.text);
+#endif
+							unicode = u8_getchar_utf8_enabled(event.text.text + (int)u8_bytelen(event.text.text, 0), NULL);
+						}
+						else
+						{
+							if (!VID_JoyBlockEmulatedKeys(keycode))
+								Key_Event(keycode, 0, isdown);
+							goto loop_start;
+						}
+					}
+				}
 				if (!VID_JoyBlockEmulatedKeys(keycode))
-					Key_Event(keycode, 0, (event.key.state == SDL_PRESSED));
+					Key_Event(keycode, unicode, isdown);
 				break;
 			case SDL_MOUSEBUTTONDOWN:
 			case SDL_MOUSEBUTTONUP:
@@ -2823,7 +2848,6 @@ void VID_Shutdown (void)
 {
 	VID_EnableJoystick(false);
 	VID_SetMouse(false, false, false);
-	VID_RestoreSystemGamma();
 
 #if SDL_MAJOR_VERSION == 1
 #ifndef WIN32
@@ -2856,24 +2880,6 @@ void VID_Shutdown (void)
 	gl_platformextensions = "";
 }
 
-int VID_SetGamma (unsigned short *ramps, int rampsize)
-{
-#if SDL_MAJOR_VERSION == 1
-	return !SDL_SetGammaRamp (ramps, ramps + rampsize, ramps + rampsize*2);
-#else
-	return !SDL_SetWindowGammaRamp (window, ramps, ramps + rampsize, ramps + rampsize*2);
-#endif
-}
-
-int VID_GetGamma (unsigned short *ramps, int rampsize)
-{
-#if SDL_MAJOR_VERSION == 1
-	return !SDL_GetGammaRamp (ramps, ramps + rampsize, ramps + rampsize*2);
-#else
-	return !SDL_GetWindowGammaRamp (window, ramps, ramps + rampsize, ramps + rampsize*2);
-#endif
-}
-
 void VID_Finish (void)
 {
 #if SDL_MAJOR_VERSION == 1
@@ -2887,7 +2893,7 @@ void VID_Finish (void)
 #endif
 	vid_activewindow = !vid_hidden && vid_hasfocus;
 
-	VID_UpdateGamma(false, 256);
+	VID_UpdateGamma();
 
 	if (!vid_hidden)
 	{

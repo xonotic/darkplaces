@@ -1316,9 +1316,9 @@ void Mod_ShadowMesh_CalcBBox(shadowmesh_t *firstmesh, vec3_t mins, vec3_t maxs, 
 		}
 		for (i = 0, v = mesh->vertex3f;i < mesh->numverts;i++, v += 3)
 		{
-			if (nmins[0] > v[0]) nmins[0] = v[0];if (nmaxs[0] < v[0]) nmaxs[0] = v[0];
-			if (nmins[1] > v[1]) nmins[1] = v[1];if (nmaxs[1] < v[1]) nmaxs[1] = v[1];
-			if (nmins[2] > v[2]) nmins[2] = v[2];if (nmaxs[2] < v[2]) nmaxs[2] = v[2];
+			if (nmins[0] > v[0]) { nmins[0] = v[0]; } if (nmaxs[0] < v[0]) { nmaxs[0] = v[0]; }
+			if (nmins[1] > v[1]) { nmins[1] = v[1]; } if (nmaxs[1] < v[1]) { nmaxs[1] = v[1]; }
+			if (nmins[2] > v[2]) { nmins[2] = v[2]; } if (nmaxs[2] < v[2]) { nmaxs[2] = v[2]; }
 		}
 	}
 	// calculate center and radius
@@ -2011,7 +2011,7 @@ void Mod_LoadQ3Shaders(void)
 							// multilayer terrain shader or similar
 							shader.textureblendalpha = true;
 							if (mod_q3shader_force_terrain_alphaflag.integer)
-								shader.layers[0].texflags |= TEXF_ALPHA;
+								shader.layers[0].dptexflags |= TEXF_ALPHA;
 						}
 					}
 
@@ -2023,29 +2023,29 @@ void Mod_LoadQ3Shaders(void)
 							layer->blendfunc[0] = GL_SRC_ALPHA;
 					}
 					
-					layer->texflags = 0;
+					layer->dptexflags = 0;
 					if (layer->alphatest)
-						layer->texflags |= TEXF_ALPHA;
+						layer->dptexflags |= TEXF_ALPHA;
 					switch(layer->blendfunc[0])
 					{
 						case GL_SRC_ALPHA:
 						case GL_ONE_MINUS_SRC_ALPHA:
-							layer->texflags |= TEXF_ALPHA;
+							layer->dptexflags |= TEXF_ALPHA;
 							break;
 					}
 					switch(layer->blendfunc[1])
 					{
 						case GL_SRC_ALPHA:
 						case GL_ONE_MINUS_SRC_ALPHA:
-							layer->texflags |= TEXF_ALPHA;
+							layer->dptexflags |= TEXF_ALPHA;
 							break;
 					}
 					if (!(shader.surfaceparms & Q3SURFACEPARM_NOMIPMAPS))
-						layer->texflags |= TEXF_MIPMAP;
+						layer->dptexflags |= TEXF_MIPMAP;
 					if (!(shader.textureflags & Q3TEXTUREFLAG_NOPICMIP))
-						layer->texflags |= TEXF_PICMIP | TEXF_COMPRESS;
+						layer->dptexflags |= TEXF_PICMIP | TEXF_COMPRESS;
 					if (layer->clampmap)
-						layer->texflags |= TEXF_CLAMP;
+						layer->dptexflags |= TEXF_CLAMP;
 					continue;
 				}
 				numparameters = 0;
@@ -2467,6 +2467,7 @@ qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qbool
 	texture->basealpha = 1.0f;
 	shader = name[0] ? Mod_LookupQ3Shader(name) : NULL;
 
+	// allow disabling of picmip or compression by defaulttexflags
 	texflagsmask = ~0;
 	if(!(defaulttexflags & TEXF_PICMIP))
 		texflagsmask &= ~TEXF_PICMIP;
@@ -2493,12 +2494,9 @@ qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qbool
 		if (developer_loading.integer)
 			Con_Printf("%s: loaded shader for %s\n", loadmodel->name, name);
 
-		// allow disabling of picmip or compression by defaulttexflags
-		texture->textureflags = (shader->textureflags & texflagsmask) | texflagsor;
-
 		if (shader->surfaceparms & Q3SURFACEPARM_SKY)
 		{
-			texture->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+			texture->basematerialflags = MATERIALFLAG_SKY;
 			if (shader->skyboxname[0])
 			{
 				// quake3 seems to append a _ to the skybox name, so this must do so as well
@@ -2646,19 +2644,19 @@ nothing                GL_ZERO GL_ONE
 			// convert the main material layer
 			// FIXME: if alphagenspecularlayer is used, we should pass a specular texture name to R_SkinFrame_LoadExternal and have it load that texture instead of the assumed name for _gloss texture
 			if (materiallayer >= 0)
-				texture->materialshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[materiallayer], materiallayer, (shader->layers[materiallayer].texflags & texflagsmask) | texflagsor, texture->name);
+				texture->materialshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[materiallayer], materiallayer, (shader->layers[materiallayer].dptexflags & texflagsmask) | texflagsor, texture->name);
 			// convert the terrain background blend layer (if any)
 			if (terrainbackgroundlayer >= 0)
-				texture->backgroundshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[terrainbackgroundlayer], terrainbackgroundlayer, (shader->layers[terrainbackgroundlayer].texflags & texflagsmask) | texflagsor, texture->name);
+				texture->backgroundshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[terrainbackgroundlayer], terrainbackgroundlayer, (shader->layers[terrainbackgroundlayer].dptexflags & texflagsmask) | texflagsor, texture->name);
 			// convert the prepass layers (if any)
 			texture->startpreshaderpass = shaderpassindex;
 			for (i = 0; i < endofprelayers; i++)
-				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[i], i, (shader->layers[i].texflags & texflagsmask) | texflagsor, texture->name);
+				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor, texture->name);
 			texture->endpreshaderpass = shaderpassindex;
 			texture->startpostshaderpass = shaderpassindex;
 			// convert the postpass layers (if any)
 			for (i = firstpostlayer; i < shader->numlayers; i++)
-				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[i], i, (shader->layers[i].texflags & texflagsmask) | texflagsor, texture->name);
+				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(&shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor, texture->name);
 			texture->startpostshaderpass = shaderpassindex;
 		}
 
@@ -2794,7 +2792,7 @@ nothing                GL_ZERO GL_ONE
 		}
 		else if (texture->surfaceflags & Q3SURFACEFLAG_SKY)
 		{
-			texture->basematerialflags |= MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+			texture->basematerialflags |= MATERIALFLAG_SKY;
 			texture->supercontents = SUPERCONTENTS_SKY;
 		}
 		else
@@ -2837,6 +2835,39 @@ nothing                GL_ZERO GL_ONE
 	texture->currentskinframe = texture->materialshaderpass ? texture->materialshaderpass->skinframes[0] : NULL;
 	texture->backgroundcurrentskinframe = texture->backgroundshaderpass ? texture->backgroundshaderpass->skinframes[0] : NULL;
 	return success;
+}
+
+void Mod_LoadCustomMaterial(texture_t *texture, const char *name, int supercontents, int materialflags, skinframe_t *skinframe)
+{
+	if (!(materialflags & (MATERIALFLAG_WALL | MATERIALFLAG_SKY)))
+		Con_DPrintf("^1%s:^7 Custom texture ^3\"%s\" does not have MATERIALFLAG_WALL set\n", loadmodel->name, texture->name);
+	strlcpy(texture->name, name, sizeof(texture->name));
+	texture->basealpha = 1.0f;
+	texture->basematerialflags = texture->currentmaterialflags = materialflags;
+	texture->supercontents = supercontents;
+
+	texture->offsetmapping = (mod_noshader_default_offsetmapping.value) ? OFFSETMAPPING_DEFAULT : OFFSETMAPPING_OFF;
+	texture->offsetscale = 1;
+	texture->offsetbias = 0;
+	texture->specularscalemod = 1;
+	texture->specularpowermod = 1;
+	texture->rtlightambient = 0;
+	texture->transparentsort = TRANSPARENTSORT_DISTANCE;
+	// WHEN ADDING DEFAULTS HERE, REMEMBER TO PUT DEFAULTS IN ALL LOADERS
+	// JUST GREP FOR "specularscalemod = 1".
+
+	if (developer_extra.integer)
+		Con_DPrintf("^1%s:^7 Custom texture ^3\"%s\"\n", loadmodel->name, texture->name);
+	texture->materialshaderpass = texture->shaderpasses[0] = Mod_CreateShaderPass(skinframe);
+
+	// init the animation variables
+	texture->currentframe = texture;
+	if (!texture->materialshaderpass)
+		texture->materialshaderpass = texture->shaderpasses[0] = Mod_CreateShaderPass(R_SkinFrame_LoadMissing());
+	if (!texture->materialshaderpass->skinframes[0])
+		texture->materialshaderpass->skinframes[0] = R_SkinFrame_LoadMissing();
+	texture->currentskinframe = texture->materialshaderpass ? texture->materialshaderpass->skinframes[0] : NULL;
+	texture->backgroundcurrentskinframe = texture->backgroundshaderpass ? texture->backgroundshaderpass->skinframes[0] : NULL;
 }
 
 skinfile_t *Mod_LoadSkinFiles(void)
@@ -3732,7 +3763,7 @@ static void Mod_GenerateLightmaps_LightPoint(dp_model_t *model, const vec3_t pos
 			continue;
 		if (model && model->TraceLine)
 		{
-			model->TraceLine(model, NULL, NULL, &trace, pos, lightorigin, SUPERCONTENTS_VISBLOCKERMASK, SUPERCONTENTS_SKY);
+			model->TraceLine(model, NULL, NULL, &trace, pos, lightorigin, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT | MATERIALFLAG_NOSHADOW);
 			if (trace.fraction < 1)
 				continue;
 		}
@@ -3934,7 +3965,7 @@ static void Mod_GenerateLightmaps_SamplePoint(const float *pos, const float *nor
 				if (!normal)
 				{
 					// for light grid we'd better check visibility of the offset point
-					cl.worldmodel->TraceLine(cl.worldmodel, NULL, NULL, &trace, pos, offsetpos, SUPERCONTENTS_VISBLOCKERMASK, SUPERCONTENTS_SKY);
+					cl.worldmodel->TraceLine(cl.worldmodel, NULL, NULL, &trace, pos, offsetpos, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT | MATERIALFLAG_NOSHADOW);
 					if (trace.fraction < 1)
 						VectorLerp(pos, trace.fraction, offsetpos, offsetpos);
 				}
@@ -4543,4 +4574,278 @@ static void Mod_GenerateLightmaps_f(void)
 		return;
 	}
 	Mod_GenerateLightmaps(cl.worldmodel);
+}
+
+void Mod_Mesh_Create(dp_model_t *mod, const char *name)
+{
+	memset(mod, 0, sizeof(*mod));
+	strlcpy(mod->name, name, sizeof(mod->name));
+	mod->mempool = Mem_AllocPool(name, 0, NULL);
+	mod->texturepool = R_AllocTexturePool();
+	mod->Draw = R_Q1BSP_Draw;
+	mod->DrawDepth = R_Q1BSP_DrawDepth;
+	mod->DrawDebug = R_Q1BSP_DrawDebug;
+	mod->DrawPrepass = R_Q1BSP_DrawPrepass;
+	mod->GetLightInfo = R_Q1BSP_GetLightInfo;
+	mod->DrawShadowMap = R_Q1BSP_DrawShadowMap;
+	mod->DrawShadowVolume = R_Q1BSP_DrawShadowVolume;
+	mod->DrawLight = R_Q1BSP_DrawLight;
+}
+
+void Mod_Mesh_Destroy(dp_model_t *mod)
+{
+	Mod_UnloadModel(mod);
+}
+
+// resets the mesh model to have no geometry to render, ready for a new frame -
+// the mesh will be prepared for rendering later using Mod_Mesh_Finalize
+void Mod_Mesh_Reset(dp_model_t *mod)
+{
+	mod->num_surfaces = 0;
+	mod->surfmesh.num_vertices = 0;
+	mod->surfmesh.num_triangles = 0;
+	memset(mod->surfmesh.data_vertexhash, -1, mod->surfmesh.num_vertexhashsize * sizeof(*mod->surfmesh.data_vertexhash));
+	mod->DrawSky = NULL; // will be set if a texture needs it
+	mod->DrawAddWaterPlanes = NULL; // will be set if a texture needs it
+}
+
+texture_t *Mod_Mesh_GetTexture(dp_model_t *mod, const char *name)
+{
+	int i;
+	texture_t *t;
+	for (i = 0; i < mod->num_textures; i++)
+		if (!strcmp(mod->data_textures[i].name, name))
+			return mod->data_textures + i;
+	if (mod->max_textures <= mod->num_textures)
+	{
+		texture_t *oldtextures = mod->data_textures;
+		mod->max_textures = max(mod->max_textures * 2, 1024);
+		mod->data_textures = (texture_t *)Mem_Realloc(mod->mempool, mod->data_textures, mod->max_textures * sizeof(*mod->data_textures));
+		// update the pointers
+		for (i = 0; i < mod->num_surfaces; i++)
+			mod->data_surfaces[i].texture = mod->data_textures + (mod->data_surfaces[i].texture - oldtextures);
+	}
+	t = &mod->data_textures[mod->num_textures++];
+	Mod_LoadTextureFromQ3Shader(t, name, false, true, 0);
+	return t;
+}
+
+msurface_t *Mod_Mesh_AddSurface(dp_model_t *mod, texture_t *tex)
+{
+	msurface_t *surf;
+	// check if the proposed surface matches the last one we created
+	if (mod->num_surfaces == 0 || mod->data_surfaces[mod->num_surfaces - 1].texture != tex)
+	{
+		if (mod->max_surfaces == mod->num_surfaces)
+		{
+			mod->max_surfaces = 2 * max(mod->num_surfaces, 64);
+			mod->data_surfaces = (msurface_t *)Mem_Realloc(mod->mempool, mod->data_surfaces, mod->max_surfaces * sizeof(*mod->data_surfaces));
+			mod->sortedmodelsurfaces = (int *)Mem_Realloc(mod->mempool, mod->sortedmodelsurfaces, mod->max_surfaces * sizeof(*mod->sortedmodelsurfaces));
+		}
+		surf = mod->data_surfaces + mod->num_surfaces;
+		mod->num_surfaces++;
+		memset(surf, 0, sizeof(*surf));
+		surf->texture = tex;
+		surf->num_firsttriangle = mod->surfmesh.num_triangles;
+		surf->num_firstvertex = mod->surfmesh.num_vertices;
+		if (tex->basematerialflags & (MATERIALFLAG_SKY))
+			mod->DrawSky = R_Q1BSP_DrawSky;
+		if (tex->basematerialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION | MATERIALFLAG_REFLECTION | MATERIALFLAG_CAMERA))
+			mod->DrawAddWaterPlanes = R_Q1BSP_DrawAddWaterPlanes;
+		return surf;
+	}
+	return mod->data_surfaces + mod->num_surfaces - 1;
+}
+
+int Mod_Mesh_IndexForVertex(dp_model_t *mod, msurface_t *surf, float x, float y, float z, float nx, float ny, float nz, float s, float t, float u, float v, float r, float g, float b, float a)
+{
+	int hashindex, h, vnum, mask;
+	surfmesh_t *mesh = &mod->surfmesh;
+	if (mesh->max_vertices == mesh->num_vertices)
+	{
+		mesh->max_vertices = max(mesh->num_vertices * 2, 256);
+		mesh->data_vertex3f = (float *)Mem_Realloc(mod->mempool, mesh->data_vertex3f, mesh->max_vertices * sizeof(float[3]));
+		mesh->data_svector3f = (float *)Mem_Realloc(mod->mempool, mesh->data_svector3f, mesh->max_vertices * sizeof(float[3]));
+		mesh->data_tvector3f = (float *)Mem_Realloc(mod->mempool, mesh->data_tvector3f, mesh->max_vertices * sizeof(float[3]));
+		mesh->data_normal3f = (float *)Mem_Realloc(mod->mempool, mesh->data_normal3f, mesh->max_vertices * sizeof(float[3]));
+		mesh->data_texcoordtexture2f = (float *)Mem_Realloc(mod->mempool, mesh->data_texcoordtexture2f, mesh->max_vertices * sizeof(float[2]));
+		mesh->data_texcoordlightmap2f = (float *)Mem_Realloc(mod->mempool, mesh->data_texcoordlightmap2f, mesh->max_vertices * sizeof(float[2]));
+		mesh->data_lightmapcolor4f = (float *)Mem_Realloc(mod->mempool, mesh->data_lightmapcolor4f, mesh->max_vertices * sizeof(float[4]));
+		// rebuild the hash table
+		mesh->num_vertexhashsize = 4 * mesh->max_vertices;
+		mesh->num_vertexhashsize &= ~(mesh->num_vertexhashsize - 1); // round down to pow2
+		mesh->data_vertexhash = (int *)Mem_Realloc(mod->mempool, mesh->data_vertexhash, mesh->num_vertexhashsize * sizeof(*mesh->data_vertexhash));
+		memset(mesh->data_vertexhash, -1, mesh->num_vertexhashsize * sizeof(*mesh->data_vertexhash));
+		mask = mod->surfmesh.num_vertexhashsize - 1;
+		// no need to hash the vertices for the entire model, the latest surface will suffice.
+		for (vnum = surf ? surf->num_firstvertex : 0; vnum < mesh->num_vertices; vnum++)
+		{
+			// this uses prime numbers intentionally for computing the hash
+			hashindex = (unsigned int)(mesh->data_vertex3f[vnum * 3 + 0] * 2003 + mesh->data_vertex3f[vnum * 3 + 1] * 4001 + mesh->data_vertex3f[vnum * 3 + 2] * 7919 + mesh->data_normal3f[vnum * 3 + 0] * 4097 + mesh->data_normal3f[vnum * 3 + 1] * 257 + mesh->data_normal3f[vnum * 3 + 2] * 17) & mask;
+			for (h = hashindex; mesh->data_vertexhash[h] >= 0; h = (h + 1) & mask)
+				; // just iterate until we find the terminator
+			mesh->data_vertexhash[h] = vnum;
+		}
+	}
+	mask = mod->surfmesh.num_vertexhashsize - 1;
+	// this uses prime numbers intentionally for computing the hash
+	hashindex = (unsigned int)(x * 2003 + y * 4001 + z * 7919 + nx * 4097 + ny * 257 + nz * 17) & mask;
+	// when possible find an identical vertex within the same surface and return it
+	for(h = hashindex;(vnum = mesh->data_vertexhash[h]) >= 0;h = (h + 1) & mask)
+	{
+		if (vnum >= surf->num_firstvertex
+		 && mesh->data_vertex3f[vnum * 3 + 0] == x && mesh->data_vertex3f[vnum * 3 + 1] == y && mesh->data_vertex3f[vnum * 3 + 2] == z
+		 && mesh->data_normal3f[vnum * 3 + 0] == nx && mesh->data_normal3f[vnum * 3 + 1] == ny && mesh->data_normal3f[vnum * 3 + 2] == nz
+		 && mesh->data_texcoordtexture2f[vnum * 2 + 0] == s && mesh->data_texcoordtexture2f[vnum * 2 + 1] == t
+		 && mesh->data_texcoordlightmap2f[vnum * 2 + 0] == u && mesh->data_texcoordlightmap2f[vnum * 2 + 1] == v
+		 && mesh->data_lightmapcolor4f[vnum * 4 + 0] == r && mesh->data_lightmapcolor4f[vnum * 4 + 1] == g && mesh->data_lightmapcolor4f[vnum * 4 + 2] == b && mesh->data_lightmapcolor4f[vnum * 4 + 3] == a)
+			return vnum;
+	}
+	// add the new vertex
+	vnum = mesh->num_vertices++;
+	if (surf->num_vertices > 0)
+	{
+		if (surf->mins[0] > x) surf->mins[0] = x;
+		if (surf->mins[1] > y) surf->mins[1] = y;
+		if (surf->mins[2] > z) surf->mins[2] = z;
+		if (surf->maxs[0] < x) surf->maxs[0] = x;
+		if (surf->maxs[1] < y) surf->maxs[1] = y;
+		if (surf->maxs[2] < z) surf->maxs[2] = z;
+	}
+	else
+	{
+		VectorSet(surf->mins, x, y, z);
+		VectorSet(surf->maxs, x, y, z);
+	}
+	surf->num_vertices = mesh->num_vertices - surf->num_firstvertex;
+	mesh->data_vertexhash[h] = vnum;
+	mesh->data_vertex3f[vnum * 3 + 0] = x;
+	mesh->data_vertex3f[vnum * 3 + 1] = y;
+	mesh->data_vertex3f[vnum * 3 + 2] = z;
+	mesh->data_normal3f[vnum * 3 + 0] = nx;
+	mesh->data_normal3f[vnum * 3 + 1] = ny;
+	mesh->data_normal3f[vnum * 3 + 2] = nz;
+	mesh->data_texcoordtexture2f[vnum * 2 + 0] = s;
+	mesh->data_texcoordtexture2f[vnum * 2 + 1] = t;
+	mesh->data_texcoordlightmap2f[vnum * 2 + 0] = u;
+	mesh->data_texcoordlightmap2f[vnum * 2 + 1] = v;
+	mesh->data_lightmapcolor4f[vnum * 4 + 0] = r;
+	mesh->data_lightmapcolor4f[vnum * 4 + 1] = g;
+	mesh->data_lightmapcolor4f[vnum * 4 + 2] = b;
+	mesh->data_lightmapcolor4f[vnum * 4 + 3] = a;
+	return vnum;
+}
+
+void Mod_Mesh_AddTriangle(dp_model_t *mod, msurface_t *surf, int e0, int e1, int e2)
+{
+	surfmesh_t *mesh = &mod->surfmesh;
+	if (mesh->max_triangles == mesh->num_triangles)
+	{
+		mesh->max_triangles = 2 * max(mesh->num_triangles, 128);
+		mesh->data_element3s = (unsigned short *)Mem_Realloc(mod->mempool, mesh->data_element3s, mesh->max_triangles * sizeof(unsigned short[3]));
+		mesh->data_element3i = (int *)Mem_Realloc(mod->mempool, mesh->data_element3i, mesh->max_triangles * sizeof(int[3]));
+	}
+	mesh->data_element3s[mesh->num_triangles * 3 + 0] = e0;
+	mesh->data_element3s[mesh->num_triangles * 3 + 1] = e1;
+	mesh->data_element3s[mesh->num_triangles * 3 + 2] = e2;
+	mesh->data_element3i[mesh->num_triangles * 3 + 0] = e0;
+	mesh->data_element3i[mesh->num_triangles * 3 + 1] = e1;
+	mesh->data_element3i[mesh->num_triangles * 3 + 2] = e2;
+	mesh->num_triangles++;
+	surf->num_triangles++;
+}
+
+static void Mod_Mesh_MakeSortedSurfaces(dp_model_t *mod)
+{
+	int i, j;
+	texture_t *tex;
+	msurface_t *surf, *surf2;
+
+	// build the sorted surfaces list properly to reduce material setup
+	// this is easy because we're just sorting on texture and don't care about the order of textures
+	mod->nummodelsurfaces = 0;
+	for (i = 0; i < mod->num_surfaces; i++)
+		mod->data_surfaces[i].included = false;
+	for (i = 0; i < mod->num_surfaces; i++)
+	{
+		surf = mod->data_surfaces + i;
+		if (surf->included)
+			continue;
+		tex = surf->texture;
+		// j = i is intentional
+		for (j = i; j < mod->num_surfaces; j++)
+		{
+			surf2 = mod->data_surfaces + j;
+			if (surf2->included)
+				continue;
+			if (surf2->texture == tex)
+			{
+				surf2->included = true;
+				mod->sortedmodelsurfaces[mod->nummodelsurfaces++] = j;
+			}
+		}
+	}
+}
+
+void Mod_Mesh_ComputeBounds(dp_model_t *mod)
+{
+	int i;
+	vec_t x2a, x2b, y2a, y2b, z2a, z2b, x2, y2, z2, yawradius, rotatedradius;
+
+	if (mod->surfmesh.num_vertices > 0)
+	{
+		// calculate normalmins/normalmaxs
+		VectorCopy(mod->surfmesh.data_vertex3f, mod->normalmins);
+		VectorCopy(mod->surfmesh.data_vertex3f, mod->normalmaxs);
+		for (i = 1; i < mod->surfmesh.num_vertices; i++)
+		{
+			float x = mod->surfmesh.data_vertex3f[i * 3 + 0];
+			float y = mod->surfmesh.data_vertex3f[i * 3 + 1];
+			float z = mod->surfmesh.data_vertex3f[i * 3 + 2];
+			// expand bounds to include this vertex
+			if (mod->normalmins[0] > x) mod->normalmins[0] = x;
+			if (mod->normalmins[1] > y) mod->normalmins[1] = y;
+			if (mod->normalmins[2] > z) mod->normalmins[2] = z;
+			if (mod->normalmaxs[0] < x) mod->normalmaxs[0] = x;
+			if (mod->normalmaxs[1] < y) mod->normalmaxs[1] = y;
+			if (mod->normalmaxs[2] < z) mod->normalmaxs[2] = z;
+		}
+		// calculate yawmins/yawmaxs, rotatedmins/maxs from normalmins/maxs
+		// (fast but less accurate than doing it per vertex)
+		x2a = mod->normalmins[0] * mod->normalmins[0];
+		x2b = mod->normalmaxs[0] * mod->normalmaxs[0];
+		y2a = mod->normalmins[1] * mod->normalmins[1];
+		y2b = mod->normalmaxs[1] * mod->normalmaxs[1];
+		z2a = mod->normalmins[2] * mod->normalmins[2];
+		z2b = mod->normalmaxs[2] * mod->normalmaxs[2];
+		x2 = max(x2a, x2b);
+		y2 = max(y2a, y2b);
+		z2 = max(z2a, z2b);
+		yawradius = sqrt(x2 + y2);
+		rotatedradius = sqrt(x2 + y2 + z2);
+		VectorSet(mod->yawmins, -yawradius, -yawradius, mod->normalmins[2]);
+		VectorSet(mod->yawmaxs, yawradius, yawradius, mod->normalmaxs[2]);
+		VectorSet(mod->rotatedmins, -rotatedradius, -rotatedradius, -rotatedradius);
+		VectorSet(mod->rotatedmaxs, rotatedradius, rotatedradius, rotatedradius);
+		mod->radius = rotatedradius;
+		mod->radius2 = x2 + y2 + z2;
+	}
+	else
+	{
+		VectorClear(mod->normalmins);
+		VectorClear(mod->normalmaxs);
+		VectorClear(mod->yawmins);
+		VectorClear(mod->yawmaxs);
+		VectorClear(mod->rotatedmins);
+		VectorClear(mod->rotatedmaxs);
+		mod->radius = 0;
+		mod->radius2 = 0;
+	}
+}
+
+void Mod_Mesh_Finalize(dp_model_t *mod)
+{
+	Mod_Mesh_ComputeBounds(mod);
+	Mod_Mesh_MakeSortedSurfaces(mod);
+	Mod_BuildTextureVectorsFromNormals(0, mod->surfmesh.num_vertices, mod->surfmesh.num_triangles, mod->surfmesh.data_vertex3f, mod->surfmesh.data_texcoordtexture2f, mod->surfmesh.data_normal3f, mod->surfmesh.data_element3i, mod->surfmesh.data_svector3f, mod->surfmesh.data_tvector3f, true);
 }

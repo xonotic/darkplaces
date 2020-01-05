@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "csprogs.h"
 #include "cl_video.h"
 #include "dpsoftrast.h"
+#include "cl_collision.h"
 
 #ifdef SUPPORTD3D
 #include <d3d9.h>
@@ -76,10 +77,10 @@ cvar_t r_motionblur_mousefactor_minspeed = {CVAR_SAVE, "r_motionblur_mousefactor
 cvar_t r_motionblur_mousefactor_maxspeed = {CVAR_SAVE, "r_motionblur_mousefactor_maxspeed", "50", "upper value of mouse acceleration when it reaches the peak factor into blur equation"};
 
 // TODO do we want a r_equalize_entities cvar that works on all ents, or would that be a cheat?
-cvar_t r_equalize_entities_fullbright = {CVAR_SAVE, "r_equalize_entities_fullbright", "0", "render fullbright entities by equalizing their lightness, not by not rendering light"};
-cvar_t r_equalize_entities_minambient = {CVAR_SAVE, "r_equalize_entities_minambient", "0.5", "light equalizing: ensure at least this ambient/diffuse ratio"};
-cvar_t r_equalize_entities_by = {CVAR_SAVE, "r_equalize_entities_by", "0.7", "light equalizing: exponent of dynamics compression (0 = no compression, 1 = full compression)"};
-cvar_t r_equalize_entities_to = {CVAR_SAVE, "r_equalize_entities_to", "0.8", "light equalizing: target light level"};
+cvar_t r_equalize_entities_fullbright = {CVAR_SAVE, "r_equalize_entities_fullbright", "0", "render fullbright entities by equalizing their lightness, not by not rendering light (DEPRECATED)"};
+cvar_t r_equalize_entities_minambient = {CVAR_SAVE, "r_equalize_entities_minambient", "0.5", "light equalizing: ensure at least this ambient/diffuse ratio (DEPRECATED)"};
+cvar_t r_equalize_entities_by = {CVAR_SAVE, "r_equalize_entities_by", "0.7", "light equalizing: exponent of dynamics compression (0 = no compression, 1 = full compression) (DEPRECATED)"};
+cvar_t r_equalize_entities_to = {CVAR_SAVE, "r_equalize_entities_to", "0.8", "light equalizing: target light level (DEPRECATED)"};
 
 cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "0", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
 cvar_t r_useinfinitefarclip = {CVAR_SAVE, "r_useinfinitefarclip", "1", "enables use of a special kind of projection matrix that has an extremely large farclip"};
@@ -93,6 +94,7 @@ cvar_t r_transparent_sortsurfacesbynearest = {0, "r_transparent_sortsurfacesbyne
 cvar_t r_transparent_useplanardistance = {0, "r_transparent_useplanardistance", "0", "sort transparent meshes by distance from view plane rather than spherical distance to the chosen point"};
 cvar_t r_showoverdraw = {0, "r_showoverdraw", "0", "shows overlapping geometry"};
 cvar_t r_showbboxes = {0, "r_showbboxes", "0", "shows bounding boxes of server entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
+cvar_t r_showbboxes_client = { 0, "r_showbboxes_client", "0", "shows bounding boxes of clientside qc entities, value controls opacity scaling (1 = 10%,  10 = 100%)" };
 cvar_t r_showsurfaces = {0, "r_showsurfaces", "0", "1 shows surfaces as different colors, or a value of 2 shows triangle draw order (for analyzing whether meshes are optimized for vertex cache)"};
 cvar_t r_showtris = {0, "r_showtris", "0", "shows triangle outlines, value controls brightness (can be above 1)"};
 cvar_t r_shownormals = {0, "r_shownormals", "0", "shows per-vertex surface normals and tangent vectors for bumpmapped lighting"};
@@ -109,17 +111,25 @@ cvar_t r_drawworld = {0, "r_drawworld","1", "draw world (most static stuff)"};
 cvar_t r_drawviewmodel = {0, "r_drawviewmodel","1", "draw your weapon model"};
 cvar_t r_drawexteriormodel = {0, "r_drawexteriormodel","1", "draw your player model (e.g. in chase cam, reflections)"};
 cvar_t r_cullentities_trace = {0, "r_cullentities_trace", "1", "probabistically cull invisible entities"};
+cvar_t r_cullentities_trace_entityocclusion = { 0, "r_cullentities_trace_entityocclusion", "1", "check for occluding entities such as doors, not just world hull" };
 cvar_t r_cullentities_trace_samples = {0, "r_cullentities_trace_samples", "2", "number of samples to test for entity culling (in addition to center sample)"};
 cvar_t r_cullentities_trace_tempentitysamples = {0, "r_cullentities_trace_tempentitysamples", "-1", "number of samples to test for entity culling of temp entities (including all CSQC entities), -1 disables trace culling on these entities to prevent flicker (pvs still applies)"};
 cvar_t r_cullentities_trace_enlarge = {0, "r_cullentities_trace_enlarge", "0", "box enlargement for entity culling"};
 cvar_t r_cullentities_trace_delay = {0, "r_cullentities_trace_delay", "1", "number of seconds until the entity gets actually culled"};
+cvar_t r_cullentities_trace_eyejitter = {0, "r_cullentities_trace_eyejitter", "16", "randomly offset rays from the eye by this much to reduce the odds of flickering"};
 cvar_t r_sortentities = {0, "r_sortentities", "0", "sort entities before drawing (might be faster)"};
 cvar_t r_speeds = {0, "r_speeds","0", "displays rendering statistics and per-subsystem timings"};
 cvar_t r_fullbright = {0, "r_fullbright","0", "makes map very bright and renders faster"};
 
-cvar_t r_fakelight = {0, "r_fakelight","0", "render 'fake' lighting instead of real lightmaps"};
-cvar_t r_fakelight_intensity = {0, "r_fakelight_intensity","0.75", "fakelight intensity modifier"};
+cvar_t r_fakelight = {0, "r_fakelight","0", "render 'fake' lighting instead of real lightmaps (DEPRECATED)"};
+cvar_t r_fakelight_intensity = {0, "r_fakelight_intensity","0.75", "fakelight intensity modifier (DEPRECATED)"};
 #define FAKELIGHT_ENABLED (r_fakelight.integer >= 2 || (r_fakelight.integer && r_refdef.scene.worldmodel && !r_refdef.scene.worldmodel->lit))
+
+cvar_t r_fullbright_directed = {0, "r_fullbright_directed", "0", "render fullbright things (unlit worldmodel and EF_FULLBRIGHT entities, but not fullbright shaders) using a constant light direction instead to add more depth while keeping uniform brightness"};
+cvar_t r_fullbright_directed_ambient = {0, "r_fullbright_directed_ambient", "0.5", "ambient light multiplier for directed fullbright"};
+cvar_t r_fullbright_directed_diffuse = {0, "r_fullbright_directed_diffuse", "0.75", "diffuse light multiplier for directed fullbright"};
+cvar_t r_fullbright_directed_pitch = {0, "r_fullbright_directed_pitch", "20", "constant pitch direction ('height') of the fake light source to use for fullbright"};
+cvar_t r_fullbright_directed_pitch_relative = {0, "r_fullbright_directed_pitch_relative", "0", "whether r_fullbright_directed_pitch is interpreted as absolute (0) or relative (1) pitch"};
 
 cvar_t r_wateralpha = {CVAR_SAVE, "r_wateralpha","1", "opacity of water polygons"};
 cvar_t r_dynamic = {CVAR_SAVE, "r_dynamic","1", "enables dynamic lights (rocket glow and such)"};
@@ -747,7 +757,7 @@ typedef struct r_glsl_permutation_s
 	/// hash lookup data
 	struct r_glsl_permutation_s *hashnext;
 	unsigned int mode;
-	unsigned int permutation;
+	dpuint64 permutation;
 
 	/// indicates if we have tried compiling this permutation already
 	qboolean compiled;
@@ -958,7 +968,7 @@ qboolean R_CompileShader_CheckStaticParms(void)
 		shaderstaticparmstrings_list[shaderstaticparms_count++] = "#define " n "\n"; \
 	else \
 		shaderstaticparmstrings_list[shaderstaticparms_count++] = "\n"
-static void R_CompileShader_AddStaticParms(unsigned int mode, unsigned int permutation)
+static void R_CompileShader_AddStaticParms(unsigned int mode, dpuint64 permutation)
 {
 	shaderstaticparms_count = 0;
 
@@ -986,7 +996,7 @@ r_glsl_permutation_t *r_glsl_permutation;
 /// storage for permutations linked in the hash table
 memexpandablearray_t r_glsl_permutationarray;
 
-static r_glsl_permutation_t *R_GLSL_FindPermutation(unsigned int mode, unsigned int permutation)
+static r_glsl_permutation_t *R_GLSL_FindPermutation(unsigned int mode, dpuint64 permutation)
 {
 	//unsigned int hashdepth = 0;
 	unsigned int hashindex = (permutation * 0x1021) & (SHADERPERMUTATION_HASHSIZE - 1);
@@ -1070,7 +1080,7 @@ static char *ShaderModeInfo_GetShaderText(shadermodeinfo_t *modeinfo, qboolean p
 	return Mem_strdup(r_main_mempool, modeinfo->builtinstring);
 }
 
-static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode, unsigned int permutation)
+static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode, dpuint64 permutation)
 {
 	int i;
 	int ubibind;
@@ -1115,6 +1125,27 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		geomstrings_list[geomstrings_count++] = "#define GLSL130\n";
 		fragstrings_list[fragstrings_count++] = "#define GLSL130\n";
 	}
+	// if we can do #version 120, we should (this adds the invariant keyword)
+	else if(vid.support.glshaderversion >= 120)
+	{
+		vertstrings_list[vertstrings_count++] = "#version 120\n";
+		geomstrings_list[geomstrings_count++] = "#version 120\n";
+		fragstrings_list[fragstrings_count++] = "#version 120\n";
+		vertstrings_list[vertstrings_count++] = "#define GLSL120\n";
+		geomstrings_list[geomstrings_count++] = "#define GLSL120\n";
+		fragstrings_list[fragstrings_count++] = "#define GLSL120\n";
+	}
+	// GLES also adds several things from GLSL120
+	switch(vid.renderpath)
+	{
+	case RENDERPATH_GLES2:
+		vertstrings_list[vertstrings_count++] = "#define GLES\n";
+		geomstrings_list[geomstrings_count++] = "#define GLES\n";
+		fragstrings_list[fragstrings_count++] = "#define GLES\n";
+		break;
+	default:
+		break;
+	}
 
 	// the first pretext is which type of shader to compile as
 	// (later these will all be bound together as a program object)
@@ -1131,7 +1162,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 	// now add all the permutation pretexts
 	for (i = 0;i < SHADERPERMUTATION_COUNT;i++)
 	{
-		if (permutation & (1<<i))
+		if (permutation & (1ll<<i))
 		{
 			vertstrings_list[vertstrings_count++] = shaderpermutationinfo[i].pretext;
 			geomstrings_list[geomstrings_count++] = shaderpermutationinfo[i].pretext;
@@ -1364,7 +1395,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		Mem_Free(sourcestring);
 }
 
-static void R_SetupShader_SetPermutationGLSL(unsigned int mode, unsigned int permutation)
+static void R_SetupShader_SetPermutationGLSL(unsigned int mode, dpuint64 permutation)
 {
 	r_glsl_permutation_t *perm = R_GLSL_FindPermutation(mode, permutation);
 	if (r_glsl_permutation != perm)
@@ -1384,7 +1415,7 @@ static void R_SetupShader_SetPermutationGLSL(unsigned int mode, unsigned int per
 				for (i = 0;i < SHADERPERMUTATION_COUNT;i++)
 				{
 					// reduce i more quickly whenever it would not remove any bits
-					int j = 1<<(SHADERPERMUTATION_COUNT-1-i);
+					dpuint64 j = 1ll<<(SHADERPERMUTATION_COUNT-1-i);
 					if (!(permutation & j))
 						continue;
 					permutation -= j;
@@ -1426,7 +1457,7 @@ typedef struct r_hlsl_permutation_s
 	/// hash lookup data
 	struct r_hlsl_permutation_s *hashnext;
 	unsigned int mode;
-	unsigned int permutation;
+	dpuint64 permutation;
 
 	/// indicates if we have tried compiling this permutation already
 	qboolean compiled;
@@ -1513,7 +1544,7 @@ r_hlsl_permutation_t *r_hlsl_permutation;
 /// storage for permutations linked in the hash table
 memexpandablearray_t r_hlsl_permutationarray;
 
-static r_hlsl_permutation_t *R_HLSL_FindPermutation(unsigned int mode, unsigned int permutation)
+static r_hlsl_permutation_t *R_HLSL_FindPermutation(unsigned int mode, dpuint64 permutation)
 {
 	//unsigned int hashdepth = 0;
 	unsigned int hashindex = (permutation * 0x1021) & (SHADERPERMUTATION_HASHSIZE - 1);
@@ -1690,7 +1721,7 @@ static void R_HLSL_CacheShader(r_hlsl_permutation_t *p, const char *cachename, c
 	psbin = (DWORD *)Mem_Realloc(tempmempool, psbin, 0);
 }
 
-static void R_HLSL_CompilePermutation(r_hlsl_permutation_t *p, unsigned int mode, unsigned int permutation)
+static void R_HLSL_CompilePermutation(r_hlsl_permutation_t *p, unsigned int mode, dpuint64 permutation)
 {
 	int i;
 	shadermodeinfo_t *modeinfo = &shadermodeinfo[SHADERLANGUAGE_HLSL][mode];
@@ -1746,7 +1777,7 @@ static void R_HLSL_CompilePermutation(r_hlsl_permutation_t *p, unsigned int mode
 	// now add all the permutation pretexts
 	for (i = 0;i < SHADERPERMUTATION_COUNT;i++)
 	{
-		if (permutation & (1<<i))
+		if (permutation & (1ll<<i))
 		{
 			vertstrings_list[vertstrings_count++] = shaderpermutationinfo[i].pretext;
 			geomstrings_list[geomstrings_count++] = shaderpermutationinfo[i].pretext;
@@ -1836,7 +1867,7 @@ static inline void hlslPSSetParameter3f(D3DPSREGISTER_t r, float x, float y, flo
 static inline void hlslPSSetParameter2f(D3DPSREGISTER_t r, float x, float y) {float temp[4];Vector4Set(temp, x, y, 0, 0);IDirect3DDevice9_SetPixelShaderConstantF(vid_d3d9dev, r, temp, 1);}
 static inline void hlslPSSetParameter1f(D3DPSREGISTER_t r, float x) {float temp[4];Vector4Set(temp, x, 0, 0, 0);IDirect3DDevice9_SetPixelShaderConstantF(vid_d3d9dev, r, temp, 1);}
 
-void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutation)
+void R_SetupShader_SetPermutationHLSL(unsigned int mode, dpuint64 permutation)
 {
 	r_hlsl_permutation_t *perm = R_HLSL_FindPermutation(mode, permutation);
 	if (r_hlsl_permutation != perm)
@@ -1853,7 +1884,7 @@ void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutatio
 				for (i = 0;i < SHADERPERMUTATION_COUNT;i++)
 				{
 					// reduce i more quickly whenever it would not remove any bits
-					int j = 1<<(SHADERPERMUTATION_COUNT-1-i);
+					dpuint64 j = 1ll<<(SHADERPERMUTATION_COUNT-1-i);
 					if (!(permutation & j))
 						continue;
 					permutation -= j;
@@ -1880,7 +1911,7 @@ void R_SetupShader_SetPermutationHLSL(unsigned int mode, unsigned int permutatio
 }
 #endif
 
-static void R_SetupShader_SetPermutationSoft(unsigned int mode, unsigned int permutation)
+static void R_SetupShader_SetPermutationSoft(unsigned int mode, dpuint64 permutation)
 {
 	DPSOFTRAST_SetShader(mode, permutation, r_shadow_glossexact.integer);
 	DPSOFTRAST_UniformMatrix4fv(DPSOFTRAST_UNIFORM_ModelViewProjectionMatrixM1, 1, false, gl_modelviewprojection16f);
@@ -1989,7 +2020,7 @@ static void R_GLSL_DumpShader_f(void)
 
 void R_SetupShader_Generic(rtexture_t *first, rtexture_t *second, int texturemode, int rgbscale, qboolean usegamma, qboolean notrippy, qboolean suppresstexalpha)
 {
-	unsigned int permutation = 0;
+	dpuint64 permutation = 0;
 	if (r_trippy.integer && !notrippy)
 		permutation |= SHADERPERMUTATION_TRIPPY;
 	permutation |= SHADERPERMUTATION_VIEWTINT;
@@ -2070,7 +2101,7 @@ void R_SetupShader_Generic_NoTexture(qboolean usegamma, qboolean notrippy)
 
 void R_SetupShader_DepthOrShadow(qboolean notrippy, qboolean depthrgb, qboolean skeletal)
 {
-	unsigned int permutation = 0;
+	dpuint64 permutation = 0;
 	if (r_trippy.integer && !notrippy)
 		permutation |= SHADERPERMUTATION_TRIPPY;
 	if (depthrgb)
@@ -2188,7 +2219,7 @@ void R_SetupShader_Surface(const vec3_t lightcolorbase, qboolean modellighting, 
 	// combination of texture, entity, light source, and fogging, only use the
 	// minimum features necessary to avoid wasting rendering time in the
 	// fragment shader on features that are not being used
-	unsigned int permutation = 0;
+	dpuint64 permutation = 0;
 	unsigned int mode = 0;
 	int blendfuncflags;
 	static float dummy_colormod[3] = {1, 1, 1};
@@ -3076,7 +3107,7 @@ void R_SetupShader_DeferredLight(const rtlight_t *rtlight)
 	// combination of texture, entity, light source, and fogging, only use the
 	// minimum features necessary to avoid wasting rendering time in the
 	// fragment shader on features that are not being used
-	unsigned int permutation = 0;
+	dpuint64 permutation = 0;
 	unsigned int mode = 0;
 	const float *lightcolorbase = rtlight->currentcolor;
 	float ambientscale = rtlight->ambientscale;
@@ -4316,6 +4347,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_transparent_useplanardistance);
 	Cvar_RegisterVariable(&r_showoverdraw);
 	Cvar_RegisterVariable(&r_showbboxes);
+	Cvar_RegisterVariable(&r_showbboxes_client);
 	Cvar_RegisterVariable(&r_showsurfaces);
 	Cvar_RegisterVariable(&r_showtris);
 	Cvar_RegisterVariable(&r_shownormals);
@@ -4330,10 +4362,12 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_draw2d);
 	Cvar_RegisterVariable(&r_drawworld);
 	Cvar_RegisterVariable(&r_cullentities_trace);
+	Cvar_RegisterVariable(&r_cullentities_trace_entityocclusion);
 	Cvar_RegisterVariable(&r_cullentities_trace_samples);
 	Cvar_RegisterVariable(&r_cullentities_trace_tempentitysamples);
 	Cvar_RegisterVariable(&r_cullentities_trace_enlarge);
 	Cvar_RegisterVariable(&r_cullentities_trace_delay);
+	Cvar_RegisterVariable(&r_cullentities_trace_eyejitter);
 	Cvar_RegisterVariable(&r_sortentities);
 	Cvar_RegisterVariable(&r_drawviewmodel);
 	Cvar_RegisterVariable(&r_drawexteriormodel);
@@ -4343,6 +4377,11 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_dynamic);
 	Cvar_RegisterVariable(&r_fakelight);
 	Cvar_RegisterVariable(&r_fakelight_intensity);
+	Cvar_RegisterVariable(&r_fullbright_directed);
+	Cvar_RegisterVariable(&r_fullbright_directed_ambient);
+	Cvar_RegisterVariable(&r_fullbright_directed_diffuse);
+	Cvar_RegisterVariable(&r_fullbright_directed_pitch);
+	Cvar_RegisterVariable(&r_fullbright_directed_pitch_relative);
 	Cvar_RegisterVariable(&r_fullbright);
 	Cvar_RegisterVariable(&r_shadows);
 	Cvar_RegisterVariable(&r_shadows_darken);
@@ -5086,6 +5125,26 @@ void R_AnimCache_CacheVisibleEntities(void)
 
 extern cvar_t r_overheadsprites_pushback;
 
+static void R_GetDirectedFullbright(vec3_t ambient, vec3_t diffuse, vec3_t worldspacenormal)
+{
+	vec3_t angles;
+
+	VectorSet(ambient, r_fullbright_directed_ambient.value, r_fullbright_directed_ambient.value, r_fullbright_directed_ambient.value);
+	VectorSet(diffuse, r_fullbright_directed_diffuse.value, r_fullbright_directed_diffuse.value, r_fullbright_directed_diffuse.value);
+
+	// Use cl.viewangles and not r_refdef.view.forward here so it is the
+	// same for all stereo views, and to better handle pitches outside
+	// [-90, 90] (in_pitch_* cvars allow that).
+	VectorCopy(cl.viewangles, angles);
+	if (r_fullbright_directed_pitch_relative.integer) {
+		angles[PITCH] += r_fullbright_directed_pitch.value;
+	} else {
+		angles[PITCH] = r_fullbright_directed_pitch.value;
+	}
+	AngleVectors(angles, worldspacenormal, NULL, NULL);
+	VectorNegate(worldspacenormal, worldspacenormal);
+}
+
 static void R_View_UpdateEntityLighting (void)
 {
 	int i;
@@ -5106,9 +5165,21 @@ static void R_View_UpdateEntityLighting (void)
 		if (ent->model && ent->model == cl.worldmodel)
 		{
 			// TODO: use modellight for r_ambient settings on world?
-			VectorSet(ent->modellight_ambient, 0, 0, 0);
-			VectorSet(ent->modellight_diffuse, 0, 0, 0);
-			VectorSet(ent->modellight_lightdir, 0, 0, 1);
+			// The logic here currently matches RSurf_ActiveWorldEntity.
+			if (r_fullbright_directed.integer && (r_fullbright.integer || !ent->model || !ent->model->lit))
+			{
+				R_GetDirectedFullbright(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal);
+				Matrix4x4_Transform3x3(&ent->inversematrix, tempdiffusenormal, ent->modellight_lightdir);
+				if(VectorLength2(ent->modellight_lightdir) == 0)
+					VectorSet(ent->modellight_lightdir, 0, 0, 1); // have to set SOME valid vector here
+				VectorNormalize(ent->modellight_lightdir);
+			}
+			else
+			{
+				VectorSet(ent->modellight_ambient, 0, 0, 0);
+				VectorSet(ent->modellight_diffuse, 0, 0, 0);
+				VectorSet(ent->modellight_lightdir, 0, 0, 1);
+			}
 			continue;
 		}
 		
@@ -5137,8 +5208,18 @@ static void R_View_UpdateEntityLighting (void)
 						org[2] = org[2] + r_overheadsprites_pushback.value;
 					R_LightPoint(ent->modellight_ambient, org, LP_LIGHTMAP | LP_RTWORLD | LP_DYNLIGHT);
 				}
-				else
+				else if (!r_fullbright.integer && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->lit && r_refdef.scene.worldmodel->brush.LightPoint)
+				{
 					R_CompleteLightPoint(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal, org, LP_LIGHTMAP);
+				}
+				else if (r_fullbright_directed.integer)
+				{
+					R_GetDirectedFullbright(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal);
+				}
+				else
+				{
+					VectorSet(ent->modellight_ambient, 1, 1, 1);
+				}
 
 				if(ent->flags & RENDER_EQUALIZE)
 				{
@@ -5185,8 +5266,18 @@ static void R_View_UpdateEntityLighting (void)
 					}
 				}
 			}
-			else // highly rare
-				VectorSet(ent->modellight_ambient, 1, 1, 1);
+			else
+			{
+				// EF_FULLBRIGHT entity.
+				if (r_fullbright_directed.integer)
+				{
+					R_GetDirectedFullbright(ent->modellight_ambient, ent->modellight_diffuse, tempdiffusenormal);
+				}
+				else
+				{
+					VectorSet(ent->modellight_ambient, 1, 1, 1);
+				}
+			}
 		}
 
 		// move the light direction into modelspace coordinates for lighting code
@@ -5197,42 +5288,88 @@ static void R_View_UpdateEntityLighting (void)
 	}
 }
 
-#define MAX_LINEOFSIGHTTRACES 64
-
-static qboolean R_CanSeeBox(int numsamples, vec_t enlarge, vec3_t eye, vec3_t entboxmins, vec3_t entboxmaxs)
+qboolean R_CanSeeBox(int numsamples, vec_t eyejitter, vec_t entboxenlarge, vec3_t eye, vec3_t entboxmins, vec3_t entboxmaxs)
 {
 	int i;
+	vec3_t eyemins, eyemaxs;
 	vec3_t boxmins, boxmaxs;
 	vec3_t start;
 	vec3_t end;
 	dp_model_t *model = r_refdef.scene.worldmodel;
+	static vec3_t positions[] = {
+		{ 0.5f, 0.5f, 0.5f },
+		{ 0.0f, 0.0f, 0.0f },
+		{ 0.0f, 0.0f, 1.0f },
+		{ 0.0f, 1.0f, 0.0f },
+		{ 0.0f, 1.0f, 1.0f },
+		{ 1.0f, 0.0f, 0.0f },
+		{ 1.0f, 0.0f, 1.0f },
+		{ 1.0f, 1.0f, 0.0f },
+		{ 1.0f, 1.0f, 1.0f },
+	};
 
-	if (!model || !model->brush.TraceLineOfSight)
+	// sample count can be set to -1 to skip this logic, for flicker-prone objects
+	if (numsamples < 0)
 		return true;
 
+	// view origin is not used for culling in portal/reflection/refraction renders or isometric views
+	if (r_refdef.view.useclipplane || !r_refdef.view.useperspective || r_trippy.integer)
+		return true;
+
+	if (!r_cullentities_trace_entityocclusion.integer && (!model || !model->brush.TraceLineOfSight))
+		return true;
+
+	// expand the eye box a little
+	eyemins[0] = eye[0] - eyejitter;
+	eyemaxs[0] = eye[0] + eyejitter;
+	eyemins[1] = eye[1] - eyejitter;
+	eyemaxs[1] = eye[1] + eyejitter;
+	eyemins[2] = eye[2] - eyejitter;
+	eyemaxs[2] = eye[2] + eyejitter;
 	// expand the box a little
-	boxmins[0] = (enlarge+1) * entboxmins[0] - enlarge * entboxmaxs[0];
-	boxmaxs[0] = (enlarge+1) * entboxmaxs[0] - enlarge * entboxmins[0];
-	boxmins[1] = (enlarge+1) * entboxmins[1] - enlarge * entboxmaxs[1];
-	boxmaxs[1] = (enlarge+1) * entboxmaxs[1] - enlarge * entboxmins[1];
-	boxmins[2] = (enlarge+1) * entboxmins[2] - enlarge * entboxmaxs[2];
-	boxmaxs[2] = (enlarge+1) * entboxmaxs[2] - enlarge * entboxmins[2];
+	boxmins[0] = (entboxenlarge + 1) * entboxmins[0] - entboxenlarge * entboxmaxs[0];
+	boxmaxs[0] = (entboxenlarge + 1) * entboxmaxs[0] - entboxenlarge * entboxmins[0];
+	boxmins[1] = (entboxenlarge + 1) * entboxmins[1] - entboxenlarge * entboxmaxs[1];
+	boxmaxs[1] = (entboxenlarge + 1) * entboxmaxs[1] - entboxenlarge * entboxmins[1];
+	boxmins[2] = (entboxenlarge + 1) * entboxmins[2] - entboxenlarge * entboxmaxs[2];
+	boxmaxs[2] = (entboxenlarge + 1) * entboxmaxs[2] - entboxenlarge * entboxmins[2];
 
-	// return true if eye is inside enlarged box
-	if (BoxesOverlap(boxmins, boxmaxs, eye, eye))
+	// return true if eye overlaps enlarged box
+	if (BoxesOverlap(boxmins, boxmaxs, eyemins, eyemaxs))
 		return true;
 
-	// try center
-	VectorCopy(eye, start);
-	VectorMAM(0.5f, boxmins, 0.5f, boxmaxs, end);
-	if (model->brush.TraceLineOfSight(model, start, end))
+	// try specific positions in the box first - note that these can be cached
+	if (r_cullentities_trace_entityocclusion.integer)
+	{
+		for (i = 0; i < sizeof(positions) / sizeof(positions[0]); i++)
+		{
+			VectorCopy(eye, start);
+			end[0] = boxmins[0] + (boxmaxs[0] - boxmins[0]) * positions[i][0];
+			end[1] = boxmins[1] + (boxmaxs[1] - boxmins[1]) * positions[i][1];
+			end[2] = boxmins[2] + (boxmaxs[2] - boxmins[2]) * positions[i][2];
+			//trace_t trace = CL_TraceLine(start, end, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, 0.0f, true, false, NULL, true, true);
+			trace_t trace = CL_Cache_TraceLineSurfaces(start, end, MOVE_NORMAL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT);
+			// not picky - if the trace ended anywhere in the box we're good
+			if (BoxesOverlap(trace.endpos, trace.endpos, boxmins, boxmaxs))
+				return true;
+		}
+	}
+	else if (model->brush.TraceLineOfSight(model, start, end, boxmins, boxmaxs))
 		return true;
 
 	// try various random positions
-	for (i = 0;i < numsamples;i++)
+	for (i = 0; i < numsamples; i++)
 	{
+		VectorSet(start, lhrandom(eyemins[0], eyemaxs[0]), lhrandom(eyemins[1], eyemaxs[1]), lhrandom(eyemins[2], eyemaxs[2]));
 		VectorSet(end, lhrandom(boxmins[0], boxmaxs[0]), lhrandom(boxmins[1], boxmaxs[1]), lhrandom(boxmins[2], boxmaxs[2]));
-		if (model->brush.TraceLineOfSight(model, start, end))
+		if (r_cullentities_trace_entityocclusion.integer)
+		{
+			trace_t trace = CL_Cache_TraceLineSurfaces(start, end, MOVE_NORMAL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT);
+			// not picky - if the trace ended anywhere in the box we're good
+			if (BoxesOverlap(trace.endpos, trace.endpos, boxmins, boxmaxs))
+				return true;
+		}
+		else if (model->brush.TraceLineOfSight(model, start, end, boxmins, boxmaxs))
 			return true;
 	}
 
@@ -5281,22 +5418,19 @@ static void R_View_UpdateEntityVisible (void)
 				r_refdef.viewcache.entityvisible[i] = true;
 		}
 	}
-	if(r_cullentities_trace.integer && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.TraceLineOfSight && !r_refdef.view.useclipplane && !r_trippy.integer)
-		// sorry, this check doesn't work for portal/reflection/refraction renders as the view origin is not useful for culling
+	if (r_cullentities_trace.integer)
 	{
 		for (i = 0;i < r_refdef.scene.numentities;i++)
 		{
 			if (!r_refdef.viewcache.entityvisible[i])
 				continue;
 			ent = r_refdef.scene.entities[i];
-			if(!(ent->flags & (RENDER_VIEWMODEL | RENDER_WORLDOBJECT | RENDER_NODEPTHTEST)) && !(ent->model && (ent->model->name[0] == '*')))
+			if (!(ent->flags & (RENDER_VIEWMODEL | RENDER_WORLDOBJECT | RENDER_NODEPTHTEST)) && !(ent->model && (ent->model->name[0] == '*')))
 			{
-				samples = ent->entitynumber ? r_cullentities_trace_samples.integer : r_cullentities_trace_tempentitysamples.integer;
-				if (samples < 0)
-					continue; // temp entities do pvs only
-				if(R_CanSeeBox(samples, r_cullentities_trace_enlarge.value, r_refdef.view.origin, ent->mins, ent->maxs))
+				samples = ent->last_trace_visibility == 0 ? r_cullentities_trace_tempentitysamples.integer : r_cullentities_trace_samples.integer;
+				if (R_CanSeeBox(samples, r_cullentities_trace_eyejitter.value, r_cullentities_trace_enlarge.value, r_refdef.view.origin, ent->mins, ent->maxs))
 					ent->last_trace_visibility = realtime;
-				if(ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
+				if (ent->last_trace_visibility < realtime - r_cullentities_trace_delay.value)
 					r_refdef.viewcache.entityvisible[i] = 0;
 			}
 		}
@@ -6749,7 +6883,7 @@ static void R_Bloom_MakeTexture(void)
 
 static void R_BlendView(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 {
-	unsigned int permutation;
+	dpuint64 permutation;
 	float uservecs[4][4];
 
 	R_EntityMatrix(&identitymatrix);
@@ -7381,7 +7515,7 @@ void R_RenderWaterPlanes(int fbo, rtexture_t *depthtexture, rtexture_t *colortex
 
 extern cvar_t cl_locs_show;
 static void R_DrawLocs(void);
-static void R_DrawEntityBBoxes(void);
+static void R_DrawEntityBBoxes(prvm_prog_t *prog);
 static void R_DrawModelDecals(void);
 extern cvar_t cl_decals_newsystem;
 extern qboolean r_shadow_usingdeferredprepass;
@@ -7541,10 +7675,6 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 		R_DrawExplosions();
 		if (r_timereport_active)
 			R_TimeReport("explosions");
-
-		R_DrawLightningBeams();
-		if (r_timereport_active)
-			R_TimeReport("lightning");
 	}
 
 	if (cl.csqc_loaded)
@@ -7566,11 +7696,17 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 				R_TimeReport("portals");
 		}
 
+		if (r_showbboxes_client.value > 0)
+		{
+			R_DrawEntityBBoxes(CLVM_prog);
+			if (r_timereport_active)
+				R_TimeReport("clbboxes");
+		}
 		if (r_showbboxes.value > 0)
 		{
-			R_DrawEntityBBoxes();
+			R_DrawEntityBBoxes(SVVM_prog);
 			if (r_timereport_active)
-				R_TimeReport("bboxes");
+				R_TimeReport("svbboxes");
 		}
 	}
 
@@ -7634,10 +7770,36 @@ static const unsigned short bboxelements[36] =
 	1, 0, 2, 1, 2, 3,
 };
 
+#define BBOXEDGES 13
+static const float bboxedges[BBOXEDGES][6] = 
+{
+	// whole box
+	{ 0, 0, 0, 1, 1, 1 },
+	// bottom edges
+	{ 0, 0, 0, 0, 1, 0 },
+	{ 0, 0, 0, 1, 0, 0 },
+	{ 0, 1, 0, 1, 1, 0 },
+	{ 1, 0, 0, 1, 1, 0 },
+	// top edges
+	{ 0, 0, 1, 0, 1, 1 },
+	{ 0, 0, 1, 1, 0, 1 },
+	{ 0, 1, 1, 1, 1, 1 },
+	{ 1, 0, 1, 1, 1, 1 },
+	// vertical edges
+	{ 0, 0, 0, 0, 0, 1 },
+	{ 1, 0, 0, 1, 0, 1 },
+	{ 0, 1, 0, 0, 1, 1 },
+	{ 1, 1, 0, 1, 1, 1 },
+};
+
 static void R_DrawBBoxMesh(vec3_t mins, vec3_t maxs, float cr, float cg, float cb, float ca)
 {
-	int i;
-	float *v, *c, f1, f2, vertex3f[8*3], color4f[8*4];
+	int numvertices = BBOXEDGES * 8;
+	float vertex3f[BBOXEDGES * 8 * 3], color4f[BBOXEDGES * 8 * 4];
+	int numtriangles = BBOXEDGES * 12;
+	unsigned short elements[BBOXEDGES * 36];
+	int i, edge;
+	float *v, *c, f1, f2, edgemins[3], edgemaxs[3];
 
 	RSurf_ActiveWorldEntity();
 
@@ -7645,20 +7807,29 @@ static void R_DrawBBoxMesh(vec3_t mins, vec3_t maxs, float cr, float cg, float c
 	GL_DepthMask(false);
 	GL_DepthRange(0, 1);
 	GL_PolygonOffset(r_refdef.polygonfactor, r_refdef.polygonoffset);
-//	R_Mesh_ResetTextureState();
 
-	vertex3f[ 0] = mins[0];vertex3f[ 1] = mins[1];vertex3f[ 2] = mins[2]; //
-	vertex3f[ 3] = maxs[0];vertex3f[ 4] = mins[1];vertex3f[ 5] = mins[2];
-	vertex3f[ 6] = mins[0];vertex3f[ 7] = maxs[1];vertex3f[ 8] = mins[2];
-	vertex3f[ 9] = maxs[0];vertex3f[10] = maxs[1];vertex3f[11] = mins[2];
-	vertex3f[12] = mins[0];vertex3f[13] = mins[1];vertex3f[14] = maxs[2];
-	vertex3f[15] = maxs[0];vertex3f[16] = mins[1];vertex3f[17] = maxs[2];
-	vertex3f[18] = mins[0];vertex3f[19] = maxs[1];vertex3f[20] = maxs[2];
-	vertex3f[21] = maxs[0];vertex3f[22] = maxs[1];vertex3f[23] = maxs[2];
-	R_FillColors(color4f, 8, cr, cg, cb, ca);
+	for (edge = 0; edge < BBOXEDGES; edge++)
+	{
+		for (i = 0; i < 3; i++)
+		{
+			edgemins[i] = mins[i] + (maxs[i] - mins[i]) * bboxedges[edge][i] - 0.25f;
+			edgemaxs[i] = mins[i] + (maxs[i] - mins[i]) * bboxedges[edge][3 + i] + 0.25f;
+		}
+		vertex3f[edge * 24 + 0] = edgemins[0]; vertex3f[edge * 24 + 1] = edgemins[1]; vertex3f[edge * 24 + 2] = edgemins[2];
+		vertex3f[edge * 24 + 3] = edgemaxs[0]; vertex3f[edge * 24 + 4] = edgemins[1]; vertex3f[edge * 24 + 5] = edgemins[2];
+		vertex3f[edge * 24 + 6] = edgemins[0]; vertex3f[edge * 24 + 7] = edgemaxs[1]; vertex3f[edge * 24 + 8] = edgemins[2];
+		vertex3f[edge * 24 + 9] = edgemaxs[0]; vertex3f[edge * 24 + 10] = edgemaxs[1]; vertex3f[edge * 24 + 11] = edgemins[2];
+		vertex3f[edge * 24 + 12] = edgemins[0]; vertex3f[edge * 24 + 13] = edgemins[1]; vertex3f[edge * 24 + 14] = edgemaxs[2];
+		vertex3f[edge * 24 + 15] = edgemaxs[0]; vertex3f[edge * 24 + 16] = edgemins[1]; vertex3f[edge * 24 + 17] = edgemaxs[2];
+		vertex3f[edge * 24 + 18] = edgemins[0]; vertex3f[edge * 24 + 19] = edgemaxs[1]; vertex3f[edge * 24 + 20] = edgemaxs[2];
+		vertex3f[edge * 24 + 21] = edgemaxs[0]; vertex3f[edge * 24 + 22] = edgemaxs[1]; vertex3f[edge * 24 + 23] = edgemaxs[2];
+		for (i = 0; i < 36; i++)
+			elements[edge * 36 + i] = edge * 8 + bboxelements[i];
+	}
+	R_FillColors(color4f, numvertices, cr, cg, cb, ca);
 	if (r_refdef.fogenabled)
 	{
-		for (i = 0, v = vertex3f, c = color4f;i < 8;i++, v += 3, c += 4)
+		for (i = 0, v = vertex3f, c = color4f; i < numvertices; i++, v += 3, c += 4)
 		{
 			f1 = RSurf_FogVertex(v);
 			f2 = 1 - f1;
@@ -7667,22 +7838,19 @@ static void R_DrawBBoxMesh(vec3_t mins, vec3_t maxs, float cr, float cg, float c
 			c[2] = c[2] * f1 + r_refdef.fogcolor[2] * f2;
 		}
 	}
-	R_Mesh_PrepareVertices_Generic_Arrays(8, vertex3f, color4f, NULL);
+	R_Mesh_PrepareVertices_Generic_Arrays(numvertices, vertex3f, color4f, NULL);
 	R_Mesh_ResetTextureState();
 	R_SetupShader_Generic_NoTexture(false, false);
-	R_Mesh_Draw(0, 8, 0, 12, NULL, NULL, 0, bboxelements, NULL, 0);
+	R_Mesh_Draw(0, numvertices, 0, numtriangles, NULL, NULL, 0, elements, NULL, 0);
 }
 
 static void R_DrawEntityBBoxes_Callback(const entity_render_t *ent, const rtlight_t *rtlight, int numsurfaces, int *surfacelist)
 {
-	prvm_prog_t *prog = SVVM_prog;
+	// hacky overloading of the parameters
+	prvm_prog_t *prog = (prvm_prog_t *)rtlight;
 	int i;
 	float color[4];
 	prvm_edict_t *edict;
-
-	// this function draws bounding boxes of server entities
-	if (!sv.active)
-		return;
 
 	GL_CullFace(GL_NONE);
 	R_SetupShader_Generic_NoTexture(false, false);
@@ -7700,37 +7868,37 @@ static void R_DrawEntityBBoxes_Callback(const entity_render_t *ent, const rtligh
 			case SOLID_CORPSE:   Vector4Set(color, 1, 0.5, 0, 0.05);break;
 			default:             Vector4Set(color, 0, 0, 0, 0.50);break;
 		}
-		color[3] *= r_showbboxes.value;
+		if (prog == CLVM_prog)
+			color[3] *= r_showbboxes_client.value;
+		else
+			color[3] *= r_showbboxes.value;
 		color[3] = bound(0, color[3], 1);
 		GL_DepthTest(!r_showdisabledepthtest.integer);
-		GL_CullFace(r_refdef.view.cullface_front);
 		R_DrawBBoxMesh(edict->priv.server->areamins, edict->priv.server->areamaxs, color[0], color[1], color[2], color[3]);
 	}
 }
 
-static void R_DrawEntityBBoxes(void)
+static void R_DrawEntityBBoxes(prvm_prog_t *prog)
 {
 	int i;
 	prvm_edict_t *edict;
 	vec3_t center;
-	prvm_prog_t *prog = SVVM_prog;
 
-	// this function draws bounding boxes of server entities
-	if (!sv.active)
+	if (prog == NULL)
 		return;
 
-	for (i = 0;i < prog->num_edicts;i++)
+	for (i = 0; i < prog->num_edicts; i++)
 	{
 		edict = PRVM_EDICT_NUM(i);
 		if (edict->priv.server->free)
 			continue;
 		// exclude the following for now, as they don't live in world coordinate space and can't be solid:
-		if(PRVM_serveredictedict(edict, tag_entity) != 0)
+		if (PRVM_serveredictedict(edict, tag_entity) != 0)
 			continue;
-		if(PRVM_serveredictedict(edict, viewmodelforclient) != 0)
+		if (PRVM_serveredictedict(edict, viewmodelforclient) != 0)
 			continue;
 		VectorLerp(edict->priv.server->areamins, 0.5f, edict->priv.server->areamaxs, center);
-		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, center, R_DrawEntityBBoxes_Callback, (entity_render_t *)NULL, i, (rtlight_t *)NULL);
+		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, center, R_DrawEntityBBoxes_Callback, (entity_render_t *)NULL, i, (rtlight_t *)prog);
 	}
 }
 
@@ -8496,9 +8664,17 @@ void RSurf_ActiveWorldEntity(void)
 	rsurface.fogheightfade = r_refdef.fogheightfade;
 	rsurface.fogplaneviewdist = r_refdef.fogplaneviewdist;
 	rsurface.fogmasktabledistmultiplier = FOGMASKTABLEWIDTH * rsurface.fograngerecip;
-	VectorSet(rsurface.modellight_ambient, 0, 0, 0);
-	VectorSet(rsurface.modellight_diffuse, 0, 0, 0);
-	VectorSet(rsurface.modellight_lightdir, 0, 0, 1);
+	if (r_fullbright_directed.integer && (r_fullbright.integer || !model->lit))
+	{
+		R_GetDirectedFullbright(rsurface.modellight_ambient, rsurface.modellight_diffuse, rsurface.modellight_lightdir);
+		rsurface.ent_flags |= RENDER_LIGHT | RENDER_DYNAMICMODELLIGHT;
+	}
+	else
+	{
+		VectorSet(rsurface.modellight_ambient, 0, 0, 0);
+		VectorSet(rsurface.modellight_diffuse, 0, 0, 0);
+		VectorSet(rsurface.modellight_lightdir, 0, 0, 1);
+	}
 	VectorSet(rsurface.colormap_pantscolor, 0, 0, 0);
 	VectorSet(rsurface.colormap_shirtcolor, 0, 0, 0);
 	VectorSet(rsurface.colormod, r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale);
@@ -8613,6 +8789,10 @@ void RSurf_ActiveModelEntity(const entity_render_t *ent, qboolean wantnormals, q
 	rsurface.ent_skinnum = ent->skinnum;
 	rsurface.ent_qwskin = (ent->entitynumber <= cl.maxclients && ent->entitynumber >= 1 && cls.protocol == PROTOCOL_QUAKEWORLD && cl.scores[ent->entitynumber - 1].qw_skin[0] && !strcmp(ent->model->name, "progs/player.mdl")) ? (ent->entitynumber - 1) : -1;
 	rsurface.ent_flags = ent->flags;
+	if (r_fullbright_directed.integer && (r_fullbright.integer || !model->lit))
+	{
+		rsurface.ent_flags |= RENDER_LIGHT | RENDER_DYNAMICMODELLIGHT;
+	}
 	rsurface.shadertime = r_refdef.scene.time - ent->shadertime;
 	rsurface.matrix = ent->matrix;
 	rsurface.inversematrix = ent->inversematrix;

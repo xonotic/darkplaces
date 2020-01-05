@@ -307,10 +307,8 @@ typedef struct rtlight_s
 	/// culling
 	vec3_t cullmins;
 	vec3_t cullmaxs;
-	// culling
-	//vec_t cullradius;
-	// squared cullradius
-	//vec_t cullradius2;
+	/// when r_shadow_culllights_trace is set, this is refreshed by each successful trace.
+	double trace_timer;
 
 	// rendering properties, updated each time a light is rendered
 	// this is rtlight->color * d_lightstylevalue
@@ -1728,10 +1726,6 @@ void CL_ParticleExplosion (const vec3_t org);
 void CL_ParticleExplosion2 (const vec3_t org, int colorStart, int colorLength);
 void R_NewExplosion(const vec3_t org);
 
-void Debug_PolygonBegin(const char *picname, int flags);
-void Debug_PolygonVertex(float x, float y, float z, float s, float t, float r, float g, float b, float a);
-void Debug_PolygonEnd(void);
-
 #include "cl_screen.h"
 
 extern qboolean sb_showscores;
@@ -2022,10 +2016,28 @@ void CL_ClientMovement_PlayerMove_Frame(cl_clientmovement_state_t *s);
 // warpzone prediction hack (CSQC builtin)
 void CL_RotateMoves(const matrix4x4_t *m);
 
+typedef enum meshname_e {
+	MESH_DEBUG,
+	MESH_CSQCPOLYGONS,
+	MESH_PARTICLES,
+	MESH_UI,
+	NUM_MESHENTITIES,
+} meshname_t;
+extern entity_t cl_meshentities[NUM_MESHENTITIES];
+extern dp_model_t cl_meshentitymodels[NUM_MESHENTITIES];
+extern const char *cl_meshentitynames[NUM_MESHENTITIES];
+#define CL_Mesh_Debug() (&cl_meshentitymodels[MESH_DEBUG])
+#define CL_Mesh_CSQC() (&cl_meshentitymodels[MESH_CSQCPOLYGONS])
+#define CL_Mesh_Particles() (&cl_meshentitymodels[MESH_PARTICLES])
+#define CL_Mesh_UI() (&cl_meshentitymodels[MESH_UI])
+void CL_MeshEntities_AddToScene(void);
+void CL_MeshEntities_Reset(void);
+
 void CL_NewFrameReceived(int num);
 void CL_ParseEntityLump(char *entitystring);
 void CL_FindNonSolidLocation(const vec3_t in, vec3_t out, vec_t radius);
 void CL_RelinkLightFlashes(void);
+void CL_Beam_AddPolygons(const beam_t *b);
 void Sbar_ShowFPS(void);
 void Sbar_ShowFPS_Update(void);
 void Host_SaveConfig(void);

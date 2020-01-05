@@ -70,7 +70,7 @@ static texture_t mod_q1bsp_texture_lava;
 static texture_t mod_q1bsp_texture_slime;
 static texture_t mod_q1bsp_texture_water;
 
-static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end);
+static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs);
 
 void Mod_BrushInit(void)
 {
@@ -887,7 +887,7 @@ static int Mod_Q1BSP_RecursiveHullCheckPoint(RecursiveHullCheckTraceInfo_t *t, i
 }
 //#endif
 
-static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
@@ -902,22 +902,22 @@ static void Mod_Q1BSP_TracePoint(struct model_s *model, const frameblend_t *fram
 	Mod_Q1BSP_RecursiveHullCheckPoint(&rhc, rhc.hull->firstclipnode);
 }
 
-static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
+static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 
-static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
 	if (VectorCompare(start, end))
 	{
-		Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
 	// sometimes we want to traceline against polygons so we can report the texture that was hit rather than merely a contents, but using this method breaks one of negke's maps so it must be a cvar check...
 	if (sv_gameplayfix_q1bsptracelinereportstexture.integer)
 	{
-		Mod_Q1BSP_TraceLineAgainstSurfaces(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_Q1BSP_TraceLineAgainstSurfaces(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -926,6 +926,7 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+	rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	rhc.trace->fraction = 1;
 	rhc.trace->allsolid = true;
 	rhc.hull = &model->brushq1.hulls[0]; // 0x0x0
@@ -944,6 +945,7 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 		rhc.trace = &testtrace;
 		rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 		rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+		rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 		rhc.trace->fraction = 1;
 		rhc.trace->allsolid = true;
 		VectorCopy(test, rhc.start);
@@ -963,7 +965,7 @@ static void Mod_Q1BSP_TraceLine(struct model_s *model, const frameblend_t *frame
 #endif
 }
 
-static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	// this function currently only supports same size start and end
 	double boxsize[3];
@@ -972,9 +974,9 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 	if (VectorCompare(boxmins, boxmaxs))
 	{
 		if (VectorCompare(start, end))
-			Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_Q1BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		else
-			Mod_Q1BSP_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_Q1BSP_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -983,6 +985,7 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+	rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	rhc.trace->fraction = 1;
 	rhc.trace->allsolid = true;
 	VectorSubtract(boxmaxs, boxmins, boxsize);
@@ -1026,6 +1029,7 @@ static void Mod_Q1BSP_TraceBox(struct model_s *model, const frameblend_t *frameb
 		rhc.trace = &testtrace;
 		rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 		rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+		rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 		rhc.trace->fraction = 1;
 		rhc.trace->allsolid = true;
 		VectorCopy(test, rhc.start);
@@ -1059,7 +1063,7 @@ static int Mod_Q1BSP_PointSuperContents(struct model_s *model, int frame, const 
 	return Mod_Q1BSP_SuperContentsFromNativeContents(NULL, num);
 }
 
-void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
+void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
 {
 #if 1
 	colbrushf_t cbox;
@@ -1095,6 +1099,7 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 	memset(trace, 0, sizeof(trace_t));
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	trace->fraction = 1;
 	Collision_TraceLineBrushFloat(trace, start, end, &cbox, &cbox);
 #else
@@ -1153,6 +1158,7 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+	rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	rhc.trace->fraction = 1;
 	rhc.trace->allsolid = true;
 	VectorCopy(start, rhc.start);
@@ -1165,12 +1171,13 @@ void Collision_ClipTrace_Box(trace_t *trace, const vec3_t cmins, const vec3_t cm
 #endif
 }
 
-void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
+void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t cmaxs, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask, int boxsupercontents, int boxq3surfaceflags, const texture_t *boxtexture)
 {
 	memset(trace, 0, sizeof(trace_t));
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	if (BoxesOverlap(start, start, cmins, cmaxs))
 	{
 		trace->startsupercontents |= boxsupercontents;
@@ -1182,11 +1189,11 @@ void Collision_ClipTrace_Point(trace_t *trace, const vec3_t cmins, const vec3_t 
 	}
 }
 
-static qboolean Mod_Q1BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
+static qboolean Mod_Q1BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs)
 {
 	trace_t trace;
-	Mod_Q1BSP_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
-	return trace.fraction == 1;
+	Mod_Q1BSP_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0, MATERIALFLAGMASK_TRANSLUCENT);
+	return trace.fraction == 1 || BoxesOverlap(trace.endpos, trace.endpos, acceptmins, acceptmaxs);
 }
 
 static int Mod_Q1BSP_LightPoint_RecursiveBSPNode(dp_model_t *model, vec3_t ambientcolor, vec3_t diffusecolor, vec3_t diffusenormal, const mnode_t *node, float x, float y, float startz, float endz)
@@ -1375,6 +1382,9 @@ static const texture_t *Mod_Q1BSP_TraceLineAgainstSurfacesFindTextureOnNode(Recu
 		// ignore surfaces matching the skipsupercontentsmask (this is rare)
 		if (t->trace->skipsupercontentsmask & surface->texture->supercontents)
 			continue;
+		// skip surfaces matching the skipmaterialflagsmask (e.g. MATERIALFLAG_NOSHADOW)
+		if (t->trace->skipmaterialflagsmask & surface->texture->currentmaterialflags)
+			continue;
 		// get the surface normal - since it is flat we know any vertex normal will suffice
 		VectorCopy(model->surfmesh.data_normal3f + 3 * surface->num_firstvertex, normal);
 		// skip backfaces
@@ -1505,7 +1515,7 @@ static int Mod_Q1BSP_TraceLineAgainstSurfacesRecursiveBSPNode(RecursiveHullCheck
 	}
 }
 
-static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	RecursiveHullCheckTraceInfo_t rhc;
 
@@ -1514,6 +1524,7 @@ static void Mod_Q1BSP_TraceLineAgainstSurfaces(struct model_s *model, const fram
 	rhc.trace = trace;
 	rhc.trace->hitsupercontentsmask = hitsupercontentsmask;
 	rhc.trace->skipsupercontentsmask = skipsupercontentsmask;
+	rhc.trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	rhc.trace->fraction = 1;
 	rhc.trace->allsolid = true;
 	rhc.hull = &model->brushq1.hulls[0]; // 0x0x0
@@ -1633,9 +1644,9 @@ static void R_Q1BSP_LoadSplitSky (unsigned char *src, int width, int height, int
 
 static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 {
-	int i, j, k, num, max, altmax, mtwidth, mtheight, doffset, incomplete, nummiptex = 0;
+	int i, j, k, num, max, altmax, mtwidth, mtheight, doffset, incomplete, nummiptex = 0, firstskynoshadowtexture = 0;
 	skinframe_t *skinframemissing;
-	texture_t *tx, *tx2, *anims[10], *altanims[10];
+	texture_t *tx, *tx2, *anims[10], *altanims[10], *currentskynoshadowtexture;
 	texture_t backuptex;
 	unsigned char *data, *mtdata;
 	const char *s;
@@ -1648,20 +1659,63 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 
 	loadmodel->data_textures = NULL;
 
-	// add two slots for notexture walls and notexture liquids
+	// add two slots for notexture walls and notexture liquids, and duplicate
+	// all sky textures; sky surfaces can be shadow-casting or not, the surface
+	// loading will choose according to the contents behind the surface
+	// (necessary to support e1m5 logo shadow which has a SKY contents brush,
+	// while correctly treating sky textures as occluders in other situations).
 	if (sb->cursize)
 	{
+		int numsky = 0;
+		size_t watermark;
 		nummiptex = MSG_ReadLittleLong(sb);
 		loadmodel->num_textures = nummiptex + 2;
-		loadmodel->num_texturesperskin = loadmodel->num_textures;
+		// save the position so we can go back to it
+		watermark = sb->readcount;
+		for (i = 0; i < nummiptex; i++)
+		{
+			doffset = MSG_ReadLittleLong(sb);
+			if (r_nosurftextures.integer)
+				continue;
+			if (doffset == -1)
+			{
+				Con_DPrintf("%s: miptex #%i missing\n", loadmodel->name, i);
+				continue;
+			}
+
+			MSG_InitReadBuffer(&miptexsb, sb->data + doffset, sb->cursize - doffset);
+
+			// copy name, but only up to 16 characters
+			// (the output buffer can hold more than this, but the input buffer is
+			//  only 16)
+			for (j = 0; j < 16; j++)
+				name[j] = MSG_ReadByte(&miptexsb);
+			name[j] = 0;
+			// pretty up the buffer (replacing any trailing garbage with 0)
+			for (j = (int)strlen(name); j < 16; j++)
+				name[j] = 0;
+
+			if (!strncmp(name, "sky", 3))
+				numsky++;
+		}
+
+		// bump it back to where we started parsing
+		sb->readcount = watermark;
+
+		firstskynoshadowtexture = loadmodel->num_textures;
+		loadmodel->num_textures += numsky;
 	}
 	else
 	{
 		loadmodel->num_textures = 2;
-		loadmodel->num_texturesperskin = loadmodel->num_textures;
+		firstskynoshadowtexture = loadmodel->num_textures;
 	}
+	loadmodel->num_texturesperskin = loadmodel->num_textures;
 
 	loadmodel->data_textures = (texture_t *)Mem_Alloc(loadmodel->mempool, loadmodel->num_textures * sizeof(texture_t));
+
+	// we'll be writing to these in parallel for sky textures
+	currentskynoshadowtexture = loadmodel->data_textures + firstskynoshadowtexture;
 
 	// fill out all slots with notexture
 	skinframemissing = R_SkinFrame_LoadMissing();
@@ -1717,7 +1771,6 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		s += 5;
 	FS_StripExtension(s, mapname, sizeof(mapname));
 
-	// just to work around bounds checking when debugging with it (array index out of bounds error thing)
 	// LordHavoc: mostly rewritten map texture loader
 	for (i = 0;i < nummiptex;i++)
 	{
@@ -1902,12 +1955,21 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 			tx->basematerialflags |= MATERIALFLAG_REFLECTION;
 		}
 		else if (!strncmp(tx->name, "sky", 3))
-			tx->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+			tx->basematerialflags = MATERIALFLAG_SKY;
 		else if (!strcmp(tx->name, "caulk"))
 			tx->basematerialflags = MATERIALFLAG_NODRAW | MATERIALFLAG_NOSHADOW;
 		else if (tx->currentskinframe != NULL && tx->currentskinframe->hasalpha)
 			tx->basematerialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW;
 		tx->currentmaterialflags = tx->basematerialflags;
+
+		// duplicate of sky with NOSHADOW
+		if (tx->basematerialflags & MATERIALFLAG_SKY)
+		{
+			*currentskynoshadowtexture = *tx;
+			currentskynoshadowtexture->basematerialflags |= MATERIALFLAG_NOSHADOW;
+			tx->skynoshadowtexture = currentskynoshadowtexture;
+			currentskynoshadowtexture++;
+		}
 	}
 
 	// sequence the animations
@@ -3181,6 +3243,26 @@ static void Mod_Q1BSP_LoadPlanes(sizebuf_t *sb)
 	}
 }
 
+// fixes up sky surfaces that have SKY contents behind them, so that they do not cast shadows (e1m5 logo shadow trick).
+static void Mod_Q1BSP_AssignNoShadowSkySurfaces(dp_model_t *mod)
+{
+	int i;
+	msurface_t *surface;
+	vec3_t center;
+	int contents;
+	for (i = 0, surface = mod->data_surfaces + mod->firstmodelsurface; i < mod->nummodelsurfaces; i++, surface++)
+	{
+		if (surface->texture->basematerialflags & MATERIALFLAG_SKY)
+		{
+			// check if the point behind the surface polygon is SOLID or SKY contents
+			VectorMAMAM(0.5f, surface->mins, 0.5f, surface->maxs, -0.25f, mod->surfmesh.data_normal3f + 3*surface->num_firstvertex, center);
+			contents = Mod_Q1BSP_PointSuperContents(mod, 0, center);
+			if (!(contents & SUPERCONTENTS_SOLID))
+				surface->texture = surface->texture->skynoshadowtexture;
+		}
+	}
+}
+
 static void Mod_Q1BSP_LoadMapBrushes(void)
 {
 #if 0
@@ -3795,7 +3877,7 @@ static int Mod_Q1BSP_CreateShadowMesh(dp_model_t *mod)
 	return numshadowmeshtriangles;
 }
 
-void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
+void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 
 void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 {
@@ -4048,6 +4130,9 @@ void Mod_Q1BSP_Load(dp_model_t *mod, void *buffer, void *bufferend)
 
 		// set node/leaf parents for this submodel
 		Mod_Q1BSP_LoadNodes_RecursiveSetParent(mod->brush.data_nodes + mod->brushq1.hulls[0].firstclipnode, NULL);
+
+		// this has to occur after hull info has been set, as it uses Mod_Q1BSP_PointSuperContents
+		Mod_Q1BSP_AssignNoShadowSkySurfaces(mod);
 
 		// make the model surface list (used by shadowing/lighting)
 		mod->sortedmodelsurfaces = (int *)datapointer;datapointer += mod->nummodelsurfaces * sizeof(int);
@@ -4386,7 +4471,7 @@ static void Mod_Q2BSP_LoadTexinfo(sizebuf_t *sb)
 				{
 					// sky is a rather specific thing
 					q2flags &= ~Q2SURF_NODRAW; // quake2 had a slightly different meaning than we have in mind here...
-					tx->basematerialflags = MATERIALFLAG_SKY | MATERIALFLAG_NOSHADOW;
+					tx->basematerialflags = MATERIALFLAG_SKY;
 					tx->supercontents = SUPERCONTENTS_SKY | SUPERCONTENTS_NODROP | SUPERCONTENTS_OPAQUE;
 					tx->surfaceflags = Q3SURFACEFLAG_SKY | Q3SURFACEFLAG_NOIMPACT | Q3SURFACEFLAG_NOMARKS | Q3SURFACEFLAG_NODLIGHT | Q3SURFACEFLAG_NOLIGHTMAP;
 				}
@@ -6712,7 +6797,7 @@ static void Mod_Q3BSP_LightPoint(dp_model_t *model, const vec3_t p, vec3_t ambie
 	//Con_Printf("result: ambient %f %f %f diffuse %f %f %f diffusenormal %f %f %f\n", ambientcolor[0], ambientcolor[1], ambientcolor[2], diffusecolor[0], diffusecolor[1], diffusecolor[2], diffusenormal[0], diffusenormal[1], diffusenormal[2]);
 }
 
-static int Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(mnode_t *node, double p1[3], double p2[3])
+static int Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(mnode_t *node, double p1[3], double p2[3], double endpos[3])
 {
 	double t1, t2;
 	double midf, mid[3];
@@ -6762,35 +6847,38 @@ static int Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(mnode_t *node, double p
 		// or if start is solid and end is empty
 		// as these degenerate cases usually indicate the eye is in solid and
 		// should see the target point anyway
-		ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side    ], p1, mid);
+		ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side    ], p1, mid, endpos);
 		if (ret != 0)
 			return ret;
-		ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side ^ 1], mid, p2);
+		ret = Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(node->children[side ^ 1], mid, p2, endpos);
 		if (ret != 1)
 			return ret;
+		VectorCopy(mid, endpos);
 		return 2;
 	}
 	return ((mleaf_t *)node)->clusterindex < 0;
 }
 
-static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
+static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs)
 {
 	if (model->brush.submodel || mod_q3bsp_tracelineofsight_brushes.integer)
 	{
 		trace_t trace;
-		model->TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
-		return trace.fraction == 1;
+		model->TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0, MATERIALFLAGMASK_TRANSLUCENT);
+		return trace.fraction == 1 || BoxesOverlap(trace.endpos, trace.endpos, acceptmins, acceptmaxs);
 	}
 	else
 	{
-		double tracestart[3], traceend[3];
+		double tracestart[3], traceend[3], traceendpos[3];
 		VectorCopy(start, tracestart);
 		VectorCopy(end, traceend);
-		return !Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(model->brush.data_nodes, tracestart, traceend);
+		VectorCopy(end, traceendpos);
+		Mod_Q3BSP_TraceLineOfSight_RecursiveNodeCheck(model->brush.data_nodes, tracestart, traceend, traceendpos);
+		return BoxesOverlap(traceendpos, traceendpos, acceptmins, acceptmaxs);
 	}
 }
 
-void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	const bih_t *bih;
 	const bih_leaf_t *leaf;
@@ -6805,6 +6893,7 @@ void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameble
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 
 	bih = &model->collision_bih;
 	if(!bih->nodes)
@@ -6855,7 +6944,7 @@ void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameble
 	}
 }
 
-static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, const bih_t *bih)
+static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask, const bih_t *bih)
 {
 	const bih_leaf_t *leaf;
 	const bih_node_t *node;
@@ -6871,7 +6960,7 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 
 	if (VectorCompare(start, end))
 	{
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -6881,6 +6970,7 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 
 	// push first node
 	nodestackline[nodestackpos][0] = start[0];
@@ -6902,7 +6992,7 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 		sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + 1;
 		sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + 1;
 		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
-		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
+		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs) && !collision_bih_fullrecursion.integer)
 			continue;
 		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
 		{
@@ -6912,6 +7002,8 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 			d2 = node->backmax - nodeend[axis];
 			d3 = nodestart[axis] - node->frontmin;
 			d4 = nodeend[axis] - node->frontmin;
+			if (collision_bih_fullrecursion.integer)
+				d1 = d2 = d3 = d4 = 1; // force full recursion
 			switch((d1 < 0) | ((d2 < 0) << 1) | ((d3 < 0) << 2) | ((d4 < 0) << 3))
 			{
 			case  0: /* >>>> */                     VectorCopy(nodestart,             nodestackline[nodestackpos]); VectorCopy(              nodeend, nodestackline[nodestackpos] + 3); nodestack[nodestackpos++] = node->back;                      VectorCopy(nodestart,             nodestackline[nodestackpos]); VectorCopy(              nodeend, nodestackline[nodestackpos] + 3); nodestack[nodestackpos++] = node->front; break;
@@ -6979,17 +7071,17 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 	}
 }
 
-void Mod_CollisionBIH_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	if (VectorCompare(start, end))
 	{
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
-	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, &model->collision_bih);
+	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask, &model->collision_bih);
 }
 
-void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *thisbrush_start, colbrushf_t *thisbrush_end, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *thisbrush_start, colbrushf_t *thisbrush_end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	const bih_t *bih;
 	const bih_leaf_t *leaf;
@@ -7005,9 +7097,9 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	if (mod_q3bsp_optimizedtraceline.integer && VectorCompare(thisbrush_start->mins, thisbrush_start->maxs) && VectorCompare(thisbrush_end->mins, thisbrush_end->maxs))
 	{
 		if (VectorCompare(thisbrush_start->mins, thisbrush_end->mins))
-			Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, thisbrush_start->mins, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, thisbrush_start->mins, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		else
-			Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, thisbrush_start->mins, thisbrush_end->mins, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, thisbrush_start->mins, thisbrush_end->mins, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -7021,6 +7113,7 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 
 	// calculate tracebox-like parameters for efficient culling
 	VectorMAM(0.5f, thisbrush_start->mins, 0.5f, thisbrush_start->maxs, start);
@@ -7133,7 +7226,7 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	}
 }
 
-void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	colboxbrushf_t thisbrush_start, thisbrush_end;
 	vec3_t boxstartmins, boxstartmaxs, boxendmins, boxendmaxs;
@@ -7145,25 +7238,25 @@ void Mod_CollisionBIH_TraceBox(dp_model_t *model, const frameblend_t *frameblend
 	VectorAdd(end, boxmaxs, boxendmaxs);
 	Collision_BrushForBox(&thisbrush_start, boxstartmins, boxstartmaxs, 0, 0, NULL);
 	Collision_BrushForBox(&thisbrush_end, boxendmins, boxendmaxs, 0, 0, NULL);
-	Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask);
+	Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 }
 
 
 int Mod_CollisionBIH_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
 {
 	trace_t trace;
-	Mod_CollisionBIH_TracePoint(model, NULL, NULL, &trace, point, 0, 0);
+	Mod_CollisionBIH_TracePoint(model, NULL, NULL, &trace, point, 0, 0, 0);
 	return trace.startsupercontents;
 }
 
-qboolean Mod_CollisionBIH_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end)
+qboolean Mod_CollisionBIH_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs)
 {
 	trace_t trace;
-	Mod_CollisionBIH_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0);
-	return trace.fraction == 1;
+	Mod_CollisionBIH_TraceLine(model, NULL, NULL, &trace, start, end, SUPERCONTENTS_VISBLOCKERMASK, 0, MATERIALFLAGMASK_TRANSLUCENT);
+	return trace.fraction == 1 || BoxesOverlap(trace.endpos, trace.endpos, acceptmins, acceptmaxs);
 }
 
-void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 #if 0
 	// broken - needs to be modified to count front faces and backfaces to figure out if it is in solid
@@ -7175,13 +7268,15 @@ void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const frameblend_t *fra
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 #if 0
-	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 	hitsupercontents = trace->hitsupercontents;
 	memset(trace, 0, sizeof(*trace));
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	trace->startsupercontents = hitsupercontents;
 #endif
 }
@@ -7197,7 +7292,8 @@ int Mod_CollisionBIH_PointSuperContents_Mesh(struct model_s *model, int frame, c
 	trace.fraction = 1;
 	trace.hitsupercontentsmask = hitsupercontentsmask;
 	trace.skipsupercontentsmask = skipsupercontentsmask;
-	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+	trace.skipmaterialflagsmask = skipmaterialflagsmask;
+	Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 	return trace.hitsupercontents;
 #else
 	return 0;
@@ -7419,7 +7515,7 @@ static void Mod_Q3BSP_TraceBrush_RecursiveBSPNode(trace_t *trace, dp_model_t *mo
 
 static int markframe = 0;
 
-static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	int i;
 	q3mbrush_t *brush;
@@ -7427,8 +7523,9 @@ static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameble
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_CollisionBIH_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -7439,7 +7536,7 @@ static void Mod_Q3BSP_TracePoint(dp_model_t *model, const frameblend_t *frameble
 		Mod_Q3BSP_TracePoint_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, ++markframe);
 }
 
-static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	int i;
 	float segmentmins[3], segmentmaxs[3];
@@ -7448,7 +7545,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 
 	if (VectorCompare(start, end))
 	{
-		Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -7456,6 +7553,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	segmentmins[0] = min(start[0], end[0]) - 1;
 	segmentmins[1] = min(start[1], end[1]) - 1;
 	segmentmins[2] = min(start[2], end[2]) - 1;
@@ -7463,7 +7561,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 	segmentmaxs[1] = max(start[1], end[1]) + 1;
 	segmentmaxs[2] = max(start[2], end[2]) + 1;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_CollisionBIH_TraceLine(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -7478,7 +7576,7 @@ static void Mod_Q3BSP_TraceLine(dp_model_t *model, const frameblend_t *frameblen
 		Mod_Q3BSP_TraceLine_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, 0, 1, start, end, ++markframe, segmentmins, segmentmaxs);
 }
 
-static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *start, colbrushf_t *end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, colbrushf_t *start, colbrushf_t *end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	float segmentmins[3], segmentmaxs[3];
 	int i;
@@ -7488,9 +7586,9 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	if (mod_q3bsp_optimizedtraceline.integer && VectorCompare(start->mins, start->maxs) && VectorCompare(end->mins, end->maxs))
 	{
 		if (VectorCompare(start->mins, end->mins))
-			Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start->mins, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_Q3BSP_TracePoint(model, frameblend, skeleton, trace, start->mins, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		else
-			Mod_Q3BSP_TraceLine(model, frameblend, skeleton, trace, start->mins, end->mins, hitsupercontentsmask, skipsupercontentsmask);
+			Mod_Q3BSP_TraceLine(model, frameblend, skeleton, trace, start->mins, end->mins, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 		return;
 	}
 
@@ -7499,6 +7597,7 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	trace->fraction = 1;
 	trace->hitsupercontentsmask = hitsupercontentsmask;
 	trace->skipsupercontentsmask = skipsupercontentsmask;
+	trace->skipmaterialflagsmask = skipmaterialflagsmask;
 	segmentmins[0] = min(start->mins[0], end->mins[0]) - 1;
 	segmentmins[1] = min(start->mins[1], end->mins[1]) - 1;
 	segmentmins[2] = min(start->mins[2], end->mins[2]) - 1;
@@ -7506,7 +7605,7 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	segmentmaxs[1] = max(start->maxs[1], end->maxs[1]) + 1;
 	segmentmaxs[2] = max(start->maxs[2], end->maxs[2]) + 1;
 	if (mod_collision_bih.integer)
-		Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask);
+		Mod_CollisionBIH_TraceBrush(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 	else if (model->brush.submodel)
 	{
 		for (i = 0, brush = model->brush.data_brushes + model->firstmodelbrush;i < model->nummodelbrushes;i++, brush++)
@@ -7521,7 +7620,7 @@ static void Mod_Q3BSP_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 		Mod_Q3BSP_TraceBrush_RecursiveBSPNode(trace, model, model->brush.data_nodes, start, end, ++markframe, segmentmins, segmentmaxs);
 }
 
-static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
 	colboxbrushf_t thisbrush_start, thisbrush_end;
 	vec3_t boxstartmins, boxstartmaxs, boxendmins, boxendmaxs;
@@ -7533,7 +7632,7 @@ static void Mod_Q3BSP_TraceBox(dp_model_t *model, const frameblend_t *frameblend
 	VectorAdd(end, boxmaxs, boxendmaxs);
 	Collision_BrushForBox(&thisbrush_start, boxstartmins, boxstartmaxs, 0, 0, NULL);
 	Collision_BrushForBox(&thisbrush_end, boxendmins, boxendmaxs, 0, 0, NULL);
-	Mod_Q3BSP_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask);
+	Mod_Q3BSP_TraceBrush(model, frameblend, skeleton, trace, &thisbrush_start.brush, &thisbrush_end.brush, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 }
 
 static int Mod_Q3BSP_PointSuperContents(struct model_s *model, int frame, const vec3_t point)
@@ -7572,9 +7671,9 @@ static int Mod_Q3BSP_PointSuperContents(struct model_s *model, int frame, const 
 	return supercontents;
 }
 
-void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask)
+void Mod_CollisionBIH_TraceLineAgainstSurfaces(dp_model_t *model, const frameblend_t *frameblend, const skeleton_t *skeleton, trace_t *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask)
 {
-	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, &model->render_bih);
+	Mod_CollisionBIH_TraceLineShared(model, frameblend, skeleton, trace, start, end, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask, &model->render_bih);
 }
 
 
@@ -8510,8 +8609,10 @@ void Mod_OBJ_Load(dp_model_t *mod, void *buffer, void *bufferend)
 	loadmodel->surfmesh.data_tvector3f = (float *)data;data += numvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_normal3f = (float *)data;data += numvertices * sizeof(float[3]);
 	loadmodel->surfmesh.data_texcoordtexture2f = (float *)data;data += numvertices * sizeof(float[2]);
-	if (loadmodel->surfmesh.num_vertices <= 65536)
+
+	if (loadmodel->surfmesh.num_vertices <= 65536) {
 		loadmodel->surfmesh.data_element3s = (unsigned short *)data;data += loadmodel->surfmesh.num_triangles * sizeof(unsigned short[3]);
+	}
 
 	for (j = 0;j < loadmodel->surfmesh.num_vertices;j++)
 	{

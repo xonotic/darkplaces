@@ -589,20 +589,20 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup;
 #if 0
 #if 1
-				//trace = CL_TraceLine(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-				trace = CL_TraceLine(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				//trace = CL_TraceLine(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				trace = CL_TraceLine(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
 #else
-				//trace = CL_TraceBox(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				//trace = CL_TraceBox(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
+				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
 #endif
 				VectorCopy(trace.endpos, vieworg);
 				vieworg[2] -= 8;
 #else
 				// trace from first person view location to our chosen third person view location
 #if 1
-				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
+				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 #else
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false);
+				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false);
 #endif
 				VectorCopy(trace.endpos, bestvieworg);
 				offset[2] = 0;
@@ -615,9 +615,9 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup + offset[1];
 						chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup + offset[2];
 #if 1
-						trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
+						trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 #else
-						trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false);
+						trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false);
 #endif
 						if (bestvieworg[2] > trace.endpos[2])
 							bestvieworg[2] = trace.endpos[2];
@@ -643,7 +643,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				chase_dest[0] = vieworg[0] + forward[0] * dist;
 				chase_dest[1] = vieworg[1] + forward[1] * dist;
 				chase_dest[2] = vieworg[2] + forward[2] * dist + camup;
-				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, true);
+				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 				VectorMAMAM(1, trace.endpos, 8, forward, 4, trace.plane.normal, vieworg);
 			}
 		}
@@ -670,50 +670,59 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 
 				frametime = (cl.time - cl.calcrefdef_prevtime) * cl.movevars_timescale;
 
-				// 1. if we teleported, clear the frametime... the lowpass will recover the previous value then
-				if(teleported)
+				if(cl_followmodel.integer || cl_leanmodel.integer)
 				{
-					// try to fix the first highpass; result is NOT
-					// perfect! TODO find a better fix
-					VectorCopy(viewangles, cl.gunangles_prev);
+					// 1. if we teleported, clear the frametime... the lowpass will recover the previous value then
+					if(teleported)
+					{
+						// try to fix the first highpass; result is NOT
+						// perfect! TODO find a better fix
+						VectorCopy(viewangles, cl.gunangles_prev);
+						VectorCopy(vieworg, cl.gunorg_prev);
+					}
+
+					// 2. for the gun origin, only keep the high frequency (non-DC) parts, which is "somewhat like velocity"
+					VectorAdd(cl.gunorg_highpass, cl.gunorg_prev, cl.gunorg_highpass);
+					highpass3_limited(vieworg, frametime*cl_followmodel_side_highpass1.value, cl_followmodel_side_limit.value, frametime*cl_followmodel_side_highpass1.value, cl_followmodel_side_limit.value, frametime*cl_followmodel_up_highpass1.value, cl_followmodel_up_limit.value, cl.gunorg_highpass, gunorg);
 					VectorCopy(vieworg, cl.gunorg_prev);
+					VectorSubtract(cl.gunorg_highpass, cl.gunorg_prev, cl.gunorg_highpass);
+
+					// in the highpass, we _store_ the DIFFERENCE to the actual view angles...
+					VectorAdd(cl.gunangles_highpass, cl.gunangles_prev, cl.gunangles_highpass);
+					cl.gunangles_highpass[PITCH] += 360 * floor((viewangles[PITCH] - cl.gunangles_highpass[PITCH]) / 360 + 0.5);
+					cl.gunangles_highpass[YAW] += 360 * floor((viewangles[YAW] - cl.gunangles_highpass[YAW]) / 360 + 0.5);
+					cl.gunangles_highpass[ROLL] += 360 * floor((viewangles[ROLL] - cl.gunangles_highpass[ROLL]) / 360 + 0.5);
+					highpass3_limited(viewangles, frametime*cl_leanmodel_up_highpass1.value, cl_leanmodel_up_limit.value, frametime*cl_leanmodel_side_highpass1.value, cl_leanmodel_side_limit.value, 0, 0, cl.gunangles_highpass, gunangles);
+					VectorCopy(viewangles, cl.gunangles_prev);
+					VectorSubtract(cl.gunangles_highpass, cl.gunangles_prev, cl.gunangles_highpass);
+
+					// 3. calculate the RAW adjustment vectors
+					gunorg[0] *= -cl_followmodel_side_speed.value;
+					gunorg[1] *= -cl_followmodel_side_speed.value;
+					gunorg[2] *= -cl_followmodel_up_speed.value;
+
+					gunangles[PITCH] *= -cl_leanmodel_up_speed.value;
+					gunangles[YAW] *= -cl_leanmodel_side_speed.value;
+					gunangles[ROLL] = 0;
+
+					// 4. perform highpass/lowpass on the adjustment vectors (turning velocity into acceleration!)
+					//    trick: we must do the lowpass LAST, so the lowpass vector IS the final vector!
+					highpass3(gunorg, frametime*cl_followmodel_side_highpass.value, frametime*cl_followmodel_side_highpass.value, frametime*cl_followmodel_up_highpass.value, cl.gunorg_adjustment_highpass, gunorg);
+					lowpass3(gunorg, frametime*cl_followmodel_side_lowpass.value, frametime*cl_followmodel_side_lowpass.value, frametime*cl_followmodel_up_lowpass.value, cl.gunorg_adjustment_lowpass, gunorg);
+					// we assume here: PITCH = 0, YAW = 1, ROLL = 2
+					highpass3(gunangles, frametime*cl_leanmodel_up_highpass.value, frametime*cl_leanmodel_side_highpass.value, 0, cl.gunangles_adjustment_highpass, gunangles);
+					lowpass3(gunangles, frametime*cl_leanmodel_up_lowpass.value, frametime*cl_leanmodel_side_lowpass.value, 0, cl.gunangles_adjustment_lowpass, gunangles);
+
+					// 5. use the adjusted vectors
+					VectorAdd(vieworg, gunorg, gunorg);
+					VectorAdd(viewangles, gunangles, gunangles);
 				}
-
-				// 2. for the gun origin, only keep the high frequency (non-DC) parts, which is "somewhat like velocity"
-				VectorAdd(cl.gunorg_highpass, cl.gunorg_prev, cl.gunorg_highpass);
-				highpass3_limited(vieworg, frametime*cl_followmodel_side_highpass1.value, cl_followmodel_side_limit.value, frametime*cl_followmodel_side_highpass1.value, cl_followmodel_side_limit.value, frametime*cl_followmodel_up_highpass1.value, cl_followmodel_up_limit.value, cl.gunorg_highpass, gunorg);
-				VectorCopy(vieworg, cl.gunorg_prev);
-				VectorSubtract(cl.gunorg_highpass, cl.gunorg_prev, cl.gunorg_highpass);
-
-				// in the highpass, we _store_ the DIFFERENCE to the actual view angles...
-				VectorAdd(cl.gunangles_highpass, cl.gunangles_prev, cl.gunangles_highpass);
-				cl.gunangles_highpass[PITCH] += 360 * floor((viewangles[PITCH] - cl.gunangles_highpass[PITCH]) / 360 + 0.5);
-				cl.gunangles_highpass[YAW] += 360 * floor((viewangles[YAW] - cl.gunangles_highpass[YAW]) / 360 + 0.5);
-				cl.gunangles_highpass[ROLL] += 360 * floor((viewangles[ROLL] - cl.gunangles_highpass[ROLL]) / 360 + 0.5);
-				highpass3_limited(viewangles, frametime*cl_leanmodel_up_highpass1.value, cl_leanmodel_up_limit.value, frametime*cl_leanmodel_side_highpass1.value, cl_leanmodel_side_limit.value, 0, 0, cl.gunangles_highpass, gunangles);
-				VectorCopy(viewangles, cl.gunangles_prev);
-				VectorSubtract(cl.gunangles_highpass, cl.gunangles_prev, cl.gunangles_highpass);
-
-				// 3. calculate the RAW adjustment vectors
-				gunorg[0] *= (cl_followmodel.value ? -cl_followmodel_side_speed.value : 0);
-				gunorg[1] *= (cl_followmodel.value ? -cl_followmodel_side_speed.value : 0);
-				gunorg[2] *= (cl_followmodel.value ? -cl_followmodel_up_speed.value : 0);
-
-				gunangles[PITCH] *= (cl_leanmodel.value ? -cl_leanmodel_up_speed.value : 0);
-				gunangles[YAW] *= (cl_leanmodel.value ? -cl_leanmodel_side_speed.value : 0);
-				gunangles[ROLL] = 0;
-
-				// 4. perform highpass/lowpass on the adjustment vectors (turning velocity into acceleration!)
-				//    trick: we must do the lowpass LAST, so the lowpass vector IS the final vector!
-				highpass3(gunorg, frametime*cl_followmodel_side_highpass.value, frametime*cl_followmodel_side_highpass.value, frametime*cl_followmodel_up_highpass.value, cl.gunorg_adjustment_highpass, gunorg);
-				lowpass3(gunorg, frametime*cl_followmodel_side_lowpass.value, frametime*cl_followmodel_side_lowpass.value, frametime*cl_followmodel_up_lowpass.value, cl.gunorg_adjustment_lowpass, gunorg);
-				// we assume here: PITCH = 0, YAW = 1, ROLL = 2
-				highpass3(gunangles, frametime*cl_leanmodel_up_highpass.value, frametime*cl_leanmodel_side_highpass.value, 0, cl.gunangles_adjustment_highpass, gunangles);
-				lowpass3(gunangles, frametime*cl_leanmodel_up_lowpass.value, frametime*cl_leanmodel_side_lowpass.value, 0, cl.gunangles_adjustment_lowpass, gunangles);
-
-				// 5. use the adjusted vectors
-				VectorAdd(vieworg, gunorg, gunorg);
-				VectorAdd(viewangles, gunangles, gunangles);
+				else
+				{
+					// Just initialize gunorg/gunangles.
+					VectorCopy(vieworg, gunorg);
+					VectorCopy(viewangles, gunangles);
+				}
 
 				// bounded XY speed, used by several effects below
 				xyspeed = bound (0, sqrt(clvelocity[0]*clvelocity[0] + clvelocity[1]*clvelocity[1]), cl_bob_velocity_limit.value);
@@ -734,13 +743,13 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						bob_height_check_dest[0] = vieworg[0];
 						bob_height_check_dest[1] = vieworg[1];
 						bob_height_check_dest[2] = vieworg[2] + cl_bob_limit.value * 1.1f;
-						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, collision_extendmovelength.value, true, false, NULL, false, true);
+						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 						trace1fraction = trace.fraction;
 
 						bob_height_check_dest[0] = vieworg[0];
 						bob_height_check_dest[1] = vieworg[1];
 						bob_height_check_dest[2] = vieworg[2] + cl_bob_limit.value * -0.5f;
-						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, collision_extendmovelength.value, true, false, NULL, false, true);
+						trace = CL_TraceLine(vieworg, bob_height_check_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY | (cl_bob_limit_heightcheck_dontcrosswatersurface.integer ? SUPERCONTENTS_LIQUIDSMASK : 0), 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 						trace2fraction = trace.fraction;
 
 						bob_limit *= min(trace1fraction, trace2fraction);

@@ -1490,7 +1490,7 @@ static void CL_LinkNetworkEntity(entity_t *e)
 		trace_t trace;
 		matrix4x4_t tempmatrix;
 		Matrix4x4_Transform(&e->render.matrix, muzzleflashorigin, v2);
-		trace = CL_TraceLine(origin, v2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, collision_extendmovelength.value, true, false, NULL, false, false);
+		trace = CL_TraceLine(origin, v2, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, 0, collision_extendmovelength.value, true, false, NULL, false, false);
 		Matrix4x4_Normalize(&tempmatrix, &e->render.matrix);
 		Matrix4x4_SetOrigin(&tempmatrix, trace.endpos[0], trace.endpos[1], trace.endpos[2]);
 		Matrix4x4_Scale(&tempmatrix, 150, 1);
@@ -1776,7 +1776,10 @@ void CL_RelinkBeams(void)
 				r_refdef.scene.lights[r_refdef.scene.numlights] = &r_refdef.scene.templights[r_refdef.scene.numlights];r_refdef.scene.numlights++;
 			}
 			if (cl_beams_polygons.integer)
+			{
+				CL_Beam_AddPolygons(b);
 				continue;
+			}
 		}
 
 		// calculate pitch and yaw
@@ -1810,12 +1813,7 @@ void CL_RelinkBeams(void)
 			entrender = CL_NewTempEntity (0);
 			if (!entrender)
 				return;
-			//VectorCopy (org, ent->render.origin);
 			entrender->model = b->model;
-			//ent->render.effects = EF_FULLBRIGHT;
-			//ent->render.angles[0] = pitch;
-			//ent->render.angles[1] = yaw;
-			//ent->render.angles[2] = rand()%360;
 			Matrix4x4_CreateFromQuakeEntity(&entrender->matrix, org[0], org[1], org[2], -pitch, yaw, lhrandom(0, 360), 1);
 			CL_UpdateRenderEntity(entrender);
 			VectorMA(org, 30, dist, org);
@@ -1887,6 +1885,7 @@ void CSQC_RelinkAllEntities (int drawmask)
 	CL_RelinkStaticEntities();
 	CL_RelinkBeams();
 	CL_RelinkEffects();
+	CL_RelinkLightFlashes();
 
 	// link stuff
 	if (drawmask & ENTMASK_ENGINE)
@@ -1899,6 +1898,8 @@ void CSQC_RelinkAllEntities (int drawmask)
 
 	// update view blend
 	V_CalcViewBlend();
+
+	CL_MeshEntities_AddToScene();
 }
 
 /*
@@ -1947,8 +1948,9 @@ void CL_UpdateWorld(void)
 		// update the engine-based viewmodel
 		CL_UpdateViewModel();
 
-		CL_RelinkLightFlashes();
-		CSQC_RelinkAllEntities(ENTMASK_ENGINE | ENTMASK_ENGINEVIEWMODELS);
+		// when csqc is loaded, it will call this in CSQC_UpdateView
+		if (!cl.csqc_loaded)
+			CSQC_RelinkAllEntities(ENTMASK_ENGINE | ENTMASK_ENGINEVIEWMODELS);
 
 		// decals, particles, and explosions will be updated during rneder
 	}
@@ -2373,6 +2375,82 @@ void CL_Locs_Reload_f(void)
 	}
 }
 
+entity_t cl_meshentities[NUM_MESHENTITIES];
+dp_model_t cl_meshentitymodels[NUM_MESHENTITIES];
+const char *cl_meshentitynames[NUM_MESHENTITIES] =
+{
+	"MESH_DEBUG",
+	"MESH_CSQC_POLYGONS",
+	"MESH_PARTICLES",
+	"MESH_UI",
+};
+
+void CL_MeshEntities_Restart(void)
+{
+	int i;
+	entity_t *ent;
+	for (i = 0; i < NUM_MESHENTITIES; i++)
+	{
+		ent = cl_meshentities + i;
+		Mod_Mesh_Create(ent->render.model, cl_meshentitynames[i]);
+	}
+}
+
+void CL_MeshEntities_Init(void)
+{
+	int i;
+	entity_t *ent;
+	for (i = 0; i < NUM_MESHENTITIES; i++)
+	{
+		ent = cl_meshentities + i;
+		ent->state_current.active = true;
+		ent->render.model = cl_meshentitymodels + i;
+		ent->render.alpha = 1;
+		ent->render.flags = RENDER_SHADOW | RENDER_LIGHT;
+		ent->render.framegroupblend[0].lerp = 1;
+		ent->render.frameblend[0].lerp = 1;
+		VectorSet(ent->render.colormod, 1, 1, 1);
+		VectorSet(ent->render.glowmod, 1, 1, 1);
+		VectorSet(ent->render.modellight_ambient, 1, 1, 1);
+		VectorSet(ent->render.modellight_diffuse, 0, 0, 0);
+		VectorSet(ent->render.modellight_lightdir, 0, 0, 1);
+		Matrix4x4_CreateIdentity(&ent->render.matrix);
+		CL_UpdateRenderEntity(&ent->render);
+	}
+	R_RegisterModule("cl_meshentities", CL_MeshEntities_Restart, CL_MeshEntities_Restart, CL_MeshEntities_Restart, CL_MeshEntities_Restart, CL_MeshEntities_Restart);
+}
+
+void CL_MeshEntities_AddToScene(void)
+{
+	int i;
+	entity_t *ent;
+	for (i = 0; i < NUM_MESHENTITIES && r_refdef.scene.numentities < r_refdef.scene.maxentities; i++)
+	{
+		ent = cl_meshentities + i;
+		if (ent->render.model->num_surfaces == 0)
+			continue;
+		Mod_Mesh_Finalize(ent->render.model);
+		VectorCopy(ent->render.model->normalmins, ent->render.mins);
+		VectorCopy(ent->render.model->normalmaxs, ent->render.maxs);
+		r_refdef.scene.entities[r_refdef.scene.numentities++] = &ent->render;
+	}
+}
+
+void CL_MeshEntities_Reset(void)
+{
+	int i;
+	entity_t *ent;
+	for (i = 0; i < NUM_MESHENTITIES && r_refdef.scene.numentities < r_refdef.scene.maxentities; i++)
+	{
+		ent = cl_meshentities + i;
+		Mod_Mesh_Reset(ent->render.model);
+	}
+}
+
+void CL_MeshEntities_Shutdown(void)
+{
+}
+
 /*
 ===========
 CL_Shutdown
@@ -2383,6 +2461,7 @@ void CL_Shutdown (void)
 	CL_Screen_Shutdown();
 	CL_Particles_Shutdown();
 	CL_Parse_Shutdown();
+	CL_MeshEntities_Shutdown();
 
 	Mem_FreePool (&cls.permanentmempool);
 	Mem_FreePool (&cls.levelmempool);
@@ -2502,6 +2581,7 @@ void CL_Init (void)
 	CL_Parse_Init();
 	CL_Particles_Init();
 	CL_Screen_Init();
+	CL_MeshEntities_Init();
 
 	CL_Video_Init();
 }

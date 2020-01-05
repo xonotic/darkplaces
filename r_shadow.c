@@ -334,6 +334,13 @@ cvar_t r_shadow_sortsurfaces = {0, "r_shadow_sortsurfaces", "1", "improve perfor
 cvar_t r_shadow_polygonfactor = {0, "r_shadow_polygonfactor", "0", "how much to enlarge shadow volume polygons when rendering (should be 0!)"};
 cvar_t r_shadow_polygonoffset = {0, "r_shadow_polygonoffset", "1", "how much to push shadow volumes into the distance when rendering, to reduce chances of zfighting artifacts (should not be less than 0)"};
 cvar_t r_shadow_texture3d = {0, "r_shadow_texture3d", "1", "use 3D voxel textures for spherical attenuation rather than cylindrical (does not affect OpenGL 2.0 render path)"};
+cvar_t r_shadow_culllights_pvs = {CVAR_SAVE, "r_shadow_culllights_pvs", "1", "check if light overlaps any visible bsp leafs when determining if the light is visible"};
+cvar_t r_shadow_culllights_trace = {CVAR_SAVE, "r_shadow_culllights_trace", "1", "use raytraces from the eye to random places within light bounds to determine if the light is visible"};
+cvar_t r_shadow_culllights_trace_eyejitter = {CVAR_SAVE, "r_shadow_culllights_trace_eyejitter", "16", "offset eye location randomly by this much"};
+cvar_t r_shadow_culllights_trace_enlarge = {CVAR_SAVE, "r_shadow_culllights_trace_enlarge", "0.1", "make light bounds bigger by *1.0+enlarge"};
+cvar_t r_shadow_culllights_trace_samples = {CVAR_SAVE, "r_shadow_culllights_trace_samples", "16", "use this many traces to random positions (in addition to center trace)"};
+cvar_t r_shadow_culllights_trace_tempsamples = {CVAR_SAVE, "r_shadow_culllights_trace_tempsamples", "16", "use this many traces if the light was created by csqc (no inter-frame caching), -1 disables the check (to avoid flicker entirely)"};
+cvar_t r_shadow_culllights_trace_delay = {CVAR_SAVE, "r_shadow_culllights_trace_delay", "1", "light will be considered visible for this many seconds after any trace connects"};
 cvar_t r_shadow_bouncegrid = {CVAR_SAVE, "r_shadow_bouncegrid", "0", "perform particle tracing for indirect lighting (Global Illumination / radiosity) using a 3D texture covering the scene, only active on levels with realtime lights active (r_shadow_realtime_world is usually required for these)"};
 cvar_t r_shadow_bouncegrid_blur = {CVAR_SAVE, "r_shadow_bouncegrid_blur", "0", "apply a 1-radius blur on bouncegrid to denoise it and deal with boundary issues with surfaces"};
 cvar_t r_shadow_bouncegrid_bounceanglediffuse = {CVAR_SAVE, "r_shadow_bouncegrid_bounceanglediffuse", "0", "use random bounce direction rather than true reflection, makes some corner areas dark"};
@@ -733,20 +740,22 @@ static void r_shadow_shutdown(void)
 static void r_shadow_newmap(void)
 {
 	r_shadow_bouncegrid_state.highpixels = NULL;
-	if (r_shadow_bouncegrid_state.blurpixels[0]) Mem_Free(r_shadow_bouncegrid_state.blurpixels[0]); r_shadow_bouncegrid_state.blurpixels[0] = NULL;
-	if (r_shadow_bouncegrid_state.blurpixels[1]) Mem_Free(r_shadow_bouncegrid_state.blurpixels[1]); r_shadow_bouncegrid_state.blurpixels[1] = NULL;
-	if (r_shadow_bouncegrid_state.u8pixels) Mem_Free(r_shadow_bouncegrid_state.u8pixels); r_shadow_bouncegrid_state.u8pixels = NULL;
-	if (r_shadow_bouncegrid_state.fp16pixels) Mem_Free(r_shadow_bouncegrid_state.fp16pixels); r_shadow_bouncegrid_state.fp16pixels = NULL;
-	if (r_shadow_bouncegrid_state.splatpaths) Mem_Free(r_shadow_bouncegrid_state.splatpaths); r_shadow_bouncegrid_state.splatpaths = NULL;
+	if (r_shadow_bouncegrid_state.blurpixels[0]) { Mem_Free(r_shadow_bouncegrid_state.blurpixels[0]); r_shadow_bouncegrid_state.blurpixels[0] = NULL; }
+	if (r_shadow_bouncegrid_state.blurpixels[1]) { Mem_Free(r_shadow_bouncegrid_state.blurpixels[1]); r_shadow_bouncegrid_state.blurpixels[1] = NULL; }
+	if (r_shadow_bouncegrid_state.u8pixels) { Mem_Free(r_shadow_bouncegrid_state.u8pixels); r_shadow_bouncegrid_state.u8pixels = NULL; }
+	if (r_shadow_bouncegrid_state.fp16pixels) { Mem_Free(r_shadow_bouncegrid_state.fp16pixels); r_shadow_bouncegrid_state.fp16pixels = NULL; }
+	if (r_shadow_bouncegrid_state.splatpaths) { Mem_Free(r_shadow_bouncegrid_state.splatpaths); r_shadow_bouncegrid_state.splatpaths = NULL; }
+
 	r_shadow_bouncegrid_state.maxsplatpaths = 0;
-	if (r_shadow_bouncegrid_state.texture)    R_FreeTexture(r_shadow_bouncegrid_state.texture);r_shadow_bouncegrid_state.texture = NULL;
-	if (r_shadow_lightcorona)                 R_SkinFrame_MarkUsed(r_shadow_lightcorona);
-	if (r_editlights_sprcursor)               R_SkinFrame_MarkUsed(r_editlights_sprcursor);
-	if (r_editlights_sprlight)                R_SkinFrame_MarkUsed(r_editlights_sprlight);
-	if (r_editlights_sprnoshadowlight)        R_SkinFrame_MarkUsed(r_editlights_sprnoshadowlight);
-	if (r_editlights_sprcubemaplight)         R_SkinFrame_MarkUsed(r_editlights_sprcubemaplight);
-	if (r_editlights_sprcubemapnoshadowlight) R_SkinFrame_MarkUsed(r_editlights_sprcubemapnoshadowlight);
-	if (r_editlights_sprselection)            R_SkinFrame_MarkUsed(r_editlights_sprselection);
+
+	if (r_shadow_bouncegrid_state.texture)    { R_FreeTexture(r_shadow_bouncegrid_state.texture);r_shadow_bouncegrid_state.texture = NULL; }
+	if (r_shadow_lightcorona)                 { R_SkinFrame_MarkUsed(r_shadow_lightcorona); }
+	if (r_editlights_sprcursor)               { R_SkinFrame_MarkUsed(r_editlights_sprcursor); }
+	if (r_editlights_sprlight)                { R_SkinFrame_MarkUsed(r_editlights_sprlight); }
+	if (r_editlights_sprnoshadowlight)        { R_SkinFrame_MarkUsed(r_editlights_sprnoshadowlight); }
+	if (r_editlights_sprcubemaplight)         { R_SkinFrame_MarkUsed(r_editlights_sprcubemaplight); }
+	if (r_editlights_sprcubemapnoshadowlight) { R_SkinFrame_MarkUsed(r_editlights_sprcubemapnoshadowlight); }
+	if (r_editlights_sprselection)            { R_SkinFrame_MarkUsed(r_editlights_sprselection); }
 	if (strncmp(cl.worldname, r_shadow_mapname, sizeof(r_shadow_mapname)))
 		R_Shadow_EditLights_Reload_f();
 }
@@ -804,6 +813,13 @@ void R_Shadow_Init(void)
 	Cvar_RegisterVariable(&r_shadow_polygonfactor);
 	Cvar_RegisterVariable(&r_shadow_polygonoffset);
 	Cvar_RegisterVariable(&r_shadow_texture3d);
+	Cvar_RegisterVariable(&r_shadow_culllights_pvs);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace_eyejitter);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace_enlarge);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace_samples);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace_tempsamples);
+	Cvar_RegisterVariable(&r_shadow_culllights_trace_delay);
 	Cvar_RegisterVariable(&r_shadow_bouncegrid);
 	Cvar_RegisterVariable(&r_shadow_bouncegrid_blur);
 	Cvar_RegisterVariable(&r_shadow_bouncegrid_bounceanglediffuse);
@@ -2758,13 +2774,16 @@ static void R_Shadow_BounceGrid_UpdateSpacing(void)
 	numpixels = r_shadow_bouncegrid_state.pixelsperband*r_shadow_bouncegrid_state.pixelbands;
 	if (r_shadow_bouncegrid_state.numpixels != numpixels)
 	{
-		if (r_shadow_bouncegrid_state.texture) R_FreeTexture(r_shadow_bouncegrid_state.texture);r_shadow_bouncegrid_state.texture = NULL;
+		if (r_shadow_bouncegrid_state.texture) { R_FreeTexture(r_shadow_bouncegrid_state.texture);r_shadow_bouncegrid_state.texture = NULL; }
+
 		r_shadow_bouncegrid_state.highpixels = NULL;
-		if (r_shadow_bouncegrid_state.blurpixels[0]) Mem_Free(r_shadow_bouncegrid_state.blurpixels[0]); r_shadow_bouncegrid_state.blurpixels[0] = NULL;
-		if (r_shadow_bouncegrid_state.blurpixels[1]) Mem_Free(r_shadow_bouncegrid_state.blurpixels[1]); r_shadow_bouncegrid_state.blurpixels[1] = NULL;
-		if (r_shadow_bouncegrid_state.u8pixels) Mem_Free(r_shadow_bouncegrid_state.u8pixels); r_shadow_bouncegrid_state.u8pixels = NULL;
-		if (r_shadow_bouncegrid_state.fp16pixels) Mem_Free(r_shadow_bouncegrid_state.fp16pixels); r_shadow_bouncegrid_state.fp16pixels = NULL;
-		if (r_shadow_bouncegrid_state.splatpaths) Mem_Free(r_shadow_bouncegrid_state.splatpaths); r_shadow_bouncegrid_state.splatpaths = NULL;
+
+		if (r_shadow_bouncegrid_state.blurpixels[0]) { Mem_Free(r_shadow_bouncegrid_state.blurpixels[0]); r_shadow_bouncegrid_state.blurpixels[0] = NULL; }
+		if (r_shadow_bouncegrid_state.blurpixels[1]) { Mem_Free(r_shadow_bouncegrid_state.blurpixels[1]); r_shadow_bouncegrid_state.blurpixels[1] = NULL; }
+		if (r_shadow_bouncegrid_state.u8pixels) { Mem_Free(r_shadow_bouncegrid_state.u8pixels); r_shadow_bouncegrid_state.u8pixels = NULL; }
+		if (r_shadow_bouncegrid_state.fp16pixels) { Mem_Free(r_shadow_bouncegrid_state.fp16pixels); r_shadow_bouncegrid_state.fp16pixels = NULL; }
+		if (r_shadow_bouncegrid_state.splatpaths) { Mem_Free(r_shadow_bouncegrid_state.splatpaths); r_shadow_bouncegrid_state.splatpaths = NULL; }
+
 		r_shadow_bouncegrid_state.maxsplatpaths = 0;
 		r_shadow_bouncegrid_state.numpixels = numpixels;
 	}
@@ -2846,12 +2865,26 @@ static void R_Shadow_BounceGrid_AssignPhotons(r_shadow_bouncegrid_settings_t *se
 		w = r_shadow_lightintensityscale.value * (rtlight->ambientscale + rtlight->diffusescale + rtlight->specularscale);
 		if (!settings->staticmode)
 		{
+			// skip if the expanded light box does not touch any visible leafs
+			if (r_refdef.scene.worldmodel
+				&& r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs
+				&& !r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.scene.worldmodel, r_refdef.viewcache.world_leafvisible, cullmins, cullmaxs))
+				continue;
+			// skip if the expanded light box is not visible to traceline
+			// note that PrepareLight already did this check but for a smaller box, so we
+			// end up casting more traces per frame per light when using bouncegrid, which
+			// is probably fine (and they use the same timer)
+			if (r_shadow_culllights_trace.integer)
+			{
+				if (rtlight->trace_timer != realtime && R_CanSeeBox(rtlight->trace_timer == 0 ? r_shadow_culllights_trace_tempsamples.integer : r_shadow_culllights_trace_samples.integer, r_shadow_culllights_trace_eyejitter.value, r_shadow_culllights_trace_enlarge.value, r_refdef.view.origin, rtlight->cullmins, rtlight->cullmaxs))
+					rtlight->trace_timer = realtime;
+				if (realtime - rtlight->trace_timer > r_shadow_culllights_trace_delay.value)
+					return;
+			}
+			// skip if expanded light box is offscreen
 			if (R_CullBox(cullmins, cullmaxs))
 				continue;
-			if (r_refdef.scene.worldmodel
-			 && r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs
-			 && !r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.scene.worldmodel, r_refdef.viewcache.world_leafvisible, cullmins, cullmaxs))
-				continue;
+			// skip if overall light intensity is zero
 			if (w * VectorLength2(rtlight->color) == 0.0f)
 				continue;
 		}
@@ -3316,6 +3349,7 @@ static void R_Shadow_BounceGrid_TracePhotons(r_shadow_bouncegrid_settings_t sett
 	int bouncecount;
 	int hitsupercontentsmask;
 	int skipsupercontentsmask;
+	int skipmaterialflagsmask;
 	int maxbounce;
 	int shootparticles;
 	int shotparticles;
@@ -3345,10 +3379,11 @@ static void R_Shadow_BounceGrid_TracePhotons(r_shadow_bouncegrid_settings_t sett
 
 	// figure out what we want to interact with
 	if (settings.hitmodels)
-		hitsupercontentsmask = SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY;// | SUPERCONTENTS_LIQUIDSMASK;
+		hitsupercontentsmask = SUPERCONTENTS_SOLID;// | SUPERCONTENTS_LIQUIDSMASK;
 	else
 		hitsupercontentsmask = SUPERCONTENTS_SOLID;// | SUPERCONTENTS_LIQUIDSMASK;
-	skipsupercontentsmask = SUPERCONTENTS_SKY; // this allows the e1m5 sky shadow to work by ignoring the sky surfaces
+	skipsupercontentsmask = 0;
+	skipmaterialflagsmask = MATERIALFLAGMASK_TRANSLUCENT;
 	maxbounce = settings.maxbounce;
 
 	for (lightindex = 0;lightindex < range2;lightindex++)
@@ -3449,12 +3484,12 @@ static void R_Shadow_BounceGrid_TracePhotons(r_shadow_bouncegrid_settings_t sett
 				{
 					// static mode fires a LOT of rays but none of them are identical, so they are not cached
 					// non-stable random in dynamic mode also never reuses a direction, so there's no reason to cache it
-					cliptrace = CL_TraceLine(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), NULL, hitsupercontentsmask, skipsupercontentsmask, collision_extendmovelength.value, true, false, NULL, true, true);
+					cliptrace = CL_TraceLine(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), NULL, hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask, collision_extendmovelength.value, true, false, NULL, true, true);
 				}
 				else
 				{
 					// dynamic mode fires many rays and most will match the cache from the previous frame
-					cliptrace = CL_Cache_TraceLineSurfaces(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), hitsupercontentsmask, skipsupercontentsmask);
+					cliptrace = CL_Cache_TraceLineSurfaces(clipstart, clipend, settings.staticmode ? MOVE_WORLDONLY : (settings.hitmodels ? MOVE_HITMODEL : MOVE_NOMONSTERS), hitsupercontentsmask, skipsupercontentsmask, skipmaterialflagsmask);
 				}
 				if (bouncecount > 0 || settings.includedirectlighting)
 				{
@@ -4138,7 +4173,7 @@ void R_RTLight_Compile(rtlight_t *rtlight)
 		// this variable must be set for the CompileShadowVolume/CompileShadowMap code
 		r_shadow_compilingrtlight = rtlight;
 		R_FrameData_SetMark();
-		model->GetLightInfo(ent, rtlight->shadoworigin, rtlight->radius, rtlight->cullmins, rtlight->cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, 0, NULL);
+		model->GetLightInfo(ent, rtlight->shadoworigin, rtlight->radius, rtlight->cullmins, rtlight->cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, 0, NULL, rtlight->shadow == 0);
 		R_FrameData_ReturnToMark();
 		numleafpvsbytes = (model->brush.num_leafs + 7) >> 3;
 		numshadowtrispvsbytes = ((model->brush.shadowmesh ? model->brush.shadowmesh->numtriangles : model->surfmesh.num_triangles) + 7) >> 3;
@@ -4656,7 +4691,7 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 	}
 	*/
 
-	// if lightstyle is currently off, don't draw the light
+	// skip if lightstyle is currently off
 	if (VectorLength2(rtlight->currentcolor) < (1.0f / 1048576.0f))
 		return;
 
@@ -4664,10 +4699,27 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 	if (nolight)
 		return;
 
-	// if the light box is offscreen, skip it
+	// skip if the light box is not touching any visible leafs
+	if (r_shadow_culllights_pvs.integer
+		&& r_refdef.scene.worldmodel
+		&& r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs
+		&& !r_refdef.scene.worldmodel->brush.BoxTouchingVisibleLeafs(r_refdef.scene.worldmodel, r_refdef.viewcache.world_leafvisible, rtlight->cullmins, rtlight->cullmaxs))
+		return;
+
+	// skip if the light box is not visible to traceline
+	if (r_shadow_culllights_trace.integer)
+	{
+		if (rtlight->trace_timer != realtime && R_CanSeeBox(rtlight->trace_timer == 0 ? r_shadow_culllights_trace_tempsamples.integer : r_shadow_culllights_trace_samples.integer, r_shadow_culllights_trace_eyejitter.value, r_shadow_culllights_trace_enlarge.value, r_refdef.view.origin, rtlight->cullmins, rtlight->cullmaxs))
+			rtlight->trace_timer = realtime;
+		if (realtime - rtlight->trace_timer > r_shadow_culllights_trace_delay.value)
+			return;
+	}
+
+	// skip if the light box is off screen
 	if (R_CullBox(rtlight->cullmins, rtlight->cullmaxs))
 		return;
 
+	// in the typical case this will be quickly replaced by GetLightInfo
 	VectorCopy(rtlight->cullmins, rtlight->cached_cullmins);
 	VectorCopy(rtlight->cullmaxs, rtlight->cached_cullmaxs);
 
@@ -4694,7 +4746,7 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 	{
 		// dynamic light, world available and can receive realtime lighting
 		// calculate lit surfaces and leafs
-		r_refdef.scene.worldmodel->GetLightInfo(r_refdef.scene.worldentity, rtlight->shadoworigin, rtlight->radius, rtlight->cached_cullmins, rtlight->cached_cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, rtlight->cached_numfrustumplanes, rtlight->cached_frustumplanes);
+		r_refdef.scene.worldmodel->GetLightInfo(r_refdef.scene.worldentity, rtlight->shadoworigin, rtlight->radius, rtlight->cached_cullmins, rtlight->cached_cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, rtlight->cached_numfrustumplanes, rtlight->cached_frustumplanes, rtlight->shadow == 0);
 		R_Shadow_ComputeShadowCasterCullingPlanes(rtlight);
 		leaflist = r_shadow_buffer_leaflist;
 		leafpvs = r_shadow_buffer_leafpvs;
@@ -5994,8 +6046,7 @@ static void R_DrawCorona(rtlight_t *rtlight, float cscale, float scale)
 	}
 	else
 	{
-		// FIXME: these traces should scan all render entities instead of cl.world
-		if (CL_TraceLine(r_refdef.view.origin, rtlight->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
+		if (CL_Cache_TraceLineSurfaces(r_refdef.view.origin, rtlight->shadoworigin, MOVE_NORMAL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT).fraction < 1)
 			return;
 	}
 	VectorScale(rtlight->currentcolor, cscale, color);
@@ -6328,7 +6379,7 @@ static void R_Shadow_SelectLightInView(void)
 		if (rating >= 0.95)
 		{
 			rating /= (1 + 0.0625f * sqrt(DotProduct(temp, temp)));
-			if (bestrating < rating && CL_TraceLine(light->origin, r_refdef.view.origin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1.0f)
+			if (bestrating < rating && CL_TraceLine(light->origin, r_refdef.view.origin, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1.0f)
 			{
 				bestrating = rating;
 				best = light;
@@ -6778,7 +6829,7 @@ static void R_Shadow_SetCursorLocationForView(void)
 	vec3_t dest, endpos;
 	trace_t trace;
 	VectorMA(r_refdef.view.origin, r_editlights_cursordistance.value, r_refdef.view.forward, dest);
-	trace = CL_TraceLine(r_refdef.view.origin, dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true);
+	trace = CL_TraceLine(r_refdef.view.origin, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
 	if (trace.fraction < 1)
 	{
 		dist = trace.fraction * r_editlights_cursordistance.value;
@@ -7577,7 +7628,7 @@ void R_LightPoint(float *color, const vec3_t p, const int flags)
 			if (f <= 0)
 				continue;
 			// todo: add to both ambient and diffuse
-			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
+			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
 				VectorMA(color, f, light->currentcolor, color);
 		}
 	}
@@ -7598,7 +7649,7 @@ void R_LightPoint(float *color, const vec3_t p, const int flags)
 			if (f <= 0)
 				continue;
 			// todo: add to both ambient and diffuse
-			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
+			if (!light->shadow || CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true).fraction == 1)
 				VectorMA(color, f, light->color, color);
 		}
 	}
@@ -7682,7 +7733,7 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 			intensity = min(1.0f, (1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist)) * r_shadow_lightintensityscale.value;
 			if (intensity <= 0.0f)
 				continue;
-			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
+			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
 				continue;
 			// scale down intensity to add to both ambient and diffuse
 			//intensity *= 0.5f;
@@ -7715,7 +7766,7 @@ void R_CompleteLightPoint(vec3_t ambient, vec3_t diffuse, vec3_t lightdir, const
 			intensity = (1.0f - dist) * r_shadow_lightattenuationlinearscale.value / (r_shadow_lightattenuationdividebias.value + dist*dist) * r_shadow_lightintensityscale.value;
 			if (intensity <= 0.0f)
 				continue;
-			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
+			if (light->shadow && CL_TraceLine(p, light->shadoworigin, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true).fraction < 1)
 				continue;
 			// scale down intensity to add to both ambient and diffuse
 			//intensity *= 0.5f;

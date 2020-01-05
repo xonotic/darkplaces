@@ -2111,10 +2111,10 @@ void DrawQ_SetClipArea(float x, float y, float width, float height)
 
 	// We have to convert the con coords into real coords
 	// OGL uses top to bottom
-	ix = (int)(0.5 + x * ((float)vid.width / vid_conwidth.integer));
-	iy = (int)(0.5 + y * ((float) vid.height / vid_conheight.integer));
-	iw = (int)(0.5 + (x+width) * ((float)vid.width / vid_conwidth.integer)) - ix;
-	ih = (int)(0.5 + (y+height) * ((float) vid.height / vid_conheight.integer)) - iy;
+	ix = (int)(0.5 + x * ((float)r_refdef.view.width / vid_conwidth.integer)) + r_refdef.view.x;
+	iy = (int)(0.5 + y * ((float)r_refdef.view.height / vid_conheight.integer)) + r_refdef.view.y;
+	iw = (int)(0.5 + width * ((float)r_refdef.view.width / vid_conwidth.integer));
+	ih = (int)(0.5 + height * ((float)r_refdef.view.height / vid_conheight.integer));
 	switch(vid.renderpath)
 	{
 	case RENDERPATH_GL11:
@@ -2167,13 +2167,11 @@ void R_DrawGamma(void)
 	case RENDERPATH_D3D10:
 	case RENDERPATH_D3D11:
 	case RENDERPATH_GLES2:
-		if (vid_usinghwgamma || v_glslgamma.integer)
+		if (v_glslgamma.integer)
 			return;
 		break;
 	case RENDERPATH_GL11:
 	case RENDERPATH_GL13:
-		if (vid_usinghwgamma)
-			return;
 		break;
 	case RENDERPATH_GLES1:
 	case RENDERPATH_SOFT:

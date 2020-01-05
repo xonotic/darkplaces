@@ -164,8 +164,7 @@ static void adddirentry(stringlist_t *list, const char *path, const char *name)
 #ifdef WIN32
 void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 {
-	int i;
-	char pattern[4096], *c;
+	char pattern[4096];
 	WIN32_FIND_DATA n_file;
 	HANDLE hFile;
 	strlcpy (pattern, basepath, sizeof(pattern));
@@ -179,12 +178,6 @@ void listdirectory(stringlist_t *list, const char *basepath, const char *path)
 		adddirentry(list, path, n_file.cFileName);
 	} while (FindNextFile(hFile, &n_file) != 0);
 	FindClose(hFile);
-
-	// convert names to lowercase because windows does not care, but pattern matching code often does
-	for (i = 0;i < list->numstrings;i++)
-		for (c = list->strings[i];*c;c++)
-			if (*c >= 'A' && *c <= 'Z')
-				*c += 'a' - 'A';
 }
 #else
 void listdirectory(stringlist_t *list, const char *basepath, const char *path)

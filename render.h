@@ -92,7 +92,6 @@ rmesh_t;
 // useful functions for rendering
 void R_ModulateColors(float *in, float *out, int verts, float r, float g, float b);
 void R_FillColors(float *out, int verts, float r, float g, float b, float a);
-int R_Mesh_AddVertex3f(rmesh_t *mesh, const float *v);
 void R_Mesh_AddPolygon3f(rmesh_t *mesh, int numvertices, float *vertex3f);
 void R_Mesh_AddBrushMeshFromPlanes(rmesh_t *mesh, int numplanes, mplane_t *planes);
 
@@ -162,6 +161,7 @@ void R_DrawExplosions(void);
 
 int R_CullBox(const vec3_t mins, const vec3_t maxs);
 int R_CullBoxCustomPlanes(const vec3_t mins, const vec3_t maxs, int numplanes, const mplane_t *planes);
+qboolean R_CanSeeBox(int numsamples, vec_t eyejitter, vec_t entboxenlarge, vec3_t eye, vec3_t entboxmins, vec3_t entboxmaxs);
 
 #include "r_modules.h"
 
@@ -613,7 +613,6 @@ void SCR_DrawConsole(void);
 void R_Shadow_EditLights_DrawSelectedLightProperties(void);
 void R_DecalSystem_Reset(decalsystem_t *decalsystem);
 void R_Shadow_UpdateBounceGridTexture(void);
-void R_DrawLightningBeams(void);
 void VM_CL_AddPolygonsToMeshQueue(struct prvm_prog_s *prog);
 void R_DrawPortals(void);
 void R_BuildLightMap(const entity_render_t *ent, msurface_t *surface);

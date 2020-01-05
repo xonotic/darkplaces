@@ -193,6 +193,12 @@ typedef struct surfmesh_s
 
 	// vertex and index buffers for rendering
 	r_meshbuffer_t *vertexmesh_vertexbuffer;
+
+	// dynamic mesh building support (Mod_Mesh_*)
+	int num_vertexhashsize; // always pow2 for simple masking
+	int *data_vertexhash; // hash table - wrapping buffer for storing index of similar vertex with -1 as terminator
+	int max_vertices; // preallocated size of data_vertex3f and friends (always >= num_vertices)
+	int max_triangles; // preallocated size of data_element3i
 }
 surfmesh_t;
 
@@ -406,7 +412,7 @@ typedef struct q3shaderinfo_layer_s
 	int clampmap;
 	float framerate;
 	int numframes;
-	int texflags;
+	int dptexflags;
 	char** texturename;
 	int blendfunc[2];
 	q3shaderinfo_layer_rgbgen_t rgbgen;
@@ -627,7 +633,6 @@ typedef struct texture_s
 	char name[64];
 	int surfaceflags;
 	int supercontents;
-	int textureflags;
 
 	// q2bsp
 	// we have to load the texture multiple times when Q2SURF_ flags differ,
@@ -635,6 +640,10 @@ typedef struct texture_s
 	int q2flags;
 	int q2value;
 	int q2contents;
+
+	// q1qsp
+	/// this points to a variant of the sky texture that has MATERIALFLAG_NOSHADOW, for the e1m5 logo shadow trick.
+	struct texture_s *skynoshadowtexture;
 
 	// reflection
 	float reflectmin; // when refraction is used, minimum amount of reflection (when looking straight down)
@@ -733,6 +742,9 @@ typedef struct msurface_s
 	int deprecatedq3num_bboxstride;
 	// FIXME: collisionmarkframe should be kept in a separate array
 	int deprecatedq3collisionmarkframe; // q3bsp // don't collide twice in one trace
+
+	// used by Mod_Mesh_Finalize when building sortedmodelsurfaces
+	qboolean included;
 }
 msurface_t;
 
@@ -855,7 +867,7 @@ typedef struct model_brush_s
 	void (*AmbientSoundLevelsForPoint)(struct model_s *model, const vec3_t p, unsigned char *out, int outsize);
 	void (*RoundUpToHullSize)(struct model_s *cmodel, const vec3_t inmins, const vec3_t inmaxs, vec3_t outmins, vec3_t outmaxs);
 	// trace a line of sight through this model (returns false if the line if sight is definitely blocked)
-	qboolean (*TraceLineOfSight)(struct model_s *model, const vec3_t start, const vec3_t end);
+	qboolean (*TraceLineOfSight)(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs);
 
 	char skybox[MAX_QPATH];
 
@@ -1036,12 +1048,14 @@ typedef struct model_s
 	float			*data_baseboneposeinverse;
 	// textures of this model
 	int				num_textures;
+	int				max_textures; // preallocated for expansion (Mod_Mesh_*)
 	int				num_texturesperskin;
 	texture_t		*data_textures;
 	qboolean		wantnormals;
 	qboolean		wanttangents;
 	// surfaces of this model
 	int				num_surfaces;
+	int				max_surfaces; // preallocated for expansion (Mod_Mesh_*)
 	msurface_t		*data_surfaces;
 	// optional lightmapinfo data for surface lightmap updates
 	msurface_lightmapinfo_t *data_surfaces_lightmapinfo;
@@ -1068,7 +1082,7 @@ typedef struct model_s
 	// draw depth into a shadowmap
 	void(*DrawShadowMap)(int side, struct entity_render_s *ent, const vec3_t relativelightorigin, const vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist, const unsigned char *surfacesides, const vec3_t lightmins, const vec3_t lightmaxs);
 	// gathers info on which clusters and surfaces are lit by light, as well as calculating a bounding box
-	void(*GetLightInfo)(struct entity_render_s *ent, vec3_t relativelightorigin, float lightradius, vec3_t outmins, vec3_t outmaxs, int *outleaflist, unsigned char *outleafpvs, int *outnumleafspointer, int *outsurfacelist, unsigned char *outsurfacepvs, int *outnumsurfacespointer, unsigned char *outshadowtrispvs, unsigned char *outlighttrispvs, unsigned char *visitingleafpvs, int numfrustumplanes, const mplane_t *frustumplanes);
+	void(*GetLightInfo)(struct entity_render_s *ent, vec3_t relativelightorigin, float lightradius, vec3_t outmins, vec3_t outmaxs, int *outleaflist, unsigned char *outleafpvs, int *outnumleafspointer, int *outsurfacelist, unsigned char *outsurfacepvs, int *outnumsurfacespointer, unsigned char *outshadowtrispvs, unsigned char *outlighttrispvs, unsigned char *visitingleafpvs, int numfrustumplanes, const mplane_t *frustumplanes, qboolean noocclusion);
 	// compile a shadow volume for the model based on light source
 	void(*CompileShadowVolume)(struct entity_render_s *ent, vec3_t relativelightorigin, vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist);
 	// draw a shadow volume for the model based on light source
@@ -1076,16 +1090,16 @@ typedef struct model_s
 	// draw the lighting on a model (through stencil)
 	void(*DrawLight)(struct entity_render_s *ent, int numsurfaces, const int *surfacelist, const unsigned char *trispvs);
 	// trace a box against this model
-	void (*TraceBox)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
-	void (*TraceBrush)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, struct colbrushf_s *start, struct colbrushf_s *end, int hitsupercontentsmask, int skipsupercontentsmask);
+	void (*TraceBox)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+	void (*TraceBrush)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, struct colbrushf_s *start, struct colbrushf_s *end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 	// trace a box against this model
-	void (*TraceLine)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
+	void (*TraceLine)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 	// trace a point against this model (like PointSuperContents)
-	void (*TracePoint)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask);
+	void (*TracePoint)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 	// find the supercontents value at a point in this model
 	int (*PointSuperContents)(struct model_s *model, int frame, const vec3_t point);
 	// trace a line against geometry in this model and report correct texture (used by r_shadow_bouncegrid)
-	void (*TraceLineAgainstSurfaces)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
+	void (*TraceLineAgainstSurfaces)(struct model_s *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
 	// fields belonging to some types of model
 	model_sprite_t	sprite;
 	model_brush_t	brush;
@@ -1157,6 +1171,8 @@ q3shaderinfo_t *Mod_LookupQ3Shader(const char *name);
 qboolean Mod_LoadTextureFromQ3Shader(texture_t *texture, const char *name, qboolean warnmissing, qboolean fallback, int defaulttexflags);
 texture_shaderpass_t *Mod_CreateShaderPass(skinframe_t *skinframe);
 texture_shaderpass_t *Mod_CreateShaderPassFromQ3ShaderLayer(q3shaderinfo_layer_t *layer, int layerindex, int texflags, const char *texturename);
+/// Sets up a material to render the provided skinframe.  See also R_SkinFrame_LoadInternalBGRA.
+void Mod_LoadCustomMaterial(texture_t *texture, const char *name, int supercontents, int materialflags, skinframe_t *skinframe);
 
 extern cvar_t r_mipskins;
 extern cvar_t r_mipnormalmaps;
@@ -1223,20 +1239,30 @@ void R_Q1BSP_Draw(struct entity_render_s *ent);
 void R_Q1BSP_DrawDepth(struct entity_render_s *ent);
 void R_Q1BSP_DrawDebug(struct entity_render_s *ent);
 void R_Q1BSP_DrawPrepass(struct entity_render_s *ent);
-void R_Q1BSP_GetLightInfo(struct entity_render_s *ent, vec3_t relativelightorigin, float lightradius, vec3_t outmins, vec3_t outmaxs, int *outleaflist, unsigned char *outleafpvs, int *outnumleafspointer, int *outsurfacelist, unsigned char *outsurfacepvs, int *outnumsurfacespointer, unsigned char *outshadowtrispvs, unsigned char *outlighttrispvs, unsigned char *visitingleafpvs, int numfrustumplanes, const mplane_t *frustumplanes);
+void R_Q1BSP_GetLightInfo(struct entity_render_s *ent, vec3_t relativelightorigin, float lightradius, vec3_t outmins, vec3_t outmaxs, int *outleaflist, unsigned char *outleafpvs, int *outnumleafspointer, int *outsurfacelist, unsigned char *outsurfacepvs, int *outnumsurfacespointer, unsigned char *outshadowtrispvs, unsigned char *outlighttrispvs, unsigned char *visitingleafpvs, int numfrustumplanes, const mplane_t *frustumplanes, qboolean noocclusion);
 void R_Q1BSP_CompileShadowMap(struct entity_render_s *ent, vec3_t relativelightorigin, vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist);
 void R_Q1BSP_DrawShadowMap(int side, struct entity_render_s *ent, const vec3_t relativelightorigin, const vec3_t relativelightdirection, float lightradius, int modelnumsurfaces, const int *modelsurfacelist, const unsigned char *surfacesides, const vec3_t lightmins, const vec3_t lightmaxs);
 void R_Q1BSP_CompileShadowVolume(struct entity_render_s *ent, vec3_t relativelightorigin, vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist);
 void R_Q1BSP_DrawShadowVolume(struct entity_render_s *ent, const vec3_t relativelightorigin, const vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist, const vec3_t lightmins, const vec3_t lightmaxs);
 void R_Q1BSP_DrawLight(struct entity_render_s *ent, int numsurfaces, const int *surfacelist, const unsigned char *trispvs);
 
+// dynamic mesh building (every frame) for debugging and other uses
+void Mod_Mesh_Create(dp_model_t *mod, const char *name);
+void Mod_Mesh_Destroy(dp_model_t *mod);
+void Mod_Mesh_Reset(dp_model_t *mod);
+texture_t *Mod_Mesh_GetTexture(dp_model_t *mod, const char *name);
+msurface_t *Mod_Mesh_AddSurface(dp_model_t *mod, texture_t *tex);
+int Mod_Mesh_IndexForVertex(dp_model_t *mod, msurface_t *surf, float x, float y, float z, float nx, float ny, float nz, float s, float t, float u, float v, float r, float g, float b, float a);
+void Mod_Mesh_AddTriangle(dp_model_t *mod, msurface_t *surf, int e0, int e1, int e2);
+void Mod_Mesh_Finalize(dp_model_t *mod);
+
 // Collision optimization using Bounding Interval Hierarchy
-void Mod_CollisionBIH_TracePoint(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask);
-void Mod_CollisionBIH_TraceLine(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
-void Mod_CollisionBIH_TraceBox(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask);
-void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, struct colbrushf_s *start, struct colbrushf_s *end, int hitsupercontentsmask, int skipsupercontentsmask);
-void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask);
-qboolean Mod_CollisionBIH_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end);
+void Mod_CollisionBIH_TracePoint(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+void Mod_CollisionBIH_TraceLine(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+void Mod_CollisionBIH_TraceBox(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, const vec3_t boxmins, const vec3_t boxmaxs, const vec3_t end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, struct colbrushf_s *start, struct colbrushf_s *end, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+void Mod_CollisionBIH_TracePoint_Mesh(dp_model_t *model, const struct frameblend_s *frameblend, const skeleton_t *skeleton, struct trace_s *trace, const vec3_t start, int hitsupercontentsmask, int skipsupercontentsmask, int skipmaterialflagsmask);
+qboolean Mod_CollisionBIH_TraceLineOfSight(struct model_s *model, const vec3_t start, const vec3_t end, const vec3_t acceptmins, const vec3_t acceptmaxs);
 int Mod_CollisionBIH_PointSuperContents(struct model_s *model, int frame, const vec3_t point);
 int Mod_CollisionBIH_PointSuperContents_Mesh(struct model_s *model, int frame, const vec3_t point);
 bih_t *Mod_MakeCollisionBIH(dp_model_t *model, qboolean userendersurfaces, bih_t *out);
