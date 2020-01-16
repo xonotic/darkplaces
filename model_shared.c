@@ -2224,7 +2224,7 @@ texture_shaderpass_t *Mod_CreateShaderPass(mempool_t *mempool, skinframe_t *skin
 	return shaderpass;
 }
 
-texture_shaderpass_t *Mod_CreateShaderPassFromQ3ShaderLayer(mempool_t *mempool, const char *modelname, q3shaderinfo_layer_t *layer, int layerindex, int texflags, const char *texturename)
+texture_shaderpass_t *Mod_CreateShaderPassFromQ3ShaderLayer(mempool_t *mempool, const char *modelname, q3shaderinfo_layer_t *layer, int layerindex, int texflags/*, const char *texturename*/) // FIXME: This parameter is totally ignored...
 {
 	int j;
 	texture_shaderpass_t *shaderpass = (texture_shaderpass_t *)Mem_Alloc(mempool, sizeof(*shaderpass));
@@ -2437,16 +2437,16 @@ nothing                GL_ZERO GL_ONE
 				texture->materialshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[materiallayer], materiallayer, (shader->layers[materiallayer].dptexflags & texflagsmask) | texflagsor, texture->name);
 			// convert the terrain background blend layer (if any)
 			if (terrainbackgroundlayer >= 0)
-				texture->backgroundshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[terrainbackgroundlayer], terrainbackgroundlayer, (shader->layers[terrainbackgroundlayer].dptexflags & texflagsmask) | texflagsor, texture->name);
+				texture->backgroundshaderpass = texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[terrainbackgroundlayer], terrainbackgroundlayer, (shader->layers[terrainbackgroundlayer].dptexflags & texflagsmask) | texflagsor);
 			// convert the prepass layers (if any)
 			texture->startpreshaderpass = shaderpassindex;
 			for (i = 0; i < endofprelayers; i++)
-				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor, texture->name);
+				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor);
 			texture->endpreshaderpass = shaderpassindex;
 			texture->startpostshaderpass = shaderpassindex;
 			// convert the postpass layers (if any)
 			for (i = firstpostlayer; i < shader->numlayers; i++)
-				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor, texture->name);
+				texture->shaderpasses[shaderpassindex++] = Mod_CreateShaderPassFromQ3ShaderLayer(mempool, modelname, &shader->layers[i], i, (shader->layers[i].dptexflags & texflagsmask) | texflagsor);
 			texture->startpostshaderpass = shaderpassindex;
 		}
 

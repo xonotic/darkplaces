@@ -1137,7 +1137,7 @@ void Mod_LoadQ3Shaders(void);
 q3shaderinfo_t *Mod_LookupQ3Shader(const char *name);
 qboolean Mod_LoadTextureFromQ3Shader(mempool_t *mempool, const char *modelname, texture_t *texture, const char *name, qboolean warnmissing, qboolean fallback, int defaulttexflags, int defaultmaterialflags);
 texture_shaderpass_t *Mod_CreateShaderPass(mempool_t *mempool, skinframe_t *skinframe);
-texture_shaderpass_t *Mod_CreateShaderPassFromQ3ShaderLayer(mempool_t *mempool, const char *modelname, q3shaderinfo_layer_t *layer, int layerindex, int texflags, const char *texturename);
+texture_shaderpass_t *Mod_CreateShaderPassFromQ3ShaderLayer(mempool_t *mempool, const char *modelname, q3shaderinfo_layer_t *layer, int layerindex, int texflags);
 /// Sets up a material to render the provided skinframe.  See also R_SkinFrame_LoadInternalBGRA.
 void Mod_LoadCustomMaterial(mempool_t *mempool, texture_t *texture, const char *name, int supercontents, int materialflags, skinframe_t *skinframe);
 /// Removes all shaderpasses from material, and optionally deletes the textures in the skinframes.
