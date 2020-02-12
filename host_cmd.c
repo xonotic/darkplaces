@@ -1362,7 +1362,7 @@ static void Host_Playerskin_f (void)
 
 static void Host_Version_f (void)
 {
-	Con_Printf("Version: %s build %s\n", gamename, buildstring);
+	Con_Printf("Engine version: %s build %s\n", gamename, buildstring);
 }
 
 static void Host_Say(qboolean teamonly)
