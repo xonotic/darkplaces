@@ -398,11 +398,16 @@ cvar_t cl_nopred = {CVAR_CLIENT | CVAR_SAVE, "cl_nopred", "0", "(QWSV only) disa
 cvar_t in_pitch_min = {CVAR_CLIENT, "in_pitch_min", "-90", "how far you can aim upward (quake used -70)"};
 cvar_t in_pitch_max = {CVAR_CLIENT, "in_pitch_max", "90", "how far you can aim downward (quake used 80)"};
 
-cvar_t m_filter = {CVAR_CLIENT | CVAR_SAVE, "m_filter","0", "smoothes mouse movement, less responsive but smoother aiming"};
-cvar_t m_accelerate = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate","1", "mouse acceleration factor (try 2)"};
-cvar_t m_accelerate_minspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_minspeed","5000", "below this speed, no acceleration is done"};
-cvar_t m_accelerate_maxspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_maxspeed","10000", "above this speed, full acceleration is done"};
-cvar_t m_accelerate_filter = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_filter","0.1", "mouse acceleration factor filtering"};
+cvar_t m_filter = {CVAR_CLIENT | CVAR_SAVE, "m_filter","0", "smoothes mouse movement, less responsive but smoother aiming"}; 
+cvar_t m_accelerate = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate","1", "mouse acceleration factor (try 2 when m_accelerate_type is 0 and 0.01 when m_accelerate_type is 1)"};
+cvar_t m_accelerate_minspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_minspeed","5000", "(when m_accelerate is 0) below this speed, no acceleration is done"};
+cvar_t m_accelerate_maxspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_maxspeed","10000", "(when m_accelerate is 0) above this speed, full acceleration is done"};
+cvar_t m_accelerate_filter = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_filter","0.1", "(when m_accelerate is 0) mouse acceleration factor filtering"};
+// Quake live implementation of mouse acceleration
+cvar_t m_accelerate_type = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_type","0", "0 for the darkplaces default implementation of mouse acceleration, 1 for the quakelive implementation"};
+cvar_t m_accelerate_offset = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_offset","0", "(when m_accelerate_type is 1) below this speed, no acceleration is done"};
+cvar_t m_accelerate_power = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_power","2", "(when m_accelerate_type is 1) 2 means linear dependence with the speed, higher values means exponential dependency"};
+cvar_t m_accelerate_senscap = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_senscap", "0", "(when m_accelerate_type is 1) the sensitivity won't go above this value, 0 means no cap"};
 
 cvar_t cl_netfps = {CVAR_CLIENT | CVAR_SAVE, "cl_netfps","72", "how many input packets to send to server each second"};
 cvar_t cl_netrepeatinput = {CVAR_CLIENT | CVAR_SAVE, "cl_netrepeatinput", "1", "how many packets in a row can be lost without movement issues when using cl_movement (technically how many input messages to repeat in each packet that have not yet been acknowledged by the server), only affects DP7 and later servers (Quake uses 0, QuakeWorld uses 2, and just for comparison Quake3 uses 1)"};
@@ -540,38 +545,86 @@ void CL_Input (void)
 		}
 	}
 
-	// apply m_accelerate if it is on
-	if(m_accelerate.value > 1)
+       // apply m_accelerate if it is on
+	if(m_accelerate.value > 0)
 	{
-		static float averagespeed = 0;
-		float speed, f, mi, ma;
 
-		speed = sqrt(in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y) / cl.realframetime;
-		if(m_accelerate_filter.value > 0)
-			f = bound(0, cl.realframetime / m_accelerate_filter.value, 1);
-		else
-			f = 1;
-		averagespeed = speed * f + averagespeed * (1 - f);
+	        if (! m_accelerate_type.value)             // Default Darkplaces acceleration
+	        {
+	    
+	  
+		        static float averagespeed = 0;
+			float speed, f, mi, ma;
 
-		mi = max(1, m_accelerate_minspeed.value);
-		ma = max(m_accelerate_minspeed.value + 1, m_accelerate_maxspeed.value);
+			speed = sqrt(in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y) / cl.realframetime;
+			if(m_accelerate_filter.value > 0)
+			        f = bound(0, cl.realframetime / m_accelerate_filter.value, 1);
+			else
+			        f = 1;
+			averagespeed = speed * f + averagespeed * (1 - f);
 
-		if(averagespeed <= mi)
-		{
-			f = 1;
+			mi = max(1, m_accelerate_minspeed.value);
+			ma = max(m_accelerate_minspeed.value + 1, m_accelerate_maxspeed.value);
+
+			if(averagespeed <= mi)
+			{
+			        f = 1;
+			}
+			else if(averagespeed >= ma)
+			{
+			        f = m_accelerate.value;
+			}
+			else
+			{
+			        f = averagespeed;
+				f = (f - mi) / (ma - mi) * (m_accelerate.value - 1) + 1;
+			}
+
+			in_mouse_x *= f;
+			in_mouse_y *= f;
+		
 		}
-		else if(averagespeed >= ma)
+		else if (m_accelerate_type.value == 1)        // quakelive acceleration
 		{
-			f = m_accelerate.value;
-		}
-		else
-		{
-			f = averagespeed;
-			f = (f - mi) / (ma - mi) * (m_accelerate.value - 1) + 1;
-		}
 
-		in_mouse_x *= f;
-		in_mouse_y *= f;
+	      
+		        if (cl.realframetime)
+			{
+		                float accelsens = sensitivity.value;
+				float speed = (sqrt (in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y)) /
+				  (cl.realframetime * 1000);
+				speed -= m_accelerate_offset.value;
+		  
+				if (speed > 0)
+				{
+		                        speed *= m_accelerate.value;
+			  
+					if (m_accelerate_power.value > 1)
+					{
+				                accelsens += exp((m_accelerate_power.value - 1) * log(speed));
+					}
+					else
+					{
+			                        accelsens = 1;
+					}
+				}
+		  
+				if (m_accelerate_senscap.value > 0 && accelsens > m_accelerate_senscap.value)
+				{
+				        accelsens = m_accelerate_senscap.value;
+				}
+		  
+				in_mouse_x *= accelsens;
+				in_mouse_y *= accelsens;
+		
+			}
+			else
+			{
+		                float mouse_deltadist = sqrt(in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y);
+				in_mouse_x *= (mouse_deltadist*m_accelerate.value + sensitivity.value);
+				in_mouse_y *= (mouse_deltadist*m_accelerate.value + sensitivity.value);
+			}
+		}
 	}
 
 	// apply m_filter if it is on
@@ -2209,6 +2262,10 @@ void CL_InitInput (void)
 	Cvar_RegisterVariable(&m_accelerate_minspeed);
 	Cvar_RegisterVariable(&m_accelerate_maxspeed);
 	Cvar_RegisterVariable(&m_accelerate_filter);
+	Cvar_RegisterVariable(&m_accelerate_type);
+	Cvar_RegisterVariable(&m_accelerate_offset);
+	Cvar_RegisterVariable(&m_accelerate_power);
+	Cvar_RegisterVariable(&m_accelerate_senscap);
 
 	Cvar_RegisterVariable(&cl_netfps);
 	Cvar_RegisterVariable(&cl_netrepeatinput);
