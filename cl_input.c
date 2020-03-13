@@ -592,18 +592,21 @@ void CL_Input (void)
 			// sensitivity, so we apply it but then dividie by
 			// sensitivity.value so that the later multiplication
 			// restores it again.
-			float accelsens = sensitivity.value;
+			float accelsens = 1.0f;
 			float adjusted_speed_pxms = (speed * 0.001f - m_accelerate_power_offset.value) * m_accelerate_power_strength.value;
+			float inv_sensitivity = 1.0f / sensitivity.value;
 			if (adjusted_speed_pxms > 0)
 			{
 				if (m_accelerate_power.value > 1.0f)
 				{
-					accelsens += expf((m_accelerate_power.value - 1.0f) * logf(adjusted_speed_pxms));
+					// TODO: How does this interact with sensitivity changes? Is this intended?
+					// Currently: more sensitivity = less acceleration at same pixel speed.
+					accelsens += expf((m_accelerate_power.value - 1.0f) * logf(adjusted_speed_pxms)) * inv_sensitivity;
 				}
 				else
 				{
 					// The limit of the then-branch for m_accel_power -> 1.
-					accelsens += 1.0f;
+					accelsens += inv_sensitivity;
 					// Note: QL had just accelsens = 1.0f.
 					// This is mathematically wrong though.
 				}
@@ -613,12 +616,12 @@ void CL_Input (void)
 				// The limit of the then-branch for adjusted_speed -> 0.
 				// accelsens += 0.0f;
 			}
-			if (m_accelerate_power_senscap.value > 0.0f && accelsens > m_accelerate_power_senscap.value)
+			if (m_accelerate_power_senscap.value > 0.0f && accelsens > m_accelerate_power_senscap.value * inv_sensitivity)
 			{
-			        accelsens = m_accelerate_power_senscap.value;
+				// TODO: How does this interact with sensitivity changes? Is this intended?
+				// Currently: senscap is in absolute sensitivity units, so if senscap < sensitivity, it overrides.
+			        accelsens = m_accelerate_power_senscap.value * inv_sensitivity;
 			}
-			// Divide by the standard linear sensitivity again.
-			accelsens /= sensitivity.value;
 
 			in_mouse_x *= accelsens;
 			in_mouse_y *= accelsens;
