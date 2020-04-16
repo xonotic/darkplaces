@@ -5,6 +5,7 @@
 #endif
 
 #include "quakedef.h"
+#include "taskqueue.h"
 #include "thread.h"
 
 #define SUPPORTDLL
@@ -45,8 +46,12 @@ extern qboolean host_shuttingdown;
 void Sys_Quit (int returnvalue)
 {
 	// Unlock mutexes because the quit command may jump directly here, causing a deadlock
-	Cbuf_UnlockThreadMutex();
+	if (cmd_client.text_lock)
+		Cbuf_Unlock(&cmd_client);
+	if (cmd_server.text_lock)
+		Cbuf_Unlock(&cmd_server);
 	SV_UnlockThreadMutex();
+	TaskQueue_Frame(true);
 
 	if (COM_CheckParm("-profilegameonly"))
 		Sys_AllowProfiling(false);
@@ -260,17 +265,17 @@ void* Sys_GetProcAddress (dllhandle_t handle, const char* name)
 #endif
 
 // this one is referenced elsewhere
-cvar_t sys_usenoclockbutbenchmark = {CVAR_SAVE, "sys_usenoclockbutbenchmark", "0", "don't use ANY real timing, and simulate a clock (for benchmarking); the game then runs as fast as possible. Run a QC mod with bots that does some stuff, then does a quit at the end, to benchmark a server. NEVER do this on a public server."};
+cvar_t sys_usenoclockbutbenchmark = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "sys_usenoclockbutbenchmark", "0", "don't use ANY real timing, and simulate a clock (for benchmarking); the game then runs as fast as possible. Run a QC mod with bots that does some stuff, then does a quit at the end, to benchmark a server. NEVER do this on a public server."};
 
 // these are not
-static cvar_t sys_debugsleep = {0, "sys_debugsleep", "0", "write requested and attained sleep times to standard output, to be used with gnuplot"};
-static cvar_t sys_usesdlgetticks = {CVAR_SAVE, "sys_usesdlgetticks", "0", "use SDL_GetTicks() timer (less accurate, for debugging)"};
-static cvar_t sys_usesdldelay = {CVAR_SAVE, "sys_usesdldelay", "0", "use SDL_Delay() (less accurate, for debugging)"};
+static cvar_t sys_debugsleep = {CVAR_CLIENT | CVAR_SERVER, "sys_debugsleep", "0", "write requested and attained sleep times to standard output, to be used with gnuplot"};
+static cvar_t sys_usesdlgetticks = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "sys_usesdlgetticks", "0", "use SDL_GetTicks() timer (less accurate, for debugging)"};
+static cvar_t sys_usesdldelay = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "sys_usesdldelay", "0", "use SDL_Delay() (less accurate, for debugging)"};
 #if HAVE_QUERYPERFORMANCECOUNTER
-static cvar_t sys_usequeryperformancecounter = {CVAR_SAVE, "sys_usequeryperformancecounter", "0", "use windows QueryPerformanceCounter timer (which has issues on multicore/multiprocessor machines and processors which are designed to conserve power) for timing rather than timeGetTime function (which has issues on some motherboards)"};
+static cvar_t sys_usequeryperformancecounter = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "sys_usequeryperformancecounter", "0", "use windows QueryPerformanceCounter timer (which has issues on multicore/multiprocessor machines and processors which are designed to conserve power) for timing rather than timeGetTime function (which has issues on some motherboards)"};
 #endif
 #if HAVE_CLOCKGETTIME
-static cvar_t sys_useclockgettime = {CVAR_SAVE, "sys_useclockgettime", "1", "use POSIX clock_gettime function (not adjusted by NTP on some older Linux kernels) for timing rather than gettimeofday (which has issues if the system time is stepped by ntpdate, or apparently on some Xen installations)"};
+static cvar_t sys_useclockgettime = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "sys_useclockgettime", "1", "use POSIX clock_gettime function (not adjusted by NTP on some older Linux kernels) for timing rather than gettimeofday (which has issues if the system time is stepped by ntpdate, or apparently on some Xen installations)"};
 #endif
 
 static double benchmark_time; // actually always contains an integer amount of milliseconds, will eventually "overflow"

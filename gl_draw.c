@@ -50,19 +50,19 @@ struct cachepic_s
 dp_fonts_t dp_fonts;
 static mempool_t *fonts_mempool = NULL;
 
-cvar_t r_textshadow = {CVAR_SAVE, "r_textshadow", "0", "draws a shadow on all text to improve readability (note: value controls offset, 1 = 1 pixel, 1.5 = 1.5 pixels, etc)"};
-cvar_t r_textbrightness = {CVAR_SAVE, "r_textbrightness", "0", "additional brightness for text color codes (0 keeps colors as is, 1 makes them all white)"};
-cvar_t r_textcontrast = {CVAR_SAVE, "r_textcontrast", "1", "additional contrast for text color codes (1 keeps colors as is, 0 makes them all black)"};
+cvar_t r_textshadow = {CVAR_CLIENT | CVAR_SAVE, "r_textshadow", "0", "draws a shadow on all text to improve readability (note: value controls offset, 1 = 1 pixel, 1.5 = 1.5 pixels, etc)"};
+cvar_t r_textbrightness = {CVAR_CLIENT | CVAR_SAVE, "r_textbrightness", "0", "additional brightness for text color codes (0 keeps colors as is, 1 makes them all white)"};
+cvar_t r_textcontrast = {CVAR_CLIENT | CVAR_SAVE, "r_textcontrast", "1", "additional contrast for text color codes (1 keeps colors as is, 0 makes them all black)"};
 
-cvar_t r_font_postprocess_blur = {CVAR_SAVE, "r_font_postprocess_blur", "0", "font blur amount"};
-cvar_t r_font_postprocess_outline = {CVAR_SAVE, "r_font_postprocess_outline", "0", "font outline amount"};
-cvar_t r_font_postprocess_shadow_x = {CVAR_SAVE, "r_font_postprocess_shadow_x", "0", "font shadow X shift amount, applied during outlining"};
-cvar_t r_font_postprocess_shadow_y = {CVAR_SAVE, "r_font_postprocess_shadow_y", "0", "font shadow Y shift amount, applied during outlining"};
-cvar_t r_font_postprocess_shadow_z = {CVAR_SAVE, "r_font_postprocess_shadow_z", "0", "font shadow Z shift amount, applied during blurring"};
-cvar_t r_font_hinting = {CVAR_SAVE, "r_font_hinting", "3", "0 = no hinting, 1 = light autohinting, 2 = full autohinting, 3 = full hinting"};
-cvar_t r_font_antialias = {CVAR_SAVE, "r_font_antialias", "1", "0 = monochrome, 1 = grey" /* , 2 = rgb, 3 = bgr" */};
-cvar_t r_nearest_2d = {CVAR_SAVE, "r_nearest_2d", "0", "use nearest filtering on all 2d textures (including conchars)"};
-cvar_t r_nearest_conchars = {CVAR_SAVE, "r_nearest_conchars", "0", "use nearest filtering on conchars texture"};
+cvar_t r_font_postprocess_blur = {CVAR_CLIENT | CVAR_SAVE, "r_font_postprocess_blur", "0", "font blur amount"};
+cvar_t r_font_postprocess_outline = {CVAR_CLIENT | CVAR_SAVE, "r_font_postprocess_outline", "0", "font outline amount"};
+cvar_t r_font_postprocess_shadow_x = {CVAR_CLIENT | CVAR_SAVE, "r_font_postprocess_shadow_x", "0", "font shadow X shift amount, applied during outlining"};
+cvar_t r_font_postprocess_shadow_y = {CVAR_CLIENT | CVAR_SAVE, "r_font_postprocess_shadow_y", "0", "font shadow Y shift amount, applied during outlining"};
+cvar_t r_font_postprocess_shadow_z = {CVAR_CLIENT | CVAR_SAVE, "r_font_postprocess_shadow_z", "0", "font shadow Z shift amount, applied during blurring"};
+cvar_t r_font_hinting = {CVAR_CLIENT | CVAR_SAVE, "r_font_hinting", "3", "0 = no hinting, 1 = light autohinting, 2 = full autohinting, 3 = full hinting"};
+cvar_t r_font_antialias = {CVAR_CLIENT | CVAR_SAVE, "r_font_antialias", "1", "0 = monochrome, 1 = grey" /* , 2 = rgb, 3 = bgr" */};
+cvar_t r_nearest_2d = {CVAR_CLIENT | CVAR_SAVE, "r_nearest_2d", "0", "use nearest filtering on all 2d textures (including conchars)"};
+cvar_t r_nearest_conchars = {CVAR_CLIENT | CVAR_SAVE, "r_nearest_conchars", "0", "use nearest filtering on conchars texture"};
 
 //=============================================================================
 /* Support Routines */
@@ -536,7 +536,7 @@ static float snap_to_pixel_y(float y, float roundUpAt)
 	*/
 }
 
-static void LoadFont_f(void)
+static void LoadFont_f(cmd_state_t *cmd)
 {
 	dp_font_t *f;
 	int i, sizes;
@@ -544,7 +544,7 @@ static void LoadFont_f(void)
 	float sz, scale, voffset;
 	char mainfont[MAX_QPATH];
 
-	if(Cmd_Argc() < 2)
+	if(Cmd_Argc(cmd) < 2)
 	{
 		Con_Printf("Available font commands:\n");
 		for(i = 0; i < dp_fonts.maxsize; ++i)
@@ -564,17 +564,17 @@ static void LoadFont_f(void)
 			);
 		return;
 	}
-	f = FindFont(Cmd_Argv(1), true);
+	f = FindFont(Cmd_Argv(cmd, 1), true);
 	if(f == NULL)
 	{
 		Con_Printf("font function not found\n");
 		return;
 	}
 
-	if(Cmd_Argc() < 3)
+	if(Cmd_Argc(cmd) < 3)
 		filelist = "gfx/conchars";
 	else
-		filelist = Cmd_Argv(2);
+		filelist = Cmd_Argv(cmd, 2);
 
 	memset(f->fallbacks, 0, sizeof(f->fallbacks));
 	memset(f->fallback_faces, 0, sizeof(f->fallback_faces));
@@ -633,23 +633,23 @@ static void LoadFont_f(void)
 
 	scale = 1;
 	voffset = 0;
-	if(Cmd_Argc() >= 4)
+	if(Cmd_Argc(cmd) >= 4)
 	{
-		for(sizes = 0, i = 3; i < Cmd_Argc(); ++i)
+		for(sizes = 0, i = 3; i < Cmd_Argc(cmd); ++i)
 		{
 			// special switches
-			if (!strcmp(Cmd_Argv(i), "scale"))
+			if (!strcmp(Cmd_Argv(cmd, i), "scale"))
 			{
 				i++;
-				if (i < Cmd_Argc())
-					scale = atof(Cmd_Argv(i));
+				if (i < Cmd_Argc(cmd))
+					scale = atof(Cmd_Argv(cmd, i));
 				continue;
 			}
-			if (!strcmp(Cmd_Argv(i), "voffset"))
+			if (!strcmp(Cmd_Argv(cmd, i), "voffset"))
 			{
 				i++;
-				if (i < Cmd_Argc())
-					voffset = atof(Cmd_Argv(i));
+				if (i < Cmd_Argc(cmd))
+					voffset = atof(Cmd_Argv(cmd, i));
 				continue;
 			}
 
@@ -657,7 +657,7 @@ static void LoadFont_f(void)
 				continue; // no slot for other sizes
 
 			// parse one of sizes
-			sz = atof(Cmd_Argv(i));
+			sz = atof(Cmd_Argv(cmd, i));
 			if (sz > 0.001f && sz < 1000.0f) // do not use crap sizes
 			{
 				// search for duplicated sizes
@@ -769,7 +769,7 @@ void GL_Draw_Init (void)
 		if(!FONT_USER(i)->title[0])
 			dpsnprintf(FONT_USER(i)->title, sizeof(FONT_USER(i)->title), "user%d", j++);
 
-	Cmd_AddCommand ("loadfont",LoadFont_f, "loadfont function tganame loads a font; example: loadfont console gfx/veramono; loadfont without arguments lists the available functions");
+	Cmd_AddCommand(&cmd_client, "loadfont", LoadFont_f, "loadfont function tganame loads a font; example: loadfont console gfx/veramono; loadfont without arguments lists the available functions");
 	R_RegisterModule("GL_Draw", gl_draw_start, gl_draw_shutdown, gl_draw_newmap, NULL, NULL);
 }
 

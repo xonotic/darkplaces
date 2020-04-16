@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "csprogs.h"
 #include "sv_demo.h"
 #include "snd_main.h"
+#include "taskqueue.h"
 #include "thread.h"
 #include "utf8lib.h"
 
@@ -60,35 +61,35 @@ client_t *host_client;
 jmp_buf host_abortframe;
 
 // pretend frames take this amount of time (in seconds), 0 = realtime
-cvar_t host_framerate = {0, "host_framerate","0", "locks frame timing to this value in seconds, 0.05 is 20fps for example, note that this can easily run too fast, use cl_maxfps if you want to limit your framerate instead, or sys_ticrate to limit server speed"};
-cvar_t cl_maxphysicsframesperserverframe = {0, "cl_maxphysicsframesperserverframe","10", "maximum number of physics frames per server frame"};
+cvar_t host_framerate = {CVAR_CLIENT | CVAR_SERVER, "host_framerate","0", "locks frame timing to this value in seconds, 0.05 is 20fps for example, note that this can easily run too fast, use cl_maxfps if you want to limit your framerate instead, or sys_ticrate to limit server speed"};
+cvar_t cl_maxphysicsframesperserverframe = {CVAR_CLIENT, "cl_maxphysicsframesperserverframe","10", "maximum number of physics frames per server frame"};
 // shows time used by certain subsystems
-cvar_t host_speeds = {0, "host_speeds","0", "reports how much time is used in server/graphics/sound"};
-cvar_t host_maxwait = {0, "host_maxwait","1000", "maximum sleep time requested from the operating system in millisecond. Larger sleeps will be done using multiple host_maxwait length sleeps. Lowering this value will increase CPU load, but may help working around problems with accuracy of sleep times."};
-cvar_t cl_minfps = {CVAR_SAVE, "cl_minfps", "40", "minimum fps target - while the rendering performance is below this, it will drift toward lower quality"};
-cvar_t cl_minfps_fade = {CVAR_SAVE, "cl_minfps_fade", "1", "how fast the quality adapts to varying framerate"};
-cvar_t cl_minfps_qualitymax = {CVAR_SAVE, "cl_minfps_qualitymax", "1", "highest allowed drawdistance multiplier"};
-cvar_t cl_minfps_qualitymin = {CVAR_SAVE, "cl_minfps_qualitymin", "0.25", "lowest allowed drawdistance multiplier"};
-cvar_t cl_minfps_qualitymultiply = {CVAR_SAVE, "cl_minfps_qualitymultiply", "0.2", "multiplier for quality changes in quality change per second render time (1 assumes linearity of quality and render time)"};
-cvar_t cl_minfps_qualityhysteresis = {CVAR_SAVE, "cl_minfps_qualityhysteresis", "0.05", "reduce all quality increments by this to reduce flickering"};
-cvar_t cl_minfps_qualitystepmax = {CVAR_SAVE, "cl_minfps_qualitystepmax", "0.1", "maximum quality change in a single frame"};
-cvar_t cl_minfps_force = {0, "cl_minfps_force", "0", "also apply quality reductions in timedemo/capturevideo"};
-cvar_t cl_maxfps = {CVAR_SAVE, "cl_maxfps", "0", "maximum fps cap, 0 = unlimited, if game is running faster than this it will wait before running another frame (useful to make cpu time available to other programs)"};
-cvar_t cl_maxfps_alwayssleep = {0, "cl_maxfps_alwayssleep","1", "gives up some processing time to other applications each frame, value in milliseconds, disabled if cl_maxfps is 0"};
-cvar_t cl_maxidlefps = {CVAR_SAVE, "cl_maxidlefps", "20", "maximum fps cap when the game is not the active window (makes cpu time available to other programs"};
+cvar_t host_speeds = {CVAR_CLIENT | CVAR_SERVER, "host_speeds","0", "reports how much time is used in server/graphics/sound"};
+cvar_t host_maxwait = {CVAR_CLIENT | CVAR_SERVER, "host_maxwait","1000", "maximum sleep time requested from the operating system in millisecond. Larger sleeps will be done using multiple host_maxwait length sleeps. Lowering this value will increase CPU load, but may help working around problems with accuracy of sleep times."};
+cvar_t cl_minfps = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps", "40", "minimum fps target - while the rendering performance is below this, it will drift toward lower quality"};
+cvar_t cl_minfps_fade = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_fade", "1", "how fast the quality adapts to varying framerate"};
+cvar_t cl_minfps_qualitymax = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymax", "1", "highest allowed drawdistance multiplier"};
+cvar_t cl_minfps_qualitymin = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymin", "0.25", "lowest allowed drawdistance multiplier"};
+cvar_t cl_minfps_qualitymultiply = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymultiply", "0.2", "multiplier for quality changes in quality change per second render time (1 assumes linearity of quality and render time)"};
+cvar_t cl_minfps_qualityhysteresis = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualityhysteresis", "0.05", "reduce all quality increments by this to reduce flickering"};
+cvar_t cl_minfps_qualitystepmax = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitystepmax", "0.1", "maximum quality change in a single frame"};
+cvar_t cl_minfps_force = {CVAR_CLIENT, "cl_minfps_force", "0", "also apply quality reductions in timedemo/capturevideo"};
+cvar_t cl_maxfps = {CVAR_CLIENT | CVAR_SAVE, "cl_maxfps", "0", "maximum fps cap, 0 = unlimited, if game is running faster than this it will wait before running another frame (useful to make cpu time available to other programs)"};
+cvar_t cl_maxfps_alwayssleep = {CVAR_CLIENT, "cl_maxfps_alwayssleep","1", "gives up some processing time to other applications each frame, value in milliseconds, disabled if cl_maxfps is 0"};
+cvar_t cl_maxidlefps = {CVAR_CLIENT | CVAR_SAVE, "cl_maxidlefps", "20", "maximum fps cap when the game is not the active window (makes cpu time available to other programs"};
 
-cvar_t developer = {CVAR_SAVE, "developer","0", "shows debugging messages and information (recommended for all developers and level designers); the value -1 also suppresses buffering and logging these messages"};
-cvar_t developer_extra = {0, "developer_extra", "0", "prints additional debugging messages, often very verbose!"};
-cvar_t developer_insane = {0, "developer_insane", "0", "prints huge streams of information about internal workings, entire contents of files being read/written, etc.  Not recommended!"};
-cvar_t developer_loadfile = {0, "developer_loadfile","0", "prints name and size of every file loaded via the FS_LoadFile function (which is almost everything)"};
-cvar_t developer_loading = {0, "developer_loading","0", "prints information about files as they are loaded or unloaded successfully"};
-cvar_t developer_entityparsing = {0, "developer_entityparsing", "0", "prints detailed network entities information each time a packet is received"};
+cvar_t developer = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "developer","0", "shows debugging messages and information (recommended for all developers and level designers); the value -1 also suppresses buffering and logging these messages"};
+cvar_t developer_extra = {CVAR_CLIENT | CVAR_SERVER, "developer_extra", "0", "prints additional debugging messages, often very verbose!"};
+cvar_t developer_insane = {CVAR_CLIENT | CVAR_SERVER, "developer_insane", "0", "prints huge streams of information about internal workings, entire contents of files being read/written, etc.  Not recommended!"};
+cvar_t developer_loadfile = {CVAR_CLIENT | CVAR_SERVER, "developer_loadfile","0", "prints name and size of every file loaded via the FS_LoadFile function (which is almost everything)"};
+cvar_t developer_loading = {CVAR_CLIENT | CVAR_SERVER, "developer_loading","0", "prints information about files as they are loaded or unloaded successfully"};
+cvar_t developer_entityparsing = {CVAR_CLIENT, "developer_entityparsing", "0", "prints detailed network entities information each time a packet is received"};
 
-cvar_t timestamps = {CVAR_SAVE, "timestamps", "0", "prints timestamps on console messages"};
-cvar_t timeformat = {CVAR_SAVE, "timeformat", "[%Y-%m-%d %H:%M:%S] ", "time format to use on timestamped console messages"};
+cvar_t timestamps = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "timestamps", "0", "prints timestamps on console messages"};
+cvar_t timeformat = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "timeformat", "[%Y-%m-%d %H:%M:%S] ", "time format to use on timestamped console messages"};
 
-cvar_t sessionid = {CVAR_READONLY, "sessionid", "", "ID of the current session (use the -sessionid parameter to set it); this is always either empty or begins with a dot (.)"};
-cvar_t locksession = {0, "locksession", "0", "Lock the session? 0 = no, 1 = yes and abort on failure, 2 = yes and continue on failure"};
+cvar_t sessionid = {CVAR_CLIENT | CVAR_SERVER | CVAR_READONLY, "sessionid", "", "ID of the current session (use the -sessionid parameter to set it); this is always either empty or begins with a dot (.)"};
+cvar_t locksession = {CVAR_CLIENT | CVAR_SERVER, "locksession", "0", "Lock the session? 0 = no, 1 = yes and abort on failure, 2 = yes and continue on failure"};
 
 /*
 ================
@@ -194,7 +195,7 @@ static void Host_ServerOptions (void)
 		if (COM_CheckParm ("-listen"))
 			Con_Printf ("Only one of -dedicated or -listen can be specified\n");
 		// default sv_public on for dedicated servers (often hosted by serious administrators), off for listen servers (often hosted by clueless users)
-		Cvar_SetValue("sv_public", 1);
+		Cvar_SetValue(&cvars_all, "sv_public", 1);
 	}
 	else if (cl_available)
 	{
@@ -228,14 +229,16 @@ static void Host_ServerOptions (void)
 Host_InitLocal
 ======================
 */
-void Host_SaveConfig_f(void);
-void Host_LoadConfig_f(void);
+void Host_SaveConfig_f(cmd_state_t *cmd);
+void Host_LoadConfig_f(cmd_state_t *cmd);
 extern cvar_t sv_writepicture_quality;
 extern cvar_t r_texture_jpeg_fastpicmip;
 static void Host_InitLocal (void)
 {
-	Cmd_AddCommand("saveconfig", Host_SaveConfig_f, "save settings to config.cfg (or a specified filename) immediately (also automatic when quitting)");
-	Cmd_AddCommand("loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
+	Cmd_AddCommand(&cmd_client, "saveconfig", Host_SaveConfig_f, "save settings to config.cfg (or a specified filename) immediately (also automatic when quitting)");
+	Cmd_AddCommand(&cmd_client, "loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
+	Cmd_AddCommand(&cmd_server, "saveconfig", Host_SaveConfig_f, "save settings to config.cfg (or a specified filename) immediately (also automatic when quitting)");
+	Cmd_AddCommand(&cmd_server, "loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
 
 	Cvar_RegisterVariable (&cl_maxphysicsframesperserverframe);
 	Cvar_RegisterVariable (&host_framerate);
@@ -292,7 +295,7 @@ static void Host_SaveConfig_to(const char *file)
 		}
 
 		Key_WriteBindings (f);
-		Cvar_WriteVariables (f);
+		Cvar_WriteVariables (&cvars_all, f);
 
 		FS_Close (f);
 	}
@@ -301,30 +304,30 @@ void Host_SaveConfig(void)
 {
 	Host_SaveConfig_to(CONFIGFILENAME);
 }
-void Host_SaveConfig_f(void)
+void Host_SaveConfig_f(cmd_state_t *cmd)
 {
 	const char *file = CONFIGFILENAME;
 
-	if(Cmd_Argc() >= 2) {
-		file = Cmd_Argv(1);
+	if(Cmd_Argc(cmd) >= 2) {
+		file = Cmd_Argv(cmd, 1);
 		Con_Printf("Saving to %s\n", file);
 	}
 
 	Host_SaveConfig_to(file);
 }
 
-static void Host_AddConfigText(void)
+static void Host_AddConfigText(cmd_state_t *cmd)
 {
 	// set up the default startmap_sp and startmap_dm aliases (mods can
 	// override these) and then execute the quake.rc startup script
 	if (gamemode == GAME_NEHAHRA)
-		Cbuf_InsertText("alias startmap_sp \"map nehstart\"\nalias startmap_dm \"map nehstart\"\nexec " STARTCONFIGFILENAME "\n");
+		Cbuf_InsertText(cmd, "alias startmap_sp \"map nehstart\"\nalias startmap_dm \"map nehstart\"\nexec " STARTCONFIGFILENAME "\n");
 	else if (gamemode == GAME_TRANSFUSION)
-		Cbuf_InsertText("alias startmap_sp \"map e1m1\"\n""alias startmap_dm \"map bb1\"\nexec " STARTCONFIGFILENAME "\n");
+		Cbuf_InsertText(cmd, "alias startmap_sp \"map e1m1\"\n""alias startmap_dm \"map bb1\"\nexec " STARTCONFIGFILENAME "\n");
 	else if (gamemode == GAME_TEU)
-		Cbuf_InsertText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec teu.rc\n");
+		Cbuf_InsertText(cmd, "alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec teu.rc\n");
 	else
-		Cbuf_InsertText("alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec " STARTCONFIGFILENAME "\n");
+		Cbuf_InsertText(cmd, "alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec " STARTCONFIGFILENAME "\n");
 }
 
 /*
@@ -334,16 +337,16 @@ Host_LoadConfig_f
 Resets key bindings and cvars to defaults and then reloads scripts
 ===============
 */
-void Host_LoadConfig_f(void)
+void Host_LoadConfig_f(cmd_state_t *cmd)
 {
 	// reset all cvars, commands and aliases to init values
 	Cmd_RestoreInitState();
 #ifdef CONFIG_MENU
 	// prepend a menu restart command to execute after the config
-	Cbuf_InsertText("\nmenu_restart\n");
+	Cbuf_InsertText(&cmd_client, "\nmenu_restart\n");
 #endif
 	// reset cvars to their defaults, and then exec startup scripts again
-	Host_AddConfigText();
+	Host_AddConfigText(&cmd_client);
 }
 
 /*
@@ -631,14 +634,14 @@ Add them exactly as if they had been typed at the console
 */
 static void Host_GetConsoleCommands (void)
 {
-	char *cmd;
+	char *line;
 
-	while (1)
+	while ((line = Sys_ConsoleInput()))
 	{
-		cmd = Sys_ConsoleInput ();
-		if (!cmd)
-			break;
-		Cbuf_AddText (cmd);
+		if (cls.state == ca_dedicated)
+			Cbuf_AddText(&cmd_server, line);
+		else
+			Cbuf_AddText(&cmd_client, line);
 	}
 }
 
@@ -741,9 +744,11 @@ void Host_Main(void)
 		}
 
 		if (slowmo.value < 0.00001 && slowmo.value != 0)
-			Cvar_SetValue("slowmo", 0);
+			Cvar_SetValueQuick(&slowmo, 0);
 		if (host_framerate.value < 0.00001 && host_framerate.value != 0)
-			Cvar_SetValue("host_framerate", 0);
+			Cvar_SetValueQuick(&host_framerate, 0);
+
+		TaskQueue_Frame(false);
 
 		// keep the random time dependent, but not when playing demos/benchmarking
 		if(!*sv_random_seed.string && !cls.demoplayback)
@@ -776,7 +781,8 @@ void Host_Main(void)
 			// process console commands
 //			R_TimeReport("preconsole");
 			CL_VM_PreventInformationLeaks();
-			Cbuf_Frame();
+			Cbuf_Frame(&cmd_client);
+			Cbuf_Frame(&cmd_server);
 //			R_TimeReport("console");
 		}
 
@@ -1091,8 +1097,6 @@ char engineversion[128];
 
 qboolean sys_nostdout = false;
 
-extern qboolean host_stuffcmdsrun;
-
 static qfile_t *locksession_fh = NULL;
 static qboolean locksession_run = false;
 static void Host_InitSession(void)
@@ -1162,6 +1166,8 @@ static void Host_Init (void)
 	int i;
 	const char* os;
 	char vabuf[1024];
+	qboolean dedicated_server = COM_CheckParm("-dedicated") || !cl_available;
+	cmd_state_t *cmd = &cmd_client;
 
 	if (COM_CheckParm("-profilegameonly"))
 		Sys_AllowProfiling(false);
@@ -1212,6 +1218,8 @@ static void Host_Init (void)
 	// initialize console command/cvar/alias/command execution systems
 	Cmd_Init();
 
+	Cmd_Init_Commands(dedicated_server);
+
 	// initialize memory subsystem cvars/commands
 	Memory_Init_Commands();
 
@@ -1221,7 +1229,6 @@ static void Host_Init (void)
 	// initialize various cvars that could not be initialized earlier
 	u8_Init();
 	Curl_Init_Commands();
-	Cmd_Init_Commands();
 	Sys_Init_Commands();
 	COM_Init_Commands();
 	FS_Init_Commands();
@@ -1270,9 +1277,13 @@ static void Host_Init (void)
 	Host_ServerOptions();
 
 	Thread_Init();
+	TaskQueue_Init();
 
 	if (cls.state == ca_dedicated)
-		Cmd_AddCommand ("disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
+	{
+		cmd = &cmd_server;
+		Cmd_AddCommand(&cmd_server, "disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
+	}
 	else
 	{
 		Con_DPrintf("Initializing client\n");
@@ -1303,14 +1314,14 @@ static void Host_Init (void)
 		return;
 	}
 
-	Host_AddConfigText();
-	Cbuf_Execute();
+	Host_AddConfigText(cmd);
+	Cbuf_Execute(cmd);
 
 	// if stuffcmds wasn't run, then quake.rc is probably missing, use default
 	if (!host_stuffcmdsrun)
 	{
-		Cbuf_AddText("exec default.cfg\nexec " CONFIGFILENAME "\nexec autoexec.cfg\nstuffcmds\n");
-		Cbuf_Execute();
+		Cbuf_AddText(cmd, "exec default.cfg\nexec " CONFIGFILENAME "\nexec autoexec.cfg\nstuffcmds\n");
+		Cbuf_Execute(cmd);
 	}
 
 	// put up the loading image so the user doesn't stare at a black screen...
@@ -1329,8 +1340,8 @@ static void Host_Init (void)
 	if (i && i + 1 < com_argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(va(vabuf, sizeof(vabuf), "timedemo %s\n", com_argv[i + 1]));
-		Cbuf_Execute();
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "timedemo %s\n", com_argv[i + 1]));
+		Cbuf_Execute(&cmd_client);
 	}
 
 	// check for special demo mode
@@ -1339,8 +1350,8 @@ static void Host_Init (void)
 	if (i && i + 1 < com_argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(va(vabuf, sizeof(vabuf), "playdemo %s\n", com_argv[i + 1]));
-		Cbuf_Execute();
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\n", com_argv[i + 1]));
+		Cbuf_Execute(&cmd_client);
 	}
 
 // COMMANDLINEOPTION: Client: -capturedemo <demoname> captures a playdemo and quits
@@ -1348,23 +1359,23 @@ static void Host_Init (void)
 	if (i && i + 1 < com_argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", com_argv[i + 1]));
-		Cbuf_Execute();
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", com_argv[i + 1]));
+		Cbuf_Execute(&cmd_client);
 	}
 
 	if (cls.state == ca_dedicated || COM_CheckParm("-listen"))
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText("startmap_dm\n");
-		Cbuf_Execute();
+		Cbuf_AddText(&cmd_client, "startmap_dm\n");
+		Cbuf_Execute(&cmd_client);
 	}
 
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 #ifdef CONFIG_MENU
-		Cbuf_AddText("togglemenu 1\n");
+		Cbuf_AddText(&cmd_client, "togglemenu 1\n");
 #endif
-		Cbuf_Execute();
+		Cbuf_Execute(&cmd_client);
 	}
 
 	Con_DPrint("========Initialized=========\n");
@@ -1441,6 +1452,7 @@ void Host_Shutdown(void)
 	}
 
 	SV_StopThread();
+	TaskQueue_Shutdown();
 	Thread_Shutdown();
 	Cmd_Shutdown();
 	Key_Shutdown();

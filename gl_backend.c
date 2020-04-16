@@ -4,16 +4,16 @@
 
 #define MAX_RENDERTARGETS 4
 
-cvar_t gl_debug = {0, "gl_debug", "0", "enables OpenGL debug output, 0 = off, 1 = HIGH severity only, 2 = also MEDIUM severity, 3 = also LOW severity messages.  (note: enabling may not take effect until vid_restart on some drivers)"};
-cvar_t gl_paranoid = {0, "gl_paranoid", "0", "enables OpenGL error checking and other tests"};
-cvar_t gl_printcheckerror = {0, "gl_printcheckerror", "0", "prints all OpenGL error checks, useful to identify location of driver crashes"};
+cvar_t gl_debug = {CVAR_CLIENT, "gl_debug", "0", "enables OpenGL debug output, 0 = off, 1 = HIGH severity only, 2 = also MEDIUM severity, 3 = also LOW severity messages.  (note: enabling may not take effect until vid_restart on some drivers)"};
+cvar_t gl_paranoid = {CVAR_CLIENT, "gl_paranoid", "0", "enables OpenGL error checking and other tests"};
+cvar_t gl_printcheckerror = {CVAR_CLIENT, "gl_printcheckerror", "0", "prints all OpenGL error checks, useful to identify location of driver crashes"};
 
-cvar_t r_render = {0, "r_render", "1", "enables rendering 3D views (you want this on!)"};
-cvar_t r_renderview = {0, "r_renderview", "1", "enables rendering 3D views (you want this on!)"};
-cvar_t r_waterwarp = {CVAR_SAVE, "r_waterwarp", "1", "warp view while underwater"};
-cvar_t gl_polyblend = {CVAR_SAVE, "gl_polyblend", "1", "tints view while underwater, hurt, etc"};
+cvar_t r_render = {CVAR_CLIENT, "r_render", "1", "enables rendering 3D views (you want this on!)"};
+cvar_t r_renderview = {CVAR_CLIENT, "r_renderview", "1", "enables rendering 3D views (you want this on!)"};
+cvar_t r_waterwarp = {CVAR_CLIENT | CVAR_SAVE, "r_waterwarp", "1", "warp view while underwater"};
+cvar_t gl_polyblend = {CVAR_CLIENT | CVAR_SAVE, "gl_polyblend", "1", "tints view while underwater, hurt, etc"};
 
-cvar_t v_flipped = {0, "v_flipped", "0", "mirror the screen (poor man's left handed mode)"};
+cvar_t v_flipped = {CVAR_CLIENT, "v_flipped", "0", "mirror the screen (poor man's left handed mode)"};
 qboolean v_flipped_state = false;
 
 r_viewport_t gl_viewport;
@@ -112,7 +112,7 @@ static void GLAPIENTRY GL_DebugOutputCallback(GLenum source, GLenum type, GLuint
 
 #define BACKENDACTIVECHECK if (!gl_state.active) Sys_Error("GL backend function called when backend is not active");
 
-void SCR_ScreenShot_f (void);
+void SCR_ScreenShot_f(cmd_state_t *cmd);
 
 typedef struct gltextureunit_s
 {
@@ -245,7 +245,7 @@ unsigned short polygonelement3s[(POLYGONELEMENTS_MAXPOINTS-2)*3];
 int quadelement3i[QUADELEMENTS_MAXQUADS*6];
 unsigned short quadelement3s[QUADELEMENTS_MAXQUADS*6];
 
-static void GL_VBOStats_f(void)
+static void GL_VBOStats_f(cmd_state_t *cmd)
 {
 	GL_Mesh_ListVBOs(true);
 }
@@ -372,7 +372,7 @@ void gl_backend_init(void)
 	Cvar_RegisterVariable(&gl_paranoid);
 	Cvar_RegisterVariable(&gl_printcheckerror);
 
-	Cmd_AddCommand("gl_vbostats", GL_VBOStats_f, "prints a list of all buffer objects (vertex data and triangle elements) and total video memory used by them");
+	Cmd_AddCommand(&cmd_client, "gl_vbostats", GL_VBOStats_f, "prints a list of all buffer objects (vertex data and triangle elements) and total video memory used by them");
 
 	R_RegisterModule("GL_Backend", gl_backend_start, gl_backend_shutdown, gl_backend_newmap, gl_backend_devicelost, gl_backend_devicerestored);
 }

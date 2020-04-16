@@ -27,17 +27,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "r_shadow.h"
 #include "polygon.h"
 
-cvar_t r_mipskins = {CVAR_SAVE, "r_mipskins", "0", "mipmaps model skins so they render faster in the distance and do not display noise artifacts, can cause discoloration of skins if they contain undesirable border colors"};
-cvar_t r_mipnormalmaps = {CVAR_SAVE, "r_mipnormalmaps", "1", "mipmaps normalmaps (turning it off looks sharper but may have aliasing)"};
-cvar_t mod_generatelightmaps_unitspersample = {CVAR_SAVE, "mod_generatelightmaps_unitspersample", "8", "lightmap resolution"};
-cvar_t mod_generatelightmaps_borderpixels = {CVAR_SAVE, "mod_generatelightmaps_borderpixels", "2", "extra space around polygons to prevent sampling artifacts"};
-cvar_t mod_generatelightmaps_texturesize = {CVAR_SAVE, "mod_generatelightmaps_texturesize", "1024", "size of lightmap textures"};
-cvar_t mod_generatelightmaps_lightmapsamples = {CVAR_SAVE, "mod_generatelightmaps_lightmapsamples", "16", "number of shadow tests done per lightmap pixel"};
-cvar_t mod_generatelightmaps_vertexsamples = {CVAR_SAVE, "mod_generatelightmaps_vertexsamples", "16", "number of shadow tests done per vertex"};
-cvar_t mod_generatelightmaps_gridsamples = {CVAR_SAVE, "mod_generatelightmaps_gridsamples", "64", "number of shadow tests done per lightgrid cell"};
-cvar_t mod_generatelightmaps_lightmapradius = {CVAR_SAVE, "mod_generatelightmaps_lightmapradius", "16", "sampling area around each lightmap pixel"};
-cvar_t mod_generatelightmaps_vertexradius = {CVAR_SAVE, "mod_generatelightmaps_vertexradius", "16", "sampling area around each vertex"};
-cvar_t mod_generatelightmaps_gridradius = {CVAR_SAVE, "mod_generatelightmaps_gridradius", "64", "sampling area around each lightgrid cell center"};
+cvar_t r_mipskins = {CVAR_CLIENT | CVAR_SAVE, "r_mipskins", "0", "mipmaps model skins so they render faster in the distance and do not display noise artifacts, can cause discoloration of skins if they contain undesirable border colors"};
+cvar_t r_mipnormalmaps = {CVAR_CLIENT | CVAR_SAVE, "r_mipnormalmaps", "1", "mipmaps normalmaps (turning it off looks sharper but may have aliasing)"};
+cvar_t mod_generatelightmaps_unitspersample = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_unitspersample", "8", "lightmap resolution"};
+cvar_t mod_generatelightmaps_borderpixels = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_borderpixels", "2", "extra space around polygons to prevent sampling artifacts"};
+cvar_t mod_generatelightmaps_texturesize = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_texturesize", "1024", "size of lightmap textures"};
+cvar_t mod_generatelightmaps_lightmapsamples = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_lightmapsamples", "16", "number of shadow tests done per lightmap pixel"};
+cvar_t mod_generatelightmaps_vertexsamples = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_vertexsamples", "16", "number of shadow tests done per vertex"};
+cvar_t mod_generatelightmaps_gridsamples = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_gridsamples", "64", "number of shadow tests done per lightgrid cell"};
+cvar_t mod_generatelightmaps_lightmapradius = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_lightmapradius", "16", "sampling area around each lightmap pixel"};
+cvar_t mod_generatelightmaps_vertexradius = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_vertexradius", "16", "sampling area around each vertex"};
+cvar_t mod_generatelightmaps_gridradius = {CVAR_CLIENT | CVAR_SAVE, "mod_generatelightmaps_gridradius", "64", "sampling area around each lightgrid cell center"};
 
 dp_model_t *loadmodel;
 
@@ -148,10 +148,10 @@ static void mod_newmap(void)
 Mod_Init
 ===============
 */
-static void Mod_Print(void);
-static void Mod_Precache (void);
-static void Mod_Decompile_f(void);
-static void Mod_GenerateLightmaps_f(void);
+static void Mod_Print_f(cmd_state_t *cmd);
+static void Mod_Precache_f(cmd_state_t *cmd);
+static void Mod_Decompile_f(cmd_state_t *cmd);
+static void Mod_GenerateLightmaps_f(cmd_state_t *cmd);
 void Mod_Init (void)
 {
 	mod_mempool = Mem_AllocPool("modelinfo", 0, NULL);
@@ -174,10 +174,10 @@ void Mod_Init (void)
 	Cvar_RegisterVariable(&mod_generatelightmaps_vertexradius);
 	Cvar_RegisterVariable(&mod_generatelightmaps_gridradius);
 
-	Cmd_AddCommand ("modellist", Mod_Print, "prints a list of loaded models");
-	Cmd_AddCommand ("modelprecache", Mod_Precache, "load a model");
-	Cmd_AddCommand ("modeldecompile", Mod_Decompile_f, "exports a model in several formats for editing purposes");
-	Cmd_AddCommand ("mod_generatelightmaps", Mod_GenerateLightmaps_f, "rebuilds lighting on current worldmodel");
+	Cmd_AddCommand(&cmd_client, "modellist", Mod_Print_f, "prints a list of loaded models");
+	Cmd_AddCommand(&cmd_client, "modelprecache", Mod_Precache_f, "load a model");
+	Cmd_AddCommand(&cmd_client, "modeldecompile", Mod_Decompile_f, "exports a model in several formats for editing purposes");
+	Cmd_AddCommand(&cmd_client, "mod_generatelightmaps", Mod_GenerateLightmaps_f, "rebuilds lighting on current worldmodel");
 }
 
 void Mod_RenderInit(void)
@@ -663,7 +663,7 @@ unsigned char *mod_base;
 Mod_Print
 ================
 */
-static void Mod_Print(void)
+static void Mod_Print_f(cmd_state_t *cmd)
 {
 	int i;
 	int nummodels = (int)Mem_ExpandableArray_IndexRange(&models);
@@ -687,10 +687,10 @@ static void Mod_Print(void)
 Mod_Precache
 ================
 */
-static void Mod_Precache(void)
+static void Mod_Precache_f(cmd_state_t *cmd)
 {
-	if (Cmd_Argc() == 2)
-		Mod_ForName(Cmd_Argv(1), false, true, Cmd_Argv(1)[0] == '*' ? cl.model_name[1] : NULL);
+	if (Cmd_Argc(cmd) == 2)
+		Mod_ForName(Cmd_Argv(cmd, 1), false, true, Cmd_Argv(cmd, 1)[0] == '*' ? cl.model_name[1] : NULL);
 	else
 		Con_Print("usage: modelprecache <filename>\n");
 }
@@ -1431,14 +1431,6 @@ static void Q3Shader_AddToHash (q3shaderinfo_t* shader)
 	memcpy (&entry->shader, shader, sizeof (q3shaderinfo_t));
 }
 
-extern cvar_t mod_noshader_default_offsetmapping;
-extern cvar_t mod_q3shader_default_offsetmapping;
-extern cvar_t mod_q3shader_default_offsetmapping_scale;
-extern cvar_t mod_q3shader_default_offsetmapping_bias;
-extern cvar_t mod_q3shader_default_polygonoffset;
-extern cvar_t mod_q3shader_default_polygonfactor;
-extern cvar_t mod_q3shader_force_addalpha;
-extern cvar_t mod_q3shader_force_terrain_alphaflag;
 void Mod_LoadQ3Shaders(void)
 {
 	int j;
@@ -1970,7 +1962,7 @@ void Mod_LoadQ3Shaders(void)
 				// this sets dpshaderkill to true if dpshaderkillifcvarzero was used, and to false if dpnoshaderkillifcvarzero was used
 				else if (((dpshaderkill = !strcasecmp(parameter[0], "dpshaderkillifcvarzero")) || !strcasecmp(parameter[0], "dpnoshaderkillifcvarzero")) && numparameters >= 2)
 				{
-					if (Cvar_VariableValue(parameter[1]) == 0.0f)
+					if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) == 0.0f)
 						shader.dpshaderkill = dpshaderkill;
 				}
 				// this sets dpshaderkill to true if dpshaderkillifcvar was used, and to false if dpnoshaderkillifcvar was used
@@ -1981,37 +1973,37 @@ void Mod_LoadQ3Shaders(void)
 						op = parameter[2];
 					if(!op)
 					{
-						if (Cvar_VariableValue(parameter[1]) != 0.0f)
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) != 0.0f)
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, "=="))
 					{
-						if (Cvar_VariableValue(parameter[1]) == atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) == atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, "!="))
 					{
-						if (Cvar_VariableValue(parameter[1]) != atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) != atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, ">"))
 					{
-						if (Cvar_VariableValue(parameter[1]) > atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) > atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, "<"))
 					{
-						if (Cvar_VariableValue(parameter[1]) < atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) < atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, ">="))
 					{
-						if (Cvar_VariableValue(parameter[1]) >= atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) >= atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else if (numparameters >= 4 && !strcmp(op, "<="))
 					{
-						if (Cvar_VariableValue(parameter[1]) <= atof(parameter[3]))
+						if (Cvar_VariableValue(&cvars_all, parameter[1], ~0) <= atof(parameter[3]))
 							shader.dpshaderkill = dpshaderkill;
 					}
 					else
@@ -2473,6 +2465,7 @@ nothing                GL_ZERO GL_ONE
 		texture->specularscalemod = shader->specularscalemod;
 		texture->specularpowermod = shader->specularpowermod;
 		texture->rtlightambient = shader->rtlightambient;
+		texture->refractive_index = mod_q3shader_default_refractive_index.value;
 		if (shader->dpreflectcube[0])
 			texture->reflectcubetexture = R_GetCubemap(shader->dpreflectcube);
 
@@ -3245,7 +3238,7 @@ Mod_Decompile_f
 decompiles a model to editable files
 ================
 */
-static void Mod_Decompile_f(void)
+static void Mod_Decompile_f(cmd_state_t *cmd)
 {
 	int i, j, k, l, first, count;
 	dp_model_t *mod;
@@ -3263,13 +3256,13 @@ static void Mod_Decompile_f(void)
 	int framegroupstextsize = 0;
 	char vabuf[1024];
 
-	if (Cmd_Argc() != 2)
+	if (Cmd_Argc(cmd) != 2)
 	{
 		Con_Print("usage: modeldecompile <filename>\n");
 		return;
 	}
 
-	strlcpy(inname, Cmd_Argv(1), sizeof(inname));
+	strlcpy(inname, Cmd_Argv(cmd, 1), sizeof(inname));
 	FS_StripExtension(inname, basename, sizeof(basename));
 
 	mod = Mod_ForName(inname, false, true, inname[0] == '*' ? cl.model_name[1] : NULL);
@@ -4354,9 +4347,9 @@ static void Mod_GenerateLightmaps(dp_model_t *model)
 	loadmodel = oldloadmodel;
 }
 
-static void Mod_GenerateLightmaps_f(void)
+static void Mod_GenerateLightmaps_f(cmd_state_t *cmd)
 {
-	if (Cmd_Argc() != 1)
+	if (Cmd_Argc(cmd) != 1)
 	{
 		Con_Printf("usage: mod_generatelightmaps\n");
 		return;
@@ -4405,9 +4398,10 @@ texture_t *Mod_Mesh_GetTexture(dp_model_t *mod, const char *name, int defaultdra
 {
 	int i;
 	texture_t *t;
-	for (i = 0; i < mod->num_textures; i++)
-		if (!strcmp(mod->data_textures[i].name, name))
-			return mod->data_textures + i;
+	int drawflag = defaultdrawflags & DRAWFLAG_MASK;
+	for (i = 0, t = mod->data_textures; i < mod->num_textures; i++, t++)
+		if (!strcmp(t->name, name) && t->drawflag == drawflag)
+			return t;
 	if (mod->max_textures <= mod->num_textures)
 	{
 		texture_t *oldtextures = mod->data_textures;
@@ -4419,6 +4413,7 @@ texture_t *Mod_Mesh_GetTexture(dp_model_t *mod, const char *name, int defaultdra
 	}
 	t = &mod->data_textures[mod->num_textures++];
 	Mod_LoadTextureFromQ3Shader(mod->mempool, mod->name, t, name, false, true, defaulttexflags, defaultmaterialflags);
+	t->drawflag = drawflag;
 	switch (defaultdrawflags & DRAWFLAG_MASK)
 	{
 	case DRAWFLAG_ADDITIVE:

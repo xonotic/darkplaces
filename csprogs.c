@@ -485,6 +485,8 @@ qboolean CL_VM_UpdateView (double frametime)
 		r_refdef.scene.numlights = 0;
 		// polygonbegin without draw2d arg has to guess
 		prog->polygonbegin_guess2d = false;
+		// free memory for resources that are no longer referenced
+		PRVM_GarbageCollection(prog);
 		// pass in width and height as parameters (EXT_CSQC_1)
 		PRVM_G_FLOAT(OFS_PARM0) = vid.width;
 		PRVM_G_FLOAT(OFS_PARM1) = vid.height;
@@ -563,7 +565,7 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 		int sizeflags = csqc_progcrc.flags;
 		csqc_progcrc.flags &= ~CVAR_READONLY;
 		csqc_progsize.flags &= ~CVAR_READONLY;
-		Cmd_ExecuteString (msg, src_command, true);
+		Cmd_ExecuteString(&cmd_clientfromserver, msg, src_command, true);
 		csqc_progcrc.flags = crcflags;
 		csqc_progsize.flags = sizeflags;
 		return;
@@ -596,7 +598,7 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 				l = sizeof(buf) - 1;
 			strlcpy(buf, p, l + 1); // strlcpy needs a + 1 as it includes the newline!
 
-			Cmd_ExecuteString(buf, src_command, true);
+			Cmd_ExecuteString(&cmd_clientfromserver, buf, src_command, true);
 
 			p += l;
 			if(*p == '\n')
@@ -604,13 +606,13 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 			else
 				break; // end of string or overflow
 		}
-		Cmd_ExecuteString("curl --clear_autodownload", src_command, true); // don't inhibit CSQC loading
+		Cmd_ExecuteString(&cmd_clientfromserver, "curl --clear_autodownload", src_command, true); // don't inhibit CSQC loading
 		return;
 	}
 
 	if(!cl.csqc_loaded)
 	{
-		Cbuf_AddText(msg);
+		Cbuf_AddText(&cmd_clientfromserver, msg);
 		return;
 	}
 	CSQC_BEGIN
@@ -624,7 +626,7 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 		prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 	}
 	else
-		Cbuf_AddText(msg);
+		Cbuf_AddText(&cmd_clientfromserver, msg);
 	CSQC_END
 }
 
@@ -1059,7 +1061,7 @@ void CL_VM_Init (void)
 		return;
 	}
 
-	PRVM_Prog_Init(prog);
+	PRVM_Prog_Init(prog, &cmd_client);
 
 	// allocate the mempools
 	prog->progs_mempool = Mem_AllocPool(csqc_progname.string, 0, NULL);
@@ -1161,7 +1163,7 @@ void CL_VM_Init (void)
 void CL_VM_ShutDown (void)
 {
 	prvm_prog_t *prog = CLVM_prog;
-	Cmd_ClearCsqcFuncs();
+	Cmd_ClearCsqcFuncs(&cmd_client);
 	//Cvar_SetValueQuick(&csqc_progcrc, -1);
 	//Cvar_SetValueQuick(&csqc_progsize, -1);
 	if(!cl.csqc_loaded)

@@ -114,8 +114,6 @@ extern char engineversion[128];
 #define	MAX_BINDMAPS			8
 #define	MAX_PARTICLES_INITIAL	8192
 #define	MAX_PARTICLES			8192
-#define	MAX_DECALS_INITIAL		1024
-#define	MAX_DECALS				1024
 #define	MAX_ENITIES_INITIAL		256
 #define	MAX_STATICENTITIES		256
 #define	MAX_EFFECTS				16
@@ -186,8 +184,6 @@ extern char engineversion[128];
 #define	MAX_BINDMAPS			8
 #define	MAX_PARTICLES_INITIAL	8192 ///< initial allocation for cl.particles
 #define	MAX_PARTICLES			1048576 ///< upper limit on cl.particles size
-#define	MAX_DECALS_INITIAL		8192 ///< initial allocation for cl.decals
-#define	MAX_DECALS				1048576 ///< upper limit on cl.decals size
 #define	MAX_ENITIES_INITIAL		256 ///< initial size of cl.entities
 #define	MAX_STATICENTITIES		1024 ///< limit on size of cl.static_entities
 #define	MAX_EFFECTS				256 ///< limit on size of cl.effects
@@ -530,11 +526,11 @@ void Host_Main(void);
 void Host_Shutdown(void);
 void Host_StartVideo(void);
 void Host_Error(const char *error, ...) DP_FUNC_PRINTF(1) DP_FUNC_NORETURN;
-void Host_Quit_f(void);
+void Host_Quit_f(cmd_state_t *cmd);
 void Host_ClientCommands(const char *fmt, ...) DP_FUNC_PRINTF(1);
 void Host_ShutdownServer(void);
-void Host_Reconnect_f(void);
-void Host_NoOperation_f(void);
+void Host_Reconnect_f(cmd_state_t *cmd);
+void Host_NoOperation_f(cmd_state_t *cmd);
 void Host_LockSession(void);
 void Host_UnlockSession(void);
 

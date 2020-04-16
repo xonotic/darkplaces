@@ -3,10 +3,10 @@
 #include "image.h"
 
 // FIXME: fix skybox after vid_restart
-cvar_t r_sky = {CVAR_SAVE, "r_sky", "1", "enables sky rendering (black otherwise)"};
-cvar_t r_skyscroll1 = {CVAR_SAVE, "r_skyscroll1", "1", "speed at which upper clouds layer scrolls in quake sky"};
-cvar_t r_skyscroll2 = {CVAR_SAVE, "r_skyscroll2", "2", "speed at which lower clouds layer scrolls in quake sky"};
-cvar_t r_sky_scissor = {0, "r_sky_scissor", "1", "limit rendering of sky to approximately the area of the sky surfaces"};
+cvar_t r_sky = {CVAR_CLIENT | CVAR_SAVE, "r_sky", "1", "enables sky rendering (black otherwise)"};
+cvar_t r_skyscroll1 = {CVAR_CLIENT | CVAR_SAVE, "r_skyscroll1", "1", "speed at which upper clouds layer scrolls in quake sky"};
+cvar_t r_skyscroll2 = {CVAR_CLIENT | CVAR_SAVE, "r_skyscroll2", "2", "speed at which lower clouds layer scrolls in quake sky"};
+cvar_t r_sky_scissor = {CVAR_CLIENT, "r_sky_scissor", "1", "limit rendering of sky to approximately the area of the sky surfaces"};
 int skyrenderlater;
 int skyrendermasked;
 int skyscissor[4];
@@ -163,9 +163,9 @@ int R_SetSkyBox(const char *sky)
 }
 
 // LadyHavoc: added LoadSky console command
-static void LoadSky_f (void)
+static void LoadSky_f(cmd_state_t *cmd)
 {
-	switch (Cmd_Argc())
+	switch (Cmd_Argc(cmd))
 	{
 	case 1:
 		if (skyname[0])
@@ -174,7 +174,7 @@ static void LoadSky_f (void)
 			Con_Print("no skybox has been set\n");
 		break;
 	case 2:
-		if (R_SetSkyBox(Cmd_Argv(1)))
+		if (R_SetSkyBox(Cmd_Argv(cmd, 1)))
 		{
 			if (skyname[0])
 				Con_Printf("skybox set to %s\n", skyname);
@@ -182,7 +182,7 @@ static void LoadSky_f (void)
 				Con_Print("skybox disabled\n");
 		}
 		else
-			Con_Printf("failed to load skybox %s\n", Cmd_Argv(1));
+			Con_Printf("failed to load skybox %s\n", Cmd_Argv(cmd, 1));
 		break;
 	default:
 		Con_Print("usage: loadsky skyname\n");
@@ -463,7 +463,7 @@ static void r_sky_newmap(void)
 
 void R_Sky_Init(void)
 {
-	Cmd_AddCommand ("loadsky", &LoadSky_f, "load a skybox by basename (for example loadsky mtnsun_ loads mtnsun_ft.tga and so on)");
+	Cmd_AddCommand(&cmd_client, "loadsky", &LoadSky_f, "load a skybox by basename (for example loadsky mtnsun_ loads mtnsun_ft.tga and so on)");
 	Cvar_RegisterVariable (&r_sky);
 	Cvar_RegisterVariable (&r_skyscroll1);
 	Cvar_RegisterVariable (&r_skyscroll2);

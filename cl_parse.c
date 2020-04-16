@@ -164,37 +164,37 @@ const char *qw_svc_strings[128] =
 
 //=============================================================================
 
-cvar_t cl_worldmessage = {CVAR_READONLY, "cl_worldmessage", "", "title of current level"};
-cvar_t cl_worldname = {CVAR_READONLY, "cl_worldname", "", "name of current worldmodel"};
-cvar_t cl_worldnamenoextension = {CVAR_READONLY, "cl_worldnamenoextension", "", "name of current worldmodel without extension"};
-cvar_t cl_worldbasename = {CVAR_READONLY, "cl_worldbasename", "", "name of current worldmodel without maps/ prefix or extension"};
+cvar_t cl_worldmessage = {CVAR_CLIENT | CVAR_READONLY, "cl_worldmessage", "", "title of current level"};
+cvar_t cl_worldname = {CVAR_CLIENT | CVAR_READONLY, "cl_worldname", "", "name of current worldmodel"};
+cvar_t cl_worldnamenoextension = {CVAR_CLIENT | CVAR_READONLY, "cl_worldnamenoextension", "", "name of current worldmodel without extension"};
+cvar_t cl_worldbasename = {CVAR_CLIENT | CVAR_READONLY, "cl_worldbasename", "", "name of current worldmodel without maps/ prefix or extension"};
 
-cvar_t developer_networkentities = {0, "developer_networkentities", "0", "prints received entities, value is 0-10 (higher for more info, 10 being the most verbose)"};
-cvar_t cl_gameplayfix_soundsmovewithentities = {0, "cl_gameplayfix_soundsmovewithentities", "1", "causes sounds made by lifts, players, projectiles, and any other entities, to move with the entity, so for example a rocket noise follows the rocket rather than staying at the starting position"};
-cvar_t cl_sound_wizardhit = {0, "cl_sound_wizardhit", "wizard/hit.wav", "sound to play during TE_WIZSPIKE (empty cvar disables sound)"};
-cvar_t cl_sound_hknighthit = {0, "cl_sound_hknighthit", "hknight/hit.wav", "sound to play during TE_KNIGHTSPIKE (empty cvar disables sound)"};
-cvar_t cl_sound_tink1 = {0, "cl_sound_tink1", "weapons/tink1.wav", "sound to play with 80% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
-cvar_t cl_sound_ric1 = {0, "cl_sound_ric1", "weapons/ric1.wav", "sound to play with 5% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
-cvar_t cl_sound_ric2 = {0, "cl_sound_ric2", "weapons/ric2.wav", "sound to play with 5% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
-cvar_t cl_sound_ric3 = {0, "cl_sound_ric3", "weapons/ric3.wav", "sound to play with 10% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
-cvar_t cl_readpicture_force = {0, "cl_readpicture_force", "0", "when enabled, the low quality pictures read by ReadPicture() are preferred over the high quality pictures on the file system"};
+cvar_t developer_networkentities = {CVAR_CLIENT, "developer_networkentities", "0", "prints received entities, value is 0-10 (higher for more info, 10 being the most verbose)"};
+cvar_t cl_gameplayfix_soundsmovewithentities = {CVAR_CLIENT, "cl_gameplayfix_soundsmovewithentities", "1", "causes sounds made by lifts, players, projectiles, and any other entities, to move with the entity, so for example a rocket noise follows the rocket rather than staying at the starting position"};
+cvar_t cl_sound_wizardhit = {CVAR_CLIENT, "cl_sound_wizardhit", "wizard/hit.wav", "sound to play during TE_WIZSPIKE (empty cvar disables sound)"};
+cvar_t cl_sound_hknighthit = {CVAR_CLIENT, "cl_sound_hknighthit", "hknight/hit.wav", "sound to play during TE_KNIGHTSPIKE (empty cvar disables sound)"};
+cvar_t cl_sound_tink1 = {CVAR_CLIENT, "cl_sound_tink1", "weapons/tink1.wav", "sound to play with 80% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
+cvar_t cl_sound_ric1 = {CVAR_CLIENT, "cl_sound_ric1", "weapons/ric1.wav", "sound to play with 5% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
+cvar_t cl_sound_ric2 = {CVAR_CLIENT, "cl_sound_ric2", "weapons/ric2.wav", "sound to play with 5% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
+cvar_t cl_sound_ric3 = {CVAR_CLIENT, "cl_sound_ric3", "weapons/ric3.wav", "sound to play with 10% chance during TE_SPIKE/TE_SUPERSPIKE (empty cvar disables sound)"};
+cvar_t cl_readpicture_force = {CVAR_CLIENT, "cl_readpicture_force", "0", "when enabled, the low quality pictures read by ReadPicture() are preferred over the high quality pictures on the file system"};
 
 #define RIC_GUNSHOT		1
 #define RIC_GUNSHOTQUAD	2
-cvar_t cl_sound_ric_gunshot = {0, "cl_sound_ric_gunshot", "0", "specifies if and when the related cl_sound_ric and cl_sound_tink sounds apply to TE_GUNSHOT/TE_GUNSHOTQUAD, 0 = no sound, 1 = TE_GUNSHOT, 2 = TE_GUNSHOTQUAD, 3 = TE_GUNSHOT and TE_GUNSHOTQUAD"};
-cvar_t cl_sound_r_exp3 = {0, "cl_sound_r_exp3", "weapons/r_exp3.wav", "sound to play during TE_EXPLOSION and related effects (empty cvar disables sound)"};
-cvar_t cl_serverextension_download = {0, "cl_serverextension_download", "0", "indicates whether the server supports the download command"};
-cvar_t cl_joinbeforedownloadsfinish = {CVAR_SAVE, "cl_joinbeforedownloadsfinish", "1", "if non-zero the game will begin after the map is loaded before other downloads finish"};
-cvar_t cl_nettimesyncfactor = {CVAR_SAVE, "cl_nettimesyncfactor", "0", "rate at which client time adapts to match server time, 1 = instantly, 0.125 = slowly, 0 = not at all (bounding still applies)"};
-cvar_t cl_nettimesyncboundmode = {CVAR_SAVE, "cl_nettimesyncboundmode", "6", "method of restricting client time to valid values, 0 = no correction, 1 = tight bounding (jerky with packet loss), 2 = loose bounding (corrects it if out of bounds), 3 = leniant bounding (ignores temporary errors due to varying framerate), 4 = slow adjustment method from Quake3, 5 = slighttly nicer version of Quake3 method, 6 = bounding + Quake3"};
-cvar_t cl_nettimesyncboundtolerance = {CVAR_SAVE, "cl_nettimesyncboundtolerance", "0.25", "how much error is tolerated by bounding check, as a fraction of frametime, 0.25 = up to 25% margin of error tolerated, 1 = use only new time, 0 = use only old time (same effect as setting cl_nettimesyncfactor to 1)"};
-cvar_t cl_iplog_name = {CVAR_SAVE, "cl_iplog_name", "darkplaces_iplog.txt", "name of iplog file containing player addresses for iplog_list command and automatic ip logging when parsing status command"};
+cvar_t cl_sound_ric_gunshot = {CVAR_CLIENT, "cl_sound_ric_gunshot", "0", "specifies if and when the related cl_sound_ric and cl_sound_tink sounds apply to TE_GUNSHOT/TE_GUNSHOTQUAD, 0 = no sound, 1 = TE_GUNSHOT, 2 = TE_GUNSHOTQUAD, 3 = TE_GUNSHOT and TE_GUNSHOTQUAD"};
+cvar_t cl_sound_r_exp3 = {CVAR_CLIENT, "cl_sound_r_exp3", "weapons/r_exp3.wav", "sound to play during TE_EXPLOSION and related effects (empty cvar disables sound)"};
+cvar_t cl_serverextension_download = {CVAR_CLIENT, "cl_serverextension_download", "0", "indicates whether the server supports the download command"};
+cvar_t cl_joinbeforedownloadsfinish = {CVAR_CLIENT | CVAR_SAVE, "cl_joinbeforedownloadsfinish", "1", "if non-zero the game will begin after the map is loaded before other downloads finish"};
+cvar_t cl_nettimesyncfactor = {CVAR_CLIENT | CVAR_SAVE, "cl_nettimesyncfactor", "0", "rate at which client time adapts to match server time, 1 = instantly, 0.125 = slowly, 0 = not at all (bounding still applies)"};
+cvar_t cl_nettimesyncboundmode = {CVAR_CLIENT | CVAR_SAVE, "cl_nettimesyncboundmode", "6", "method of restricting client time to valid values, 0 = no correction, 1 = tight bounding (jerky with packet loss), 2 = loose bounding (corrects it if out of bounds), 3 = leniant bounding (ignores temporary errors due to varying framerate), 4 = slow adjustment method from Quake3, 5 = slighttly nicer version of Quake3 method, 6 = bounding + Quake3"};
+cvar_t cl_nettimesyncboundtolerance = {CVAR_CLIENT | CVAR_SAVE, "cl_nettimesyncboundtolerance", "0.25", "how much error is tolerated by bounding check, as a fraction of frametime, 0.25 = up to 25% margin of error tolerated, 1 = use only new time, 0 = use only old time (same effect as setting cl_nettimesyncfactor to 1)"};
+cvar_t cl_iplog_name = {CVAR_CLIENT | CVAR_SAVE, "cl_iplog_name", "darkplaces_iplog.txt", "name of iplog file containing player addresses for iplog_list command and automatic ip logging when parsing status command"};
 
 static qboolean QW_CL_CheckOrDownloadFile(const char *filename);
 static void QW_CL_RequestNextDownload(void);
-static void QW_CL_NextUpload(void);
+static void QW_CL_NextUpload_f(cmd_state_t *cmd);
 //static qboolean QW_CL_IsUploading(void);
-static void QW_CL_StopUpload(void);
+static void QW_CL_StopUpload_f(cmd_state_t *cmd);
 
 /*
 ==================
@@ -500,7 +500,7 @@ static void CL_SetupWorldModel(void)
 	World_Start(&cl.world);
 
 	// load or reload .loc file for team chat messages
-	CL_Locs_Reload_f();
+	CL_Locs_Reload_f(&cmd_client);
 
 	// make sure we send enough keepalives
 	CL_KeepaliveMessage(false);
@@ -885,14 +885,14 @@ static void QW_CL_ParseSoundList(void)
 	QW_CL_RequestNextDownload();
 }
 
-static void QW_CL_Skins_f(void)
+static void QW_CL_Skins_f(cmd_state_t *cmd)
 {
 	cls.qw_downloadnumber = 0;
 	cls.qw_downloadtype = dl_skin;
 	QW_CL_RequestNextDownload();
 }
 
-static void QW_CL_Changing_f(void)
+static void QW_CL_Changing_f(cmd_state_t *cmd)
 {
 	if (cls.qw_downloadmemory)  // don't change when downloading
 		return;
@@ -903,7 +903,7 @@ static void QW_CL_Changing_f(void)
 	Con_Printf("\nChanging map...\n");
 }
 
-void QW_CL_NextUpload(void)
+void QW_CL_NextUpload_f(cmd_state_t *cmd)
 {
 	int r, percent, size;
 
@@ -930,7 +930,7 @@ void QW_CL_NextUpload(void)
 
 	Con_Printf("Upload completed\n");
 
-	QW_CL_StopUpload();
+	QW_CL_StopUpload_f(cmd);
 }
 
 void QW_CL_StartUpload(unsigned char *data, int size)
@@ -940,7 +940,7 @@ void QW_CL_StartUpload(unsigned char *data, int size)
 		return;
 
 	// abort existing upload if in progress
-	QW_CL_StopUpload();
+	QW_CL_StopUpload_f(&cmd_client);
 
 	Con_DPrintf("Starting upload of %d bytes...\n", size);
 
@@ -949,7 +949,7 @@ void QW_CL_StartUpload(unsigned char *data, int size)
 	cls.qw_uploadsize = size;
 	cls.qw_uploadpos = 0;
 
-	QW_CL_NextUpload();
+	QW_CL_NextUpload_f(&cmd_client);
 }
 
 #if 0
@@ -959,7 +959,7 @@ qboolean QW_CL_IsUploading(void)
 }
 #endif
 
-void QW_CL_StopUpload(void)
+void QW_CL_StopUpload_f(cmd_state_t *cmd)
 {
 	if (cls.qw_uploaddata)
 		Mem_Free(cls.qw_uploaddata);
@@ -1366,7 +1366,7 @@ static void CL_BeginDownloads(qboolean aborteddownload)
 	}
 }
 
-static void CL_BeginDownloads_f(void)
+static void CL_BeginDownloads_f(cmd_state_t *cmd)
 {
 	// prevent cl_begindownloads from being issued multiple times in one match
 	// to prevent accidentally cancelled downloads
@@ -1509,11 +1509,11 @@ static void CL_ParseDownload(void)
 	cls.qw_downloadspeedcount += size;
 }
 
-static void CL_DownloadBegin_f(void)
+static void CL_DownloadBegin_f(cmd_state_t *cmd)
 {
-	int size = atoi(Cmd_Argv(1));
+	int size = atoi(Cmd_Argv(cmd, 1));
 
-	if (size < 0 || size > 1<<30 || FS_CheckNastyPath(Cmd_Argv(2), false))
+	if (size < 0 || size > 1<<30 || FS_CheckNastyPath(Cmd_Argv(cmd, 2), false))
 	{
 		Con_Printf("cl_downloadbegin: received bogus information\n");
 		CL_StopDownload(0, 0);
@@ -1526,15 +1526,15 @@ static void CL_DownloadBegin_f(void)
 	CL_StopDownload(0, 0);
 
 	// we're really beginning a download now, so initialize stuff
-	strlcpy(cls.qw_downloadname, Cmd_Argv(2), sizeof(cls.qw_downloadname));
+	strlcpy(cls.qw_downloadname, Cmd_Argv(cmd, 2), sizeof(cls.qw_downloadname));
 	cls.qw_downloadmemorymaxsize = size;
 	cls.qw_downloadmemory = (unsigned char *) Mem_Alloc(cls.permanentmempool, cls.qw_downloadmemorymaxsize);
 	cls.qw_downloadnumber++;
 
 	cls.qw_download_deflate = false;
-	if(Cmd_Argc() >= 4)
+	if(Cmd_Argc(cmd) >= 4)
 	{
-		if(!strcmp(Cmd_Argv(3), "deflate"))
+		if(!strcmp(Cmd_Argv(cmd, 3), "deflate"))
 			cls.qw_download_deflate = true;
 		// check further encodings here
 	}
@@ -1542,7 +1542,7 @@ static void CL_DownloadBegin_f(void)
 	Cmd_ForwardStringToServer("sv_startdownload");
 }
 
-static void CL_StopDownload_f(void)
+static void CL_StopDownload_f(cmd_state_t *cmd)
 {
 	Curl_CancelAll();
 	if (cls.qw_downloadname[0])
@@ -1553,14 +1553,14 @@ static void CL_StopDownload_f(void)
 	CL_BeginDownloads(true);
 }
 
-static void CL_DownloadFinished_f(void)
+static void CL_DownloadFinished_f(cmd_state_t *cmd)
 {
-	if (Cmd_Argc() < 3)
+	if (Cmd_Argc(cmd) < 3)
 	{
 		Con_Printf("Malformed cl_downloadfinished command\n");
 		return;
 	}
-	CL_StopDownload(atoi(Cmd_Argv(1)), atoi(Cmd_Argv(2)));
+	CL_StopDownload(atoi(Cmd_Argv(cmd, 1)), atoi(Cmd_Argv(cmd, 2)));
 	CL_BeginDownloads(false);
 }
 
@@ -1619,7 +1619,7 @@ static void CL_SignonReply (void)
 			// execute cl_begindownloads next frame
 			// (after any commands added by svc_stufftext have been executed)
 			// when done with downloads the "prespawn" will be sent
-			Cbuf_AddText("\ncl_begindownloads\n");
+			Cbuf_AddText(&cmd_client, "\ncl_begindownloads\n");
 
 			//MSG_WriteByte (&cls.netcon->message, clc_stringcmd);
 			//MSG_WriteString (&cls.netcon->message, "prespawn");
@@ -1920,7 +1920,7 @@ static void CL_ParseServerInfo (void)
 			if (cls.demorecording)
 			{
 				// finish the previous level's demo file
-				CL_Stop_f();
+				CL_Stop_f(&cmd_client);
 			}
 
 			// start a new demo file
@@ -3094,18 +3094,18 @@ static void CL_IPLog_Load(void)
 	}
 }
 
-static void CL_IPLog_List_f(void)
+static void CL_IPLog_List_f(cmd_state_t *cmd)
 {
 	int i, j;
 	const char *addressprefix;
-	if (Cmd_Argc() > 2)
+	if (Cmd_Argc(cmd) > 2)
 	{
-		Con_Printf("usage: %s 123.456.789.\n", Cmd_Argv(0));
+		Con_Printf("usage: %s 123.456.789.\n", Cmd_Argv(cmd, 0));
 		return;
 	}
 	addressprefix = "";
-	if (Cmd_Argc() >= 2)
-		addressprefix = Cmd_Argv(1);
+	if (Cmd_Argc(cmd) >= 2)
+		addressprefix = Cmd_Argv(cmd, 1);
 	if (!cl_iplog_loaded)
 		CL_IPLog_Load();
 	if (addressprefix && addressprefix[0])
@@ -3663,7 +3663,7 @@ void CL_ParseServerMessage(void)
 				break;
 
 			case qw_svc_sellscreen:
-				Cmd_ExecuteString ("help", src_command, true);
+				Cmd_ExecuteString(&cmd_client, "help", src_command, true);
 				break;
 
 			case qw_svc_smallkick:
@@ -4170,7 +4170,7 @@ void CL_ParseServerMessage(void)
 				break;
 
 			case svc_sellscreen:
-				Cmd_ExecuteString ("help", src_command, true);
+				Cmd_ExecuteString(&cmd_client, "help", src_command, true);
 				break;
 			case svc_hidelmp:
 				if (gamemode == GAME_TENEBRAE)
@@ -4273,7 +4273,7 @@ void CL_Parse_DumpPacket(void)
 void CL_Parse_ErrorCleanUp(void)
 {
 	CL_StopDownload(0, 0);
-	QW_CL_StopUpload();
+	QW_CL_StopUpload_f(&cmd_client);
 }
 
 void CL_Parse_Init(void)
@@ -4306,15 +4306,15 @@ void CL_Parse_Init(void)
 	Cvar_RegisterVariable(&cl_iplog_name);
 	Cvar_RegisterVariable(&cl_readpicture_force);
 
-	Cmd_AddCommand("nextul", QW_CL_NextUpload, "sends next fragment of current upload buffer (screenshot for example)");
-	Cmd_AddCommand("stopul", QW_CL_StopUpload, "aborts current upload (screenshot for example)");
-	Cmd_AddCommand("skins", QW_CL_Skins_f, "downloads missing qw skins from server");
-	Cmd_AddCommand("changing", QW_CL_Changing_f, "sent by qw servers to tell client to wait for level change");
-	Cmd_AddCommand("cl_begindownloads", CL_BeginDownloads_f, "used internally by darkplaces client while connecting (causes loading of models and sounds or triggers downloads for missing ones)");
-	Cmd_AddCommand("cl_downloadbegin", CL_DownloadBegin_f, "(networking) informs client of download file information, client replies with sv_startsoundload to begin the transfer");
-	Cmd_AddCommand("stopdownload", CL_StopDownload_f, "terminates a download");
-	Cmd_AddCommand("cl_downloadfinished", CL_DownloadFinished_f, "signals that a download has finished and provides the client with file size and crc to check its integrity");
-	Cmd_AddCommand("iplog_list", CL_IPLog_List_f, "lists names of players whose IP address begins with the supplied text (example: iplog_list 123.456.789)");
+	Cmd_AddCommand(&cmd_client, "nextul", QW_CL_NextUpload_f, "sends next fragment of current upload buffer (screenshot for example)");
+	Cmd_AddCommand(&cmd_client, "stopul", QW_CL_StopUpload_f, "aborts current upload (screenshot for example)");
+	Cmd_AddCommand(&cmd_client, "skins", QW_CL_Skins_f, "downloads missing qw skins from server");
+	Cmd_AddCommand(&cmd_client, "changing", QW_CL_Changing_f, "sent by qw servers to tell client to wait for level change");
+	Cmd_AddCommand(&cmd_client, "cl_begindownloads", CL_BeginDownloads_f, "used internally by darkplaces client while connecting (causes loading of models and sounds or triggers downloads for missing ones)");
+	Cmd_AddCommand(&cmd_client, "cl_downloadbegin", CL_DownloadBegin_f, "(networking) informs client of download file information, client replies with sv_startsoundload to begin the transfer");
+	Cmd_AddCommand(&cmd_client, "stopdownload", CL_StopDownload_f, "terminates a download");
+	Cmd_AddCommand(&cmd_client, "cl_downloadfinished", CL_DownloadFinished_f, "signals that a download has finished and provides the client with file size and crc to check its integrity");
+	Cmd_AddCommand(&cmd_client, "iplog_list", CL_IPLog_List_f, "lists names of players whose IP address begins with the supplied text (example: iplog_list 123.456.789)");
 }
 
 void CL_Parse_Shutdown(void)

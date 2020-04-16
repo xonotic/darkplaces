@@ -986,29 +986,6 @@ typedef enum ptype_e
 }
 ptype_t;
 
-typedef struct decal_s
-{
-	// fields used by rendering:  (44 bytes)
-	unsigned short	typeindex;
-	unsigned short	texnum;
-	unsigned int	decalsequence;
-	vec3_t			org;
-	vec3_t			normal;
-	float			size;
-	float			alpha; // 0-255
-	unsigned char	color[3];
-	unsigned char	unused1;
-	int				clusterindex; // cheap culling by pvs
-
-	// fields not used by rendering: (36 bytes in 32bit, 40 bytes in 64bit)
-	float			time2; // used for decal fade
-	unsigned int	owner; // decal stuck to this entity
-	dp_model_t			*ownermodel; // model the decal is stuck to (used to make sure the entity is still alive)
-	vec3_t			relativeorigin; // decal at this location in entity's coordinate space
-	vec3_t			relativenormal; // decal oriented this way relative to entity's coordinate space
-}
-decal_t;
-
 typedef struct particle_s
 {
 	// for faster batch rendering, particles are rendered in groups by effect (resulting in less perfect sorting but far less state changes)
@@ -1325,7 +1302,6 @@ typedef struct client_state_s
 	int max_lightstyle;
 	int max_brushmodel_entities;
 	int max_particles;
-	int max_decals;
 	int max_showlmps;
 
 	entity_t *entities;
@@ -1338,7 +1314,6 @@ typedef struct client_state_s
 	lightstyle_t *lightstyle;
 	int *brushmodel_entities;
 	particle_t *particles;
-	decal_t *decals;
 	showlmp_t *showlmps;
 
 	int num_entities;
@@ -1560,7 +1535,7 @@ void CL_Init (void);
 void CL_EstablishConnection(const char *host, int firstarg);
 
 void CL_Disconnect (void);
-void CL_Disconnect_f (void);
+void CL_Disconnect_f(cmd_state_t *cmd);
 
 void CL_UpdateRenderEntity(entity_render_t *ent);
 void CL_SetEntityColormapColors(entity_render_t *ent, int colormap);
@@ -1624,10 +1599,10 @@ void CL_CutDemo(unsigned char **buf, fs_offset_t *filesize);
 void CL_PasteDemo(unsigned char **buf, fs_offset_t *filesize);
 
 void CL_NextDemo(void);
-void CL_Stop_f(void);
-void CL_Record_f(void);
-void CL_PlayDemo_f(void);
-void CL_TimeDemo_f(void);
+void CL_Stop_f(cmd_state_t *cmd);
+void CL_Record_f(cmd_state_t *cmd);
+void CL_PlayDemo_f(cmd_state_t *cmd);
+void CL_TimeDemo_f(cmd_state_t *cmd);
 
 //
 // cl_parse.c
@@ -1644,7 +1619,7 @@ void CL_KeepaliveMessage(qboolean readmessages); // call this during loading of 
 //
 // view
 //
-void V_StartPitchDrift (void);
+void V_StartPitchDrift_f(cmd_state_t *cmd);
 void V_StopPitchDrift (void);
 
 void V_Init (void);
@@ -2062,7 +2037,7 @@ void CL_Beam_AddPolygons(const beam_t *b);
 void Sbar_ShowFPS(void);
 void Sbar_ShowFPS_Update(void);
 void Host_SaveConfig(void);
-void Host_LoadConfig_f(void);
+void Host_LoadConfig_f(cmd_state_t *cmd);
 void CL_UpdateMoveVars(void);
 void SCR_CaptureVideo_SoundFrame(const portable_sampleframe_t *paintbuffer, size_t length);
 void V_DriftPitch(void);
@@ -2070,7 +2045,7 @@ void V_FadeViewFlashs(void);
 void V_CalcViewBlend(void);
 void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qboolean teleported, qboolean clonground, qboolean clcmdjump, float clstatsviewheight, qboolean cldead, qboolean clintermission, const vec3_t clvelocity);
 void V_CalcRefdef(void);
-void CL_Locs_Reload_f(void);
+void CL_Locs_Reload_f(cmd_state_t *cmd);
 
 #endif
 

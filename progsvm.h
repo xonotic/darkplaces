@@ -489,6 +489,31 @@ typedef struct prvm_stringbuffer_s
 }
 prvm_stringbuffer_t;
 
+// flags for knownstrings
+#define KNOWNSTRINGFLAG_ENGINE 1
+#define KNOWNSTRINGFLAG_GCMARK 2
+#define KNOWNSTRINGFLAG_GCPRUNE 4 // cleared by GCMARK code, string is freed if prune remains after two sweeps
+
+typedef enum prvm_prog_garbagecollection_state_stage_e
+{
+	PRVM_GC_START = 0,
+	PRVM_GC_GLOBALS_MARK,
+	PRVM_GC_FIELDS_MARK,
+	PRVM_GC_KNOWNSTRINGS_SWEEP,
+	PRVM_GC_RESET,
+}
+prvm_prog_garbagecollection_state_stage_t;
+
+typedef struct prvm_prog_garbagecollection_state_s
+{
+	prvm_prog_garbagecollection_state_stage_t stage;
+	int globals_mark_progress;
+	int fields_mark_progress;
+	int fields_mark_progress_entity;
+	int knownstrings_sweep_progress;
+}
+prvm_prog_garbagecollection_state_t;
+
 // [INIT] variables flagged with this token can be initialized by 'you'
 // NOTE: external code has to create and free the mempools but everything else is done by prvm !
 typedef struct prvm_prog_s
@@ -547,11 +572,14 @@ typedef struct prvm_prog_s
 	// (simple optimization of the free string search)
 	int					firstfreeknownstring;
 	const char			**knownstrings;
-	unsigned char		*knownstrings_freeable;
+	unsigned char		*knownstrings_flags;
 	const char          **knownstrings_origin;
 	const char			***stringshash;
 
 	memexpandablearray_t	stringbuffersarray;
+
+	// garbage collection status
+	prvm_prog_garbagecollection_state_t gc;
 
 	// all memory allocations related to this vm_prog (code, edicts, strings)
 	mempool_t			*progs_mempool; // [INIT]
@@ -593,6 +621,7 @@ typedef struct prvm_prog_s
 	fssearch_t			*opensearches[PRVM_MAX_OPENSEARCHES];
 	const char *         opensearches_origin[PRVM_MAX_OPENSEARCHES];
 	skeleton_t			*skeletons[MAX_EDICTS];
+	cmd_state_t			*console_cmd; // points to the relevant console command interpreter for this vm (&cmd_client or &cmd_server), also used to access cvars
 
 	// buffer for storing all tempstrings created during one invocation of ExecuteProgram
 	sizebuf_t			tempstringsbuf;
@@ -620,7 +649,11 @@ typedef struct prvm_prog_s
 	int					reserved_edicts; // [INIT]
 
 	prvm_edict_t		*edicts;
-	prvm_vec_t		*edictsfields;
+	union
+	{
+		prvm_vec_t *fp;
+		prvm_int_t *ip;
+	} edictsfields;
 	void				*edictprivate;
 
 	// size of the engine private struct
@@ -757,15 +790,16 @@ void PRVM_ExecuteProgram (prvm_prog_t *prog, func_t fnum, const char *errormessa
 #define PRVM_Free(buffer) Mem_Free(buffer)
 
 void PRVM_Profile (prvm_prog_t *prog, int maxfunctions, double mintime, int sortby);
-void PRVM_Profile_f (void);
-void PRVM_ChildProfile_f (void);
-void PRVM_CallProfile_f (void);
-void PRVM_PrintFunction_f (void);
+void PRVM_Profile_f(cmd_state_t *cmd);
+void PRVM_ChildProfile_f(cmd_state_t *cmd);
+void PRVM_CallProfile_f(cmd_state_t *cmd);
+void PRVM_PrintFunction_f(cmd_state_t *cmd);
 
 void PRVM_PrintState(prvm_prog_t *prog, int stack_index);
 void PRVM_Crash(prvm_prog_t *prog);
 void PRVM_ShortStackTrace(prvm_prog_t *prog, char *buf, size_t bufsize);
 const char *PRVM_AllocationOrigin(prvm_prog_t *prog);
+void PRVM_GarbageCollection(prvm_prog_t *prog);
 
 ddef_t *PRVM_ED_FindField(prvm_prog_t *prog, const char *name);
 ddef_t *PRVM_ED_FindGlobal(prvm_prog_t *prog, const char *name);
@@ -830,7 +864,7 @@ extern	int		prvm_type_size[8]; // for consistency : I think a goal of this sub-p
 
 void PRVM_Init_Exec(prvm_prog_t *prog);
 
-void PRVM_ED_PrintEdicts_f (void);
+void PRVM_ED_PrintEdicts_f(cmd_state_t *cmd);
 void PRVM_ED_PrintNum (prvm_prog_t *prog, int ent, const char *wildcard_fieldname);
 
 const char *PRVM_GetString(prvm_prog_t *prog, int num);
@@ -855,7 +889,7 @@ Set up the fields marked with [INIT] in the prog struct
 Load a program with LoadProgs
 */
 // Load expects to be called right after Reset
-void PRVM_Prog_Init(prvm_prog_t *prog);
+void PRVM_Prog_Init(prvm_prog_t *prog, cmd_state_t *cmd);
 void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data, fs_offset_t size, int numrequiredfunc, const char **required_func, int numrequiredfields, prvm_required_field_t *required_field, int numrequiredglobals, prvm_required_field_t *required_global);
 void PRVM_Prog_Reset(prvm_prog_t *prog);
 

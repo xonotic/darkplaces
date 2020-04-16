@@ -62,12 +62,12 @@ int			in_impulse;
 
 
 
-static void KeyDown (kbutton_t *b)
+static void KeyDown (cmd_state_t *cmd, kbutton_t *b)
 {
 	int k;
 	const char *c;
 
-	c = Cmd_Argv(1);
+	c = Cmd_Argv(cmd, 1);
 	if (c[0])
 		k = atoi(c);
 	else
@@ -91,12 +91,12 @@ static void KeyDown (kbutton_t *b)
 	b->state |= 1 + 2;	// down + impulse down
 }
 
-static void KeyUp (kbutton_t *b)
+static void KeyUp (cmd_state_t *cmd, kbutton_t *b)
 {
 	int k;
 	const char *c;
 
-	c = Cmd_Argv(1);
+	c = Cmd_Argv(cmd, 1);
 	if (c[0])
 		k = atoi(c);
 	else
@@ -121,82 +121,82 @@ static void KeyUp (kbutton_t *b)
 	b->state |= 4; 		// impulse up
 }
 
-static void IN_KLookDown (void) {KeyDown(&in_klook);}
-static void IN_KLookUp (void) {KeyUp(&in_klook);}
-static void IN_MLookDown (void) {KeyDown(&in_mlook);}
-static void IN_MLookUp (void)
+static void IN_KLookDown(cmd_state_t *cmd) {KeyDown(cmd, &in_klook);}
+static void IN_KLookUp(cmd_state_t *cmd) {KeyUp(cmd, &in_klook);}
+static void IN_MLookDown(cmd_state_t *cmd) {KeyDown(cmd, &in_mlook);}
+static void IN_MLookUp(cmd_state_t *cmd)
 {
-	KeyUp(&in_mlook);
+	KeyUp(cmd, &in_mlook);
 	if ( !(in_mlook.state&1) && lookspring.value)
-		V_StartPitchDrift();
+		V_StartPitchDrift_f(cmd);
 }
-static void IN_UpDown(void) {KeyDown(&in_up);}
-static void IN_UpUp(void) {KeyUp(&in_up);}
-static void IN_DownDown(void) {KeyDown(&in_down);}
-static void IN_DownUp(void) {KeyUp(&in_down);}
-static void IN_LeftDown(void) {KeyDown(&in_left);}
-static void IN_LeftUp(void) {KeyUp(&in_left);}
-static void IN_RightDown(void) {KeyDown(&in_right);}
-static void IN_RightUp(void) {KeyUp(&in_right);}
-static void IN_ForwardDown(void) {KeyDown(&in_forward);}
-static void IN_ForwardUp(void) {KeyUp(&in_forward);}
-static void IN_BackDown(void) {KeyDown(&in_back);}
-static void IN_BackUp(void) {KeyUp(&in_back);}
-static void IN_LookupDown(void) {KeyDown(&in_lookup);}
-static void IN_LookupUp(void) {KeyUp(&in_lookup);}
-static void IN_LookdownDown(void) {KeyDown(&in_lookdown);}
-static void IN_LookdownUp(void) {KeyUp(&in_lookdown);}
-static void IN_MoveleftDown(void) {KeyDown(&in_moveleft);}
-static void IN_MoveleftUp(void) {KeyUp(&in_moveleft);}
-static void IN_MoverightDown(void) {KeyDown(&in_moveright);}
-static void IN_MoverightUp(void) {KeyUp(&in_moveright);}
+static void IN_UpDown(cmd_state_t *cmd) {KeyDown(cmd, &in_up);}
+static void IN_UpUp(cmd_state_t *cmd) {KeyUp(cmd, &in_up);}
+static void IN_DownDown(cmd_state_t *cmd) {KeyDown(cmd, &in_down);}
+static void IN_DownUp(cmd_state_t *cmd) {KeyUp(cmd, &in_down);}
+static void IN_LeftDown(cmd_state_t *cmd) {KeyDown(cmd, &in_left);}
+static void IN_LeftUp(cmd_state_t *cmd) {KeyUp(cmd, &in_left);}
+static void IN_RightDown(cmd_state_t *cmd) {KeyDown(cmd, &in_right);}
+static void IN_RightUp(cmd_state_t *cmd) {KeyUp(cmd, &in_right);}
+static void IN_ForwardDown(cmd_state_t *cmd) {KeyDown(cmd, &in_forward);}
+static void IN_ForwardUp(cmd_state_t *cmd) {KeyUp(cmd, &in_forward);}
+static void IN_BackDown(cmd_state_t *cmd) {KeyDown(cmd, &in_back);}
+static void IN_BackUp(cmd_state_t *cmd) {KeyUp(cmd, &in_back);}
+static void IN_LookupDown(cmd_state_t *cmd) {KeyDown(cmd, &in_lookup);}
+static void IN_LookupUp(cmd_state_t *cmd) {KeyUp(cmd, &in_lookup);}
+static void IN_LookdownDown(cmd_state_t *cmd) {KeyDown(cmd, &in_lookdown);}
+static void IN_LookdownUp(cmd_state_t *cmd) {KeyUp(cmd, &in_lookdown);}
+static void IN_MoveleftDown(cmd_state_t *cmd) {KeyDown(cmd, &in_moveleft);}
+static void IN_MoveleftUp(cmd_state_t *cmd) {KeyUp(cmd, &in_moveleft);}
+static void IN_MoverightDown(cmd_state_t *cmd) {KeyDown(cmd, &in_moveright);}
+static void IN_MoverightUp(cmd_state_t *cmd) {KeyUp(cmd, &in_moveright);}
 
-static void IN_SpeedDown(void) {KeyDown(&in_speed);}
-static void IN_SpeedUp(void) {KeyUp(&in_speed);}
-static void IN_StrafeDown(void) {KeyDown(&in_strafe);}
-static void IN_StrafeUp(void) {KeyUp(&in_strafe);}
+static void IN_SpeedDown(cmd_state_t *cmd) {KeyDown(cmd, &in_speed);}
+static void IN_SpeedUp(cmd_state_t *cmd) {KeyUp(cmd, &in_speed);}
+static void IN_StrafeDown(cmd_state_t *cmd) {KeyDown(cmd, &in_strafe);}
+static void IN_StrafeUp(cmd_state_t *cmd) {KeyUp(cmd, &in_strafe);}
 
-static void IN_AttackDown(void) {KeyDown(&in_attack);}
-static void IN_AttackUp(void) {KeyUp(&in_attack);}
+static void IN_AttackDown(cmd_state_t *cmd) {KeyDown(cmd, &in_attack);}
+static void IN_AttackUp(cmd_state_t *cmd) {KeyUp(cmd, &in_attack);}
 
-static void IN_UseDown(void) {KeyDown(&in_use);}
-static void IN_UseUp(void) {KeyUp(&in_use);}
+static void IN_UseDown(cmd_state_t *cmd) {KeyDown(cmd, &in_use);}
+static void IN_UseUp(cmd_state_t *cmd) {KeyUp(cmd, &in_use);}
 
 // LadyHavoc: added 6 new buttons
-static void IN_Button3Down(void) {KeyDown(&in_button3);}
-static void IN_Button3Up(void) {KeyUp(&in_button3);}
-static void IN_Button4Down(void) {KeyDown(&in_button4);}
-static void IN_Button4Up(void) {KeyUp(&in_button4);}
-static void IN_Button5Down(void) {KeyDown(&in_button5);}
-static void IN_Button5Up(void) {KeyUp(&in_button5);}
-static void IN_Button6Down(void) {KeyDown(&in_button6);}
-static void IN_Button6Up(void) {KeyUp(&in_button6);}
-static void IN_Button7Down(void) {KeyDown(&in_button7);}
-static void IN_Button7Up(void) {KeyUp(&in_button7);}
-static void IN_Button8Down(void) {KeyDown(&in_button8);}
-static void IN_Button8Up(void) {KeyUp(&in_button8);}
+static void IN_Button3Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button3);}
+static void IN_Button3Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button3);}
+static void IN_Button4Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button4);}
+static void IN_Button4Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button4);}
+static void IN_Button5Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button5);}
+static void IN_Button5Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button5);}
+static void IN_Button6Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button6);}
+static void IN_Button6Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button6);}
+static void IN_Button7Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button7);}
+static void IN_Button7Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button7);}
+static void IN_Button8Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button8);}
+static void IN_Button8Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button8);}
 
-static void IN_Button9Down(void) {KeyDown(&in_button9);}
-static void IN_Button9Up(void) {KeyUp(&in_button9);}
-static void IN_Button10Down(void) {KeyDown(&in_button10);}
-static void IN_Button10Up(void) {KeyUp(&in_button10);}
-static void IN_Button11Down(void) {KeyDown(&in_button11);}
-static void IN_Button11Up(void) {KeyUp(&in_button11);}
-static void IN_Button12Down(void) {KeyDown(&in_button12);}
-static void IN_Button12Up(void) {KeyUp(&in_button12);}
-static void IN_Button13Down(void) {KeyDown(&in_button13);}
-static void IN_Button13Up(void) {KeyUp(&in_button13);}
-static void IN_Button14Down(void) {KeyDown(&in_button14);}
-static void IN_Button14Up(void) {KeyUp(&in_button14);}
-static void IN_Button15Down(void) {KeyDown(&in_button15);}
-static void IN_Button15Up(void) {KeyUp(&in_button15);}
-static void IN_Button16Down(void) {KeyDown(&in_button16);}
-static void IN_Button16Up(void) {KeyUp(&in_button16);}
+static void IN_Button9Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button9);}
+static void IN_Button9Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button9);}
+static void IN_Button10Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button10);}
+static void IN_Button10Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button10);}
+static void IN_Button11Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button11);}
+static void IN_Button11Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button11);}
+static void IN_Button12Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button12);}
+static void IN_Button12Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button12);}
+static void IN_Button13Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button13);}
+static void IN_Button13Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button13);}
+static void IN_Button14Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button14);}
+static void IN_Button14Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button14);}
+static void IN_Button15Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button15);}
+static void IN_Button15Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button15);}
+static void IN_Button16Down(cmd_state_t *cmd) {KeyDown(cmd, &in_button16);}
+static void IN_Button16Up(cmd_state_t *cmd) {KeyUp(cmd, &in_button16);}
 
-static void IN_JumpDown (void) {KeyDown(&in_jump);}
-static void IN_JumpUp (void) {KeyUp(&in_jump);}
+static void IN_JumpDown(cmd_state_t *cmd) {KeyDown(cmd, &in_jump);}
+static void IN_JumpUp(cmd_state_t *cmd) {KeyUp(cmd, &in_jump);}
 
-static void IN_Impulse (void) {in_impulse=atoi(Cmd_Argv(1));}
+static void IN_Impulse(cmd_state_t *cmd) {in_impulse=atoi(Cmd_Argv(cmd, 1));}
 
 in_bestweapon_info_t in_bestweapon_info[IN_BESTWEAPON_MAX];
 
@@ -241,45 +241,45 @@ void IN_BestWeapon_ResetData (void)
 	IN_BestWeapon_Register("h", 226, HIT_MJOLNIR, HIT_MJOLNIR, STAT_CELLS, 0); // hipnotic mjolnir hammer
 }
 
-static void IN_BestWeapon_Register_f (void)
+static void IN_BestWeapon_Register_f(cmd_state_t *cmd)
 {
-	if(Cmd_Argc() == 7)
+	if(Cmd_Argc(cmd) == 7)
 	{
 		IN_BestWeapon_Register(
-			Cmd_Argv(1),
-			atoi(Cmd_Argv(2)),
-			atoi(Cmd_Argv(3)),
-			atoi(Cmd_Argv(4)),
-			atoi(Cmd_Argv(5)),
-			atoi(Cmd_Argv(6))
+			Cmd_Argv(cmd, 1),
+			atoi(Cmd_Argv(cmd, 2)),
+			atoi(Cmd_Argv(cmd, 3)),
+			atoi(Cmd_Argv(cmd, 4)),
+			atoi(Cmd_Argv(cmd, 5)),
+			atoi(Cmd_Argv(cmd, 6))
 		);
 	}
-	else if(Cmd_Argc() == 2 && !strcmp(Cmd_Argv(1), "clear"))
+	else if(Cmd_Argc(cmd) == 2 && !strcmp(Cmd_Argv(cmd, 1), "clear"))
 	{
 		memset(in_bestweapon_info, 0, sizeof(in_bestweapon_info));
 	}
-	else if(Cmd_Argc() == 2 && !strcmp(Cmd_Argv(1), "quake"))
+	else if(Cmd_Argc(cmd) == 2 && !strcmp(Cmd_Argv(cmd, 1), "quake"))
 	{
 		IN_BestWeapon_ResetData();
 	}
 	else
 	{
-		Con_Printf("Usage: %s weaponshortname impulse itemcode activeweaponcode ammostat ammomin; %s clear; %s quake\n", Cmd_Argv(0), Cmd_Argv(0), Cmd_Argv(0));
+		Con_Printf("Usage: %s weaponshortname impulse itemcode activeweaponcode ammostat ammomin; %s clear; %s quake\n", Cmd_Argv(cmd, 0), Cmd_Argv(cmd, 0), Cmd_Argv(cmd, 0));
 	}
 }
 
-static void IN_BestWeapon (void)
+static void IN_BestWeapon_f(cmd_state_t *cmd)
 {
 	int i, n;
 	const char *t;
-	if (Cmd_Argc() < 2)
+	if (Cmd_Argc(cmd) < 2)
 	{
 		Con_Printf("bestweapon requires 1 or more parameters\n");
 		return;
 	}
-	for (i = 1;i < Cmd_Argc();i++)
+	for (i = 1;i < Cmd_Argc(cmd);i++)
 	{
-		t = Cmd_Argv(i);
+		t = Cmd_Argv(cmd, i);
 		// figure out which weapon this character refers to
 		for (n = 0;n < IN_BESTWEAPON_MAX && in_bestweapon_info[n].impulse;n++)
 		{
@@ -301,55 +301,6 @@ static void IN_BestWeapon (void)
 	}
 	// if we couldn't find any of the weapons, there's nothing more we can do...
 }
-
-#if 0
-void IN_CycleWeapon (void)
-{
-	int i, n;
-	int first = -1;
-	qboolean found = false;
-	const char *t;
-	if (Cmd_Argc() < 2)
-	{
-		Con_Printf("bestweapon requires 1 or more parameters\n");
-		return;
-	}
-	for (i = 1;i < Cmd_Argc();i++)
-	{
-		t = Cmd_Argv(i);
-		// figure out which weapon this character refers to
-		for (n = 0;n < IN_BESTWEAPON_MAX && in_bestweapon_info[n].impulse;n++)
-		{
-			if (!strcmp(in_bestweapon_info[n].name, t))
-			{
-				// we found out what weapon this character refers to
-				// check if the inventory contains the weapon and enough ammo
-				if ((cl.stats[STAT_ITEMS] & in_bestweapon_info[n].weaponbit) && (cl.stats[in_bestweapon_info[n].ammostat] >= in_bestweapon_info[n].ammomin))
-				{
-					// we found one of the weapons the player wanted
-					if(first == -1)
-						first = n;
-					if(found)
-					{
-						in_impulse = in_bestweapon_info[n].impulse;
-						return;
-					}
-					if(cl.stats[STAT_ACTIVEWEAPON] == in_bestweapon_info[n].activeweaponcode)
-						found = true;
-				}
-				break;
-			}
-		}
-		// if we couldn't identify the weapon we just ignore it and continue checking for other weapons
-	}
-	if(first != -1)
-	{
-		in_impulse = in_bestweapon_info[first].impulse;
-		return;
-	}
-	// if we couldn't find any of the weapons, there's nothing more we can do...
-}
-#endif
 
 /*
 ===============
@@ -410,56 +361,60 @@ float CL_KeyState (kbutton_t *key)
 
 //==========================================================================
 
-cvar_t cl_upspeed = {CVAR_SAVE, "cl_upspeed","400","vertical movement speed (while swimming or flying)"};
-cvar_t cl_forwardspeed = {CVAR_SAVE, "cl_forwardspeed","400","forward movement speed"};
-cvar_t cl_backspeed = {CVAR_SAVE, "cl_backspeed","400","backward movement speed"};
-cvar_t cl_sidespeed = {CVAR_SAVE, "cl_sidespeed","350","strafe movement speed"};
+cvar_t cl_upspeed = {CVAR_CLIENT | CVAR_SAVE, "cl_upspeed","400","vertical movement speed (while swimming or flying)"};
+cvar_t cl_forwardspeed = {CVAR_CLIENT | CVAR_SAVE, "cl_forwardspeed","400","forward movement speed"};
+cvar_t cl_backspeed = {CVAR_CLIENT | CVAR_SAVE, "cl_backspeed","400","backward movement speed"};
+cvar_t cl_sidespeed = {CVAR_CLIENT | CVAR_SAVE, "cl_sidespeed","350","strafe movement speed"};
 
-cvar_t cl_movespeedkey = {CVAR_SAVE, "cl_movespeedkey","2.0","how much +speed multiplies keyboard movement speed"};
-cvar_t cl_movecliptokeyboard = {0, "cl_movecliptokeyboard", "0", "if set to 1, any move is clipped to the nine keyboard states; if set to 2, only the direction is clipped, not the amount"};
+cvar_t cl_movespeedkey = {CVAR_CLIENT | CVAR_SAVE, "cl_movespeedkey","2.0","how much +speed multiplies keyboard movement speed"};
+cvar_t cl_movecliptokeyboard = {CVAR_CLIENT, "cl_movecliptokeyboard", "0", "if set to 1, any move is clipped to the nine keyboard states; if set to 2, only the direction is clipped, not the amount"};
 
-cvar_t cl_yawspeed = {CVAR_SAVE, "cl_yawspeed","140","keyboard yaw turning speed"};
-cvar_t cl_pitchspeed = {CVAR_SAVE, "cl_pitchspeed","150","keyboard pitch turning speed"};
+cvar_t cl_yawspeed = {CVAR_CLIENT | CVAR_SAVE, "cl_yawspeed","140","keyboard yaw turning speed"};
+cvar_t cl_pitchspeed = {CVAR_CLIENT | CVAR_SAVE, "cl_pitchspeed","150","keyboard pitch turning speed"};
 
-cvar_t cl_anglespeedkey = {CVAR_SAVE, "cl_anglespeedkey","1.5","how much +speed multiplies keyboard turning speed"};
+cvar_t cl_anglespeedkey = {CVAR_CLIENT | CVAR_SAVE, "cl_anglespeedkey","1.5","how much +speed multiplies keyboard turning speed"};
 
-cvar_t cl_movement = {CVAR_SAVE, "cl_movement", "0", "enables clientside prediction of your player movement on DP servers (use cl_nopred for QWSV servers)"};
-cvar_t cl_movement_replay = {0, "cl_movement_replay", "1", "use engine prediction"};
-cvar_t cl_movement_nettimeout = {CVAR_SAVE, "cl_movement_nettimeout", "0.3", "stops predicting moves when server is lagging badly (avoids major performance problems), timeout in seconds"};
-cvar_t cl_movement_minping = {CVAR_SAVE, "cl_movement_minping", "0", "whether to use prediction when ping is lower than this value in milliseconds"};
-cvar_t cl_movement_track_canjump = {CVAR_SAVE, "cl_movement_track_canjump", "1", "track if the player released the jump key between two jumps to decide if he is able to jump or not; when off, this causes some \"sliding\" slightly above the floor when the jump key is held too long; if the mod allows repeated jumping by holding space all the time, this has to be set to zero too"};
-cvar_t cl_movement_maxspeed = {0, "cl_movement_maxspeed", "320", "how fast you can move (should match sv_maxspeed)"};
-cvar_t cl_movement_maxairspeed = {0, "cl_movement_maxairspeed", "30", "how fast you can move while in the air (should match sv_maxairspeed)"};
-cvar_t cl_movement_stopspeed = {0, "cl_movement_stopspeed", "100", "speed below which you will be slowed rapidly to a stop rather than sliding endlessly (should match sv_stopspeed)"};
-cvar_t cl_movement_friction = {0, "cl_movement_friction", "4", "how fast you slow down (should match sv_friction)"};
-cvar_t cl_movement_wallfriction = {0, "cl_movement_wallfriction", "1", "how fast you slow down while sliding along a wall (should match sv_wallfriction)"};
-cvar_t cl_movement_waterfriction = {0, "cl_movement_waterfriction", "-1", "how fast you slow down (should match sv_waterfriction), if less than 0 the cl_movement_friction variable is used instead"};
-cvar_t cl_movement_edgefriction = {0, "cl_movement_edgefriction", "1", "how much to slow down when you may be about to fall off a ledge (should match edgefriction)"};
-cvar_t cl_movement_stepheight = {0, "cl_movement_stepheight", "18", "how tall a step you can step in one instant (should match sv_stepheight)"};
-cvar_t cl_movement_accelerate = {0, "cl_movement_accelerate", "10", "how fast you accelerate (should match sv_accelerate)"};
-cvar_t cl_movement_airaccelerate = {0, "cl_movement_airaccelerate", "-1", "how fast you accelerate while in the air (should match sv_airaccelerate), if less than 0 the cl_movement_accelerate variable is used instead"};
-cvar_t cl_movement_wateraccelerate = {0, "cl_movement_wateraccelerate", "-1", "how fast you accelerate while in water (should match sv_wateraccelerate), if less than 0 the cl_movement_accelerate variable is used instead"};
-cvar_t cl_movement_jumpvelocity = {0, "cl_movement_jumpvelocity", "270", "how fast you move upward when you begin a jump (should match the quakec code)"};
-cvar_t cl_movement_airaccel_qw = {0, "cl_movement_airaccel_qw", "1", "ratio of QW-style air control as opposed to simple acceleration (reduces speed gain when zigzagging) (should match sv_airaccel_qw); when < 0, the speed is clamped against the maximum allowed forward speed after the move"};
-cvar_t cl_movement_airaccel_sideways_friction = {0, "cl_movement_airaccel_sideways_friction", "0", "anti-sideways movement stabilization (should match sv_airaccel_sideways_friction); when < 0, only so much friction is applied that braking (by accelerating backwards) cannot be stronger"};
-cvar_t cl_nopred = {CVAR_SAVE, "cl_nopred", "0", "(QWSV only) disables player movement prediction when playing on QWSV servers (this setting is separate from cl_movement because player expectations are different when playing on DP vs QW servers)"};
+cvar_t cl_movement = {CVAR_CLIENT | CVAR_SAVE, "cl_movement", "0", "enables clientside prediction of your player movement on DP servers (use cl_nopred for QWSV servers)"};
+cvar_t cl_movement_replay = {CVAR_CLIENT, "cl_movement_replay", "1", "use engine prediction"};
+cvar_t cl_movement_nettimeout = {CVAR_CLIENT | CVAR_SAVE, "cl_movement_nettimeout", "0.3", "stops predicting moves when server is lagging badly (avoids major performance problems), timeout in seconds"};
+cvar_t cl_movement_minping = {CVAR_CLIENT | CVAR_SAVE, "cl_movement_minping", "0", "whether to use prediction when ping is lower than this value in milliseconds"};
+cvar_t cl_movement_track_canjump = {CVAR_CLIENT | CVAR_SAVE, "cl_movement_track_canjump", "1", "track if the player released the jump key between two jumps to decide if he is able to jump or not; when off, this causes some \"sliding\" slightly above the floor when the jump key is held too long; if the mod allows repeated jumping by holding space all the time, this has to be set to zero too"};
+cvar_t cl_movement_maxspeed = {CVAR_CLIENT, "cl_movement_maxspeed", "320", "how fast you can move (should match sv_maxspeed)"};
+cvar_t cl_movement_maxairspeed = {CVAR_CLIENT, "cl_movement_maxairspeed", "30", "how fast you can move while in the air (should match sv_maxairspeed)"};
+cvar_t cl_movement_stopspeed = {CVAR_CLIENT, "cl_movement_stopspeed", "100", "speed below which you will be slowed rapidly to a stop rather than sliding endlessly (should match sv_stopspeed)"};
+cvar_t cl_movement_friction = {CVAR_CLIENT, "cl_movement_friction", "4", "how fast you slow down (should match sv_friction)"};
+cvar_t cl_movement_wallfriction = {CVAR_CLIENT, "cl_movement_wallfriction", "1", "how fast you slow down while sliding along a wall (should match sv_wallfriction)"};
+cvar_t cl_movement_waterfriction = {CVAR_CLIENT, "cl_movement_waterfriction", "-1", "how fast you slow down (should match sv_waterfriction), if less than 0 the cl_movement_friction variable is used instead"};
+cvar_t cl_movement_edgefriction = {CVAR_CLIENT, "cl_movement_edgefriction", "1", "how much to slow down when you may be about to fall off a ledge (should match edgefriction)"};
+cvar_t cl_movement_stepheight = {CVAR_CLIENT, "cl_movement_stepheight", "18", "how tall a step you can step in one instant (should match sv_stepheight)"};
+cvar_t cl_movement_accelerate = {CVAR_CLIENT, "cl_movement_accelerate", "10", "how fast you accelerate (should match sv_accelerate)"};
+cvar_t cl_movement_airaccelerate = {CVAR_CLIENT, "cl_movement_airaccelerate", "-1", "how fast you accelerate while in the air (should match sv_airaccelerate), if less than 0 the cl_movement_accelerate variable is used instead"};
+cvar_t cl_movement_wateraccelerate = {CVAR_CLIENT, "cl_movement_wateraccelerate", "-1", "how fast you accelerate while in water (should match sv_wateraccelerate), if less than 0 the cl_movement_accelerate variable is used instead"};
+cvar_t cl_movement_jumpvelocity = {CVAR_CLIENT, "cl_movement_jumpvelocity", "270", "how fast you move upward when you begin a jump (should match the quakec code)"};
+cvar_t cl_movement_airaccel_qw = {CVAR_CLIENT, "cl_movement_airaccel_qw", "1", "ratio of QW-style air control as opposed to simple acceleration (reduces speed gain when zigzagging) (should match sv_airaccel_qw); when < 0, the speed is clamped against the maximum allowed forward speed after the move"};
+cvar_t cl_movement_airaccel_sideways_friction = {CVAR_CLIENT, "cl_movement_airaccel_sideways_friction", "0", "anti-sideways movement stabilization (should match sv_airaccel_sideways_friction); when < 0, only so much friction is applied that braking (by accelerating backwards) cannot be stronger"};
+cvar_t cl_nopred = {CVAR_CLIENT | CVAR_SAVE, "cl_nopred", "0", "(QWSV only) disables player movement prediction when playing on QWSV servers (this setting is separate from cl_movement because player expectations are different when playing on DP vs QW servers)"};
 
-cvar_t in_pitch_min = {0, "in_pitch_min", "-90", "how far you can aim upward (quake used -70)"};
-cvar_t in_pitch_max = {0, "in_pitch_max", "90", "how far you can aim downward (quake used 80)"};
+cvar_t in_pitch_min = {CVAR_CLIENT, "in_pitch_min", "-90", "how far you can aim upward (quake used -70)"};
+cvar_t in_pitch_max = {CVAR_CLIENT, "in_pitch_max", "90", "how far you can aim downward (quake used 80)"};
 
-cvar_t m_filter = {CVAR_SAVE, "m_filter","0", "smoothes mouse movement, less responsive but smoother aiming"};
-cvar_t m_accelerate = {CVAR_SAVE, "m_accelerate","1", "mouse acceleration factor (try 2)"};
-cvar_t m_accelerate_minspeed = {CVAR_SAVE, "m_accelerate_minspeed","5000", "below this speed, no acceleration is done"};
-cvar_t m_accelerate_maxspeed = {CVAR_SAVE, "m_accelerate_maxspeed","10000", "above this speed, full acceleration is done"};
-cvar_t m_accelerate_filter = {CVAR_SAVE, "m_accelerate_filter","0.1", "mouse acceleration factor filtering"};
+cvar_t m_filter = {CVAR_CLIENT | CVAR_SAVE, "m_filter","0", "smoothes mouse movement, less responsive but smoother aiming"}; 
+cvar_t m_accelerate = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate","1", "linear mouse acceleration factor (set to 1 to disable the linear acceleration and use only the power acceleration; set to 0 to disable all acceleration)"};
+cvar_t m_accelerate_minspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_minspeed","5000", "below this speed in px/s, no acceleration is done, with a linear slope between (applied only on linear acceleration)"};
+cvar_t m_accelerate_maxspeed = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_maxspeed","10000", "above this speed in px/s, full acceleration is done, with a linear slope between (applied only on linear acceleration)"};
+cvar_t m_accelerate_filter = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_filter","0", "linear mouse acceleration factor filtering lowpass constant in seconds (set to 0 for no filtering)"};
+cvar_t m_accelerate_power_offset = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_power_offset","0", "below this speed in px/ms, no power acceleration is done"};
+cvar_t m_accelerate_power = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_power","2", "acceleration power (must be above 1 to be useful)"};
+cvar_t m_accelerate_power_senscap = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_power_senscap", "0", "maximum acceleration factor generated by power acceleration; use 0 for unbounded"};
+cvar_t m_accelerate_power_strength = {CVAR_CLIENT | CVAR_SAVE, "m_accelerate_power_strength", "0", "strength of the power mouse acceleration effect"};
 
-cvar_t cl_netfps = {CVAR_SAVE, "cl_netfps","72", "how many input packets to send to server each second"};
-cvar_t cl_netrepeatinput = {CVAR_SAVE, "cl_netrepeatinput", "1", "how many packets in a row can be lost without movement issues when using cl_movement (technically how many input messages to repeat in each packet that have not yet been acknowledged by the server), only affects DP7 and later servers (Quake uses 0, QuakeWorld uses 2, and just for comparison Quake3 uses 1)"};
-cvar_t cl_netimmediatebuttons = {CVAR_SAVE, "cl_netimmediatebuttons", "1", "sends extra packets whenever your buttons change or an impulse is used (basically: whenever you click fire or change weapon)"};
+cvar_t cl_netfps = {CVAR_CLIENT | CVAR_SAVE, "cl_netfps","72", "how many input packets to send to server each second"};
+cvar_t cl_netrepeatinput = {CVAR_CLIENT | CVAR_SAVE, "cl_netrepeatinput", "1", "how many packets in a row can be lost without movement issues when using cl_movement (technically how many input messages to repeat in each packet that have not yet been acknowledged by the server), only affects DP7 and later servers (Quake uses 0, QuakeWorld uses 2, and just for comparison Quake3 uses 1)"};
+cvar_t cl_netimmediatebuttons = {CVAR_CLIENT | CVAR_SAVE, "cl_netimmediatebuttons", "1", "sends extra packets whenever your buttons change or an impulse is used (basically: whenever you click fire or change weapon)"};
 
-cvar_t cl_nodelta = {0, "cl_nodelta", "0", "disables delta compression of non-player entities in QW network protocol"};
+cvar_t cl_nodelta = {CVAR_CLIENT, "cl_nodelta", "0", "disables delta compression of non-player entities in QW network protocol"};
 
-cvar_t cl_csqc_generatemousemoveevents = {0, "cl_csqc_generatemousemoveevents", "1", "enables calls to CSQC_InputEvent with type 2, for compliance with EXT_CSQC spec"};
+cvar_t cl_csqc_generatemousemoveevents = {CVAR_CLIENT, "cl_csqc_generatemousemoveevents", "1", "enables calls to CSQC_InputEvent with type 2, for compliance with EXT_CSQC spec"};
 
 extern cvar_t v_flipped;
 
@@ -589,38 +544,88 @@ void CL_Input (void)
 		}
 	}
 
-	// apply m_accelerate if it is on
-	if(m_accelerate.value > 1)
+       // apply m_accelerate if it is on
+	if(m_accelerate.value > 0)
 	{
+		float mouse_deltadist = sqrtf(in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y);
+		float speed = mouse_deltadist / cl.realframetime;
 		static float averagespeed = 0;
-		float speed, f, mi, ma;
-
-		speed = sqrt(in_mouse_x * in_mouse_x + in_mouse_y * in_mouse_y) / cl.realframetime;
+		float f, mi, ma;
 		if(m_accelerate_filter.value > 0)
-			f = bound(0, cl.realframetime / m_accelerate_filter.value, 1);
+		        f = bound(0, cl.realframetime / m_accelerate_filter.value, 1);
 		else
-			f = 1;
+		        f = 1;
 		averagespeed = speed * f + averagespeed * (1 - f);
 
-		mi = max(1, m_accelerate_minspeed.value);
-		ma = max(m_accelerate_minspeed.value + 1, m_accelerate_maxspeed.value);
+		// Note: this check is technically unnecessary, as everything in here cancels out if it is zero.
+		if (m_accelerate.value != 1.0f)
+		{
+			// First do linear slope acceleration which was ripped "in
+			// spirit" from many classic mouse driver implementations.
+			// If m_accelerate.value == 1, this code does nothing at all.
 
-		if(averagespeed <= mi)
-		{
-			f = 1;
-		}
-		else if(averagespeed >= ma)
-		{
-			f = m_accelerate.value;
-		}
-		else
-		{
-			f = averagespeed;
-			f = (f - mi) / (ma - mi) * (m_accelerate.value - 1) + 1;
+			mi = max(1, m_accelerate_minspeed.value);
+			ma = max(m_accelerate_minspeed.value + 1, m_accelerate_maxspeed.value);
+
+			if(averagespeed <= mi)
+			{
+				f = 1;
+			}
+			else if(averagespeed >= ma)
+			{
+				f = m_accelerate.value;
+			}
+			else
+			{
+				f = averagespeed;
+				f = (f - mi) / (ma - mi) * (m_accelerate.value - 1) + 1;
+			}
+			in_mouse_x *= f;
+			in_mouse_y *= f;
 		}
 
-		in_mouse_x *= f;
-		in_mouse_y *= f;
+		// Note: this check is technically unnecessary, as everything in here cancels out if it is zero.
+		if (m_accelerate_power_strength.value != 0.0f)
+		{
+			// Then do Quake Live-style power acceleration.
+			// Note that this behavior REPLACES the usual
+			// sensitivity, so we apply it but then dividie by
+			// sensitivity.value so that the later multiplication
+			// restores it again.
+			float accelsens = 1.0f;
+			float adjusted_speed_pxms = (averagespeed * 0.001f - m_accelerate_power_offset.value) * m_accelerate_power_strength.value;
+			float inv_sensitivity = 1.0f / sensitivity.value;
+			if (adjusted_speed_pxms > 0)
+			{
+				if (m_accelerate_power.value > 1.0f)
+				{
+					// TODO: How does this interact with sensitivity changes? Is this intended?
+					// Currently: more sensitivity = less acceleration at same pixel speed.
+					accelsens += expf((m_accelerate_power.value - 1.0f) * logf(adjusted_speed_pxms)) * inv_sensitivity;
+				}
+				else
+				{
+					// The limit of the then-branch for m_accelerate_power -> 1.
+					accelsens += inv_sensitivity;
+					// Note: QL had just accelsens = 1.0f.
+					// This is mathematically wrong though.
+				}
+			}
+			else
+			{
+				// The limit of the then-branch for adjusted_speed -> 0.
+				// accelsens += 0.0f;
+			}
+			if (m_accelerate_power_senscap.value > 0.0f && accelsens > m_accelerate_power_senscap.value * inv_sensitivity)
+			{
+				// TODO: How does this interact with sensitivity changes? Is this intended?
+				// Currently: senscap is in absolute sensitivity units, so if senscap < sensitivity, it overrides.
+			        accelsens = m_accelerate_power_senscap.value * inv_sensitivity;
+			}
+
+			in_mouse_x *= accelsens;
+			in_mouse_y *= accelsens;
+		}
 	}
 
 	// apply m_filter if it is on
@@ -2159,80 +2164,75 @@ CL_InitInput
 */
 void CL_InitInput (void)
 {
-	Cmd_AddCommand ("+moveup",IN_UpDown, "swim upward");
-	Cmd_AddCommand ("-moveup",IN_UpUp, "stop swimming upward");
-	Cmd_AddCommand ("+movedown",IN_DownDown, "swim downward");
-	Cmd_AddCommand ("-movedown",IN_DownUp, "stop swimming downward");
-	Cmd_AddCommand ("+left",IN_LeftDown, "turn left");
-	Cmd_AddCommand ("-left",IN_LeftUp, "stop turning left");
-	Cmd_AddCommand ("+right",IN_RightDown, "turn right");
-	Cmd_AddCommand ("-right",IN_RightUp, "stop turning right");
-	Cmd_AddCommand ("+forward",IN_ForwardDown, "move forward");
-	Cmd_AddCommand ("-forward",IN_ForwardUp, "stop moving forward");
-	Cmd_AddCommand ("+back",IN_BackDown, "move backward");
-	Cmd_AddCommand ("-back",IN_BackUp, "stop moving backward");
-	Cmd_AddCommand ("+lookup", IN_LookupDown, "look upward");
-	Cmd_AddCommand ("-lookup", IN_LookupUp, "stop looking upward");
-	Cmd_AddCommand ("+lookdown", IN_LookdownDown, "look downward");
-	Cmd_AddCommand ("-lookdown", IN_LookdownUp, "stop looking downward");
-	Cmd_AddCommand ("+strafe", IN_StrafeDown, "activate strafing mode (move instead of turn)");
-	Cmd_AddCommand ("-strafe", IN_StrafeUp, "deactivate strafing mode");
-	Cmd_AddCommand ("+moveleft", IN_MoveleftDown, "strafe left");
-	Cmd_AddCommand ("-moveleft", IN_MoveleftUp, "stop strafing left");
-	Cmd_AddCommand ("+moveright", IN_MoverightDown, "strafe right");
-	Cmd_AddCommand ("-moveright", IN_MoverightUp, "stop strafing right");
-	Cmd_AddCommand ("+speed", IN_SpeedDown, "activate run mode (faster movement and turning)");
-	Cmd_AddCommand ("-speed", IN_SpeedUp, "deactivate run mode");
-	Cmd_AddCommand ("+attack", IN_AttackDown, "begin firing");
-	Cmd_AddCommand ("-attack", IN_AttackUp, "stop firing");
-	Cmd_AddCommand ("+jump", IN_JumpDown, "jump");
-	Cmd_AddCommand ("-jump", IN_JumpUp, "end jump (so you can jump again)");
-	Cmd_AddCommand ("impulse", IN_Impulse, "send an impulse number to server (select weapon, use item, etc)");
-	Cmd_AddCommand ("+klook", IN_KLookDown, "activate keyboard looking mode, do not recenter view");
-	Cmd_AddCommand ("-klook", IN_KLookUp, "deactivate keyboard looking mode");
-	Cmd_AddCommand ("+mlook", IN_MLookDown, "activate mouse looking mode, do not recenter view");
-	Cmd_AddCommand ("-mlook", IN_MLookUp, "deactivate mouse looking mode");
+	Cmd_AddCommand(&cmd_client, "+moveup",IN_UpDown, "swim upward");
+	Cmd_AddCommand(&cmd_client, "-moveup",IN_UpUp, "stop swimming upward");
+	Cmd_AddCommand(&cmd_client, "+movedown",IN_DownDown, "swim downward");
+	Cmd_AddCommand(&cmd_client, "-movedown",IN_DownUp, "stop swimming downward");
+	Cmd_AddCommand(&cmd_client, "+left",IN_LeftDown, "turn left");
+	Cmd_AddCommand(&cmd_client, "-left",IN_LeftUp, "stop turning left");
+	Cmd_AddCommand(&cmd_client, "+right",IN_RightDown, "turn right");
+	Cmd_AddCommand(&cmd_client, "-right",IN_RightUp, "stop turning right");
+	Cmd_AddCommand(&cmd_client, "+forward",IN_ForwardDown, "move forward");
+	Cmd_AddCommand(&cmd_client, "-forward",IN_ForwardUp, "stop moving forward");
+	Cmd_AddCommand(&cmd_client, "+back",IN_BackDown, "move backward");
+	Cmd_AddCommand(&cmd_client, "-back",IN_BackUp, "stop moving backward");
+	Cmd_AddCommand(&cmd_client, "+lookup", IN_LookupDown, "look upward");
+	Cmd_AddCommand(&cmd_client, "-lookup", IN_LookupUp, "stop looking upward");
+	Cmd_AddCommand(&cmd_client, "+lookdown", IN_LookdownDown, "look downward");
+	Cmd_AddCommand(&cmd_client, "-lookdown", IN_LookdownUp, "stop looking downward");
+	Cmd_AddCommand(&cmd_client, "+strafe", IN_StrafeDown, "activate strafing mode (move instead of turn)");
+	Cmd_AddCommand(&cmd_client, "-strafe", IN_StrafeUp, "deactivate strafing mode");
+	Cmd_AddCommand(&cmd_client, "+moveleft", IN_MoveleftDown, "strafe left");
+	Cmd_AddCommand(&cmd_client, "-moveleft", IN_MoveleftUp, "stop strafing left");
+	Cmd_AddCommand(&cmd_client, "+moveright", IN_MoverightDown, "strafe right");
+	Cmd_AddCommand(&cmd_client, "-moveright", IN_MoverightUp, "stop strafing right");
+	Cmd_AddCommand(&cmd_client, "+speed", IN_SpeedDown, "activate run mode (faster movement and turning)");
+	Cmd_AddCommand(&cmd_client, "-speed", IN_SpeedUp, "deactivate run mode");
+	Cmd_AddCommand(&cmd_client, "+attack", IN_AttackDown, "begin firing");
+	Cmd_AddCommand(&cmd_client, "-attack", IN_AttackUp, "stop firing");
+	Cmd_AddCommand(&cmd_client, "+jump", IN_JumpDown, "jump");
+	Cmd_AddCommand(&cmd_client, "-jump", IN_JumpUp, "end jump (so you can jump again)");
+	Cmd_AddCommand(&cmd_client, "impulse", IN_Impulse, "send an impulse number to server (select weapon, use item, etc)");
+	Cmd_AddCommand(&cmd_client, "+klook", IN_KLookDown, "activate keyboard looking mode, do not recenter view");
+	Cmd_AddCommand(&cmd_client, "-klook", IN_KLookUp, "deactivate keyboard looking mode");
+	Cmd_AddCommand(&cmd_client, "+mlook", IN_MLookDown, "activate mouse looking mode, do not recenter view");
+	Cmd_AddCommand(&cmd_client, "-mlook", IN_MLookUp, "deactivate mouse looking mode");
 
-	// LadyHavoc: added use button
-	Cmd_AddCommand ("+use", IN_UseDown, "use something (may be used by some mods)");
-	Cmd_AddCommand ("-use", IN_UseUp, "stop using something");
-
-	// LadyHavoc: added 6 new buttons
-	Cmd_AddCommand ("+button3", IN_Button3Down, "activate button3 (behavior depends on mod)");
-	Cmd_AddCommand ("-button3", IN_Button3Up, "deactivate button3");
-	Cmd_AddCommand ("+button4", IN_Button4Down, "activate button4 (behavior depends on mod)");
-	Cmd_AddCommand ("-button4", IN_Button4Up, "deactivate button4");
-	Cmd_AddCommand ("+button5", IN_Button5Down, "activate button5 (behavior depends on mod)");
-	Cmd_AddCommand ("-button5", IN_Button5Up, "deactivate button5");
-	Cmd_AddCommand ("+button6", IN_Button6Down, "activate button6 (behavior depends on mod)");
-	Cmd_AddCommand ("-button6", IN_Button6Up, "deactivate button6");
-	Cmd_AddCommand ("+button7", IN_Button7Down, "activate button7 (behavior depends on mod)");
-	Cmd_AddCommand ("-button7", IN_Button7Up, "deactivate button7");
-	Cmd_AddCommand ("+button8", IN_Button8Down, "activate button8 (behavior depends on mod)");
-	Cmd_AddCommand ("-button8", IN_Button8Up, "deactivate button8");
-	Cmd_AddCommand ("+button9", IN_Button9Down, "activate button9 (behavior depends on mod)");
-	Cmd_AddCommand ("-button9", IN_Button9Up, "deactivate button9");
-	Cmd_AddCommand ("+button10", IN_Button10Down, "activate button10 (behavior depends on mod)");
-	Cmd_AddCommand ("-button10", IN_Button10Up, "deactivate button10");
-	Cmd_AddCommand ("+button11", IN_Button11Down, "activate button11 (behavior depends on mod)");
-	Cmd_AddCommand ("-button11", IN_Button11Up, "deactivate button11");
-	Cmd_AddCommand ("+button12", IN_Button12Down, "activate button12 (behavior depends on mod)");
-	Cmd_AddCommand ("-button12", IN_Button12Up, "deactivate button12");
-	Cmd_AddCommand ("+button13", IN_Button13Down, "activate button13 (behavior depends on mod)");
-	Cmd_AddCommand ("-button13", IN_Button13Up, "deactivate button13");
-	Cmd_AddCommand ("+button14", IN_Button14Down, "activate button14 (behavior depends on mod)");
-	Cmd_AddCommand ("-button14", IN_Button14Up, "deactivate button14");
-	Cmd_AddCommand ("+button15", IN_Button15Down, "activate button15 (behavior depends on mod)");
-	Cmd_AddCommand ("-button15", IN_Button15Up, "deactivate button15");
-	Cmd_AddCommand ("+button16", IN_Button16Down, "activate button16 (behavior depends on mod)");
-	Cmd_AddCommand ("-button16", IN_Button16Up, "deactivate button16");
+	// LadyHavoc: added lots of buttons
+	Cmd_AddCommand(&cmd_client, "+use", IN_UseDown, "use something (may be used by some mods)");
+	Cmd_AddCommand(&cmd_client, "-use", IN_UseUp, "stop using something");
+	Cmd_AddCommand(&cmd_client, "+button3", IN_Button3Down, "activate button3 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button3", IN_Button3Up, "deactivate button3");
+	Cmd_AddCommand(&cmd_client, "+button4", IN_Button4Down, "activate button4 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button4", IN_Button4Up, "deactivate button4");
+	Cmd_AddCommand(&cmd_client, "+button5", IN_Button5Down, "activate button5 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button5", IN_Button5Up, "deactivate button5");
+	Cmd_AddCommand(&cmd_client, "+button6", IN_Button6Down, "activate button6 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button6", IN_Button6Up, "deactivate button6");
+	Cmd_AddCommand(&cmd_client, "+button7", IN_Button7Down, "activate button7 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button7", IN_Button7Up, "deactivate button7");
+	Cmd_AddCommand(&cmd_client, "+button8", IN_Button8Down, "activate button8 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button8", IN_Button8Up, "deactivate button8");
+	Cmd_AddCommand(&cmd_client, "+button9", IN_Button9Down, "activate button9 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button9", IN_Button9Up, "deactivate button9");
+	Cmd_AddCommand(&cmd_client, "+button10", IN_Button10Down, "activate button10 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button10", IN_Button10Up, "deactivate button10");
+	Cmd_AddCommand(&cmd_client, "+button11", IN_Button11Down, "activate button11 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button11", IN_Button11Up, "deactivate button11");
+	Cmd_AddCommand(&cmd_client, "+button12", IN_Button12Down, "activate button12 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button12", IN_Button12Up, "deactivate button12");
+	Cmd_AddCommand(&cmd_client, "+button13", IN_Button13Down, "activate button13 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button13", IN_Button13Up, "deactivate button13");
+	Cmd_AddCommand(&cmd_client, "+button14", IN_Button14Down, "activate button14 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button14", IN_Button14Up, "deactivate button14");
+	Cmd_AddCommand(&cmd_client, "+button15", IN_Button15Down, "activate button15 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button15", IN_Button15Up, "deactivate button15");
+	Cmd_AddCommand(&cmd_client, "+button16", IN_Button16Down, "activate button16 (behavior depends on mod)");
+	Cmd_AddCommand(&cmd_client, "-button16", IN_Button16Up, "deactivate button16");
 
 	// LadyHavoc: added bestweapon command
-	Cmd_AddCommand ("bestweapon", IN_BestWeapon, "send an impulse number to server to select the first usable weapon out of several (example: 8 7 6 5 4 3 2 1)");
-#if 0
-	Cmd_AddCommand ("cycleweapon", IN_CycleWeapon, "send an impulse number to server to select the next usable weapon out of several (example: 9 4 8) if you are holding one of these, and choose the first one if you are holding none of these");
-#endif
-	Cmd_AddCommand ("register_bestweapon", IN_BestWeapon_Register_f, "(for QC usage only) change weapon parameters to be used by bestweapon; stuffcmd this in ClientConnect");
+	Cmd_AddCommand(&cmd_client, "bestweapon", IN_BestWeapon_f, "send an impulse number to server to select the first usable weapon out of several (example: 8 7 6 5 4 3 2 1)");
+	Cmd_AddCommand(&cmd_client, "register_bestweapon", IN_BestWeapon_Register_f, "(for QC usage only) change weapon parameters to be used by bestweapon; stuffcmd this in ClientConnect");
 
 	Cvar_RegisterVariable(&cl_movecliptokeyboard);
 	Cvar_RegisterVariable(&cl_movement);
@@ -2263,6 +2263,10 @@ void CL_InitInput (void)
 	Cvar_RegisterVariable(&m_accelerate_minspeed);
 	Cvar_RegisterVariable(&m_accelerate_maxspeed);
 	Cvar_RegisterVariable(&m_accelerate_filter);
+	Cvar_RegisterVariable(&m_accelerate_power);
+	Cvar_RegisterVariable(&m_accelerate_power_offset);
+	Cvar_RegisterVariable(&m_accelerate_power_senscap);
+	Cvar_RegisterVariable(&m_accelerate_power_strength);
 
 	Cvar_RegisterVariable(&cl_netfps);
 	Cvar_RegisterVariable(&cl_netrepeatinput);

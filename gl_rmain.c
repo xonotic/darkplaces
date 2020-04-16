@@ -56,202 +56,202 @@ static qboolean r_gpuskeletal;
 //
 r_refdef_t r_refdef;
 
-cvar_t r_motionblur = {CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
-cvar_t r_damageblur = {CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
-cvar_t r_motionblur_averaging = {CVAR_SAVE, "r_motionblur_averaging", "0.1", "sliding average reaction time for velocity (higher = slower adaption to change)"};
-cvar_t r_motionblur_randomize = {CVAR_SAVE, "r_motionblur_randomize", "0.1", "randomizing coefficient to workaround ghosting"};
-cvar_t r_motionblur_minblur = {CVAR_SAVE, "r_motionblur_minblur", "0.5", "factor of blur to apply at all times (always have this amount of blur no matter what the other factors are)"};
-cvar_t r_motionblur_maxblur = {CVAR_SAVE, "r_motionblur_maxblur", "0.9", "maxmimum amount of blur"};
-cvar_t r_motionblur_velocityfactor = {CVAR_SAVE, "r_motionblur_velocityfactor", "1", "factoring in of player velocity to the blur equation - the faster the player moves around the map, the more blur they get"};
-cvar_t r_motionblur_velocityfactor_minspeed = {CVAR_SAVE, "r_motionblur_velocityfactor_minspeed", "400", "lower value of velocity when it starts to factor into blur equation"};
-cvar_t r_motionblur_velocityfactor_maxspeed = {CVAR_SAVE, "r_motionblur_velocityfactor_maxspeed", "800", "upper value of velocity when it reaches the peak factor into blur equation"};
-cvar_t r_motionblur_mousefactor = {CVAR_SAVE, "r_motionblur_mousefactor", "2", "factoring in of mouse acceleration to the blur equation - the faster the player turns their mouse, the more blur they get"};
-cvar_t r_motionblur_mousefactor_minspeed = {CVAR_SAVE, "r_motionblur_mousefactor_minspeed", "0", "lower value of mouse acceleration when it starts to factor into blur equation"};
-cvar_t r_motionblur_mousefactor_maxspeed = {CVAR_SAVE, "r_motionblur_mousefactor_maxspeed", "50", "upper value of mouse acceleration when it reaches the peak factor into blur equation"};
+cvar_t r_motionblur = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur", "0", "screen motionblur - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
+cvar_t r_damageblur = {CVAR_CLIENT | CVAR_SAVE, "r_damageblur", "0", "screen motionblur based on damage - value represents intensity, somewhere around 0.5 recommended - NOTE: bad performance on multi-gpu!"};
+cvar_t r_motionblur_averaging = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_averaging", "0.1", "sliding average reaction time for velocity (higher = slower adaption to change)"};
+cvar_t r_motionblur_randomize = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_randomize", "0.1", "randomizing coefficient to workaround ghosting"};
+cvar_t r_motionblur_minblur = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_minblur", "0.5", "factor of blur to apply at all times (always have this amount of blur no matter what the other factors are)"};
+cvar_t r_motionblur_maxblur = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_maxblur", "0.9", "maxmimum amount of blur"};
+cvar_t r_motionblur_velocityfactor = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_velocityfactor", "1", "factoring in of player velocity to the blur equation - the faster the player moves around the map, the more blur they get"};
+cvar_t r_motionblur_velocityfactor_minspeed = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_velocityfactor_minspeed", "400", "lower value of velocity when it starts to factor into blur equation"};
+cvar_t r_motionblur_velocityfactor_maxspeed = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_velocityfactor_maxspeed", "800", "upper value of velocity when it reaches the peak factor into blur equation"};
+cvar_t r_motionblur_mousefactor = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_mousefactor", "2", "factoring in of mouse acceleration to the blur equation - the faster the player turns their mouse, the more blur they get"};
+cvar_t r_motionblur_mousefactor_minspeed = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_mousefactor_minspeed", "0", "lower value of mouse acceleration when it starts to factor into blur equation"};
+cvar_t r_motionblur_mousefactor_maxspeed = {CVAR_CLIENT | CVAR_SAVE, "r_motionblur_mousefactor_maxspeed", "50", "upper value of mouse acceleration when it reaches the peak factor into blur equation"};
 
-cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "0", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
-cvar_t r_useinfinitefarclip = {CVAR_SAVE, "r_useinfinitefarclip", "1", "enables use of a special kind of projection matrix that has an extremely large farclip"};
-cvar_t r_farclip_base = {0, "r_farclip_base", "65536", "farclip (furthest visible distance) for rendering when r_useinfinitefarclip is 0"};
-cvar_t r_farclip_world = {0, "r_farclip_world", "2", "adds map size to farclip multiplied by this value"};
-cvar_t r_nearclip = {0, "r_nearclip", "1", "distance from camera of nearclip plane" };
-cvar_t r_deformvertexes = {0, "r_deformvertexes", "1", "allows use of deformvertexes in shader files (can be turned off to check performance impact)"};
-cvar_t r_transparent = {0, "r_transparent", "1", "allows use of transparent surfaces (can be turned off to check performance impact)"};
-cvar_t r_transparent_alphatocoverage = {0, "r_transparent_alphatocoverage", "1", "enables GL_ALPHA_TO_COVERAGE antialiasing technique on alphablend and alphatest surfaces when using vid_samples 2 or higher"};
-cvar_t r_transparent_sortsurfacesbynearest = {0, "r_transparent_sortsurfacesbynearest", "1", "sort entity and world surfaces by nearest point on bounding box instead of using the center of the bounding box, usually reduces sorting artifacts"};
-cvar_t r_transparent_useplanardistance = {0, "r_transparent_useplanardistance", "0", "sort transparent meshes by distance from view plane rather than spherical distance to the chosen point"};
-cvar_t r_showoverdraw = {0, "r_showoverdraw", "0", "shows overlapping geometry"};
-cvar_t r_showbboxes = {0, "r_showbboxes", "0", "shows bounding boxes of server entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
-cvar_t r_showbboxes_client = { 0, "r_showbboxes_client", "0", "shows bounding boxes of clientside qc entities, value controls opacity scaling (1 = 10%,  10 = 100%)" };
-cvar_t r_showsurfaces = {0, "r_showsurfaces", "0", "1 shows surfaces as different colors, or a value of 2 shows triangle draw order (for analyzing whether meshes are optimized for vertex cache)"};
-cvar_t r_showtris = {0, "r_showtris", "0", "shows triangle outlines, value controls brightness (can be above 1)"};
-cvar_t r_shownormals = {0, "r_shownormals", "0", "shows per-vertex surface normals and tangent vectors for bumpmapped lighting"};
-cvar_t r_showlighting = {0, "r_showlighting", "0", "shows areas lit by lights, useful for finding out why some areas of a map render slowly (bright orange = lots of passes = slow), a value of 2 disables depth testing which can be interesting but not very useful"};
-cvar_t r_showcollisionbrushes = {0, "r_showcollisionbrushes", "0", "draws collision brushes in quake3 maps (mode 1), mode 2 disables rendering of world (trippy!)"};
-cvar_t r_showcollisionbrushes_polygonfactor = {0, "r_showcollisionbrushes_polygonfactor", "-1", "expands outward the brush polygons a little bit, used to make collision brushes appear infront of walls"};
-cvar_t r_showcollisionbrushes_polygonoffset = {0, "r_showcollisionbrushes_polygonoffset", "0", "nudges brush polygon depth in hardware depth units, used to make collision brushes appear infront of walls"};
-cvar_t r_showdisabledepthtest = {0, "r_showdisabledepthtest", "0", "disables depth testing on r_show* cvars, allowing you to see what hidden geometry the graphics card is processing"};
-cvar_t r_showspriteedges = {0, "r_showspriteedges", "0", "renders a debug outline to show the polygon shape of each sprite frame rendered (may be 2 or more in case of interpolated animations), for debugging rendering bugs with specific view types"};
-cvar_t r_showparticleedges = {0, "r_showparticleedges", "0", "renders a debug outline to show the polygon shape of each particle, for debugging rendering bugs with specific view types"};
-cvar_t r_drawportals = {0, "r_drawportals", "0", "shows portals (separating polygons) in world interior in quake1 maps"};
-cvar_t r_drawentities = {0, "r_drawentities","1", "draw entities (doors, players, projectiles, etc)"};
-cvar_t r_draw2d = {0, "r_draw2d","1", "draw 2D stuff (dangerous to turn off)"};
-cvar_t r_drawworld = {0, "r_drawworld","1", "draw world (most static stuff)"};
-cvar_t r_drawviewmodel = {0, "r_drawviewmodel","1", "draw your weapon model"};
-cvar_t r_drawexteriormodel = {0, "r_drawexteriormodel","1", "draw your player model (e.g. in chase cam, reflections)"};
-cvar_t r_cullentities_trace = {0, "r_cullentities_trace", "1", "probabistically cull invisible entities"};
-cvar_t r_cullentities_trace_entityocclusion = { 0, "r_cullentities_trace_entityocclusion", "1", "check for occluding entities such as doors, not just world hull" };
-cvar_t r_cullentities_trace_samples = {0, "r_cullentities_trace_samples", "2", "number of samples to test for entity culling (in addition to center sample)"};
-cvar_t r_cullentities_trace_tempentitysamples = {0, "r_cullentities_trace_tempentitysamples", "-1", "number of samples to test for entity culling of temp entities (including all CSQC entities), -1 disables trace culling on these entities to prevent flicker (pvs still applies)"};
-cvar_t r_cullentities_trace_enlarge = {0, "r_cullentities_trace_enlarge", "0", "box enlargement for entity culling"};
-cvar_t r_cullentities_trace_expand = {0, "r_cullentities_trace_expand", "0", "box expanded by this many units for entity culling"};
-cvar_t r_cullentities_trace_pad = {0, "r_cullentities_trace_pad", "8", "accept traces that hit within this many units of the box"};
-cvar_t r_cullentities_trace_delay = {0, "r_cullentities_trace_delay", "1", "number of seconds until the entity gets actually culled"};
-cvar_t r_cullentities_trace_eyejitter = {0, "r_cullentities_trace_eyejitter", "16", "randomly offset rays from the eye by this much to reduce the odds of flickering"};
-cvar_t r_sortentities = {0, "r_sortentities", "0", "sort entities before drawing (might be faster)"};
-cvar_t r_speeds = {0, "r_speeds","0", "displays rendering statistics and per-subsystem timings"};
-cvar_t r_fullbright = {0, "r_fullbright","0", "makes map very bright and renders faster"};
+cvar_t r_depthfirst = {CVAR_CLIENT | CVAR_SAVE, "r_depthfirst", "0", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
+cvar_t r_useinfinitefarclip = {CVAR_CLIENT | CVAR_SAVE, "r_useinfinitefarclip", "1", "enables use of a special kind of projection matrix that has an extremely large farclip"};
+cvar_t r_farclip_base = {CVAR_CLIENT, "r_farclip_base", "65536", "farclip (furthest visible distance) for rendering when r_useinfinitefarclip is 0"};
+cvar_t r_farclip_world = {CVAR_CLIENT, "r_farclip_world", "2", "adds map size to farclip multiplied by this value"};
+cvar_t r_nearclip = {CVAR_CLIENT, "r_nearclip", "1", "distance from camera of nearclip plane" };
+cvar_t r_deformvertexes = {CVAR_CLIENT, "r_deformvertexes", "1", "allows use of deformvertexes in shader files (can be turned off to check performance impact)"};
+cvar_t r_transparent = {CVAR_CLIENT, "r_transparent", "1", "allows use of transparent surfaces (can be turned off to check performance impact)"};
+cvar_t r_transparent_alphatocoverage = {CVAR_CLIENT, "r_transparent_alphatocoverage", "1", "enables GL_ALPHA_TO_COVERAGE antialiasing technique on alphablend and alphatest surfaces when using vid_samples 2 or higher"};
+cvar_t r_transparent_sortsurfacesbynearest = {CVAR_CLIENT, "r_transparent_sortsurfacesbynearest", "1", "sort entity and world surfaces by nearest point on bounding box instead of using the center of the bounding box, usually reduces sorting artifacts"};
+cvar_t r_transparent_useplanardistance = {CVAR_CLIENT, "r_transparent_useplanardistance", "0", "sort transparent meshes by distance from view plane rather than spherical distance to the chosen point"};
+cvar_t r_showoverdraw = {CVAR_CLIENT, "r_showoverdraw", "0", "shows overlapping geometry"};
+cvar_t r_showbboxes = {CVAR_CLIENT, "r_showbboxes", "0", "shows bounding boxes of server entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
+cvar_t r_showbboxes_client = {CVAR_CLIENT, "r_showbboxes_client", "0", "shows bounding boxes of clientside qc entities, value controls opacity scaling (1 = 10%,  10 = 100%)"};
+cvar_t r_showsurfaces = {CVAR_CLIENT, "r_showsurfaces", "0", "1 shows surfaces as different colors, or a value of 2 shows triangle draw order (for analyzing whether meshes are optimized for vertex cache)"};
+cvar_t r_showtris = {CVAR_CLIENT, "r_showtris", "0", "shows triangle outlines, value controls brightness (can be above 1)"};
+cvar_t r_shownormals = {CVAR_CLIENT, "r_shownormals", "0", "shows per-vertex surface normals and tangent vectors for bumpmapped lighting"};
+cvar_t r_showlighting = {CVAR_CLIENT, "r_showlighting", "0", "shows areas lit by lights, useful for finding out why some areas of a map render slowly (bright orange = lots of passes = slow), a value of 2 disables depth testing which can be interesting but not very useful"};
+cvar_t r_showcollisionbrushes = {CVAR_CLIENT, "r_showcollisionbrushes", "0", "draws collision brushes in quake3 maps (mode 1), mode 2 disables rendering of world (trippy!)"};
+cvar_t r_showcollisionbrushes_polygonfactor = {CVAR_CLIENT, "r_showcollisionbrushes_polygonfactor", "-1", "expands outward the brush polygons a little bit, used to make collision brushes appear infront of walls"};
+cvar_t r_showcollisionbrushes_polygonoffset = {CVAR_CLIENT, "r_showcollisionbrushes_polygonoffset", "0", "nudges brush polygon depth in hardware depth units, used to make collision brushes appear infront of walls"};
+cvar_t r_showdisabledepthtest = {CVAR_CLIENT, "r_showdisabledepthtest", "0", "disables depth testing on r_show* cvars, allowing you to see what hidden geometry the graphics card is processing"};
+cvar_t r_showspriteedges = {CVAR_CLIENT, "r_showspriteedges", "0", "renders a debug outline to show the polygon shape of each sprite frame rendered (may be 2 or more in case of interpolated animations), for debugging rendering bugs with specific view types"};
+cvar_t r_showparticleedges = {CVAR_CLIENT, "r_showparticleedges", "0", "renders a debug outline to show the polygon shape of each particle, for debugging rendering bugs with specific view types"};
+cvar_t r_drawportals = {CVAR_CLIENT, "r_drawportals", "0", "shows portals (separating polygons) in world interior in quake1 maps"};
+cvar_t r_drawentities = {CVAR_CLIENT, "r_drawentities","1", "draw entities (doors, players, projectiles, etc)"};
+cvar_t r_draw2d = {CVAR_CLIENT, "r_draw2d","1", "draw 2D stuff (dangerous to turn off)"};
+cvar_t r_drawworld = {CVAR_CLIENT, "r_drawworld","1", "draw world (most static stuff)"};
+cvar_t r_drawviewmodel = {CVAR_CLIENT, "r_drawviewmodel","1", "draw your weapon model"};
+cvar_t r_drawexteriormodel = {CVAR_CLIENT, "r_drawexteriormodel","1", "draw your player model (e.g. in chase cam, reflections)"};
+cvar_t r_cullentities_trace = {CVAR_CLIENT, "r_cullentities_trace", "1", "probabistically cull invisible entities"};
+cvar_t r_cullentities_trace_entityocclusion = {CVAR_CLIENT, "r_cullentities_trace_entityocclusion", "1", "check for occluding entities such as doors, not just world hull"};
+cvar_t r_cullentities_trace_samples = {CVAR_CLIENT, "r_cullentities_trace_samples", "2", "number of samples to test for entity culling (in addition to center sample)"};
+cvar_t r_cullentities_trace_tempentitysamples = {CVAR_CLIENT, "r_cullentities_trace_tempentitysamples", "-1", "number of samples to test for entity culling of temp entities (including all CSQC entities), -1 disables trace culling on these entities to prevent flicker (pvs still applies)"};
+cvar_t r_cullentities_trace_enlarge = {CVAR_CLIENT, "r_cullentities_trace_enlarge", "0", "box enlargement for entity culling"};
+cvar_t r_cullentities_trace_expand = {CVAR_CLIENT, "r_cullentities_trace_expand", "0", "box expanded by this many units for entity culling"};
+cvar_t r_cullentities_trace_pad = {CVAR_CLIENT, "r_cullentities_trace_pad", "8", "accept traces that hit within this many units of the box"};
+cvar_t r_cullentities_trace_delay = {CVAR_CLIENT, "r_cullentities_trace_delay", "1", "number of seconds until the entity gets actually culled"};
+cvar_t r_cullentities_trace_eyejitter = {CVAR_CLIENT, "r_cullentities_trace_eyejitter", "16", "randomly offset rays from the eye by this much to reduce the odds of flickering"};
+cvar_t r_sortentities = {CVAR_CLIENT, "r_sortentities", "0", "sort entities before drawing (might be faster)"};
+cvar_t r_speeds = {CVAR_CLIENT, "r_speeds","0", "displays rendering statistics and per-subsystem timings"};
+cvar_t r_fullbright = {CVAR_CLIENT, "r_fullbright","0", "makes map very bright and renders faster"};
 
-cvar_t r_fullbright_directed = {0, "r_fullbright_directed", "0", "render fullbright things (unlit worldmodel and EF_FULLBRIGHT entities, but not fullbright shaders) using a constant light direction instead to add more depth while keeping uniform brightness"};
-cvar_t r_fullbright_directed_ambient = {0, "r_fullbright_directed_ambient", "0.5", "ambient light multiplier for directed fullbright"};
-cvar_t r_fullbright_directed_diffuse = {0, "r_fullbright_directed_diffuse", "0.75", "diffuse light multiplier for directed fullbright"};
-cvar_t r_fullbright_directed_pitch = {0, "r_fullbright_directed_pitch", "20", "constant pitch direction ('height') of the fake light source to use for fullbright"};
-cvar_t r_fullbright_directed_pitch_relative = {0, "r_fullbright_directed_pitch_relative", "0", "whether r_fullbright_directed_pitch is interpreted as absolute (0) or relative (1) pitch"};
+cvar_t r_fullbright_directed = {CVAR_CLIENT, "r_fullbright_directed", "0", "render fullbright things (unlit worldmodel and EF_FULLBRIGHT entities, but not fullbright shaders) using a constant light direction instead to add more depth while keeping uniform brightness"};
+cvar_t r_fullbright_directed_ambient = {CVAR_CLIENT, "r_fullbright_directed_ambient", "0.5", "ambient light multiplier for directed fullbright"};
+cvar_t r_fullbright_directed_diffuse = {CVAR_CLIENT, "r_fullbright_directed_diffuse", "0.75", "diffuse light multiplier for directed fullbright"};
+cvar_t r_fullbright_directed_pitch = {CVAR_CLIENT, "r_fullbright_directed_pitch", "20", "constant pitch direction ('height') of the fake light source to use for fullbright"};
+cvar_t r_fullbright_directed_pitch_relative = {CVAR_CLIENT, "r_fullbright_directed_pitch_relative", "0", "whether r_fullbright_directed_pitch is interpreted as absolute (0) or relative (1) pitch"};
 
-cvar_t r_wateralpha = {CVAR_SAVE, "r_wateralpha","1", "opacity of water polygons"};
-cvar_t r_dynamic = {CVAR_SAVE, "r_dynamic","1", "enables dynamic lights (rocket glow and such)"};
-cvar_t r_fullbrights = {CVAR_SAVE, "r_fullbrights", "1", "enables glowing pixels in quake textures (changes need r_restart to take effect)"};
-cvar_t r_shadows = {CVAR_SAVE, "r_shadows", "0", "casts fake stencil shadows from models onto the world (rtlights are unaffected by this); when set to 2, always cast the shadows in the direction set by r_shadows_throwdirection, otherwise use the model lighting."};
-cvar_t r_shadows_darken = {CVAR_SAVE, "r_shadows_darken", "0.5", "how much shadowed areas will be darkened"};
-cvar_t r_shadows_throwdistance = {CVAR_SAVE, "r_shadows_throwdistance", "500", "how far to cast shadows from models"};
-cvar_t r_shadows_throwdirection = {CVAR_SAVE, "r_shadows_throwdirection", "0 0 -1", "override throwing direction for r_shadows 2"};
-cvar_t r_shadows_drawafterrtlighting = {CVAR_SAVE, "r_shadows_drawafterrtlighting", "0", "draw fake shadows AFTER realtime lightning is drawn. May be useful for simulating fast sunlight on large outdoor maps with only one noshadow rtlight. The price is less realistic appearance of dynamic light shadows."};
-cvar_t r_shadows_castfrombmodels = {CVAR_SAVE, "r_shadows_castfrombmodels", "0", "do cast shadows from bmodels"};
-cvar_t r_shadows_focus = {CVAR_SAVE, "r_shadows_focus", "0 0 0", "offset the shadowed area focus"};
-cvar_t r_shadows_shadowmapscale = {CVAR_SAVE, "r_shadows_shadowmapscale", "0.25", "higher values increase shadowmap quality at a cost of area covered (multiply global shadowmap precision) for fake shadows. Needs shadowmapping ON."};
-cvar_t r_shadows_shadowmapbias = {CVAR_SAVE, "r_shadows_shadowmapbias", "-1", "sets shadowmap bias for fake shadows. -1 sets the value of r_shadow_shadowmapping_bias. Needs shadowmapping ON."};
-cvar_t r_q1bsp_skymasking = {0, "r_q1bsp_skymasking", "1", "allows sky polygons in quake1 maps to obscure other geometry"};
-cvar_t r_polygonoffset_submodel_factor = {0, "r_polygonoffset_submodel_factor", "0", "biases depth values of world submodels such as doors, to prevent z-fighting artifacts in Quake maps"};
-cvar_t r_polygonoffset_submodel_offset = {0, "r_polygonoffset_submodel_offset", "14", "biases depth values of world submodels such as doors, to prevent z-fighting artifacts in Quake maps"};
-cvar_t r_polygonoffset_decals_factor = {0, "r_polygonoffset_decals_factor", "0", "biases depth values of decals to prevent z-fighting artifacts"};
-cvar_t r_polygonoffset_decals_offset = {0, "r_polygonoffset_decals_offset", "-14", "biases depth values of decals to prevent z-fighting artifacts"};
-cvar_t r_fog_exp2 = {0, "r_fog_exp2", "0", "uses GL_EXP2 fog (as in Nehahra) rather than realistic GL_EXP fog"};
-cvar_t r_fog_clear = {0, "r_fog_clear", "1", "clears renderbuffer with fog color before render starts"};
-cvar_t r_drawfog = {CVAR_SAVE, "r_drawfog", "1", "allows one to disable fog rendering"};
-cvar_t r_transparentdepthmasking = {CVAR_SAVE, "r_transparentdepthmasking", "0", "enables depth writes on transparent meshes whose materially is normally opaque, this prevents seeing the inside of a transparent mesh"};
-cvar_t r_transparent_sortmindist = {CVAR_SAVE, "r_transparent_sortmindist", "0", "lower distance limit for transparent sorting"};
-cvar_t r_transparent_sortmaxdist = {CVAR_SAVE, "r_transparent_sortmaxdist", "32768", "upper distance limit for transparent sorting"};
-cvar_t r_transparent_sortarraysize = {CVAR_SAVE, "r_transparent_sortarraysize", "4096", "number of distance-sorting layers"};
-cvar_t r_celshading = {CVAR_SAVE, "r_celshading", "0", "cartoon-style light shading (OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
-cvar_t r_celoutlines = {CVAR_SAVE, "r_celoutlines", "0", "cartoon-style outlines (requires r_shadow_deferred; OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
+cvar_t r_wateralpha = {CVAR_CLIENT | CVAR_SAVE, "r_wateralpha","1", "opacity of water polygons"};
+cvar_t r_dynamic = {CVAR_CLIENT | CVAR_SAVE, "r_dynamic","1", "enables dynamic lights (rocket glow and such)"};
+cvar_t r_fullbrights = {CVAR_CLIENT | CVAR_SAVE, "r_fullbrights", "1", "enables glowing pixels in quake textures (changes need r_restart to take effect)"};
+cvar_t r_shadows = {CVAR_CLIENT | CVAR_SAVE, "r_shadows", "0", "casts fake stencil shadows from models onto the world (rtlights are unaffected by this); when set to 2, always cast the shadows in the direction set by r_shadows_throwdirection, otherwise use the model lighting."};
+cvar_t r_shadows_darken = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_darken", "0.5", "how much shadowed areas will be darkened"};
+cvar_t r_shadows_throwdistance = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_throwdistance", "500", "how far to cast shadows from models"};
+cvar_t r_shadows_throwdirection = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_throwdirection", "0 0 -1", "override throwing direction for r_shadows 2"};
+cvar_t r_shadows_drawafterrtlighting = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_drawafterrtlighting", "0", "draw fake shadows AFTER realtime lightning is drawn. May be useful for simulating fast sunlight on large outdoor maps with only one noshadow rtlight. The price is less realistic appearance of dynamic light shadows."};
+cvar_t r_shadows_castfrombmodels = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_castfrombmodels", "0", "do cast shadows from bmodels"};
+cvar_t r_shadows_focus = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_focus", "0 0 0", "offset the shadowed area focus"};
+cvar_t r_shadows_shadowmapscale = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_shadowmapscale", "0.25", "higher values increase shadowmap quality at a cost of area covered (multiply global shadowmap precision) for fake shadows. Needs shadowmapping ON."};
+cvar_t r_shadows_shadowmapbias = {CVAR_CLIENT | CVAR_SAVE, "r_shadows_shadowmapbias", "-1", "sets shadowmap bias for fake shadows. -1 sets the value of r_shadow_shadowmapping_bias. Needs shadowmapping ON."};
+cvar_t r_q1bsp_skymasking = {CVAR_CLIENT, "r_q1bsp_skymasking", "1", "allows sky polygons in quake1 maps to obscure other geometry"};
+cvar_t r_polygonoffset_submodel_factor = {CVAR_CLIENT, "r_polygonoffset_submodel_factor", "0", "biases depth values of world submodels such as doors, to prevent z-fighting artifacts in Quake maps"};
+cvar_t r_polygonoffset_submodel_offset = {CVAR_CLIENT, "r_polygonoffset_submodel_offset", "14", "biases depth values of world submodels such as doors, to prevent z-fighting artifacts in Quake maps"};
+cvar_t r_polygonoffset_decals_factor = {CVAR_CLIENT, "r_polygonoffset_decals_factor", "0", "biases depth values of decals to prevent z-fighting artifacts"};
+cvar_t r_polygonoffset_decals_offset = {CVAR_CLIENT, "r_polygonoffset_decals_offset", "-14", "biases depth values of decals to prevent z-fighting artifacts"};
+cvar_t r_fog_exp2 = {CVAR_CLIENT, "r_fog_exp2", "0", "uses GL_EXP2 fog (as in Nehahra) rather than realistic GL_EXP fog"};
+cvar_t r_fog_clear = {CVAR_CLIENT, "r_fog_clear", "1", "clears renderbuffer with fog color before render starts"};
+cvar_t r_drawfog = {CVAR_CLIENT | CVAR_SAVE, "r_drawfog", "1", "allows one to disable fog rendering"};
+cvar_t r_transparentdepthmasking = {CVAR_CLIENT | CVAR_SAVE, "r_transparentdepthmasking", "0", "enables depth writes on transparent meshes whose materially is normally opaque, this prevents seeing the inside of a transparent mesh"};
+cvar_t r_transparent_sortmindist = {CVAR_CLIENT | CVAR_SAVE, "r_transparent_sortmindist", "0", "lower distance limit for transparent sorting"};
+cvar_t r_transparent_sortmaxdist = {CVAR_CLIENT | CVAR_SAVE, "r_transparent_sortmaxdist", "32768", "upper distance limit for transparent sorting"};
+cvar_t r_transparent_sortarraysize = {CVAR_CLIENT | CVAR_SAVE, "r_transparent_sortarraysize", "4096", "number of distance-sorting layers"};
+cvar_t r_celshading = {CVAR_CLIENT | CVAR_SAVE, "r_celshading", "0", "cartoon-style light shading (OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
+cvar_t r_celoutlines = {CVAR_CLIENT | CVAR_SAVE, "r_celoutlines", "0", "cartoon-style outlines (requires r_shadow_deferred; OpenGL 2.x only)"}; // FIXME remove OpenGL 2.x only once implemented for DX9
 
-cvar_t gl_fogenable = {0, "gl_fogenable", "0", "nehahra fog enable (for Nehahra compatibility only)"};
-cvar_t gl_fogdensity = {0, "gl_fogdensity", "0.25", "nehahra fog density (recommend values below 0.1) (for Nehahra compatibility only)"};
-cvar_t gl_fogred = {0, "gl_fogred","0.3", "nehahra fog color red value (for Nehahra compatibility only)"};
-cvar_t gl_foggreen = {0, "gl_foggreen","0.3", "nehahra fog color green value (for Nehahra compatibility only)"};
-cvar_t gl_fogblue = {0, "gl_fogblue","0.3", "nehahra fog color blue value (for Nehahra compatibility only)"};
-cvar_t gl_fogstart = {0, "gl_fogstart", "0", "nehahra fog start distance (for Nehahra compatibility only)"};
-cvar_t gl_fogend = {0, "gl_fogend","0", "nehahra fog end distance (for Nehahra compatibility only)"};
-cvar_t gl_skyclip = {0, "gl_skyclip", "4608", "nehahra farclip distance - the real fog end (for Nehahra compatibility only)"};
+cvar_t gl_fogenable = {CVAR_CLIENT, "gl_fogenable", "0", "nehahra fog enable (for Nehahra compatibility only)"};
+cvar_t gl_fogdensity = {CVAR_CLIENT, "gl_fogdensity", "0.25", "nehahra fog density (recommend values below 0.1) (for Nehahra compatibility only)"};
+cvar_t gl_fogred = {CVAR_CLIENT, "gl_fogred","0.3", "nehahra fog color red value (for Nehahra compatibility only)"};
+cvar_t gl_foggreen = {CVAR_CLIENT, "gl_foggreen","0.3", "nehahra fog color green value (for Nehahra compatibility only)"};
+cvar_t gl_fogblue = {CVAR_CLIENT, "gl_fogblue","0.3", "nehahra fog color blue value (for Nehahra compatibility only)"};
+cvar_t gl_fogstart = {CVAR_CLIENT, "gl_fogstart", "0", "nehahra fog start distance (for Nehahra compatibility only)"};
+cvar_t gl_fogend = {CVAR_CLIENT, "gl_fogend","0", "nehahra fog end distance (for Nehahra compatibility only)"};
+cvar_t gl_skyclip = {CVAR_CLIENT, "gl_skyclip", "4608", "nehahra farclip distance - the real fog end (for Nehahra compatibility only)"};
 
-cvar_t r_texture_dds_load = {CVAR_SAVE, "r_texture_dds_load", "0", "load compressed dds/filename.dds texture instead of filename.tga, if the file exists (requires driver support)"};
-cvar_t r_texture_dds_save = {CVAR_SAVE, "r_texture_dds_save", "0", "save compressed dds/filename.dds texture when filename.tga is loaded, so that it can be loaded instead next time"};
+cvar_t r_texture_dds_load = {CVAR_CLIENT | CVAR_SAVE, "r_texture_dds_load", "0", "load compressed dds/filename.dds texture instead of filename.tga, if the file exists (requires driver support)"};
+cvar_t r_texture_dds_save = {CVAR_CLIENT | CVAR_SAVE, "r_texture_dds_save", "0", "save compressed dds/filename.dds texture when filename.tga is loaded, so that it can be loaded instead next time"};
 
-cvar_t r_textureunits = {0, "r_textureunits", "32", "number of texture units to use in GL 1.1 and GL 1.3 rendering paths"};
-static cvar_t gl_combine = {CVAR_READONLY, "gl_combine", "1", "indicates whether the OpenGL 1.3 rendering path is active"};
-static cvar_t r_glsl = {CVAR_READONLY, "r_glsl", "1", "indicates whether the OpenGL 2.0 rendering path is active"};
+cvar_t r_textureunits = {CVAR_CLIENT, "r_textureunits", "32", "number of texture units to use in GL 1.1 and GL 1.3 rendering paths"};
+static cvar_t gl_combine = {CVAR_CLIENT | CVAR_READONLY, "gl_combine", "1", "indicates whether the OpenGL 1.3 rendering path is active"};
+static cvar_t r_glsl = {CVAR_CLIENT | CVAR_READONLY, "r_glsl", "1", "indicates whether the OpenGL 2.0 rendering path is active"};
 
-cvar_t r_usedepthtextures = {CVAR_SAVE, "r_usedepthtextures", "1", "use depth texture instead of depth renderbuffer where possible, uses less video memory but may render slower (or faster) depending on hardware"};
-cvar_t r_viewfbo = {CVAR_SAVE, "r_viewfbo", "0", "enables use of an 8bit (1) or 16bit (2) or 32bit (3) per component float framebuffer render, which may be at a different resolution than the video mode"};
-cvar_t r_rendertarget_debug = {0, "r_rendertarget_debug", "-1", "replaces the view with the contents of the specified render target (by number - note that these can fluctuate depending on scene)"};
-cvar_t r_viewscale = {CVAR_SAVE, "r_viewscale", "1", "scaling factor for resolution of the fbo rendering method, must be > 0, can be above 1 for a costly antialiasing behavior, typical values are 0.5 for 1/4th as many pixels rendered, or 1 for normal rendering"};
-cvar_t r_viewscale_fpsscaling = {CVAR_SAVE, "r_viewscale_fpsscaling", "0", "change resolution based on framerate"};
-cvar_t r_viewscale_fpsscaling_min = {CVAR_SAVE, "r_viewscale_fpsscaling_min", "0.0625", "worst acceptable quality"};
-cvar_t r_viewscale_fpsscaling_multiply = {CVAR_SAVE, "r_viewscale_fpsscaling_multiply", "5", "adjust quality up or down by the frametime difference from 1.0/target, multiplied by this factor"};
-cvar_t r_viewscale_fpsscaling_stepsize = {CVAR_SAVE, "r_viewscale_fpsscaling_stepsize", "0.01", "smallest adjustment to hit the target framerate (this value prevents minute oscillations)"};
-cvar_t r_viewscale_fpsscaling_stepmax = {CVAR_SAVE, "r_viewscale_fpsscaling_stepmax", "1.00", "largest adjustment to hit the target framerate (this value prevents wild overshooting of the estimate)"};
-cvar_t r_viewscale_fpsscaling_target = {CVAR_SAVE, "r_viewscale_fpsscaling_target", "70", "desired framerate"};
+cvar_t r_usedepthtextures = {CVAR_CLIENT | CVAR_SAVE, "r_usedepthtextures", "1", "use depth texture instead of depth renderbuffer where possible, uses less video memory but may render slower (or faster) depending on hardware"};
+cvar_t r_viewfbo = {CVAR_CLIENT | CVAR_SAVE, "r_viewfbo", "0", "enables use of an 8bit (1) or 16bit (2) or 32bit (3) per component float framebuffer render, which may be at a different resolution than the video mode"};
+cvar_t r_rendertarget_debug = {CVAR_CLIENT, "r_rendertarget_debug", "-1", "replaces the view with the contents of the specified render target (by number - note that these can fluctuate depending on scene)"};
+cvar_t r_viewscale = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale", "1", "scaling factor for resolution of the fbo rendering method, must be > 0, can be above 1 for a costly antialiasing behavior, typical values are 0.5 for 1/4th as many pixels rendered, or 1 for normal rendering"};
+cvar_t r_viewscale_fpsscaling = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling", "0", "change resolution based on framerate"};
+cvar_t r_viewscale_fpsscaling_min = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling_min", "0.0625", "worst acceptable quality"};
+cvar_t r_viewscale_fpsscaling_multiply = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling_multiply", "5", "adjust quality up or down by the frametime difference from 1.0/target, multiplied by this factor"};
+cvar_t r_viewscale_fpsscaling_stepsize = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling_stepsize", "0.01", "smallest adjustment to hit the target framerate (this value prevents minute oscillations)"};
+cvar_t r_viewscale_fpsscaling_stepmax = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling_stepmax", "1.00", "largest adjustment to hit the target framerate (this value prevents wild overshooting of the estimate)"};
+cvar_t r_viewscale_fpsscaling_target = {CVAR_CLIENT | CVAR_SAVE, "r_viewscale_fpsscaling_target", "70", "desired framerate"};
 
-cvar_t r_glsl_skeletal = {CVAR_SAVE, "r_glsl_skeletal", "1", "render skeletal models faster using a gpu-skinning technique"};
-cvar_t r_glsl_deluxemapping = {CVAR_SAVE, "r_glsl_deluxemapping", "1", "use per pixel lighting on deluxemap-compiled q3bsp maps (or a value of 2 forces deluxemap shading even without deluxemaps)"};
-cvar_t r_glsl_offsetmapping = {CVAR_SAVE, "r_glsl_offsetmapping", "0", "offset mapping effect (also known as parallax mapping or virtual displacement mapping)"};
-cvar_t r_glsl_offsetmapping_steps = {CVAR_SAVE, "r_glsl_offsetmapping_steps", "2", "offset mapping steps (note: too high values may be not supported by your GPU)"};
-cvar_t r_glsl_offsetmapping_reliefmapping = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping", "0", "relief mapping effect (higher quality)"};
-cvar_t r_glsl_offsetmapping_reliefmapping_steps = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_steps", "10", "relief mapping steps (note: too high values may be not supported by your GPU)"};
-cvar_t r_glsl_offsetmapping_reliefmapping_refinesteps = {CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_refinesteps", "5", "relief mapping refine steps (these are a binary search executed as the last step as given by r_glsl_offsetmapping_reliefmapping_steps)"};
-cvar_t r_glsl_offsetmapping_scale = {CVAR_SAVE, "r_glsl_offsetmapping_scale", "0.04", "how deep the offset mapping effect is"};
-cvar_t r_glsl_offsetmapping_lod = {CVAR_SAVE, "r_glsl_offsetmapping_lod", "0", "apply distance-based level-of-detail correction to number of offsetmappig steps, effectively making it render faster on large open-area maps"};
-cvar_t r_glsl_offsetmapping_lod_distance = {CVAR_SAVE, "r_glsl_offsetmapping_lod_distance", "32", "first LOD level distance, second level (-50% steps) is 2x of this, third (33%) - 3x etc."};
-cvar_t r_glsl_postprocess = {CVAR_SAVE, "r_glsl_postprocess", "0", "use a GLSL postprocessing shader"};
-cvar_t r_glsl_postprocess_uservec1 = {CVAR_SAVE, "r_glsl_postprocess_uservec1", "0 0 0 0", "a 4-component vector to pass as uservec1 to the postprocessing shader (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec2 = {CVAR_SAVE, "r_glsl_postprocess_uservec2", "0 0 0 0", "a 4-component vector to pass as uservec2 to the postprocessing shader (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec3 = {CVAR_SAVE, "r_glsl_postprocess_uservec3", "0 0 0 0", "a 4-component vector to pass as uservec3 to the postprocessing shader (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec4 = {CVAR_SAVE, "r_glsl_postprocess_uservec4", "0 0 0 0", "a 4-component vector to pass as uservec4 to the postprocessing shader (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec1_enable = {CVAR_SAVE, "r_glsl_postprocess_uservec1_enable", "1", "enables postprocessing uservec1 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec2_enable = {CVAR_SAVE, "r_glsl_postprocess_uservec2_enable", "1", "enables postprocessing uservec2 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec3_enable = {CVAR_SAVE, "r_glsl_postprocess_uservec3_enable", "1", "enables postprocessing uservec3 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
-cvar_t r_glsl_postprocess_uservec4_enable = {CVAR_SAVE, "r_glsl_postprocess_uservec4_enable", "1", "enables postprocessing uservec4 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_skeletal = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_skeletal", "1", "render skeletal models faster using a gpu-skinning technique"};
+cvar_t r_glsl_deluxemapping = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_deluxemapping", "1", "use per pixel lighting on deluxemap-compiled q3bsp maps (or a value of 2 forces deluxemap shading even without deluxemaps)"};
+cvar_t r_glsl_offsetmapping = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping", "0", "offset mapping effect (also known as parallax mapping or virtual displacement mapping)"};
+cvar_t r_glsl_offsetmapping_steps = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_steps", "2", "offset mapping steps (note: too high values may be not supported by your GPU)"};
+cvar_t r_glsl_offsetmapping_reliefmapping = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping", "0", "relief mapping effect (higher quality)"};
+cvar_t r_glsl_offsetmapping_reliefmapping_steps = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_steps", "10", "relief mapping steps (note: too high values may be not supported by your GPU)"};
+cvar_t r_glsl_offsetmapping_reliefmapping_refinesteps = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_reliefmapping_refinesteps", "5", "relief mapping refine steps (these are a binary search executed as the last step as given by r_glsl_offsetmapping_reliefmapping_steps)"};
+cvar_t r_glsl_offsetmapping_scale = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_scale", "0.04", "how deep the offset mapping effect is"};
+cvar_t r_glsl_offsetmapping_lod = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_lod", "0", "apply distance-based level-of-detail correction to number of offsetmappig steps, effectively making it render faster on large open-area maps"};
+cvar_t r_glsl_offsetmapping_lod_distance = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_offsetmapping_lod_distance", "32", "first LOD level distance, second level (-50% steps) is 2x of this, third (33%) - 3x etc."};
+cvar_t r_glsl_postprocess = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess", "0", "use a GLSL postprocessing shader"};
+cvar_t r_glsl_postprocess_uservec1 = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec1", "0 0 0 0", "a 4-component vector to pass as uservec1 to the postprocessing shader (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec2 = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec2", "0 0 0 0", "a 4-component vector to pass as uservec2 to the postprocessing shader (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec3 = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec3", "0 0 0 0", "a 4-component vector to pass as uservec3 to the postprocessing shader (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec4 = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec4", "0 0 0 0", "a 4-component vector to pass as uservec4 to the postprocessing shader (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec1_enable = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec1_enable", "1", "enables postprocessing uservec1 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec2_enable = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec2_enable", "1", "enables postprocessing uservec2 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec3_enable = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec3_enable", "1", "enables postprocessing uservec3 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
+cvar_t r_glsl_postprocess_uservec4_enable = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_postprocess_uservec4_enable", "1", "enables postprocessing uservec4 usage, creates USERVEC1 define (only useful if default.glsl has been customized)"};
 
-cvar_t r_water = {CVAR_SAVE, "r_water", "0", "whether to use reflections and refraction on water surfaces (note: r_wateralpha must be set below 1)"};
-cvar_t r_water_cameraentitiesonly = {CVAR_SAVE, "r_water_cameraentitiesonly", "0", "whether to only show QC-defined reflections/refractions (typically used for camera- or portal-like effects)"};
-cvar_t r_water_clippingplanebias = {CVAR_SAVE, "r_water_clippingplanebias", "1", "a rather technical setting which avoids black pixels around water edges"};
-cvar_t r_water_resolutionmultiplier = {CVAR_SAVE, "r_water_resolutionmultiplier", "0.5", "multiplier for screen resolution when rendering refracted/reflected scenes, 1 is full quality, lower values are faster"};
-cvar_t r_water_refractdistort = {CVAR_SAVE, "r_water_refractdistort", "0.01", "how much water refractions shimmer"};
-cvar_t r_water_reflectdistort = {CVAR_SAVE, "r_water_reflectdistort", "0.01", "how much water reflections shimmer"};
-cvar_t r_water_scissormode = {0, "r_water_scissormode", "3", "scissor (1) or cull (2) or both (3) water renders"};
-cvar_t r_water_lowquality = {0, "r_water_lowquality", "0", "special option to accelerate water rendering, 1 disables shadows and particles, 2 disables all dynamic lights"};
-cvar_t r_water_hideplayer = {CVAR_SAVE, "r_water_hideplayer", "0", "if set to 1 then player will be hidden in refraction views, if set to 2 then player will also be hidden in reflection views, player is always visible in camera views"};
+cvar_t r_water = {CVAR_CLIENT | CVAR_SAVE, "r_water", "0", "whether to use reflections and refraction on water surfaces (note: r_wateralpha must be set below 1)"};
+cvar_t r_water_cameraentitiesonly = {CVAR_CLIENT | CVAR_SAVE, "r_water_cameraentitiesonly", "0", "whether to only show QC-defined reflections/refractions (typically used for camera- or portal-like effects)"};
+cvar_t r_water_clippingplanebias = {CVAR_CLIENT | CVAR_SAVE, "r_water_clippingplanebias", "1", "a rather technical setting which avoids black pixels around water edges"};
+cvar_t r_water_resolutionmultiplier = {CVAR_CLIENT | CVAR_SAVE, "r_water_resolutionmultiplier", "0.5", "multiplier for screen resolution when rendering refracted/reflected scenes, 1 is full quality, lower values are faster"};
+cvar_t r_water_refractdistort = {CVAR_CLIENT | CVAR_SAVE, "r_water_refractdistort", "0.01", "how much water refractions shimmer"};
+cvar_t r_water_reflectdistort = {CVAR_CLIENT | CVAR_SAVE, "r_water_reflectdistort", "0.01", "how much water reflections shimmer"};
+cvar_t r_water_scissormode = {CVAR_CLIENT, "r_water_scissormode", "3", "scissor (1) or cull (2) or both (3) water renders"};
+cvar_t r_water_lowquality = {CVAR_CLIENT, "r_water_lowquality", "0", "special option to accelerate water rendering, 1 disables shadows and particles, 2 disables all dynamic lights"};
+cvar_t r_water_hideplayer = {CVAR_CLIENT | CVAR_SAVE, "r_water_hideplayer", "0", "if set to 1 then player will be hidden in refraction views, if set to 2 then player will also be hidden in reflection views, player is always visible in camera views"};
 
-cvar_t r_lerpsprites = {CVAR_SAVE, "r_lerpsprites", "0", "enables animation smoothing on sprites"};
-cvar_t r_lerpmodels = {CVAR_SAVE, "r_lerpmodels", "1", "enables animation smoothing on models"};
-cvar_t r_lerplightstyles = {CVAR_SAVE, "r_lerplightstyles", "0", "enable animation smoothing on flickering lights"};
-cvar_t r_waterscroll = {CVAR_SAVE, "r_waterscroll", "1", "makes water scroll around, value controls how much"};
+cvar_t r_lerpsprites = {CVAR_CLIENT | CVAR_SAVE, "r_lerpsprites", "0", "enables animation smoothing on sprites"};
+cvar_t r_lerpmodels = {CVAR_CLIENT | CVAR_SAVE, "r_lerpmodels", "1", "enables animation smoothing on models"};
+cvar_t r_lerplightstyles = {CVAR_CLIENT | CVAR_SAVE, "r_lerplightstyles", "0", "enable animation smoothing on flickering lights"};
+cvar_t r_waterscroll = {CVAR_CLIENT | CVAR_SAVE, "r_waterscroll", "1", "makes water scroll around, value controls how much"};
 
-cvar_t r_bloom = {CVAR_SAVE, "r_bloom", "0", "enables bloom effect (makes bright pixels affect neighboring pixels)"};
-cvar_t r_bloom_colorscale = {CVAR_SAVE, "r_bloom_colorscale", "1", "how bright the glow is"};
+cvar_t r_bloom = {CVAR_CLIENT | CVAR_SAVE, "r_bloom", "0", "enables bloom effect (makes bright pixels affect neighboring pixels)"};
+cvar_t r_bloom_colorscale = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_colorscale", "1", "how bright the glow is"};
 
-cvar_t r_bloom_brighten = {CVAR_SAVE, "r_bloom_brighten", "2", "how bright the glow is, after subtract/power"};
-cvar_t r_bloom_blur = {CVAR_SAVE, "r_bloom_blur", "4", "how large the glow is"};
-cvar_t r_bloom_resolution = {CVAR_SAVE, "r_bloom_resolution", "320", "what resolution to perform the bloom effect at (independent of screen resolution)"};
-cvar_t r_bloom_colorexponent = {CVAR_SAVE, "r_bloom_colorexponent", "1", "how exaggerated the glow is"};
-cvar_t r_bloom_colorsubtract = {CVAR_SAVE, "r_bloom_colorsubtract", "0.125", "reduces bloom colors by a certain amount"};
-cvar_t r_bloom_scenebrightness = {CVAR_SAVE, "r_bloom_scenebrightness", "1", "global rendering brightness when bloom is enabled"};
+cvar_t r_bloom_brighten = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_brighten", "2", "how bright the glow is, after subtract/power"};
+cvar_t r_bloom_blur = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_blur", "4", "how large the glow is"};
+cvar_t r_bloom_resolution = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_resolution", "320", "what resolution to perform the bloom effect at (independent of screen resolution)"};
+cvar_t r_bloom_colorexponent = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_colorexponent", "1", "how exaggerated the glow is"};
+cvar_t r_bloom_colorsubtract = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_colorsubtract", "0.125", "reduces bloom colors by a certain amount"};
+cvar_t r_bloom_scenebrightness = {CVAR_CLIENT | CVAR_SAVE, "r_bloom_scenebrightness", "1", "global rendering brightness when bloom is enabled"};
 
-cvar_t r_hdr_scenebrightness = {CVAR_SAVE, "r_hdr_scenebrightness", "1", "global rendering brightness"};
-cvar_t r_hdr_glowintensity = {CVAR_SAVE, "r_hdr_glowintensity", "1", "how bright light emitting textures should appear"};
-cvar_t r_hdr_irisadaptation = {CVAR_SAVE, "r_hdr_irisadaptation", "0", "adjust scene brightness according to light intensity at player location"};
-cvar_t r_hdr_irisadaptation_multiplier = {CVAR_SAVE, "r_hdr_irisadaptation_multiplier", "2", "brightness at which value will be 1.0"};
-cvar_t r_hdr_irisadaptation_minvalue = {CVAR_SAVE, "r_hdr_irisadaptation_minvalue", "0.5", "minimum value that can result from multiplier / brightness"};
-cvar_t r_hdr_irisadaptation_maxvalue = {CVAR_SAVE, "r_hdr_irisadaptation_maxvalue", "4", "maximum value that can result from multiplier / brightness"};
-cvar_t r_hdr_irisadaptation_value = {0, "r_hdr_irisadaptation_value", "1", "current value as scenebrightness multiplier, changes continuously when irisadaptation is active"};
-cvar_t r_hdr_irisadaptation_fade_up = {CVAR_SAVE, "r_hdr_irisadaptation_fade_up", "0.1", "fade rate at which value adjusts to darkness"};
-cvar_t r_hdr_irisadaptation_fade_down = {CVAR_SAVE, "r_hdr_irisadaptation_fade_down", "0.5", "fade rate at which value adjusts to brightness"};
-cvar_t r_hdr_irisadaptation_radius = {CVAR_SAVE, "r_hdr_irisadaptation_radius", "15", "lighting within this many units of the eye is averaged"};
+cvar_t r_hdr_scenebrightness = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_scenebrightness", "1", "global rendering brightness"};
+cvar_t r_hdr_glowintensity = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_glowintensity", "1", "how bright light emitting textures should appear"};
+cvar_t r_hdr_irisadaptation = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation", "0", "adjust scene brightness according to light intensity at player location"};
+cvar_t r_hdr_irisadaptation_multiplier = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_multiplier", "2", "brightness at which value will be 1.0"};
+cvar_t r_hdr_irisadaptation_minvalue = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_minvalue", "0.5", "minimum value that can result from multiplier / brightness"};
+cvar_t r_hdr_irisadaptation_maxvalue = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_maxvalue", "4", "maximum value that can result from multiplier / brightness"};
+cvar_t r_hdr_irisadaptation_value = {CVAR_CLIENT, "r_hdr_irisadaptation_value", "1", "current value as scenebrightness multiplier, changes continuously when irisadaptation is active"};
+cvar_t r_hdr_irisadaptation_fade_up = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_fade_up", "0.1", "fade rate at which value adjusts to darkness"};
+cvar_t r_hdr_irisadaptation_fade_down = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_fade_down", "0.5", "fade rate at which value adjusts to brightness"};
+cvar_t r_hdr_irisadaptation_radius = {CVAR_CLIENT | CVAR_SAVE, "r_hdr_irisadaptation_radius", "15", "lighting within this many units of the eye is averaged"};
 
-cvar_t r_smoothnormals_areaweighting = {0, "r_smoothnormals_areaweighting", "1", "uses significantly faster (and supposedly higher quality) area-weighted vertex normals and tangent vectors rather than summing normalized triangle normals and tangents"};
+cvar_t r_smoothnormals_areaweighting = {CVAR_CLIENT, "r_smoothnormals_areaweighting", "1", "uses significantly faster (and supposedly higher quality) area-weighted vertex normals and tangent vectors rather than summing normalized triangle normals and tangents"};
 
-cvar_t developer_texturelogging = {0, "developer_texturelogging", "0", "produces a textures.log file containing names of skins and map textures the engine tried to load"};
+cvar_t developer_texturelogging = {CVAR_CLIENT, "developer_texturelogging", "0", "produces a textures.log file containing names of skins and map textures the engine tried to load"};
 
-cvar_t gl_lightmaps = {0, "gl_lightmaps", "0", "draws only lightmaps, no texture (for level designers), a value of 2 keeps normalmap shading"};
+cvar_t gl_lightmaps = {CVAR_CLIENT, "gl_lightmaps", "0", "draws only lightmaps, no texture (for level designers), a value of 2 keeps normalmap shading"};
 
-cvar_t r_test = {0, "r_test", "0", "internal development use only, leave it alone (usually does nothing anyway)"};
+cvar_t r_test = {CVAR_CLIENT, "r_test", "0", "internal development use only, leave it alone (usually does nothing anyway)"};
 
-cvar_t r_batch_multidraw = {CVAR_SAVE, "r_batch_multidraw", "1", "issue multiple glDrawElements calls when rendering a batch of surfaces with the same texture (otherwise the index data is copied to make it one draw)"};
-cvar_t r_batch_multidraw_mintriangles = {CVAR_SAVE, "r_batch_multidraw_mintriangles", "0", "minimum number of triangles to activate multidraw path (copying small groups of triangles may be faster)"};
-cvar_t r_batch_debugdynamicvertexpath = {CVAR_SAVE, "r_batch_debugdynamicvertexpath", "0", "force the dynamic batching code path for debugging purposes"};
-cvar_t r_batch_dynamicbuffer = {CVAR_SAVE, "r_batch_dynamicbuffer", "0", "use vertex/index buffers for drawing dynamic and copytriangles batches"};
+cvar_t r_batch_multidraw = {CVAR_CLIENT | CVAR_SAVE, "r_batch_multidraw", "1", "issue multiple glDrawElements calls when rendering a batch of surfaces with the same texture (otherwise the index data is copied to make it one draw)"};
+cvar_t r_batch_multidraw_mintriangles = {CVAR_CLIENT | CVAR_SAVE, "r_batch_multidraw_mintriangles", "0", "minimum number of triangles to activate multidraw path (copying small groups of triangles may be faster)"};
+cvar_t r_batch_debugdynamicvertexpath = {CVAR_CLIENT | CVAR_SAVE, "r_batch_debugdynamicvertexpath", "0", "force the dynamic batching code path for debugging purposes"};
+cvar_t r_batch_dynamicbuffer = {CVAR_CLIENT | CVAR_SAVE, "r_batch_dynamicbuffer", "0", "use vertex/index buffers for drawing dynamic and copytriangles batches"};
 
-cvar_t r_glsl_saturation = {CVAR_SAVE, "r_glsl_saturation", "1", "saturation multiplier (only working in glsl!)"};
-cvar_t r_glsl_saturation_redcompensate = {CVAR_SAVE, "r_glsl_saturation_redcompensate", "0", "a 'vampire sight' addition to desaturation effect, does compensation for red color, r_glsl_restart is required"};
+cvar_t r_glsl_saturation = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_saturation", "1", "saturation multiplier (only working in glsl!)"};
+cvar_t r_glsl_saturation_redcompensate = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_saturation_redcompensate", "0", "a 'vampire sight' addition to desaturation effect, does compensation for red color, r_glsl_restart is required"};
 
-cvar_t r_glsl_vertextextureblend_usebothalphas = {CVAR_SAVE, "r_glsl_vertextextureblend_usebothalphas", "0", "use both alpha layers on vertex blended surfaces, each alpha layer sets amount of 'blend leak' on another layer, requires mod_q3shader_force_terrain_alphaflag on."};
+cvar_t r_glsl_vertextextureblend_usebothalphas = {CVAR_CLIENT | CVAR_SAVE, "r_glsl_vertextextureblend_usebothalphas", "0", "use both alpha layers on vertex blended surfaces, each alpha layer sets amount of 'blend leak' on another layer, requires mod_q3shader_force_terrain_alphaflag on."};
 
-cvar_t r_framedatasize = {CVAR_SAVE, "r_framedatasize", "0.5", "size of renderer data cache used during one frame (for skeletal animation caching, light processing, etc)"};
+cvar_t r_framedatasize = {CVAR_CLIENT | CVAR_SAVE, "r_framedatasize", "0.5", "size of renderer data cache used during one frame (for skeletal animation caching, light processing, etc)"};
 cvar_t r_buffermegs[R_BUFFERDATA_COUNT] =
 {
-	{CVAR_SAVE, "r_buffermegs_vertex", "4", "vertex buffer size for one frame"},
-	{CVAR_SAVE, "r_buffermegs_index16", "1", "index buffer size for one frame (16bit indices)"},
-	{CVAR_SAVE, "r_buffermegs_index32", "1", "index buffer size for one frame (32bit indices)"},
-	{CVAR_SAVE, "r_buffermegs_uniform", "0.25", "uniform buffer size for one frame"},
+	{CVAR_CLIENT | CVAR_SAVE, "r_buffermegs_vertex", "4", "vertex buffer size for one frame"},
+	{CVAR_CLIENT | CVAR_SAVE, "r_buffermegs_index16", "1", "index buffer size for one frame (16bit indices)"},
+	{CVAR_CLIENT | CVAR_SAVE, "r_buffermegs_index32", "1", "index buffer size for one frame (32bit indices)"},
+	{CVAR_CLIENT | CVAR_SAVE, "r_buffermegs_uniform", "0.25", "uniform buffer size for one frame"},
 };
 
 extern cvar_t v_glslgamma_2d;
@@ -346,11 +346,11 @@ void FOG_clear(void)
 {
 	if (gamemode == GAME_NEHAHRA)
 	{
-		Cvar_Set("gl_fogenable", "0");
-		Cvar_Set("gl_fogdensity", "0.2");
-		Cvar_Set("gl_fogred", "0.3");
-		Cvar_Set("gl_foggreen", "0.3");
-		Cvar_Set("gl_fogblue", "0.3");
+		Cvar_Set(&cvars_all, "gl_fogenable", "0");
+		Cvar_Set(&cvars_all, "gl_fogdensity", "0.2");
+		Cvar_Set(&cvars_all, "gl_fogred", "0.3");
+		Cvar_Set(&cvars_all, "gl_foggreen", "0.3");
+		Cvar_Set(&cvars_all, "gl_fogblue", "0.3");
 	}
 	r_refdef.fog_density = 0;
 	r_refdef.fog_red = 0;
@@ -1394,7 +1394,7 @@ static void R_SetupShader_SetPermutationGLSL(unsigned int mode, dpuint64 permuta
 	CHECKGLERROR
 }
 
-void R_GLSL_Restart_f(void)
+void R_GLSL_Restart_f(cmd_state_t *cmd)
 {
 	unsigned int i, limit;
 	switch(vid.renderpath)
@@ -1419,7 +1419,7 @@ void R_GLSL_Restart_f(void)
 	}
 }
 
-static void R_GLSL_DumpShader_f(void)
+static void R_GLSL_DumpShader_f(cmd_state_t *cmd)
 {
 	int i, language, mode, dupe;
 	char *text;
@@ -1735,8 +1735,8 @@ void R_SetupShader_Surface(const float rtlightambient[3], const float rtlightdif
 			if (r_shadow_bouncegrid_state.directional)
 				permutation |= SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL;
 		}
-		GL_BlendFunc(t->currentlayers[0].blendfunc1, t->currentlayers[0].blendfunc2);
-		blendfuncflags = R_BlendFuncFlags(t->currentlayers[0].blendfunc1, t->currentlayers[0].blendfunc2);
+		GL_BlendFunc(t->currentblendfunc[0], t->currentblendfunc[1]);
+		blendfuncflags = R_BlendFuncFlags(t->currentblendfunc[0], t->currentblendfunc[1]);
 		// when using alphatocoverage, we don't need alphakill
 		if (vid.allowalphatocoverage)
 		{
@@ -1824,8 +1824,8 @@ void R_SetupShader_Surface(const float rtlightambient[3], const float rtlightdif
 			if (r_shadow_bouncegrid_state.directional)
 				permutation |= SHADERPERMUTATION_BOUNCEGRIDDIRECTIONAL;
 		}
-		GL_BlendFunc(t->currentlayers[0].blendfunc1, t->currentlayers[0].blendfunc2);
-		blendfuncflags = R_BlendFuncFlags(t->currentlayers[0].blendfunc1, t->currentlayers[0].blendfunc2);
+		GL_BlendFunc(t->currentblendfunc[0], t->currentblendfunc[1]);
+		blendfuncflags = R_BlendFuncFlags(t->currentblendfunc[0], t->currentblendfunc[1]);
 		// when using alphatocoverage, we don't need alphakill
 		if (vid.allowalphatocoverage)
 		{
@@ -3131,7 +3131,7 @@ static void gl_main_shutdown(void)
 	r_texture_numcubemaps = 0;
 	//r_texture_fogintensity = NULL;
 	memset(&r_fb, 0, sizeof(r_fb));
-	R_GLSL_Restart_f();
+	R_GLSL_Restart_f(&cmd_client);
 
 	r_glsl_permutation = NULL;
 	memset(r_glsl_permutationhash, 0, sizeof(r_glsl_permutationhash));
@@ -3170,8 +3170,8 @@ void GL_Main_Init(void)
 	r_main_mempool = Mem_AllocPool("Renderer", 0, NULL);
 	R_InitShaderModeInfo();
 
-	Cmd_AddCommand("r_glsl_restart", R_GLSL_Restart_f, "unloads GLSL shaders, they will then be reloaded as needed");
-	Cmd_AddCommand("r_glsl_dumpshader", R_GLSL_DumpShader_f, "dumps the engine internal default.glsl shader into glsl/default.glsl");
+	Cmd_AddCommand(&cmd_client, "r_glsl_restart", R_GLSL_Restart_f, "unloads GLSL shaders, they will then be reloaded as needed");
+	Cmd_AddCommand(&cmd_client, "r_glsl_dumpshader", R_GLSL_DumpShader_f, "dumps the engine internal default.glsl shader into glsl/default.glsl");
 	// FIXME: the client should set up r_refdef.fog stuff including the fogmasktable
 	if (gamemode == GAME_NEHAHRA)
 	{
@@ -3350,7 +3350,7 @@ void GL_Main_Init(void)
 		Cvar_RegisterVariable(&r_buffermegs[i]);
 	Cvar_RegisterVariable(&r_batch_dynamicbuffer);
 	if (gamemode == GAME_NEHAHRA || gamemode == GAME_TENEBRAE)
-		Cvar_SetValue("r_fullbrights", 0);
+		Cvar_SetValue(&cvars_all, "r_fullbrights", 0);
 #ifdef DP_MOBILETOUCH
 	// GLES devices have terrible depth precision in general, so...
 	Cvar_SetValueQuick(&r_nearclip, 4);
@@ -3955,7 +3955,7 @@ qboolean R_CanSeeBox(int numsamples, vec_t eyejitter, vec_t entboxenlarge, vec_t
 			end[0] = boxmins[0] + (boxmaxs[0] - boxmins[0]) * positions[i][0];
 			end[1] = boxmins[1] + (boxmaxs[1] - boxmins[1]) * positions[i][1];
 			end[2] = boxmins[2] + (boxmaxs[2] - boxmins[2]) * positions[i][2];
-			//trace_t trace = CL_TraceLine(start, end, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, 0.0f, true, false, NULL, true, true);
+			//trace_t trace = CL_TraceLine(start, end, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, MATERIALFLAGMASK_TRANSLUCENT, 0.0f, true, false, NULL, true, true);
 			trace_t trace = CL_Cache_TraceLineSurfaces(start, end, MOVE_NORMAL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT);
 			// not picky - if the trace ended anywhere in the box we're good
 			if (BoxesOverlap(trace.endpos, trace.endpos, padmins, padmaxs))
@@ -3972,7 +3972,7 @@ qboolean R_CanSeeBox(int numsamples, vec_t eyejitter, vec_t entboxenlarge, vec_t
 		VectorSet(end, lhrandom(boxmins[0], boxmaxs[0]), lhrandom(boxmins[1], boxmaxs[1]), lhrandom(boxmins[2], boxmaxs[2]));
 		if (r_cullentities_trace_entityocclusion.integer)
 		{
-			trace_t trace = CL_Cache_TraceLineSurfaces(start, end, MOVE_NORMAL, SUPERCONTENTS_SOLID, 0, MATERIALFLAGMASK_TRANSLUCENT);
+			trace_t trace = CL_TraceLine(start, end, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, SUPERCONTENTS_SKY, MATERIALFLAGMASK_TRANSLUCENT, 0.0f, true, false, NULL, true, true);
 			// not picky - if the trace ended anywhere in the box we're good
 			if (BoxesOverlap(trace.endpos, trace.endpos, padmins, padmaxs))
 				return true;
@@ -5630,7 +5630,7 @@ void R_RenderView(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture, i
 	rsurface.entity = NULL; // used only by R_GetCurrentTexture and RSurf_ActiveModelEntity
 
 	if(R_CompileShader_CheckStaticParms())
-		R_GLSL_Restart_f();
+		R_GLSL_Restart_f(&cmd_client);
 
 	if (!r_drawentities.integer)
 		r_refdef.scene.numentities = 0;
@@ -5793,7 +5793,6 @@ extern cvar_t cl_locs_show;
 static void R_DrawLocs(void);
 static void R_DrawEntityBBoxes(prvm_prog_t *prog);
 static void R_DrawModelDecals(void);
-extern cvar_t cl_decals_newsystem;
 extern qboolean r_shadow_usingdeferredprepass;
 extern int r_shadow_shadowmapatlas_modelshadows_size;
 void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewcolortexture, int viewx, int viewy, int viewwidth, int viewheight)
@@ -5920,18 +5919,9 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 
 	if (cl.csqc_vidvars.drawworld)
 	{
-		if (cl_decals_newsystem.integer)
-		{
-			R_DrawModelDecals();
-			if (r_timereport_active)
-				R_TimeReport("modeldecals");
-		}
-		else
-		{
-			R_DrawDecals();
-			if (r_timereport_active)
-				R_TimeReport("decals");
-		}
+		R_DrawModelDecals();
+		if (r_timereport_active)
+			R_TimeReport("modeldecals");
 
 		R_DrawParticles();
 		if (r_timereport_active)
@@ -6396,22 +6386,6 @@ void R_Mesh_AddBrushMeshFromPlanes(rmesh_t *mesh, int numplanes, mplane_t *plane
 	}
 }
 
-static void R_Texture_AddLayer(texture_t *t, qboolean depthmask, int blendfunc1, int blendfunc2, texturelayertype_t type, rtexture_t *texture, const matrix4x4_t *matrix, float r, float g, float b, float a)
-{
-	texturelayer_t *layer;
-	layer = t->currentlayers + t->currentnumlayers++;
-	layer->type = type;
-	layer->depthmask = depthmask;
-	layer->blendfunc1 = blendfunc1;
-	layer->blendfunc2 = blendfunc2;
-	layer->texture = texture;
-	layer->texmatrix = *matrix;
-	layer->color[0] = r;
-	layer->color[1] = g;
-	layer->color[2] = b;
-	layer->color[3] = a;
-}
-
 static qboolean R_TestQ3WaveFunc(q3wavefunc_t func, const float *parms)
 {
 	if(parms[0] == 0 && parms[1] == 0)
@@ -6650,7 +6624,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	if (t->currentmaterialflags & MATERIALFLAG_CUSTOMBLEND && !(R_BlendFuncFlags(t->customblendfunc[0], t->customblendfunc[1]) & BLENDFUNC_ALLOWS_COLORMOD))
 	{
 		// some CUSTOMBLEND blendfuncs are too weird, we have to ignore colormod and view colorscale
-		t->currentmaterialflags = t->currentmaterialflags | MATERIALFLAG_NORTLIGHT;
+		t->currentmaterialflags = t->currentmaterialflags | MATERIALFLAG_MODELLIGHT | MATERIALFLAG_NORTLIGHT;
 		for (q = 0; q < 3; q++)
 		{
 			t->render_glowmod[q] = rsurface.entity->glowmod[q];
@@ -6888,78 +6862,22 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 		}
 	}
 
-	t->currentnumlayers = 0;
-	if (t->currentmaterialflags & MATERIALFLAG_WALL)
+	t->currentblendfunc[0] = GL_ONE;
+	t->currentblendfunc[1] = GL_ZERO;
+	if (t->currentmaterialflags & MATERIALFLAG_ADD)
 	{
-		int blendfunc1, blendfunc2;
-		qboolean depthmask;
-		if (t->currentmaterialflags & MATERIALFLAG_ADD)
-		{
-			blendfunc1 = GL_SRC_ALPHA;
-			blendfunc2 = GL_ONE;
-		}
-		else if (t->currentmaterialflags & MATERIALFLAG_ALPHA)
-		{
-			blendfunc1 = GL_SRC_ALPHA;
-			blendfunc2 = GL_ONE_MINUS_SRC_ALPHA;
-		}
-		else if (t->currentmaterialflags & MATERIALFLAG_CUSTOMBLEND)
-		{
-			blendfunc1 = t->customblendfunc[0];
-			blendfunc2 = t->customblendfunc[1];
-		}
-		else
-		{
-			blendfunc1 = GL_ONE;
-			blendfunc2 = GL_ZERO;
-		}
-		depthmask = !(t->currentmaterialflags & MATERIALFLAG_BLENDED);
-		if (t->currentmaterialflags & MATERIALFLAG_MODELLIGHT)
-		{
-			// basic lit geometry
-			R_Texture_AddLayer(t, depthmask, blendfunc1, blendfunc2, TEXTURELAYERTYPE_LITTEXTURE, t->basetexture, &t->currenttexmatrix, 2, 2, 2, t->currentalpha);
-			// add pants/shirt if needed
-			if (VectorLength2(t->render_colormap_pants) >= (1.0f / 1048576.0f) && t->pantstexture)
-				R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_LITTEXTURE, t->pantstexture, &t->currenttexmatrix, 2 * t->render_colormap_pants[0], 2 * t->render_colormap_pants[1], 2 * t->render_colormap_pants[2], t->currentalpha);
-			if (VectorLength2(t->render_colormap_shirt) >= (1.0f / 1048576.0f) && t->shirttexture)
-				R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_LITTEXTURE, t->shirttexture, &t->currenttexmatrix, 2 * t->render_colormap_shirt[0], 2 * t->render_colormap_shirt[1], 2 * t->render_colormap_shirt[2], t->currentalpha);
-		}
-		else
-		{
-			// basic lit geometry
-			R_Texture_AddLayer(t, depthmask, blendfunc1, blendfunc2, TEXTURELAYERTYPE_LITTEXTURE, t->basetexture, &t->currenttexmatrix, t->render_lightmap_diffuse[0], t->render_lightmap_diffuse[1], t->render_lightmap_diffuse[2], t->currentalpha);
-			// add pants/shirt if needed
-			if (VectorLength2(t->render_colormap_pants) >= (1.0f / 1048576.0f) && t->pantstexture)
-				R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_LITTEXTURE, t->pantstexture, &t->currenttexmatrix, t->render_colormap_pants[0] * t->render_lightmap_diffuse[0], t->render_colormap_pants[1] * t->render_lightmap_diffuse[1], t->render_colormap_pants[2]  * t->render_lightmap_diffuse[2], t->currentalpha);
-			if (VectorLength2(t->render_colormap_shirt) >= (1.0f / 1048576.0f) && t->shirttexture)
-				R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_LITTEXTURE, t->shirttexture, &t->currenttexmatrix, t->render_colormap_shirt[0] * t->render_lightmap_diffuse[0], t->render_colormap_shirt[1] * t->render_lightmap_diffuse[1], t->render_colormap_shirt[2] * t->render_lightmap_diffuse[2], t->currentalpha);
-			// now add ambient passes if needed
-			if (VectorLength2(t->render_lightmap_ambient) >= (1.0f/1048576.0f))
-			{
-				R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_TEXTURE, t->basetexture, &t->currenttexmatrix, t->render_lightmap_ambient[0], t->render_lightmap_ambient[1], t->render_lightmap_ambient[2], t->currentalpha);
-				if (VectorLength2(t->render_colormap_pants) >= (1.0f / 1048576.0f) && t->pantstexture)
-					R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_TEXTURE, t->pantstexture, &t->currenttexmatrix, t->render_colormap_pants[0] * t->render_lightmap_ambient[0], t->render_colormap_pants[1] * t->render_lightmap_ambient[1], t->render_colormap_pants[2] * t->render_lightmap_ambient[2], t->currentalpha);
-				if (VectorLength2(t->render_colormap_shirt) >= (1.0f / 1048576.0f) && t->shirttexture)
-					R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_TEXTURE, t->shirttexture, &t->currenttexmatrix, t->render_colormap_shirt[0] * t->render_lightmap_ambient[0], t->render_colormap_shirt[1] * t->render_lightmap_ambient[1], t->render_colormap_shirt[2] * t->render_lightmap_ambient[2], t->currentalpha);
-			}
-		}
-		if (t->glowtexture != NULL && !gl_lightmaps.integer)
-			R_Texture_AddLayer(t, false, GL_SRC_ALPHA, GL_ONE, TEXTURELAYERTYPE_TEXTURE, t->glowtexture, &t->currenttexmatrix, t->render_glowmod[0], t->render_glowmod[1], t->render_glowmod[2], t->currentalpha);
-		if (r_refdef.fogenabled && !(t->currentmaterialflags & MATERIALFLAG_ADD))
-		{
-			// if this is opaque use alpha blend which will darken the earlier
-			// passes cheaply.
-			//
-			// if this is an alpha blended material, all the earlier passes
-			// were darkened by fog already, so we only need to add the fog
-			// color ontop through the fog mask texture
-			//
-			// if this is an additive blended material, all the earlier passes
-			// were darkened by fog already, and we should not add fog color
-			// (because the background was not darkened, there is no fog color
-			// that was lost behind it).
-			R_Texture_AddLayer(t, false, GL_SRC_ALPHA, (t->currentmaterialflags & MATERIALFLAG_BLENDED) ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA, TEXTURELAYERTYPE_FOG, t->fogtexture, &t->currenttexmatrix, r_refdef.fogcolor[0], r_refdef.fogcolor[1], r_refdef.fogcolor[2], t->currentalpha);
-		}
+		t->currentblendfunc[0] = GL_SRC_ALPHA;
+		t->currentblendfunc[1] = GL_ONE;
+	}
+	else if (t->currentmaterialflags & MATERIALFLAG_ALPHA)
+	{
+		t->currentblendfunc[0] = GL_SRC_ALPHA;
+		t->currentblendfunc[1] = GL_ONE_MINUS_SRC_ALPHA;
+	}
+	else if (t->currentmaterialflags & MATERIALFLAG_CUSTOMBLEND)
+	{
+		t->currentblendfunc[0] = t->customblendfunc[0];
+		t->currentblendfunc[1] = t->customblendfunc[1];
 	}
 
 	return t;
@@ -7195,6 +7113,24 @@ void RSurf_ActiveModelEntity(const entity_render_t *ent, qboolean wantnormals, q
 void RSurf_ActiveCustomEntity(const matrix4x4_t *matrix, const matrix4x4_t *inversematrix, int entflags, double shadertime, float r, float g, float b, float a, int numvertices, const float *vertex3f, const float *texcoord2f, const float *normal3f, const float *svector3f, const float *tvector3f, const float *color4f, int numtriangles, const int *element3i, const unsigned short *element3s, qboolean wantnormals, qboolean wanttangents)
 {
 	rsurface.entity = r_refdef.scene.worldentity;
+	if (r != 1.0f || g != 1.0f || b != 1.0f || a != 1.0f) {
+		// HACK to provide a valid entity with modded colors to R_GetCurrentTexture.
+		// A better approach could be making this copy only once per frame.
+		static entity_render_t custom_entity;
+		int q;
+		custom_entity = *rsurface.entity;
+		for (q = 0; q < 3; ++q) {
+			float colormod = q == 0 ? r : q == 1 ? g : b;
+			custom_entity.render_fullbright[q] *= colormod;
+			custom_entity.render_modellight_ambient[q] *= colormod;
+			custom_entity.render_modellight_diffuse[q] *= colormod;
+			custom_entity.render_lightmap_ambient[q] *= colormod;
+			custom_entity.render_lightmap_diffuse[q] *= colormod;
+			custom_entity.render_rtlight_diffuse[q] *= colormod;
+		}
+		custom_entity.alpha *= a;
+		rsurface.entity = &custom_entity;
+	}
 	rsurface.skeleton = NULL;
 	rsurface.ent_skinnum = 0;
 	rsurface.ent_qwskin = -1;
@@ -8966,7 +8902,7 @@ static void R_ProcessModelTextureSurfaceList(int texturenumsurfaces, const msurf
 		R_DrawTextureSurfaceList_DepthOnly(texturenumsurfaces, texturesurfacelist);
 	else if (prepass)
 	{
-		if (!rsurface.texture->currentnumlayers)
+		if (!(rsurface.texture->currentmaterialflags & MATERIALFLAG_WALL))
 			return;
 		if (rsurface.texture->currentmaterialflags & MATERIALFLAGMASK_DEPTHSORTED)
 			R_ProcessTransparentTextureSurfaceList(texturenumsurfaces, texturesurfacelist);
@@ -8975,7 +8911,7 @@ static void R_ProcessModelTextureSurfaceList(int texturenumsurfaces, const msurf
 	}
 	else if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_SKY) && (!r_showsurfaces.integer || r_showsurfaces.integer == 3))
 		R_DrawTextureSurfaceList_Sky(texturenumsurfaces, texturesurfacelist);
-	else if (!rsurface.texture->currentnumlayers)
+	else if (!(rsurface.texture->currentmaterialflags & MATERIALFLAG_WALL))
 		return;
 	else if (((rsurface.texture->currentmaterialflags & MATERIALFLAGMASK_DEPTHSORTED) || (r_showsurfaces.integer == 3 && (rsurface.texture->currentmaterialflags & MATERIALFLAG_ALPHATEST))))
 	{
@@ -9461,9 +9397,6 @@ static void R_DecalSystem_ApplySplatEntities(const vec3_t worldorigin, const vec
 	float worldmaxs[3];
 	entity_render_t *ent;
 
-	if (!cl_decals_newsystem.integer)
-		return;
-
 	worldmins[0] = worldorigin[0] - worldsize;
 	worldmins[1] = worldorigin[1] - worldsize;
 	worldmins[2] = worldorigin[2] - worldsize;
@@ -9501,7 +9434,7 @@ void R_DecalSystem_SplatEntities(const vec3_t worldorigin, const vec3_t worldnor
 {
 	r_decalsystem_splatqueue_t *queue;
 
-	if (!cl_decals_newsystem.integer || r_decalsystem_numqueued == MAX_DECALSYSTEM_QUEUE)
+	if (r_decalsystem_numqueued == MAX_DECALSYSTEM_QUEUE)
 		return;
 
 	queue = &r_decalsystem_queue[r_decalsystem_numqueued++];
@@ -9745,7 +9678,7 @@ static void R_DrawModelDecals(void)
 
 	r_refdef.stats[r_stat_totaldecals] += numdecals;
 
-	if (r_showsurfaces.integer)
+	if (r_showsurfaces.integer || !r_drawdecals.integer)
 		return;
 
 	R_DrawModelDecals_Entity(r_refdef.scene.worldentity);
@@ -9788,7 +9721,7 @@ static void R_DrawDebugModel(void)
 			{
 				RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_NOGAPS, 1, &surface);
 				GL_CullFace((rsurface.texture->currentmaterialflags & MATERIALFLAG_NOCULLFACE) ? GL_NONE : r_refdef.view.cullface_back);
-				if (!rsurface.texture->currentlayers->depthmask)
+				if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_BLENDED))
 					GL_Color(c, 0, 0, 1.0f);
 				else if (ent == r_refdef.scene.worldentity)
 					GL_Color(c, c, c, 1.0f);
@@ -9881,7 +9814,7 @@ static void R_DrawDebugModel(void)
 			if ((rsurface.texture->currentmaterialflags & flagsmask) && surface->num_triangles)
 			{
 				RSurf_PrepareVerticesForBatch(BATCHNEED_ARRAY_VERTEX | BATCHNEED_ARRAY_NORMAL | BATCHNEED_ARRAY_VECTOR | BATCHNEED_NOGAPS, 1, &surface);
-				if (!rsurface.texture->currentlayers->depthmask)
+				if ((rsurface.texture->currentmaterialflags & MATERIALFLAG_BLENDED))
 					GL_Color(r_refdef.view.colorscale, 0, 0, r_showtris.value);
 				else if (ent == r_refdef.scene.worldentity)
 					GL_Color(r_refdef.view.colorscale, r_refdef.view.colorscale, r_refdef.view.colorscale, r_showtris.value);
@@ -10161,36 +10094,8 @@ void R_DrawCustomSurface(skinframe_t *skinframe, const matrix4x4_t *texmatrix, i
 	texture.specularscalemod = 1;
 	texture.specularpowermod = 1;
 	texture.transparentsort = TRANSPARENTSORT_DISTANCE;
-	// WHEN ADDING DEFAULTS HERE, REMEMBER TO PUT DEFAULTS IN ALL LOADERS
-	// JUST GREP FOR "specularscalemod = 1".
 
-	for (q = 0; q < 3; q++)
-	{
-		texture.render_glowmod[q] = r_refdef.view.colorscale * r_hdr_glowintensity.value;
-		texture.render_modellight_lightdir[q] = q == 2;
-		texture.render_modellight_ambient[q] = r_refdef.view.colorscale * r_refdef.scene.ambientintensity;
-		texture.render_modellight_diffuse[q] = r_refdef.view.colorscale;
-		texture.render_modellight_specular[q] = r_refdef.view.colorscale;
-		texture.render_lightmap_ambient[q] = r_refdef.view.colorscale * r_refdef.scene.ambientintensity;
-		texture.render_lightmap_diffuse[q] = r_refdef.view.colorscale * r_refdef.scene.lightmapintensity;
-		texture.render_lightmap_specular[q] = r_refdef.view.colorscale;
-		texture.render_rtlight_diffuse[q] = r_refdef.view.colorscale;
-		texture.render_rtlight_specular[q] = r_refdef.view.colorscale;
-	}
-	texture.currentalpha = 1.0f;
-
-	surface.texture = &texture;
-	surface.num_triangles = numtriangles;
-	surface.num_firsttriangle = firsttriangle;
-	surface.num_vertices = numvertices;
-	surface.num_firstvertex = firstvertex;
-
-	// now render it
-	rsurface.texture = R_GetCurrentTexture(surface.texture);
-	rsurface.lightmaptexture = NULL;
-	rsurface.deluxemaptexture = NULL;
-	rsurface.uselightmaptexture = false;
-	R_DrawModelTextureSurfaceList(1, &surfacelist, writedepth, prepass, ui);
+	R_DrawCustomSurface_Texture(&texture, texmatrix, materialflags, firstvertex, numvertices, firsttriangle, numtriangles, writedepth, prepass, ui);
 }
 
 void R_DrawCustomSurface_Texture(texture_t *texture, const matrix4x4_t *texmatrix, int materialflags, int firstvertex, int numvertices, int firsttriangle, int numtriangles, qboolean writedepth, qboolean prepass, qboolean ui)

@@ -30,7 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <IOKit/hidsystem/IOHIDLib.h>
 #include <IOKit/hidsystem/IOHIDParameter.h>
 #include <IOKit/hidsystem/event_status_driver.h>
-static cvar_t apple_mouse_noaccel = {CVAR_SAVE, "apple_mouse_noaccel", "1", "disables mouse acceleration while DarkPlaces is active"};
+static cvar_t apple_mouse_noaccel = {CVAR_CLIENT | CVAR_SAVE, "apple_mouse_noaccel", "1", "disables mouse acceleration while DarkPlaces is active"};
 static qboolean vid_usingnoaccel;
 static double originalMouseSpeed = -1.0;
 io_connect_t IN_GetIOHandle(void)
@@ -875,7 +875,7 @@ static void IN_Move_TouchScreen_Quake(void)
 		if (!VID_ShowingKeyboard())
 		{
 			// user entered a command, close the console now
-			Con_ToggleConsole_f();
+			Con_ToggleConsole_f(&cmd_client);
 		}
 		VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , 0.0f, NULL, NULL, &buttons[15], (keynum_t)0, NULL, 0, 0, 0, true);
 		VID_TouchscreenArea( 0,   0,   0,   0,   0, NULL                         , 0.0f, NULL, move, &buttons[0], K_MOUSE4, NULL, 0, 0, 0, true);
@@ -1156,11 +1156,11 @@ void Sys_SendKeyEvents( void )
 							vid.width = event.window.data1;
 							vid.height = event.window.data2;
 #ifdef SDL_R_RESTART
-							// better not call R_Modules_Restart from here directly, as this may wreak havoc...
+							// better not call R_Modules_Restart_f from here directly, as this may wreak havoc...
 							// so, let's better queue it for next frame
 							if(!sdl_needs_restart)
 							{
-								Cbuf_AddText("\nr_restart\n");
+								Cbuf_AddText(&cmd_client, "\nr_restart\n");
 								sdl_needs_restart = true;
 							}
 #endif
@@ -1585,8 +1585,8 @@ extern cvar_t gl_info_driver;
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
 	// GAME_STEELSTORM specific
-	steelstorm_showing_map = Cvar_FindVar("steelstorm_showing_map");
-	steelstorm_showing_mousecursor = Cvar_FindVar("steelstorm_showing_mousecursor");
+	steelstorm_showing_map = Cvar_FindVar(&cvars_all, "steelstorm_showing_map", ~0);
+	steelstorm_showing_mousecursor = Cvar_FindVar(&cvars_all, "steelstorm_showing_mousecursor", ~0);
 
 	if (!SDL_WasInit(SDL_INIT_VIDEO) && SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 		Sys_Error ("Failed to init SDL video subsystem: %s", SDL_GetError());

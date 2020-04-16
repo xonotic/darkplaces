@@ -239,7 +239,6 @@ skinframe_t *R_SkinFrame_LoadInternalUsingTexture(const char *name, int texturef
 rtexture_t *R_GetCubemap(const char *basename);
 
 void R_View_WorldVisibility(qboolean forcenovis);
-void R_DrawDecals(void);
 void R_DrawParticles(void);
 void R_DrawExplosions(void);
 
@@ -752,6 +751,6 @@ void Mod_RenderInit(void);
 void Font_Init(void);
 
 qboolean R_CompileShader_CheckStaticParms(void);
-void R_GLSL_Restart_f(void);
+void R_GLSL_Restart_f(cmd_state_t *cmd);
 
 #endif
