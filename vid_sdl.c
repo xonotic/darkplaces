@@ -2491,6 +2491,10 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 }
 #endif
 
+#if SDL_MAJOR_VERSION != 1
+#include <SDL_syswm.h>
+#endif
+
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
 #if SDL_MAJOR_VERSION == 1
@@ -2666,6 +2670,62 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		VID_Shutdown();
 		return false;
 	}
+
+    {
+        static SDL_Surface *icon = NULL;
+	    int j;
+	    char *data;
+	    SDL_version version;
+
+	    if (icon)
+		    SDL_FreeSurface(icon);
+	    icon = NULL;
+	    SDL_GetVersion(&version);
+
+	    if(version.major >= 2 || (version.major == 1 && version.minor >= 3))
+	    {
+		    SDL_SysWMinfo info;
+		    SDL_VERSION(&info.version);
+		    if(SDL_GetWindowWMInfo(window, &info) == 1 && info.subsystem == SDL_SYSWM_X11)
+		    {
+			    data = (char *) loadimagepixelsbgra("darkplaces-icon", false, false, false, NULL);
+			    if(data)
+			    {
+				    // use _NET_WM_ICON too
+				    static long netwm_icon[MAX_NETWM_ICON];
+				    int pos = 0;
+				    int i = 1;
+				    char vabuf[1024];
+
+				    while(data)
+				    {
+					    if(pos + 2 * image_width * image_height < MAX_NETWM_ICON)
+					    {
+						    netwm_icon[pos++] = image_width;
+						    netwm_icon[pos++] = image_height;
+						    for(i = 0; i < image_height; ++i)
+							    for(j = 0; j < image_width; ++j)
+								    netwm_icon[pos++] = BuffLittleLong((unsigned char *) &data[(i*image_width+j)*4]);
+					    }
+					    else
+					    {
+						    Con_Printf("Skipping NETWM icon #%d because there is no space left\n", i);
+					    }
+					    ++i;
+					    Mem_Free(data);
+					    data = (char *) loadimagepixelsbgra(va(vabuf, sizeof(vabuf), "darkplaces-icon%d", i), false, false, false, NULL);
+				    }
+
+				    {
+					    Atom net_wm_icon = XInternAtom(info.info.x11.display, "_NET_WM_ICON", false);
+					    XChangeProperty(info.info.x11.display, info.info.x11.window, net_wm_icon, XA_CARDINAL, 32, PropModeReplace, (const unsigned char *) netwm_icon, pos);
+					    //SDL_SetWindowIcon(window, icon);
+				    }
+			    }
+		    }
+	    }
+	}
+
 	SDL_GetWindowSize(window, &mode->width, &mode->height);
 	context = SDL_GL_CreateContext(window);
 	if (context == NULL)
