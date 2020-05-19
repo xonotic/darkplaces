@@ -1517,7 +1517,7 @@ void CL_UpdateMoveVars(void)
 	else
 	{
 		cl.moveflags = 0;
-		cl.movevars_ticrate = (cls.demoplayback ? 1.0f : slowmo.value) / bound(1.0f, cl_netfps.value, 1000.0f);
+		cl.movevars_ticrate = (cls.demoplayback ? 1.0f : slowmo.value) / bound(30.0f, cl_netfps.value, 120.0f);
 		cl.movevars_timescale = (cls.demoplayback ? 1.0f : slowmo.value);
 		cl.movevars_gravity = sv_gravity.value;
 		cl.movevars_stopspeed = cl_movement_stopspeed.value;
@@ -1878,7 +1878,7 @@ void CL_SendMove(void)
 
 	// don't send too often or else network connections can get clogged by a
 	// high renderer framerate
-	packettime = 1.0 / bound(1, cl_netfps.value, 1000);
+	packettime = 1.0 / bound(30, cl_netfps.value, 120);
 	if (cl.movevars_timescale && cl.movevars_ticrate)
 	{
 		float maxtic = cl.movevars_ticrate / cl.movevars_timescale;
