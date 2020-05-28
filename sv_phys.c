@@ -723,8 +723,8 @@ void SV_LinkEdict_TouchAreaGrid_Call(prvm_edict_t *touch, prvm_edict_t *ent)
 	PRVM_serverglobalstring(trace_dphittexturename) = 0;
 	// optional entity parameter for self (EXT_ENTITYPARAM)
 	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(touch);
-	// optional entity parameter for self (EXT_ENTITYPARAM)
-	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
+	// optional entity parameter for other (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serveredictfunction(touch, touch), "QC function self.touch is missing");
 }
 
