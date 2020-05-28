@@ -456,6 +456,8 @@ qboolean CL_VM_InputEvent (int eventtype, float x, float y)
 			PRVM_G_FLOAT(OFS_PARM0) = eventtype;
 			PRVM_G_FLOAT(OFS_PARM1) = x; // key or x
 			PRVM_G_FLOAT(OFS_PARM2) = y; // ascii or y
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM3) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 			prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_InputEvent), "QC function CSQC_InputEvent is missing");
 			r = CSQC_RETURNVAL != 0;
 		}
