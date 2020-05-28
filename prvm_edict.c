@@ -1421,6 +1421,8 @@ void PRVM_ED_LoadFromFile (prvm_prog_t *prog, const char *data)
 			// self = ent
 			PRVM_serverglobalfloat(time) = sv.time;
 			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 			prog->ExecuteProgram(prog, PRVM_serverfunction(SV_OnEntityPreSpawnFunction), "QC function SV_OnEntityPreSpawnFunction is missing");
 		}
 
@@ -1458,6 +1460,8 @@ void PRVM_ED_LoadFromFile (prvm_prog_t *prog, const char *data)
 					// self = ent
 					PRVM_serverglobalfloat(time) = sv.time;
 					PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+					// optional entity parameter for self (EXT_ENTITYPARAM)
+					PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 					prog->ExecuteProgram(prog, PRVM_serverfunction(SV_OnEntityNoSpawnFunction), "QC function SV_OnEntityNoSpawnFunction is missing");
 				}
 				else
@@ -1486,6 +1490,8 @@ void PRVM_ED_LoadFromFile (prvm_prog_t *prog, const char *data)
 			// self = ent
 			PRVM_serverglobalfloat(time) = sv.time;
 			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 			prog->ExecuteProgram(prog, PRVM_serverfunction(SV_OnEntityPostSpawnFunction), "QC function SV_OnEntityPostSpawnFunction is missing");
 		}
 

@@ -721,6 +721,10 @@ void SV_LinkEdict_TouchAreaGrid_Call(prvm_edict_t *touch, prvm_edict_t *ent)
 	PRVM_serverglobalfloat(trace_dphitcontents) = 0;
 	PRVM_serverglobalfloat(trace_dphitq3surfaceflags) = 0;
 	PRVM_serverglobalstring(trace_dphittexturename) = 0;
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(touch);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serveredictfunction(touch, touch), "QC function self.touch is missing");
 }
 
@@ -1095,6 +1099,8 @@ static qboolean SV_RunThink (prvm_edict_t *ent)
 		PRVM_serveredictfloat(ent, nextthink) = 0;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
 		PRVM_serverglobaledict(other) = PRVM_EDICT_TO_PROG(prog->edicts);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 		prog->ExecuteProgram(prog, PRVM_serveredictfunction(ent, think), "QC function self.think is missing");
 		// mods often set nextthink to time to cause a think every frame,
 		// we don't want to loop in that case, so exit if the new nextthink is
@@ -1131,6 +1137,10 @@ static void SV_Impact (prvm_edict_t *e1, trace_t *trace)
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(e1);
 		PRVM_serverglobaledict(other) = PRVM_EDICT_TO_PROG(e2);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(e1);
+		// optional entity parameter for other (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(e2);
 		prog->ExecuteProgram(prog, PRVM_serveredictfunction(e1, touch), "QC function self.touch is missing");
 	}
 
@@ -1147,6 +1157,10 @@ static void SV_Impact (prvm_edict_t *e1, trace_t *trace)
 		PRVM_serverglobalfloat(trace_dphitcontents) = 0;
 		PRVM_serverglobalfloat(trace_dphitq3surfaceflags) = 0;
 		PRVM_serverglobalstring(trace_dphittexturename) = 0;
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(e2);
+		// optional entity parameter for other (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(e1);
 		prog->ExecuteProgram(prog, PRVM_serveredictfunction(e2, touch), "QC function self.touch is missing");
 	}
 
@@ -1964,6 +1978,10 @@ static void SV_PushMove (prvm_edict_t *pusher, float movetime)
 				PRVM_serverglobalfloat(time) = sv.time;
 				PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(pusher);
 				PRVM_serverglobaledict(other) = PRVM_EDICT_TO_PROG(check);
+				// optional entity parameter for self (EXT_ENTITYPARAM)
+				PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(pusher);
+				// optional entity parameter for other (EXT_ENTITYPARAM)
+				PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(check);
 				prog->ExecuteProgram(prog, PRVM_serveredictfunction(pusher, blocked), "QC function self.blocked is missing");
 			}
 			break;
@@ -2007,6 +2025,8 @@ static void SV_Physics_Pusher (prvm_edict_t *ent)
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
 		PRVM_serverglobaledict(other) = PRVM_EDICT_TO_PROG(prog->edicts);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 		prog->ExecuteProgram(prog, PRVM_serveredictfunction(ent, think), "QC function self.think is missing");
 	}
 }
@@ -2971,6 +2991,8 @@ void SV_Physics_ClientMove(void)
 	PRVM_serverglobalfloat(time) = sv.time;
 	PRVM_serverglobalfloat(frametime) = 0;
 	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serverfunction(PlayerPreThink), "QC function PlayerPreThink is missing");
 	PRVM_serverglobalfloat(frametime) = sv.frametime;
 
@@ -2985,6 +3007,8 @@ void SV_Physics_ClientMove(void)
 	PRVM_serverglobalfloat(time) = sv.time;
 	PRVM_serverglobalfloat(frametime) = 0;
 	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serverfunction(PlayerPostThink), "QC function PlayerPostThink is missing");
 	PRVM_serverglobalfloat(frametime) = sv.frametime;
 
@@ -3023,6 +3047,8 @@ static void SV_Physics_ClientEntity_PreThink(prvm_edict_t *ent)
 	// call standard client pre-think
 	PRVM_serverglobalfloat(time) = sv.time;
 	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serverfunction(PlayerPreThink), "QC function PlayerPreThink is missing");
 
 	// make sure the velocity is still sane (not a NaN)
@@ -3042,6 +3068,8 @@ static void SV_Physics_ClientEntity_PostThink(prvm_edict_t *ent)
 	// call standard player post-think
 	PRVM_serverglobalfloat(time) = sv.time;
 	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ent);
 	prog->ExecuteProgram(prog, PRVM_serverfunction(PlayerPostThink), "QC function PlayerPostThink is missing");
 
 	// make sure the velocity is still sane (not a NaN)

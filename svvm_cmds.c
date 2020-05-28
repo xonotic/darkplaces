@@ -228,6 +228,7 @@ const char *vm_sv_extensions =
 "TW_SV_STEPCONTROL "
 "ZQ_PAUSE "
 "DP_RM_CLIPGROUP "
+"EXT_ENTITYPARAM "
 //"EXT_CSQC " // not ready yet
 ;
 

@@ -501,6 +501,8 @@ void SV_DropClient(qboolean crash)
 		host_client->clientconnectcalled = false;
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(ClientDisconnect), "QC function ClientDisconnect is missing");
 		PRVM_serverglobaledict(self) = saveSelf;
 	}

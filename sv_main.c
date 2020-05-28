@@ -1647,6 +1647,10 @@ static void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = s->number;
 		PRVM_serverglobaledict(other) = sv.writeentitiestoclient_cliententitynumber;
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = s->number;
+		// optional entity parameter for other (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = sv.writeentitiestoclient_cliententitynumber;
 		prog->ExecuteProgram(prog, s->customizeentityforclient, "customizeentityforclient: NULL function");
 		if(!PRVM_G_FLOAT(OFS_RETURN) || !SV_PrepareEntityForSending(PRVM_EDICT_NUM(s->number), s, s->number))
 			return;
@@ -1788,6 +1792,8 @@ static void SV_AddCameraEyes(void)
 				VectorCopy(sv.writeentitiestoclient_eyes[0], PRVM_serverglobalvector(trace_endpos));
 				VectorCopy(sv.writeentitiestoclient_eyes[0], PRVM_G_VECTOR(OFS_PARM0));
 				VectorClear(PRVM_G_VECTOR(OFS_PARM1));
+				// optional entity parameter for self (EXT_ENTITYPARAM)
+				PRVM_G_INT(OFS_PARM2) = sv.writeentitiestoclient_cliententitynumber;
 				prog->ExecuteProgram(prog, PRVM_serveredictfunction(ed, camera_transform), "QC function e.camera_transform is missing");
 				if(!VectorCompare(PRVM_serverglobalvector(trace_endpos), sv.writeentitiestoclient_eyes[0]))
 				{
@@ -3257,6 +3263,8 @@ void SV_SaveSpawnparms (void)
 	// call the progs to get default spawn parms for the new client
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(SetChangeParms), "QC function SetChangeParms is missing");
 		for (j=0 ; j<NUM_SPAWN_PARMS ; j++)
 			host_client->spawn_parms[j] = (&PRVM_serverglobalfloat(parm1))[j];
@@ -3564,7 +3572,11 @@ void SV_SpawnServer (const char *server)
 			host_client->clientconnectcalled = true;
 			PRVM_serverglobalfloat(time) = sv.time;
 			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 			prog->ExecuteProgram(prog, PRVM_serverfunction(ClientConnect), "QC function ClientConnect is missing");
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 			prog->ExecuteProgram(prog, PRVM_serverfunction(PutClientInServer), "QC function PutClientInServer is missing");
 			host_client->begun = true;
 		}

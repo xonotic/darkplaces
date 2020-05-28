@@ -1603,6 +1603,8 @@ static void Host_Color(cmd_state_t *cmd, int changetop, int changebottom)
 	{
 		Con_DPrint("Calling SV_ChangeTeam\n");
 		prog->globals.fp[OFS_PARM0] = playercolor;
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(host_client->edict);
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(SV_ChangeTeam), "QC function SV_ChangeTeam is missing");
@@ -1744,6 +1746,8 @@ static void Host_Kill_f(cmd_state_t *cmd)
 
 	PRVM_serverglobalfloat(time) = sv.time;
 	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 	prog->ExecuteProgram(prog, PRVM_serverfunction(ClientKill), "QC function ClientKill is missing");
 }
 
@@ -1900,6 +1904,8 @@ static void Host_Spawn_f(cmd_state_t *cmd)
 			Con_DPrint("Calling RestoreGame\n");
 			PRVM_serverglobalfloat(time) = sv.time;
 			PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+			// optional entity parameter for self (EXT_ENTITYPARAM)
+			PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 			prog->ExecuteProgram(prog, PRVM_serverfunction(RestoreGame), "QC function RestoreGame is missing");
 		}
 	}
@@ -1915,12 +1921,16 @@ static void Host_Spawn_f(cmd_state_t *cmd)
 		host_client->clientconnectcalled = true;
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(ClientConnect), "QC function ClientConnect is missing");
 
 		if (cls.state == ca_dedicated)
 			Con_Printf("%s connected\n", host_client->name);
 
 		PRVM_serverglobalfloat(time) = sv.time;
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(PutClientInServer), "QC function PutClientInServer is missing");
 	}
 

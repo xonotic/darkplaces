@@ -380,6 +380,8 @@ void SV_ClientThink (void)
 	{
 		PRVM_serverglobalfloat(time) = sv.time;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(host_client->edict);
 		prog->ExecuteProgram(prog, PRVM_serverfunction(SV_PlayerPhysics), "QC function SV_PlayerPhysics is missing");
 		SV_CheckVelocity(host_client->edict);
 		return;
@@ -875,6 +877,8 @@ void SV_ReadClientMessage(void)
 				int restorevm_tempstringsbuf_cursize;
 				restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
 				PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, s);
+				// optional entity parameter for self (EXT_ENTITYPARAM)
+				PRVM_G_INT(OFS_PARM1) = PRVM_EDICT_TO_PROG(host_client->edict);
 				PRVM_serverglobalfloat(time) = sv.time;
 				PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
 				prog->ExecuteProgram(prog, PRVM_serverfunction(SV_ParseClientCommand), "QC function SV_ParseClientCommand is missing");

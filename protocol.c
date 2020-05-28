@@ -545,6 +545,8 @@ qboolean EntityFrameCSQC_WriteFrame (sizebuf_t *msg, int maxsize, int numnumbers
 					msg->allowoverflow = true;
 					PRVM_G_INT(OFS_PARM0) = sv.writeentitiestoclient_cliententitynumber;
 					PRVM_G_FLOAT(OFS_PARM1) = sendflags;
+					// optional entity parameter for self (EXT_ENTITYPARAM)
+					PRVM_G_INT(OFS_PARM2) = number;
 					PRVM_serverglobaledict(self) = number;
 					prog->ExecuteProgram(prog, PRVM_serveredictfunction(ed, SendEntity), "Null SendEntity\n");
 					msg->allowoverflow = false;

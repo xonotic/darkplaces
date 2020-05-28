@@ -266,6 +266,8 @@ void CSQC_Predraw (prvm_edict_t *ed)
 		return;
 	b = PRVM_clientglobaledict(self);
 	PRVM_clientglobaledict(self) = PRVM_EDICT_TO_PROG(ed);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ed);
 	prog->ExecuteProgram(prog, PRVM_clientedictfunction(ed, predraw), "CSQC_Predraw: NULL function\n");
 	PRVM_clientglobaledict(self) = b;
 }
@@ -280,6 +282,8 @@ void CSQC_Think (prvm_edict_t *ed)
 		PRVM_clientedictfloat(ed, nextthink) = 0;
 		b = PRVM_clientglobaledict(self);
 		PRVM_clientglobaledict(self) = PRVM_EDICT_TO_PROG(ed);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = PRVM_EDICT_TO_PROG(ed);
 		prog->ExecuteProgram(prog, PRVM_clientedictfunction(ed, think), "CSQC_Think: NULL function\n");
 		PRVM_clientglobaledict(self) = b;
 	}
@@ -490,6 +494,7 @@ qboolean CL_VM_UpdateView (double frametime)
 		// pass in width and height as parameters (EXT_CSQC_1)
 		PRVM_G_FLOAT(OFS_PARM0) = vid.width;
 		PRVM_G_FLOAT(OFS_PARM1) = vid.height;
+		PRVM_G_INT(OFS_PARM2) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_UpdateView), "QC function CSQC_UpdateView is missing");
 		//VectorCopy(oldangles, cl.viewangles);
 		// Dresk : Reset Dmg Globals Here
@@ -516,6 +521,8 @@ qboolean CL_VM_ConsoleCommand (const char *cmd)
 		PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
 		PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, cmd);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_ConsoleCommand), "QC function CSQC_ConsoleCommand is missing");
 		prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 		r = CSQC_RETURNVAL != 0;
@@ -537,6 +544,8 @@ qboolean CL_VM_Parse_TempEntity (void)
 		t = cl_message.readcount;
 		PRVM_clientglobalfloat(time) = cl.time;
 		PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[cl.playerentity];
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM0) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Parse_TempEntity), "QC function CSQC_Parse_TempEntity is missing");
 		r = CSQC_RETURNVAL != 0;
 		if(!r)
@@ -622,6 +631,8 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 		PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
 		PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, msg);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Parse_StuffCmd), "QC function CSQC_Parse_StuffCmd is missing");
 		prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 	}
@@ -638,6 +649,8 @@ static void CL_VM_Parse_Print (const char *msg)
 	PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 	restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
 	PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, msg);
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 	prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Parse_Print), "QC function CSQC_Parse_Print is missing");
 	prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 }
@@ -692,6 +705,8 @@ void CL_VM_Parse_CenterPrint (const char *msg)
 		PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		restorevm_tempstringsbuf_cursize = prog->tempstringsbuf.cursize;
 		PRVM_G_INT(OFS_PARM0) = PRVM_SetTempString(prog, msg);
+		// optional entity parameter for self (EXT_ENTITYPARAM)
+		PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[cl.playerentity];
 		prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Parse_CenterPrint), "QC function CSQC_Parse_CenterPrint is missing");
 		prog->tempstringsbuf.cursize = restorevm_tempstringsbuf_cursize;
 	}
@@ -739,6 +754,7 @@ qboolean CL_VM_Event_Sound(int sound_num, float fvolume, int channel, float atte
 			VectorCopy(pos, PRVM_G_VECTOR(OFS_PARM5) );
 			PRVM_G_FLOAT(OFS_PARM6) = speed * 100.0f;
 			PRVM_G_FLOAT(OFS_PARM7) = flags; // flags
+			// NOTE: entity parameter can't be used here, as there are not enough offsets available
 			prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Event_Sound), "QC function CSQC_Event_Sound is missing");
 			r = CSQC_RETURNVAL != 0;
 		}
@@ -825,6 +841,8 @@ void CSQC_ReadEntities (void)
 			{
 				if(PRVM_clientglobaledict(self))
 				{
+					// optional entity parameter for self (EXT_ENTITYPARAM)
+					PRVM_G_INT(OFS_PARM0) = cl.csqc_server2csqcentitynumber[realentnum];
 					prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Ent_Remove), "QC function CSQC_Ent_Remove is missing");
 					cl.csqc_server2csqcentitynumber[realentnum] = 0;
 				}
@@ -859,10 +877,14 @@ void CSQC_ReadEntities (void)
 						PRVM_clientglobaledict(self) = cl.csqc_server2csqcentitynumber[realentnum] = PRVM_EDICT( PRVM_G_INT( OFS_RETURN ) );
 					}
 					PRVM_G_FLOAT(OFS_PARM0) = 1;
+					// optional entity parameter for self (EXT_ENTITYPARAM)
+					PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[realentnum];
 					prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Ent_Update), "QC function CSQC_Ent_Update is missing");
 				}
 				else {
 					PRVM_G_FLOAT(OFS_PARM0) = 0;
+					// optional entity parameter for self (EXT_ENTITYPARAM)
+					PRVM_G_INT(OFS_PARM1) = cl.csqc_server2csqcentitynumber[realentnum];
 					prog->ExecuteProgram(prog, PRVM_clientfunction(CSQC_Ent_Update), "QC function CSQC_Ent_Update is missing");
 				}
 			}
@@ -1233,6 +1255,8 @@ qboolean CL_VM_TransformView(int entnum, matrix4x4_t *viewmatrix, mplane_t *clip
 				PRVM_clientglobaledict(self) = entnum;
 				VectorCopy(origin, PRVM_G_VECTOR(OFS_PARM0));
 				VectorCopy(ang, PRVM_G_VECTOR(OFS_PARM1));
+				// optional entity parameter for self (EXT_ENTITYPARAM)
+				PRVM_G_INT(OFS_PARM2) = entnum;
 				VectorCopy(forward, PRVM_clientglobalvector(v_forward));
 				VectorScale(left, -1, PRVM_clientglobalvector(v_right));
 				VectorCopy(up, PRVM_clientglobalvector(v_up));
