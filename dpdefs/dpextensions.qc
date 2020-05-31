@@ -2621,5 +2621,5 @@ float MOVETYPE_USER_LAST = 191;
 //idea: TimePath
 //darkplaces implementation: Mario
 //description:
-//shows that the engine supports the "entity e" parameter in most builtin functions that make use of the global ("self" or "other" for example) entity
+//shows that the engine supports the "entity ent" parameter in most builtin functions that make use of the global ("self" or "other" for example) entity
 //Note: mods are required to modify progsdefs.qc to include the parameters in the builtin functions they wish to access
