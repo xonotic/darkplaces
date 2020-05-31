@@ -521,7 +521,7 @@ static void VM_CL_findradius (prvm_prog_t *prog)
 	VM_RETURN_EDICT(chain);
 }
 
-// #34 float() droptofloor
+// #34 float([ent]) droptofloor
 static void VM_CL_droptofloor (prvm_prog_t *prog)
 {
 	prvm_edict_t		*ent;
@@ -533,7 +533,11 @@ static void VM_CL_droptofloor (prvm_prog_t *prog)
 	// assume failure if it returns early
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 
-	ent = PRVM_PROG_TO_EDICT(PRVM_clientglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 0)
+		ent = PRVM_G_EDICT(OFS_PARM0);
+	else
+		ent = PRVM_PROG_TO_EDICT(PRVM_clientglobaledict(self));
 	if (ent == prog->edicts)
 	{
 		VM_Warning(prog, "droptofloor: can not modify world entity\n");
@@ -3615,7 +3619,7 @@ static qboolean CL_movestep (prvm_edict_t *ent, vec3_t move, qboolean relink, qb
 ===============
 VM_CL_walkmove
 
-float(float yaw, float dist[, settrace]) walkmove
+float(float yaw, float dist[, settrace, ent]) walkmove
 ===============
 */
 static void VM_CL_walkmove (prvm_prog_t *prog)
@@ -3627,12 +3631,16 @@ static void VM_CL_walkmove (prvm_prog_t *prog)
 	int 	oldself;
 	qboolean	settrace;
 
-	VM_SAFEPARMCOUNTRANGE(2, 3, VM_CL_walkmove);
+	VM_SAFEPARMCOUNTRANGE(2, 4, VM_CL_walkmove);
 
 	// assume failure if it returns early
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 
-	ent = PRVM_PROG_TO_EDICT(PRVM_clientglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 4)
+		ent = PRVM_G_EDICT(OFS_PARM3);
+	else
+		ent = PRVM_PROG_TO_EDICT(PRVM_clientglobaledict(self));
 	if (ent == prog->edicts)
 	{
 		VM_Warning(prog, "walkmove: can not modify world entity\n");
@@ -4191,7 +4199,7 @@ VM_coredump,					// #28 void() coredump (QUAKE)
 VM_traceon,						// #29 void() traceon (QUAKE)
 VM_traceoff,					// #30 void() traceoff (QUAKE)
 VM_eprint,						// #31 void(entity e) eprint (QUAKE)
-VM_CL_walkmove,					// #32 float(float yaw, float dist[, float settrace]) walkmove (QUAKE)
+VM_CL_walkmove,					// #32 float(float yaw, float dist[, float settrace, entity ent]) walkmove (QUAKE)
 NULL,							// #33 (QUAKE)
 VM_CL_droptofloor,				// #34 float() droptofloor (QUAKE)
 VM_CL_lightstyle,				// #35 void(float style, string value) lightstyle (QUAKE)

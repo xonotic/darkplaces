@@ -360,8 +360,8 @@ void() coredump = #28;
 void() traceon = #29;
 void() traceoff = #30;
 void(entity e) eprint = #31;
-// settrace optional
-float(float yaw, float dist, float settrace) walkmove = #32;
+// settrace and ent optional
+float(float yaw, float dist, float settrace, entity ent) walkmove = #32;
 
 float() droptofloor = #34;
 void(float style, string value) lightstyle = #35;

@@ -828,7 +828,7 @@ If there is more than one valid option, they are cycled each frame
 If (self.origin + self.viewofs) is not in the PVS of the current target,
 it is not returned at all.
 
-name checkclient ()
+name checkclient ([ent])
 =================
 */
 int c_invis, c_notvis;
@@ -837,7 +837,7 @@ static void VM_SV_checkclient(prvm_prog_t *prog)
 	prvm_edict_t	*ent, *self;
 	vec3_t	view;
 
-	VM_SAFEPARMCOUNT(0, VM_SV_checkclient);
+	VM_SAFEPARMCOUNTRANGE(0, 1, VM_SV_checkclient);
 
 	// find a new check if on a new frame
 	if (sv.time - sv.lastchecktime >= 0.1)
@@ -855,7 +855,11 @@ static void VM_SV_checkclient(prvm_prog_t *prog)
 	}
 
 	// if current entity can't possibly see the check entity, return 0
-	self = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 1)
+		self = PRVM_G_EDICT(OFS_PARM0);
+	else
+		self = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
 	VectorAdd(PRVM_serveredictvector(self, origin), PRVM_serveredictvector(self, view_ofs), view);
 	if (sv.worldmodel && checkpvsbytes && !sv.worldmodel->brush.BoxTouchingPVS(sv.worldmodel, checkpvs, view, view))
 	{
@@ -1068,7 +1072,7 @@ static void VM_SV_precache_model(prvm_prog_t *prog)
 ===============
 VM_SV_walkmove
 
-float(float yaw, float dist[, settrace]) walkmove
+float(float yaw, float dist[, settrace, ent]) walkmove
 ===============
 */
 static void VM_SV_walkmove(prvm_prog_t *prog)
@@ -1080,12 +1084,16 @@ static void VM_SV_walkmove(prvm_prog_t *prog)
 	int 	oldself;
 	qboolean	settrace;
 
-	VM_SAFEPARMCOUNTRANGE(2, 3, VM_SV_walkmove);
+	VM_SAFEPARMCOUNTRANGE(2, 4, VM_SV_walkmove);
 
 	// assume failure if it returns early
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 
-	ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 4)
+		ent = PRVM_G_EDICT(OFS_PARM3);
+	else
+		ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
 	if (ent == prog->edicts)
 	{
 		VM_Warning(prog, "walkmove: can not modify world entity\n");
@@ -1125,7 +1133,7 @@ static void VM_SV_walkmove(prvm_prog_t *prog)
 ===============
 VM_SV_droptofloor
 
-void() droptofloor
+void([ent]) droptofloor
 ===============
 */
 
@@ -1140,7 +1148,11 @@ static void VM_SV_droptofloor(prvm_prog_t *prog)
 	// assume failure if it returns early
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 
-	ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 1)
+		ent = PRVM_G_EDICT(OFS_PARM0);
+	else
+		ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
 	if (ent == prog->edicts)
 	{
 		VM_Warning(prog, "droptofloor: can not modify world entity\n");

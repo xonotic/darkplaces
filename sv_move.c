@@ -259,9 +259,15 @@ static qboolean SV_StepDirection (prvm_edict_t *ent, float yaw, float dist)
 	prvm_prog_t *prog = SVVM_prog;
 	vec3_t		move, oldorigin;
 	float		delta;
+	int saveSelf;
 
 	PRVM_serveredictfloat(ent, ideal_yaw) = yaw;
+	
+	// Mario: since changeyaw has no parameters, copy self to ent temporarily (EXT_ENTITYPARAM)
+	saveSelf = PRVM_serverglobaledict(self);
+	PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
 	VM_changeyaw(prog);
+	PRVM_serverglobaledict(self) = saveSelf;
 
 	yaw = yaw*M_PI*2 / 360;
 	move[0] = cos(yaw)*dist;
@@ -422,9 +428,13 @@ void VM_SV_MoveToGoal(prvm_prog_t *prog)
 	prvm_edict_t		*ent, *goal;
 	float		dist;
 
-	VM_SAFEPARMCOUNT(1, SV_MoveToGoal);
+	VM_SAFEPARMCOUNTRANGE(1, 2, SV_MoveToGoal);
 
-	ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
+	// optional entity parameter for self (EXT_ENTITYPARAM)
+	if (prog->argc >= 2)
+		ent = PRVM_G_EDICT(OFS_PARM1);
+	else
+		ent = PRVM_PROG_TO_EDICT(PRVM_serverglobaledict(self));
 	goal = PRVM_PROG_TO_EDICT(PRVM_serveredictedict(ent, goalentity));
 	dist = PRVM_G_FLOAT(OFS_PARM0);
 
