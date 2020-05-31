@@ -534,7 +534,7 @@ static void VM_CL_droptofloor (prvm_prog_t *prog)
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 
 	// optional entity parameter for self (EXT_ENTITYPARAM)
-	if (prog->argc >= 0)
+	if (prog->argc >= 1)
 		ent = PRVM_G_EDICT(OFS_PARM0);
 	else
 		ent = PRVM_PROG_TO_EDICT(PRVM_clientglobaledict(self));
