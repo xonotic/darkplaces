@@ -1423,9 +1423,7 @@ extern cvar_t gl_info_driver;
 
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
-	int windowflags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
-	int xPos = SDL_WINDOWPOS_CENTERED;
-	int yPos = SDL_WINDOWPOS_CENTERED;
+	int windowflags = SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL;
 #ifndef USE_GLES2
 	int i;
 	const char *drivername;
@@ -1511,13 +1509,14 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 
 	video_bpp = mode->bitsperpixel;
 	window_flags = windowflags;
-	window = SDL_CreateWindow(gamename, xPos, yPos, mode->width, mode->height, windowflags);
+	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, mode->width, mode->height, windowflags);
 	if (window == NULL)
 	{
 		Con_Errorf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
 		VID_Shutdown();
 		return false;
 	}
+	SDL_ShowWindow(window);
 	SDL_GetWindowSize(window, &mode->width, &mode->height);
 	context = SDL_GL_CreateContext(window);
 	if (context == NULL)
