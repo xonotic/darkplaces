@@ -133,6 +133,7 @@ cvar_t gl_info_platform = {CVAR_CLIENT | CVAR_READONLY, "gl_info_platform", "", 
 cvar_t gl_info_driver = {CVAR_CLIENT | CVAR_READONLY, "gl_info_driver", "", "name of driver library (opengl32.dll, libGL.so.1, or whatever)."};
 
 cvar_t vid_fullscreen = {CVAR_CLIENT | CVAR_SAVE, "vid_fullscreen", "1", "use fullscreen (1) or windowed (0)"};
+cvar_t vid_borderless = {CVAR_CLIENT | CVAR_SAVE, "vid_borderless", "0", "makes the window borderless by removing all window decorations. has no effect if vid_fullscreen is 1."};
 cvar_t vid_width = {CVAR_CLIENT | CVAR_SAVE, "vid_width", "640", "resolution"};
 cvar_t vid_height = {CVAR_CLIENT | CVAR_SAVE, "vid_height", "480", "resolution"};
 cvar_t vid_bitsperpixel = {CVAR_CLIENT | CVAR_READONLY, "vid_bitsperpixel", "32", "how many bits per pixel to render at (this is not currently configurable)"};
@@ -1275,6 +1276,7 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&v_psycho);
 
 	Cvar_RegisterVariable(&vid_fullscreen);
+	Cvar_RegisterVariable(&vid_borderless);
 	Cvar_RegisterVariable(&vid_width);
 	Cvar_RegisterVariable(&vid_height);
 	Cvar_RegisterVariable(&vid_bitsperpixel);
@@ -1361,6 +1363,7 @@ static int VID_Mode(int fullscreen, int width, int height, int bpp, float refres
 
 	memset(&mode, 0, sizeof(mode));
 	mode.fullscreen = fullscreen != 0;
+	mode.borderless = vid_borderless.integer;
 	mode.width = width;
 	mode.height = height;
 	mode.bitsperpixel = bpp;
