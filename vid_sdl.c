@@ -1474,7 +1474,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 			vid_isfullscreen = true;
 		}
 		else {
-			if (mode->borderless)
+			if (vid_borderless.integer)
 				windowflags |= SDL_WINDOW_BORDERLESS;
 		}
 	}
