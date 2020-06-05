@@ -1277,6 +1277,7 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&v_psycho);
 
 	Cvar_RegisterVariable(&vid_fullscreen);
+	Cvar_RegisterVariable(&vid_borderless);
 	Cvar_RegisterVariable(&vid_width);
 	Cvar_RegisterVariable(&vid_height);
 	Cvar_RegisterVariable(&vid_bitsperpixel);
@@ -1296,13 +1297,12 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&vid_stick_mouse);
 	Cvar_RegisterVariable(&vid_resizable);
 	Cvar_RegisterVariable(&vid_desktopfullscreen);
+	Cvar_RegisterVariable(&vid_ignore_taskbar);
 	Cvar_RegisterVariable(&vid_minwidth);
 	Cvar_RegisterVariable(&vid_minheight);
 	Cvar_RegisterVariable(&gl_finish);
 	Cvar_RegisterVariable(&vid_sRGB);
 	Cvar_RegisterVariable(&vid_sRGB_fallback);
-	Cvar_RegisterVariable(&vid_borderless);
-	Cvar_RegisterVariable(&vid_ignore_taskbar);
 
 	Cvar_RegisterVariable(&joy_active);
 #ifdef WIN32

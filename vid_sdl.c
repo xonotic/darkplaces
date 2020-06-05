@@ -1513,6 +1513,9 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		if (mode->fullscreen) {
 			if (vid_desktopfullscreen.integer)
 			{
+				vid_mode_t *m = VID_GetDesktopMode();
+				mode->width = m->width;
+				mode->height = m->height;
 				windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 			}
 			else
