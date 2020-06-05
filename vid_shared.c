@@ -133,7 +133,7 @@ cvar_t gl_info_platform = {CVAR_CLIENT | CVAR_READONLY, "gl_info_platform", "", 
 cvar_t gl_info_driver = {CVAR_CLIENT | CVAR_READONLY, "gl_info_driver", "", "name of driver library (opengl32.dll, libGL.so.1, or whatever)."};
 
 cvar_t vid_fullscreen = {CVAR_CLIENT | CVAR_SAVE, "vid_fullscreen", "1", "use fullscreen (1) or windowed (0)"};
-cvar_t vid_borderless = {CVAR_CLIENT | CVAR_SAVE, "vid_borderless", "0", "makes the window borderless by removing all window decorations. has no effect if vid_fullscreen is 1."};
+cvar_t vid_borderless = {CVAR_CLIENT | CVAR_SAVE, "vid_borderless", "0", "make the window borderless by removing all window decorations. has no effect in fullscreen mode"};
 cvar_t vid_width = {CVAR_CLIENT | CVAR_SAVE, "vid_width", "640", "resolution"};
 cvar_t vid_height = {CVAR_CLIENT | CVAR_SAVE, "vid_height", "480", "resolution"};
 cvar_t vid_bitsperpixel = {CVAR_CLIENT | CVAR_READONLY, "vid_bitsperpixel", "32", "how many bits per pixel to render at (this is not currently configurable)"};
@@ -163,6 +163,7 @@ cvar_t vid_touchscreen_supportshowkeyboard = {CVAR_CLIENT | CVAR_READONLY, "vid_
 cvar_t vid_stick_mouse = {CVAR_CLIENT | CVAR_SAVE, "vid_stick_mouse", "0", "have the mouse stuck in the center of the screen" };
 cvar_t vid_resizable = {CVAR_CLIENT | CVAR_SAVE, "vid_resizable", "0", "0: window not resizable, 1: resizable, 2: window can be resized but the framebuffer isn't adjusted" };
 cvar_t vid_desktopfullscreen = {CVAR_CLIENT | CVAR_SAVE, "vid_desktopfullscreen", "1", "force desktop resolution for fullscreen; also use some OS dependent tricks for better fullscreen integration"};
+cvar_t vid_ignore_taskbar = {CVAR_CLIENT | CVAR_SAVE, "vid_ignore_taskbar", "0", "in windowed mode, prevent the taskbar and window borders from affecting the size and placement of the window. it will be aligned centered and uses the unaltered vid_width/vid_height values (Windows OS only)"};
 
 cvar_t v_gamma = {CVAR_CLIENT | CVAR_SAVE, "v_gamma", "1", "inverse gamma correction value, a brightness effect that does not affect white or black, and tends to make the image grey and dull"};
 cvar_t v_contrast = {CVAR_CLIENT | CVAR_SAVE, "v_contrast", "1", "brightness of white (values above 1 give a brighter image with increased color saturation, unlike v_gamma)"};
@@ -1276,7 +1277,6 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&v_psycho);
 
 	Cvar_RegisterVariable(&vid_fullscreen);
-	Cvar_RegisterVariable(&vid_borderless);
 	Cvar_RegisterVariable(&vid_width);
 	Cvar_RegisterVariable(&vid_height);
 	Cvar_RegisterVariable(&vid_bitsperpixel);
@@ -1301,6 +1301,8 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&gl_finish);
 	Cvar_RegisterVariable(&vid_sRGB);
 	Cvar_RegisterVariable(&vid_sRGB_fallback);
+	Cvar_RegisterVariable(&vid_borderless);
+	Cvar_RegisterVariable(&vid_ignore_taskbar);
 
 	Cvar_RegisterVariable(&joy_active);
 #ifdef WIN32

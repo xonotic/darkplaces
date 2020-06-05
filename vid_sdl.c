@@ -1415,6 +1415,53 @@ static void VID_OutputVersion(void)
 					version.major, version.minor, version.patch );
 }
 
+#ifdef WIN32
+static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
+{
+	static int workWidth;
+	static int workHeight;
+	static int titleBarPixels = 2;
+	static int screenHeight;
+	RECT workArea;
+	LONG width = mode->width; // vid_width
+	LONG height = mode->height; // vid_height
+
+	// adjust width and height for the space occupied by window decorators (title bar, borders)
+	rect->top = 0;
+	rect->left = 0;
+	rect->right = width;
+	rect->bottom = height;
+	AdjustWindowRectEx(rect, WS_CAPTION|WS_THICKFRAME, false, 0);
+
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+	workWidth = workArea.right - workArea.left;
+	workHeight = workArea.bottom - workArea.top;
+
+	// SDL forces the window height to be <= screen height - 27px (on Win8.1 - probably intended for the title bar) 
+	// If the task bar is docked to the the left screen border and we move the window to negative y,
+	// there would be some part of the regular desktop visible on the bottom of the screen.
+	screenHeight = GetSystemMetrics(SM_CYSCREEN);
+	if (screenHeight == workHeight)
+		titleBarPixels = -rect->top;
+
+	//Con_Printf("window mode: %dx%d, workArea: %d/%d-%d/%d (%dx%d), title: %d\n", width, height, workArea.left, workArea.top, workArea.right, workArea.bottom, workArea.right - workArea.left, workArea.bottom - workArea.top, titleBarPixels);
+
+	// if height and width matches the physical or previously adjusted screen height and width, adjust it to available desktop area
+	if ((width == GetSystemMetrics(SM_CXSCREEN) || width == workWidth) && (height == screenHeight || height == workHeight - titleBarPixels))
+	{
+		rect->left = workArea.left;
+		mode->width = workWidth;
+		rect->top = workArea.top + titleBarPixels;
+		mode->height = workHeight - titleBarPixels;
+	}
+	else 
+	{
+		rect->left = workArea.left + max(0, (workWidth - width) / 2);
+		rect->top = workArea.top + max(0, (workHeight - height) / 2);
+	}
+}
+#endif
+
 extern cvar_t gl_info_vendor;
 extern cvar_t gl_info_renderer;
 extern cvar_t gl_info_version;
@@ -1424,6 +1471,8 @@ extern cvar_t gl_info_driver;
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
 	int windowflags = SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL;
+	int xPos = SDL_WINDOWPOS_UNDEFINED;
+	int yPos = SDL_WINDOWPOS_UNDEFINED;
 #ifndef USE_GLES2
 	int i;
 	const char *drivername;
@@ -1464,9 +1513,6 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		if (mode->fullscreen) {
 			if (vid_desktopfullscreen.integer)
 			{
-				vid_mode_t *m = VID_GetDesktopMode();
-				mode->width = m->width;
-				mode->height = m->height;
 				windowflags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 			}
 			else
@@ -1476,6 +1522,18 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		else {
 			if (vid_borderless.integer)
 				windowflags |= SDL_WINDOW_BORDERLESS;
+#ifdef WIN32
+			if (vid_ignore_taskbar.integer) {
+				xPos = SDL_WINDOWPOS_CENTERED;
+				yPos = SDL_WINDOWPOS_CENTERED;
+			}
+			else {
+				RECT rect;
+				AdjustWindowBounds(mode, &rect);
+				xPos = rect.left;
+				yPos = rect.top;
+			}
+#endif
 		}
 	}
 	//flags |= SDL_HWSURFACE;
@@ -1509,7 +1567,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 
 	video_bpp = mode->bitsperpixel;
 	window_flags = windowflags;
-	window = SDL_CreateWindow(gamename, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, mode->width, mode->height, windowflags);
+	window = SDL_CreateWindow(gamename, xPos, yPos, mode->width, mode->height, windowflags);
 	if (window == NULL)
 	{
 		Con_Errorf("Failed to set video mode to %ix%i: %s\n", mode->width, mode->height, SDL_GetError());
