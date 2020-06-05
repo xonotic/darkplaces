@@ -53,7 +53,6 @@ typedef struct viddef_mode_s
 	int height;
 	int bitsperpixel;
 	qboolean fullscreen;
-	qboolean borderless;
 	float refreshrate;
 	qboolean userefreshrate;
 	qboolean stereobuffer;
@@ -70,7 +69,6 @@ typedef struct viddef_s
 	int height;
 	int bitsperpixel;
 	qboolean fullscreen;
-	qboolean borderless;
 	float refreshrate;
 	qboolean userefreshrate;
 	qboolean stereobuffer;

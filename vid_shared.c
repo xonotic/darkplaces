@@ -1363,7 +1363,6 @@ static int VID_Mode(int fullscreen, int width, int height, int bpp, float refres
 
 	memset(&mode, 0, sizeof(mode));
 	mode.fullscreen = fullscreen != 0;
-	mode.borderless = vid_borderless.integer;
 	mode.width = width;
 	mode.height = height;
 	mode.bitsperpixel = bpp;
