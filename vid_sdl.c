@@ -699,10 +699,10 @@ void VID_BuildJoyState(vid_joystate_t *joystate)
 		{
 			for (j = 0; j <= SDL_CONTROLLER_AXIS_MAX; ++j)
 			{
-				joystate->axis[j] = SDL_GameControllerGetAxis(vid_sdlgamecontroller, j) * (1.0f / 32767.0f);
+				joystate->axis[j] = SDL_GameControllerGetAxis(vid_sdlgamecontroller, (SDL_GameControllerAxis)j) * (1.0f / 32767.0f);
 			}
 			for (j = 0; j < SDL_CONTROLLER_BUTTON_MAX; ++j)
-				joystate->button[j] = SDL_GameControllerGetButton(vid_sdlgamecontroller, j);
+				joystate->button[j] = SDL_GameControllerGetButton(vid_sdlgamecontroller, (SDL_GameControllerButton)j);
 			// emulate joy buttons for trigger "axes"
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX+1] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
@@ -1618,8 +1618,8 @@ extern cvar_t gl_info_driver;
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
 	// GAME_STEELSTORM specific
-	steelstorm_showing_map = Cvar_FindVar(&cvars_all, "steelstorm_showing_map", ~0, false);
-	steelstorm_showing_mousecursor = Cvar_FindVar(&cvars_all, "steelstorm_showing_mousecursor", ~0, false);
+	steelstorm_showing_map = Cvar_FindVar(&cvars_all, "steelstorm_showing_map", ~0);
+	steelstorm_showing_mousecursor = Cvar_FindVar(&cvars_all, "steelstorm_showing_mousecursor", ~0);
 
 	if (!SDL_WasInit(SDL_INIT_VIDEO) && SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
 		Sys_Error ("Failed to init SDL video subsystem: %s", SDL_GetError());
