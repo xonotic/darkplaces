@@ -129,7 +129,7 @@ cvar_t gl_info_vendor = {CVAR_CLIENT | CVAR_READONLY, "gl_info_vendor", "", "ind
 cvar_t gl_info_renderer = {CVAR_CLIENT | CVAR_READONLY, "gl_info_renderer", "", "indicates graphics chip model and other information"};
 cvar_t gl_info_version = {CVAR_CLIENT | CVAR_READONLY, "gl_info_version", "", "indicates version of current renderer. begins with 1.0.0, 1.1.0, 1.2.0, 1.3.1 etc."};
 cvar_t gl_info_extensions = {CVAR_CLIENT | CVAR_READONLY, "gl_info_extensions", "", "indicates extension list found by engine, space separated."};
-cvar_t gl_info_platform = {CVAR_CLIENT | CVAR_READONLY, "gl_info_platform", "", "indicates GL platform: SDL, WGL, GLX, or AGL."};
+cvar_t gl_info_platform = {CVAR_CLIENT | CVAR_READONLY, "gl_info_platform", "", "indicates GL platform: WGL, GLX, or AGL."};
 cvar_t gl_info_driver = {CVAR_CLIENT | CVAR_READONLY, "gl_info_driver", "", "name of driver library (opengl32.dll, libGL.so.1, or whatever)."};
 
 cvar_t vid_fullscreen = {CVAR_CLIENT | CVAR_SAVE, "vid_fullscreen", "1", "use fullscreen (1) or windowed (0)"};
@@ -150,6 +150,7 @@ cvar_t vid_touchscreen_ydpi = {CVAR_CLIENT, "vid_touchscreen_ydpi", "300", "Vert
 
 cvar_t vid_vsync = {CVAR_CLIENT | CVAR_SAVE, "vid_vsync", "0", "sync to vertical blank, prevents 'tearing' (seeing part of one frame and part of another on the screen at the same time), automatically disabled when doing timedemo benchmarks"};
 cvar_t vid_mouse = {CVAR_CLIENT | CVAR_SAVE, "vid_mouse", "1", "whether to use the mouse in windowed mode (fullscreen always does)"};
+cvar_t vid_mouse_clickthrough = {CVAR_CLIENT | CVAR_SAVE, "vid_mouse_clickthrough", "0", "mouse behavior in windowed mode: 0 = click to focus, 1 = allow interaction even if the window is not focused (click-through behaviour, can be useful when using third-party game overlays)"};
 cvar_t vid_grabkeyboard = {CVAR_CLIENT | CVAR_SAVE, "vid_grabkeyboard", "0", "whether to grab the keyboard when mouse is active (prevents use of volume control keys, music player keys, etc on some keyboards)"};
 cvar_t vid_minwidth = {CVAR_CLIENT, "vid_minwidth", "0", "minimum vid_width that is acceptable (to be set in default.cfg in mods)"};
 cvar_t vid_minheight = {CVAR_CLIENT, "vid_minheight", "0", "minimum vid_height that is acceptable (to be set in default.cfg in mods)"};
@@ -1290,6 +1291,7 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&vid_touchscreen_ydpi);
 	Cvar_RegisterVariable(&vid_vsync);
 	Cvar_RegisterVariable(&vid_mouse);
+	Cvar_RegisterVariable(&vid_mouse_clickthrough);
 	Cvar_RegisterVariable(&vid_grabkeyboard);
 	Cvar_RegisterVariable(&vid_touchscreen);
 	Cvar_RegisterVariable(&vid_touchscreen_showkeyboard);

@@ -1541,6 +1541,9 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	}
 	//flags |= SDL_HWSURFACE;
 
+	if (vid_mouse_clickthrough.integer && !vid_isfullscreen)
+		SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+
 	SDL_GL_SetAttribute (SDL_GL_DOUBLEBUFFER, 1);
 	SDL_GL_SetAttribute (SDL_GL_RED_SIZE, 8);
 	SDL_GL_SetAttribute (SDL_GL_GREEN_SIZE, 8);
