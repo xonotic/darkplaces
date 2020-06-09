@@ -86,12 +86,8 @@ cvar_t hostname = {CVAR_SERVER | CVAR_SAVE, "hostname", "UNNAMED", "server messa
 cvar_t developer_networking = {CVAR_CLIENT | CVAR_SERVER, "developer_networking", "0", "prints all received and sent packets (recommended only for debugging)"};
 
 cvar_t net_fakelag = {CVAR_CLIENT, "net_fakelag","0", "lags local loopback connection by this much ping time (useful to play more fairly on your own server with people with higher pings)"};
-cvar_t cl_netlocalping = {CVAR_ALIAS, "cl_netlocalping"};
-static cvar_t net_fakeloss_send = {CVAR_CLIENT, "cl_netpacketloss_send","0", "drops this percentage of outgoing packets, useful for testing network protocol robustness (jerky movement, prediction errors, etc)"};
-static cvar_t net_fakeloss_receive = {CVAR_CLIENT, "cl_netpacketloss_receive","0", "drops this percentage of incoming packets, useful for testing network protocol robustness (jerky movement, effects failing to start, sounds failing to play, etc)"};
-static cvar_t cl_netpacketloss_send = {CVAR_ALIAS, "cl_netpacketloss_send"};
-static cvar_t cl_netpacketloss_receive = {CVAR_ALIAS, "cl_netpacketloss_receive"};
-
+static cvar_t net_fakeloss_send = {CVAR_CLIENT, "net_fakeloss_send","0", "drops this percentage of outgoing packets, useful for testing network protocol robustness (jerky movement, prediction errors, etc)"};
+static cvar_t net_fakeloss_receive = {CVAR_CLIENT, "net_fakeloss_receive","0", "drops this percentage of incoming packets, useful for testing network protocol robustness (jerky movement, effects failing to start, sounds failing to play, etc)"};
 static cvar_t net_slist_queriespersecond = {CVAR_CLIENT, "net_slist_queriespersecond", "20", "how many server information requests to send per second"};
 static cvar_t net_slist_queriesperframe = {CVAR_CLIENT, "net_slist_queriesperframe", "4", "maximum number of server information requests to send each rendered frame (guards against low framerates causing problems)"};
 static cvar_t net_slist_timeout = {CVAR_CLIENT, "net_slist_timeout", "4", "how long to listen for a server information response before giving up"};
@@ -3906,9 +3902,9 @@ void NetConn_Init(void)
 	Cvar_RegisterVariable(&net_fakelag);
 	Cvar_RegisterVariable(&net_fakeloss_send);
 	Cvar_RegisterVariable(&net_fakeloss_receive);
-	Cvar_RegisterAlias(&cl_netlocalping, &net_fakelag);
-	Cvar_RegisterAlias(&cl_netpacketloss_send, &net_fakeloss_send);
-	Cvar_RegisterAlias(&cl_netpacketloss_receive, &net_fakeloss_receive);
+	Cvar_RegisterAlias(&net_fakelag, "cl_netlocalping");
+	Cvar_RegisterAlias(&net_fakeloss_send, "cl_netpacketloss_send");
+	Cvar_RegisterAlias(&net_fakeloss_receive, "cl_netpacketloss_receive");
 	Cvar_RegisterVariable(&hostname);
 	Cvar_RegisterVariable(&developer_networking);
 	Cvar_RegisterVariable(&cl_netport);

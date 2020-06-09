@@ -788,7 +788,7 @@ static void Cmd_Toggle_f(cmd_state_t *cmd)
 	else
 	{ // Correct Arguments Specified
 		// Acquire Potential CVar
-		cvar_t* cvCVar = Cvar_FindVar(cmd->cvars, Cmd_Argv(cmd, 1), cmd->cvars_flagsmask, false);
+		cvar_t* cvCVar = Cvar_FindVar(cmd->cvars, Cmd_Argv(cmd, 1), cmd->cvars_flagsmask);
 
 		if(cvCVar != NULL)
 		{ // Valid CVar
@@ -1036,7 +1036,7 @@ static const char *Cmd_GetDirectCvarValue(cmd_state_t *cmd, const char *varname,
 		}
 	}
 
-	if((cvar = Cvar_FindVar(cmd->cvars, varname, cmd->cvars_flagsmask, false)) && !(cvar->flags & CVAR_PRIVATE))
+	if((cvar = Cvar_FindVar(cmd->cvars, varname, cmd->cvars_flagsmask)) && !(cvar->flags & CVAR_PRIVATE))
 		return cvar->string;
 
 	return NULL;
@@ -1429,6 +1429,7 @@ static void Cmd_Apropos_f(cmd_state_t *cmd)
 	int count;
 	qboolean ispattern;
 	char vabuf[1024];
+	char *cvar_name;
 
 	if (Cmd_Argc(cmd) > 1)
 		partial = Cmd_Args(cmd);
@@ -1445,14 +1446,26 @@ static void Cmd_Apropos_f(cmd_state_t *cmd)
 	count = 0;
 	for (cvar = cmd->cvars->vars; cvar; cvar = cvar->next)
 	{
-		if (!matchpattern_with_separator(cvar->name, partial, true, "", false))
+		if (!matchpattern_with_separator(cvar->name, partial, true, "", false) &&
+		    !matchpattern_with_separator(cvar->description, partial, true, "", false))
+		{
+			for (int i = 0; i < cvar->aliasindex; i++)
+			{
+				if (!matchpattern_with_separator(cvar->aliases[i], partial, true, "", false)) {
+					continue;
+				} else {
+					cvar_name = cvar->aliases[i];
+					goto print;
+				}
+			}	
 			continue;
-		if (!(cvar->flags & CVAR_ALIAS))
-			if (!matchpattern_with_separator(cvar->description, partial, true, "", false))
-				continue;
-		Con_Printf ("cvar ");
-		Cvar_PrintHelp(cvar, true);
-		count++;
+		} else {
+			cvar_name = (char *)cvar->name;
+print:
+			Con_Printf ("cvar ");
+			Cvar_PrintHelp(cvar, cvar_name, true);
+			count++;
+		}
 	}
 	for (func = cmd->userdefined->csqc_functions; func; func = func->next)
 	{
@@ -1714,7 +1727,7 @@ void Cmd_AddCommand(cmd_state_t *cmd, const char *cmd_name, xcommand_t function,
 	cmd_function_t *prev, *current;
 
 // fail if the command is a variable name
-	if (Cvar_FindVar(cmd->cvars, cmd_name, ~0, true))
+	if (Cvar_FindVar(cmd->cvars, cmd_name, ~0))
 	{
 		Con_Printf("Cmd_AddCommand: %s already defined as a var\n", cmd_name);
 		return;
@@ -2027,8 +2040,6 @@ A complete command line has been parsed, so try to execute it
 FIXME: lookupnoadd the token to speed search?
 ============
 */
-extern hook_t *csqc_concmd;
-
 void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qboolean lockmutex)
 {
 	int oldpos;
@@ -2050,7 +2061,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	{
 		if (!strcasecmp(cmd->argv[0], func->name))
 		{
-			if (func->csqcfunc && Hook_Call(csqc_concmd, text)->bval)	//[515]: csqc
+			if (func->csqcfunc && CL_VM_ConsoleCommand(text))	//[515]: csqc
 				goto done;
 			break;
 		}

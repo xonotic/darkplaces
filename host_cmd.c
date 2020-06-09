@@ -2502,13 +2502,13 @@ static void Host_SendCvar_f(cmd_state_t *cmd)
 	cvarname = Cmd_Argv(cmd, 1);
 	if (cls.state == ca_connected)
 	{
-		c = Cvar_FindVar(&cvars_all, cvarname, CVAR_CLIENT | CVAR_SERVER, false);
+		c = Cvar_FindVar(&cvars_all, cvarname, CVAR_CLIENT | CVAR_SERVER);
 		// LadyHavoc: if there is no such cvar or if it is private, send a
 		// reply indicating that it has no value
 		if(!c || (c->flags & CVAR_PRIVATE))
 			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "sentcvar %s", cvarname));
 		else
-			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "sentcvar %s \"%s\"", cvarname, c->string));
+			Cmd_ForwardStringToServer(va(vabuf, sizeof(vabuf), "sentcvar %s \"%s\"", c->name, c->string));
 		return;
 	}
 	if(!sv.active)// || !PRVM_serverfunction(SV_ParseClientCommand))
@@ -3145,6 +3145,7 @@ void Host_InitCommands (void)
 	Cmd_AddCommand(&cmd_client, "packet", Host_Packet_f, "send a packet to the specified address:port containing a text string");
 	Cmd_AddCommand(&cmd_clientfromserver, "packet", Host_Packet_f, "send a packet to the specified address:port containing a text string");
 	Cmd_AddCommand(&cmd_client, "topcolor", Host_TopColor_f, "QW command to set top color without changing bottom color");
+	Cmd_AddCommand(&cmd_clientfromserver, "topcolor", Host_TopColor_f, "QW command to set top color without changing bottom color");
 	Cmd_AddCommand(&cmd_client, "bottomcolor", Host_BottomColor_f, "QW command to set bottom color without changing top color");
 	Cmd_AddCommand(&cmd_client, "fixtrans", Image_FixTransparentPixels_f, "change alpha-zero pixels in an image file to sensible values, and write out a new TGA (warning: SLOW)");
 
