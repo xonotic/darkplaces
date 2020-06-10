@@ -1805,8 +1805,10 @@ void FS_Init_SelfPack (void)
 	{
 		char *buf = (char *) FS_SysLoadFile("darkplaces.opt", tempmempool, true, NULL);
 		if(buf)
+		{
 			COM_InsertFlags(buf);
-		Mem_Free(buf);
+			Mem_Free(buf);
+		}
 	}
 
 #ifndef USE_RWOPS
@@ -1823,8 +1825,10 @@ void FS_Init_SelfPack (void)
 				{
 					char *buf = (char *) FS_LoadFile("darkplaces.opt", tempmempool, true, NULL);
 					if(buf)
+					{
 						COM_InsertFlags(buf);
-					Mem_Free(buf);
+						Mem_Free(buf);
+					}
 				}
 			}
 		}
