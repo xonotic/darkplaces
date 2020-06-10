@@ -268,13 +268,16 @@ const char **Cvar_CompleteBuildList(cvar_state_t *cvars, const char *partial, in
 
 void Cvar_PrintHelp(cvar_t *cvar, const char *name, qboolean full)
 {
-	Con_Printf("^3%s^7", name);
+	// Aliases are purple, cvars are yellow
 	if (strcmp(cvar->name, name))
-		Con_Printf(" (now ^3%s^7)", cvar->name);
-	Con_Printf(" is \"%s\" [\"%s\"] ", ((cvar->flags & CVAR_PRIVATE) ? "********"/*hunter2*/ : cvar->string), cvar->defstring);
-	
+		Con_Printf("^6");
+	else
+		Con_Printf("^3");
+	Con_Printf("%s^7 is \"%s\" [\"%s\"]", name, ((cvar->flags & CVAR_PRIVATE) ? "********"/*hunter2*/ : cvar->string), cvar->defstring);
+	if (strcmp(cvar->name, name))
+		Con_Printf(" (also ^3%s^7)", cvar->name);
 	if (full)
-		Con_Printf("%s", cvar->description);
+		Con_Printf(" %s", cvar->description);
 	Con_Printf("\n");
 }
 
@@ -1002,39 +1005,47 @@ void Cvar_List_f(cmd_state_t *cmd)
 	cvar_state_t *cvars = cmd->cvars;
 	cvar_t *cvar;
 	const char *partial;
-	size_t len;
 	int count;
 	qboolean ispattern;
+	char vabuf[1024];
 
 	if (Cmd_Argc(cmd) > 1)
 	{
 		partial = Cmd_Argv(cmd, 1);
-		len = strlen(partial);
 		ispattern = (strchr(partial, '*') || strchr(partial, '?'));
+		if(!ispattern)
+			partial = va(vabuf, sizeof(vabuf), "%s*", partial);
 	}
 	else
 	{
-		partial = NULL;
-		len = 0;
+		partial = va(vabuf, sizeof(vabuf), "*");
 		ispattern = false;
 	}
 
 	count = 0;
 	for (cvar = cvars->vars; cvar; cvar = cvar->next)
 	{
-		if (len && (ispattern ? !matchpattern_with_separator(cvar->name, partial, false, "", false) : strncmp (partial,cvar->name,len)))
-			continue;
-
-		Cvar_PrintHelp(cvar, cvar->name, true);
-		count++;
+		if (matchpattern_with_separator(cvar->name, partial, false, "", false))
+		{
+			Cvar_PrintHelp(cvar, cvar->name, true);
+			count++;
+		}
+		for (int i = 0; i < cvar->aliasindex; i++)
+		{
+			if (matchpattern_with_separator(cvar->aliases[i], partial, false, "", false))
+			{
+				Cvar_PrintHelp(cvar, cvar->aliases[i], true);
+				count++;
+			}
+		}
 	}
 
-	if (len)
+	if (Cmd_Argc(cmd) > 1)
 	{
 		if(ispattern)
 			Con_Printf("%i cvar%s matching \"%s\"\n", count, (count > 1) ? "s" : "", partial);
 		else
-			Con_Printf("%i cvar%s beginning with \"%s\"\n", count, (count > 1) ? "s" : "", partial);
+			Con_Printf("%i cvar%s beginning with \"%s\"\n", count, (count > 1) ? "s" : "", Cmd_Argv(cmd,1));
 	}
 	else
 		Con_Printf("%i cvar(s)\n", count);
