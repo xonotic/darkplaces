@@ -45,7 +45,7 @@ STRIP?=strip
 
 ###### Sound #####
 
-OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o
+OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o snd_xmp.o
 
 # No sound
 OBJ_SND_NULL=snd_null.o
@@ -53,23 +53,23 @@ LIB_SND_NULL=
 
 # Open Sound System (Linux, FreeBSD and Solaris)
 OBJ_SND_OSS=$(OBJ_SND_COMMON) snd_oss.o
-LIB_SND_OSS=
+LIB_SND_OSS=$(LIB_SND_XMP)
 
 # Advanced Linux Sound Architecture (Linux)
 OBJ_SND_ALSA=$(OBJ_SND_COMMON) snd_alsa.o
-LIB_SND_ALSA=-lasound
+LIB_SND_ALSA=-lasound $(LIB_SND_XMP)
 
 # Core Audio (Mac OS X)
 OBJ_SND_COREAUDIO=$(OBJ_SND_COMMON) snd_coreaudio.o
-LIB_SND_COREAUDIO=-framework CoreAudio
+LIB_SND_COREAUDIO=-framework CoreAudio $(LIB_SND_XMP)
 
 # BSD / Sun audio API (NetBSD and OpenBSD)
 OBJ_SND_BSD=$(OBJ_SND_COMMON) snd_bsd.o
-LIB_SND_BSD=
+LIB_SND_BSD=$(LIB_SND_XMP)
 
 # DirectX and Win32 WAVE output (Win32)
 OBJ_SND_WIN=$(OBJ_SND_COMMON) snd_win.o
-LIB_SND_WIN=
+LIB_SND_WIN=$(LIB_SND_XMP)
 
 # Qantourisc's 3D Realtime Acoustic Lib (3D RAS)
 OBJ_SND_3DRAS=snd_3dras.o
@@ -208,9 +208,9 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 ##### UNIX specific variables #####
 
-LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL)
+LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(LIB_SND_XMP)
 LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
-LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl
+LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lxmp
 CFLAGS_UNIX_PRELOAD=-DPREFER_PRELOAD
 
 LDFLAGS_UNIXSDL=$(SDLCONFIG_LIBS)
@@ -261,7 +261,7 @@ WINDRES ?= windres
 # Link
 # see LDFLAGS_WINCOMMON in makefile
 LDFLAGS_WINSV=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) -mconsole -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
-LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
+LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) $(LIB_SND_XMP) $(LIB_Z) $(LIB_JPEG) -lwinmm -lws2_32
 EXE_WINSV=darkplaces-dedicated.exe
 EXE_WINSDL=darkplaces-sdl.exe
 EXE_WINSVNEXUIZ=nexuiz-dedicated.exe
@@ -417,6 +417,10 @@ prepare :
 	$(CMD_MKDIR) $(BUILD_DIR)
 	$(CMD_CP) makefile.inc $(BUILD_DIR)/
 	$(CMD_CP) $(MAKEFILE) $(BUILD_DIR)/
+
+snd_xmp.o: snd_xmp.c
+	$(CHECKLEVEL2)
+	$(DO_CC) $(CFLAGS_SND_XMP)
 
 #this checks USEODE when compiling so it needs the ODE flags as well
 prvm_cmds.o: prvm_cmds.c
