@@ -348,7 +348,7 @@ qboolean XMP_OpenLibrary (void)
 {
 	const char* dllnames_xmp [] =
 	{
-#if defined(WIN32) // FIXME: untested, please test a windows build
+#if defined(WIN32)
 		"libxmp.dll",
 #elif defined(MACOSX) // FIXME: untested, please test a mac os build
 		"libxmp.4.dylib",
