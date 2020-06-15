@@ -444,10 +444,6 @@ mod_skeletal_animatevertices_sse.o: mod_skeletal_animatevertices_sse.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SSE)
 
-snd_xmp.o: snd_xmp.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SND_XMP)
-
 #this checks USEXMP when compiling so it needs the XMP flags as well
 snd_main.o: snd_main.c
 	$(CHECKLEVEL2)
