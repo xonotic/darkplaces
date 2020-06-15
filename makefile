@@ -78,11 +78,21 @@ TARGETS_NEXUIZ=sv-nexuiz sdl-nexuiz
 DP_VIDEO_CAPTURE?=enabled
 ifeq ($(DP_VIDEO_CAPTURE), enabled)
 	CFLAGS_VIDEO_CAPTURE=-DCONFIG_VIDEO_CAPTURE
-	OBJ_VIDEO_CAPTURE= cap_avi.o cap_ogg.o
+	OBJ_VIDEO_CAPTURE=cap_avi.o cap_ogg.o
 else
 	CFLAGS_VIDEO_CAPTURE=
 	OBJ_VIDEO_CAPTURE=
 endif
+
+DP_VIDEO_PLAYBACK?=disabled
+ifeq ($(DP_VIDEO_PLAYBACK), enabled)
+	CFLAGS_VIDEO_PLAYBACK=-DCONFIG_VIDEO_PLAYBACK
+	OBJ_VIDEO_PLAYBACK=cl_video.o
+else
+	CFLAGS_VIDEO_PLAYBACK=
+	OBJ_VIDEO_PLAYBACK=
+endif
+
 
 # Linux configuration
 ifeq ($(DP_MAKE_TARGET), linux)
@@ -213,9 +223,7 @@ ifeq ($(WIN64RELEASE), 1)
 #	WINDRES=$(TARGET)-windres
 endif
 
-CFLAGS_D3D=
 CFLAGS_WARNINGS=-Wall -Wold-style-definition -Wstrict-prototypes -Wsign-compare -Wdeclaration-after-statement -Wmissing-prototypes
-LDFLAGS_D3D=
 
 
 ifeq ($(DP_MAKE_TARGET), mingw)

@@ -21,7 +21,9 @@
 */
 
 #include "quakedef.h"
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 #include "utf8lib.h"
 #include "csprogs.h"
 
@@ -1973,6 +1975,7 @@ Key_Event (int key, int ascii, qboolean down)
 		}
 	}
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 	// ignore binds while a video is played, let the video system handle the key event
 	if (cl_videoplaying)
 	{
@@ -1982,11 +1985,12 @@ Key_Event (int key, int ascii, qboolean down)
 #else
 			{
 			}
-#endif
+#endif // CONFIG_MENU
 		else
 			CL_Video_KeyEvent (key, ascii, keydown[key] != 0);
 		return;
 	}
+#endif // CONFIG_VIDEO_PLAYBACK
 
 	// anything else is a key press into the game, chat line, or menu
 	switch (keydest)

@@ -1,6 +1,8 @@
 
 #include "quakedef.h"
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 #include "image.h"
 #include "jpeg.h"
 #include "image_png.h"
@@ -2272,7 +2274,9 @@ static void SCR_DrawScreen (void)
 	if(!scr_loading)
 		MR_Draw();
 #endif
+#ifdef CONFIG_VIDEO_PLAYBACK
 	CL_DrawVideo();
+#endif
 	R_Shadow_EditLights_DrawSelectedLightProperties();
 	if(!scr_loading) {
 		SCR_DrawConsole();

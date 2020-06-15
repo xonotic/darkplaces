@@ -4156,6 +4156,7 @@ float cin_open(string file, string name)
 */
 void VM_cin_open(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	const char *file;
 	const char *name;
 
@@ -4165,12 +4166,15 @@ void VM_cin_open(prvm_prog_t *prog)
 	name = PRVM_G_STRING( OFS_PARM1 );
 
 	VM_CheckEmptyString(prog,  file );
-    VM_CheckEmptyString(prog,  name );
+	VM_CheckEmptyString(prog,  name );
 
 	if( CL_OpenVideo( file, name, MENUOWNER, "" ) )
 		PRVM_G_FLOAT( OFS_RETURN ) = 1;
 	else
 		PRVM_G_FLOAT( OFS_RETURN ) = 0;
+#else
+	PRVM_G_FLOAT( OFS_RETURN ) = 0;
+#endif
 }
 
 /*
@@ -4182,6 +4186,7 @@ void cin_close(string name)
 */
 void VM_cin_close(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	const char *name;
 
 	VM_SAFEPARMCOUNT( 1, VM_cin_close );
@@ -4190,6 +4195,7 @@ void VM_cin_close(prvm_prog_t *prog)
 	VM_CheckEmptyString(prog,  name );
 
 	CL_CloseVideo( CL_GetVideoByName( name ) );
+#endif
 }
 
 /*
@@ -4200,6 +4206,7 @@ void cin_setstate(string name, float type)
 */
 void VM_cin_setstate(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	const char *name;
 	clvideostate_t 	state;
 	clvideo_t		*video;
@@ -4214,6 +4221,7 @@ void VM_cin_setstate(prvm_prog_t *prog)
 	video = CL_GetVideoByName( name );
 	if( video && state > CLVIDEO_UNUSED && state < CLVIDEO_STATECOUNT )
 		CL_SetVideoState( video, state );
+#endif
 }
 
 /*
@@ -4225,6 +4233,7 @@ float cin_getstate(string name)
 */
 void VM_cin_getstate(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	const char *name;
 	clvideo_t		*video;
 
@@ -4238,6 +4247,9 @@ void VM_cin_getstate(prvm_prog_t *prog)
 		PRVM_G_FLOAT( OFS_RETURN ) = (int)video->state;
 	else
 		PRVM_G_FLOAT( OFS_RETURN ) = 0;
+#else
+	PRVM_G_FLOAT( OFS_RETURN ) = 0;
+#endif
 }
 
 /*
@@ -4249,6 +4261,7 @@ void cin_restart(string name)
 */
 void VM_cin_restart(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	const char *name;
 	clvideo_t		*video;
 
@@ -4260,6 +4273,7 @@ void VM_cin_restart(prvm_prog_t *prog)
 	video = CL_GetVideoByName( name );
 	if( video )
 		CL_RestartVideo( video );
+#endif
 }
 
 /*
@@ -6087,7 +6101,9 @@ static void animatemodel_reset(prvm_prog_t *prog);
 
 void VM_Cmd_Reset(prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	CL_PurgeOwner( MENUOWNER );
+#endif
 	VM_Search_Reset(prog);
 	VM_Files_CloseAll(prog);
 	animatemodel_reset(prog);
@@ -6468,8 +6484,12 @@ void VM_CL_isdemo (prvm_prog_t *prog)
 //#355 float() videoplaying 
 void VM_CL_videoplaying (prvm_prog_t *prog)
 {
+#ifdef CONFIG_VIDEO_PLAYBACK
 	VM_SAFEPARMCOUNT(0, VM_CL_videoplaying);
 	PRVM_G_FLOAT(OFS_RETURN) = cl_videoplaying;
+#else
+	PRVM_G_FLOAT(OFS_RETURN) = 0;
+#endif
 }
 
 /*

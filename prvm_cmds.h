@@ -197,7 +197,11 @@ float	getserverlistindexforkey(string key)
 #include "clprogdefs.h"
 #include "mprogdefs.h"
 
+
+// FIXME: is cl_video.h needed here?
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 
 //============================================================================
 // nice helper macros

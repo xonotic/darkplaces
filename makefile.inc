@@ -90,7 +90,6 @@ OBJ_COMMON= \
 	cl_parse.o \
 	cl_particles.o \
 	cl_screen.o \
-	cl_video.o \
 	clvm_cmds.o \
 	cmd.o \
 	collision.o \
@@ -167,12 +166,12 @@ OBJ_MENU= \
 # being linked, because it should be recompiled every time an executable is
 # built to give the executable a proper date string
 OBJ_SV= builddate.c sys_linux.o vid_null.o thread_null.o $(OBJ_SND_NULL) $(OBJ_COMMON)
-OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMMON) snd_sdl.o $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMMON) snd_sdl.o $(OBJ_VIDEO_CAPTURE) $(OBJ_VIDEO_PLAYBACK) $(OBJ_COMMON)
 
 
 # Compilation
-CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
-CFLAGS_CLIENT=-DCONFIG_MENU $(CFLAGS_VIDEO_CAPTURE)
+CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
+CFLAGS_CLIENT=-DCONFIG_MENU $(CFLAGS_VIDEO_CAPTURE) $(CFLAGS_VIDEO_PLAYBACK)
 CFLAGS_SERVER=
 CFLAGS_DEBUG=-ggdb
 CFLAGS_PROFILE=-g -pg -ggdb -fprofile-arcs

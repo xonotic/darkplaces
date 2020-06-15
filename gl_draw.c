@@ -22,7 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "image.h"
 #include "wad.h"
 
+// FIXME: is cl_video.h required here?
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 
 #include "ft2.h"
 #include "ft2_fontdefs.h"

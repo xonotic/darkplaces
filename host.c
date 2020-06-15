@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <time.h>
 #include "libcurl.h"
 #include "cdaudio.h"
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 #include "progsvm.h"
 #include "csprogs.h"
 #include "sv_demo.h"
@@ -1025,7 +1027,9 @@ void Host_Main(void)
 			CL_UpdateWorld();
 			R_TimeReport("lerpworld");
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 			CL_Video_Frame();
+#endif
 
 			R_TimeReport("client");
 
@@ -1305,7 +1309,9 @@ static void Host_Init (void)
 
 	Host_AddConfigText(cmd);
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 	Host_StartVideo();
+#endif
 
 	// if quake.rc is missing, use default
 	if (!FS_FileExists("quake.rc"))
@@ -1378,7 +1384,9 @@ static void Host_Init (void)
 
 	Con_DPrint("========Initialized=========\n");
 
-	//Host_StartVideo();
+//#ifdef CONFIG_VIDEO_PLAYBACK
+//	Host_StartVideo();
+//#endif
 
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
@@ -1433,7 +1441,9 @@ void Host_Shutdown(void)
 	// AK shutdown PRVM
 	// AK hmm, no PRVM_Shutdown(); yet
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 	CL_Video_Shutdown();
+#endif
 
 	Host_SaveConfig();
 

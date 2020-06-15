@@ -21,7 +21,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 #include "cl_collision.h"
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 #include "image.h"
 #include "csprogs.h"
 #include "r_shadow.h"
@@ -2776,6 +2778,8 @@ void CL_Init (void)
 		CL_Screen_Init();
 		CL_MeshEntities_Init();
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 		CL_Video_Init();
+#endif
 	}
 }

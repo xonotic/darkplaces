@@ -28,7 +28,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifdef CONFIG_MENU
 #include "menu.h"
 #endif
+#ifdef CONFIG_VIDEO_PLAYBACK
 #include "cl_video.h"
+#endif
 
 const char *svc_strings[128] =
 {
@@ -1677,8 +1679,10 @@ static void CL_ParseServerInfo (void)
 	int nummodels, numsounds;
 	char vabuf[1024];
 
+#ifdef CONFIG_VIDEO_PLAYBACK
 	// if we start loading a level and a video is still playing, stop it
 	CL_VideoStop();
+#endif
 
 	Con_DPrint("Serverinfo packet received.\n");
 	Collision_Cache_Reset(true);
