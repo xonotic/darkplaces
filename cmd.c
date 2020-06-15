@@ -23,7 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "thread.h"
 
 cmd_state_t cmd_client;
-cmd_state_t cmd_clientfromserver;
 cmd_state_t cmd_server;
 cmd_state_t cmd_serverfromclient;
 
@@ -37,7 +36,6 @@ cmd_iter_t;
 
 static cmd_iter_t cmd_iter_all[] = {
 	{&cmd_client},
-	{&cmd_clientfromserver},
 	{&cmd_server},
 	{&cmd_serverfromclient},
 	{NULL},
@@ -661,6 +659,7 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 "sv_gameplayfix_q2airaccelerate 1\n"
 "sv_gameplayfix_stepmultipletimes 1\n"
 "csqc_polygons_defaultmaterial_nocullface 1\n"
+"con_chatsound_team_mask 13\n"
 				);
 			break;
 		case GAME_XONOTIC:
@@ -668,6 +667,7 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 			// compatibility for versions prior to 2020-05-25, this can be overridden in newer versions to get the default behavior and be consistent with FTEQW engine
 			Cbuf_InsertText(cmd, "\n"
 "csqc_polygons_defaultmaterial_nocullface 1\n"
+"con_chatsound_team_mask 13\n"
 				);
 			break;
 		// Steel Storm: Burning Retribution csqc misinterprets CSQC_InputEvent if type is a value other than 0 or 1
@@ -788,7 +788,7 @@ static void Cmd_Toggle_f(cmd_state_t *cmd)
 	else
 	{ // Correct Arguments Specified
 		// Acquire Potential CVar
-		cvar_t* cvCVar = Cvar_FindVar(cmd->cvars, Cmd_Argv(cmd, 1), cmd->cvars_flagsmask, false);
+		cvar_t* cvCVar = Cvar_FindVar(cmd->cvars, Cmd_Argv(cmd, 1), cmd->cvars_flagsmask);
 
 		if(cvCVar != NULL)
 		{ // Valid CVar
@@ -1036,7 +1036,7 @@ static const char *Cmd_GetDirectCvarValue(cmd_state_t *cmd, const char *varname,
 		}
 	}
 
-	if((cvar = Cvar_FindVar(cmd->cvars, varname, cmd->cvars_flagsmask, false)) && !(cvar->flags & CVAR_PRIVATE))
+	if((cvar = Cvar_FindVar(cmd->cvars, varname, cmd->cvars_flagsmask)) && !(cvar->flags & CVAR_PRIVATE))
 		return cvar->string;
 
 	return NULL;
@@ -1445,14 +1445,22 @@ static void Cmd_Apropos_f(cmd_state_t *cmd)
 	count = 0;
 	for (cvar = cmd->cvars->vars; cvar; cvar = cvar->next)
 	{
-		if (!matchpattern_with_separator(cvar->name, partial, true, "", false))
-			continue;
-		if (!(cvar->flags & CVAR_ALIAS))
-			if (!matchpattern_with_separator(cvar->description, partial, true, "", false))
-				continue;
-		Con_Printf ("cvar ");
-		Cvar_PrintHelp(cvar, true);
-		count++;
+		if (matchpattern_with_separator(cvar->name, partial, true, "", false) ||
+		    matchpattern_with_separator(cvar->description, partial, true, "", false))
+		{
+			Con_Printf ("cvar ");
+			Cvar_PrintHelp(cvar, cvar->name, true);
+			count++;
+		}
+		for (int i = 0; i < cvar->aliasindex; i++)
+		{
+			if (matchpattern_with_separator(cvar->aliases[i], partial, true, "", false))
+			{
+				Con_Printf ("cvar ");
+				Cvar_PrintHelp(cvar, cvar->aliases[i], true);
+				count++;
+			}
+		}
 	}
 	for (func = cmd->userdefined->csqc_functions; func; func = func->next)
 	{
@@ -1504,10 +1512,6 @@ void Cmd_Init(void)
 	cmd_client.cvars = &cvars_all;
 	cmd_client.cvars_flagsmask = CVAR_CLIENT | CVAR_SERVER;
 	cmd_client.userdefined = &cmd_userdefined_all;
-	// stuffcmd from server has access to the reasonable client things, but it probably doesn't need to access the client's server-only cvars
-	cmd_clientfromserver.cvars = &cvars_all;
-	cmd_clientfromserver.cvars_flagsmask = CVAR_CLIENT;
-	cmd_clientfromserver.userdefined = &cmd_userdefined_all;
 	// dedicated server console can only see server cvars, there is no client
 	cmd_server.cvars = &cvars_all;
 	cmd_server.cvars_flagsmask = CVAR_SERVER;
@@ -1524,68 +1528,41 @@ void Cmd_Init_Commands(qboolean dedicated_server)
 // register our commands
 //
 	// client-only commands
-	Cmd_AddCommand(&cmd_client, "cmd", Cmd_ForwardToServer_f, "send a console commandline to the server (used by some mods)");
-	Cmd_AddCommand(&cmd_clientfromserver, "cmd", Cmd_ForwardToServer_f, "send a console commandline to the server (used by some mods)");
-	Cmd_AddCommand(&cmd_client, "wait", Cmd_Wait_f, "make script execution wait for next rendered frame");
-	Cmd_AddCommand(&cmd_client, "cprint", Cmd_Centerprint_f, "print something at the screen center");
+	Cmd_AddCommand(CMD_CLIENT | CMD_CLIENT_FROM_SERVER, "cmd", Cmd_ForwardToServer_f, "send a console commandline to the server (used by some mods)");
+	Cmd_AddCommand(CMD_SHARED, "wait", Cmd_Wait_f, "make script execution wait for next rendered frame");
+	Cmd_AddCommand(CMD_CLIENT, "cprint", Cmd_Centerprint_f, "print something at the screen center");
 
 	// maintenance commands used for upkeep of cvars and saved configs
-	Cmd_AddCommand(&cmd_client, "stuffcmds", Cmd_StuffCmds_f, "execute commandline parameters (must be present in quake.rc script)");
-	Cmd_AddCommand(&cmd_client, "cvar_lockdefaults", Cvar_LockDefaults_f, "stores the current values of all cvars into their default values, only used once during startup after parsing default.cfg");
-	Cmd_AddCommand(&cmd_client, "cvar_resettodefaults_all", Cvar_ResetToDefaults_All_f, "sets all cvars to their locked default values");
-	Cmd_AddCommand(&cmd_client, "cvar_resettodefaults_nosaveonly", Cvar_ResetToDefaults_NoSaveOnly_f, "sets all non-saved cvars to their locked default values (variables that will not be saved to config.cfg)");
-	Cmd_AddCommand(&cmd_client, "cvar_resettodefaults_saveonly", Cvar_ResetToDefaults_SaveOnly_f, "sets all saved cvars to their locked default values (variables that will be saved to config.cfg)");
-	Cmd_AddCommand(&cmd_server, "stuffcmds", Cmd_StuffCmds_f, "execute commandline parameters (must be present in quake.rc script)");
-	Cmd_AddCommand(&cmd_server, "cvar_lockdefaults", Cvar_LockDefaults_f, "stores the current values of all cvars into their default values, only used once during startup after parsing default.cfg");
-	Cmd_AddCommand(&cmd_server, "cvar_resettodefaults_all", Cvar_ResetToDefaults_All_f, "sets all cvars to their locked default values");
-	Cmd_AddCommand(&cmd_server, "cvar_resettodefaults_nosaveonly", Cvar_ResetToDefaults_NoSaveOnly_f, "sets all non-saved cvars to their locked default values (variables that will not be saved to config.cfg)");
-	Cmd_AddCommand(&cmd_server, "cvar_resettodefaults_saveonly", Cvar_ResetToDefaults_SaveOnly_f, "sets all saved cvars to their locked default values (variables that will be saved to config.cfg)");
+	Cmd_AddCommand(CMD_SHARED, "stuffcmds", Cmd_StuffCmds_f, "execute commandline parameters (must be present in quake.rc script)");
+	Cmd_AddCommand(CMD_SHARED, "cvar_lockdefaults", Cvar_LockDefaults_f, "stores the current values of all cvars into their default values, only used once during startup after parsing default.cfg");
+	Cmd_AddCommand(CMD_SHARED, "cvar_resettodefaults_all", Cvar_ResetToDefaults_All_f, "sets all cvars to their locked default values");
+	Cmd_AddCommand(CMD_SHARED, "cvar_resettodefaults_nosaveonly", Cvar_ResetToDefaults_NoSaveOnly_f, "sets all non-saved cvars to their locked default values (variables that will not be saved to config.cfg)");
+	Cmd_AddCommand(CMD_SHARED, "cvar_resettodefaults_saveonly", Cvar_ResetToDefaults_SaveOnly_f, "sets all saved cvars to their locked default values (variables that will be saved to config.cfg)");
 
 	// general console commands used in multiple environments
-	Cmd_AddCommand(&cmd_client, "exec", Cmd_Exec_f, "execute a script file");
-	Cmd_AddCommand(&cmd_client, "echo",Cmd_Echo_f, "print a message to the console (useful in scripts)");
-	Cmd_AddCommand(&cmd_client, "alias",Cmd_Alias_f, "create a script function (parameters are passed in as $X (being X a number), $* for all parameters, $X- for all parameters starting from $X). Without arguments show the list of all alias");
-	Cmd_AddCommand(&cmd_client, "unalias",Cmd_UnAlias_f, "remove an alias");
-	Cmd_AddCommand(&cmd_client, "set", Cvar_Set_f, "create or change the value of a console variable");
-	Cmd_AddCommand(&cmd_client, "seta", Cvar_SetA_f, "create or change the value of a console variable that will be saved to config.cfg");
-	Cmd_AddCommand(&cmd_client, "unset", Cvar_Del_f, "delete a cvar (does not work for static ones like _cl_name, or read-only ones)");
-	Cmd_AddCommand(&cmd_clientfromserver, "exec", Cmd_Exec_f, "execute a script file");
-	Cmd_AddCommand(&cmd_clientfromserver, "echo", Cmd_Echo_f, "print a message to the console (useful in scripts)");
-	Cmd_AddCommand(&cmd_clientfromserver, "alias", Cmd_Alias_f, "create a script function (parameters are passed in as $X (being X a number), $* for all parameters, $X- for all parameters starting from $X). Without arguments show the list of all alias");
-	Cmd_AddCommand(&cmd_clientfromserver, "unalias", Cmd_UnAlias_f, "remove an alias");
-	Cmd_AddCommand(&cmd_clientfromserver, "set", Cvar_Set_f, "create or change the value of a console variable");
-	Cmd_AddCommand(&cmd_clientfromserver, "seta", Cvar_SetA_f, "create or change the value of a console variable that will be saved to config.cfg");
-	Cmd_AddCommand(&cmd_clientfromserver, "unset", Cvar_Del_f, "delete a cvar (does not work for static ones like _cl_name, or read-only ones)");
-	Cmd_AddCommand(&cmd_server, "exec", Cmd_Exec_f, "execute a script file");
-	Cmd_AddCommand(&cmd_server, "echo", Cmd_Echo_f, "print a message to the console (useful in scripts)");
-	Cmd_AddCommand(&cmd_server, "alias", Cmd_Alias_f, "create a script function (parameters are passed in as $X (being X a number), $* for all parameters, $X- for all parameters starting from $X). Without arguments show the list of all alias");
-	Cmd_AddCommand(&cmd_server, "unalias", Cmd_UnAlias_f, "remove an alias");
-	Cmd_AddCommand(&cmd_server, "set", Cvar_Set_f, "create or change the value of a console variable");
-	Cmd_AddCommand(&cmd_server, "seta", Cvar_SetA_f, "create or change the value of a console variable that will be saved to config.cfg");
-	Cmd_AddCommand(&cmd_server, "unset", Cvar_Del_f, "delete a cvar (does not work for static ones like _cl_name, or read-only ones)");
+	Cmd_AddCommand(CMD_SHARED, "exec", Cmd_Exec_f, "execute a script file");
+	Cmd_AddCommand(CMD_SHARED, "echo",Cmd_Echo_f, "print a message to the console (useful in scripts)");
+	Cmd_AddCommand(CMD_SHARED, "alias",Cmd_Alias_f, "create a script function (parameters are passed in as $X (being X a number), $* for all parameters, $X- for all parameters starting from $X). Without arguments show the list of all alias");
+	Cmd_AddCommand(CMD_SHARED, "unalias",Cmd_UnAlias_f, "remove an alias");
+	Cmd_AddCommand(CMD_SHARED, "set", Cvar_Set_f, "create or change the value of a console variable");
+	Cmd_AddCommand(CMD_SHARED, "seta", Cvar_SetA_f, "create or change the value of a console variable that will be saved to config.cfg");
+	Cmd_AddCommand(CMD_SHARED, "unset", Cvar_Del_f, "delete a cvar (does not work for static ones like _cl_name, or read-only ones)");
 
 #ifdef FILLALLCVARSWITHRUBBISH
-	Cmd_AddCommand(&cmd_client, "fillallcvarswithrubbish", Cvar_FillAll_f, "fill all cvars with a specified number of characters to provoke buffer overruns");
-	Cmd_AddCommand(&cmd_server, "fillallcvarswithrubbish", Cvar_FillAll_f, "fill all cvars with a specified number of characters to provoke buffer overruns");
+	Cmd_AddCommand(CMD_SHARED, "fillallcvarswithrubbish", Cvar_FillAll_f, "fill all cvars with a specified number of characters to provoke buffer overruns");
 #endif /* FILLALLCVARSWITHRUBBISH */
 
 	// 2000-01-09 CmdList, CvarList commands By Matthias "Maddes" Buecher
 	// Added/Modified by EvilTypeGuy eviltypeguy@qeradiant.com
-	Cmd_AddCommand(&cmd_client, "cmdlist", Cmd_List_f, "lists all console commands beginning with the specified prefix or matching the specified wildcard pattern");
-	Cmd_AddCommand(&cmd_client, "cvarlist", Cvar_List_f, "lists all console variables beginning with the specified prefix or matching the specified wildcard pattern");
-	Cmd_AddCommand(&cmd_client, "apropos", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
-	Cmd_AddCommand(&cmd_server, "cmdlist", Cmd_List_f, "lists all console commands beginning with the specified prefix or matching the specified wildcard pattern");
-	Cmd_AddCommand(&cmd_server, "cvarlist", Cvar_List_f, "lists all console variables beginning with the specified prefix or matching the specified wildcard pattern");
-	Cmd_AddCommand(&cmd_server, "apropos", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
+	Cmd_AddCommand(CMD_SHARED, "cmdlist", Cmd_List_f, "lists all console commands beginning with the specified prefix or matching the specified wildcard pattern");
+	Cmd_AddCommand(CMD_SHARED, "cvarlist", Cvar_List_f, "lists all console variables beginning with the specified prefix or matching the specified wildcard pattern");
+	Cmd_AddCommand(CMD_SHARED, "apropos", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
 
-	Cmd_AddCommand(&cmd_client, "defer", Cmd_Defer_f, "execute a command in the future");
-	Cmd_AddCommand(&cmd_server, "defer", Cmd_Defer_f, "execute a command in the future");
+	Cmd_AddCommand(CMD_SHARED, "defer", Cmd_Defer_f, "execute a command in the future");
 
 	// DRESK - 5/14/06
 	// Support Doom3-style Toggle Command
-	Cmd_AddCommand(&cmd_client, "toggle", Cmd_Toggle_f, "toggles a console variable's values (use for more info)");
-	Cmd_AddCommand(&cmd_server, "toggle", Cmd_Toggle_f, "toggles a console variable's values (use for more info)");
-	Cmd_AddCommand(&cmd_clientfromserver, "toggle", Cmd_Toggle_f, "toggles a console variable's values (use for more info)");
+	Cmd_AddCommand(CMD_SHARED | CMD_CLIENT_FROM_SERVER, "toggle", Cmd_Toggle_f, "toggles a console variable's values (use for more info)");
 }
 
 /*
@@ -1691,7 +1668,7 @@ static void Cmd_TokenizeString (cmd_state_t *cmd, const char *text)
 			l = (int)strlen(com_token) + 1;
 			if (cmd->tokenizebufferpos + l > CMD_TOKENIZELENGTH)
 			{
-				Con_Printf("Cmd_TokenizeString: ran out of %i character buffer space for command arguements\n", CMD_TOKENIZELENGTH);
+				Con_Printf("Cmd_TokenizeString: ran out of %i character buffer space for command arguments\n", CMD_TOKENIZELENGTH);
 				break;
 			}
 			memcpy (cmd->tokenizebuffer + cmd->tokenizebufferpos, com_token, l);
@@ -1708,77 +1685,106 @@ static void Cmd_TokenizeString (cmd_state_t *cmd, const char *text)
 Cmd_AddCommand
 ============
 */
-void Cmd_AddCommand(cmd_state_t *cmd, const char *cmd_name, xcommand_t function, const char *description)
+void Cmd_AddCommand(int flags, const char *cmd_name, xcommand_t function, const char *description)
 {
 	cmd_function_t *func;
 	cmd_function_t *prev, *current;
+	cmd_state_t *cmd;
+	xcommand_t function_actual;
+	int i;
 
-// fail if the command is a variable name
-	if (Cvar_FindVar(cmd->cvars, cmd_name, ~0, true))
+	for (i = 1; i < (1<<8); i *= 2)
 	{
-		Con_Printf("Cmd_AddCommand: %s already defined as a var\n", cmd_name);
-		return;
-	}
-
-	if (function)
-	{
-		// fail if the command already exists in this interpreter
-		for (func = cmd->engine_functions; func; func = func->next)
+		function_actual = function;
+		if ((i == CMD_CLIENT) && (flags & i))
 		{
-			if (!strcmp(cmd_name, func->name))
-			{
-				Con_Printf("Cmd_AddCommand: %s already defined\n", cmd_name);
-				return;
-			}
+			cmd = &cmd_client;	
+			if (flags & 8)
+				function_actual = Cmd_ForwardToServer_f;
 		}
+		else if ((i == CMD_SERVER) && (flags & i))
+			cmd = &cmd_server;
+		else if ((i == 8) && (flags & i)) // CMD_SERVER_FROM_CLIENT
+			cmd = &cmd_serverfromclient;
+		else
+			continue;
 
-		func = (cmd_function_t *)Mem_Alloc(cmd->mempool, sizeof(cmd_function_t));
-		func->name = cmd_name;
-		func->function = function;
-		func->description = description;
-		func->next = cmd->engine_functions;
-
-		// insert it at the right alphanumeric position
-		for (prev = NULL, current = cmd->engine_functions; current && strcmp(current->name, func->name) < 0; prev = current, current = current->next)
-			;
-		if (prev) {
-			prev->next = func;
-		}
-		else {
-			cmd->engine_functions = func;
-		}
-		func->next = current;
-	}
-	else
-	{
-		// mark csqcfunc if the function already exists in the csqc_functions list
-		for (func = cmd->userdefined->csqc_functions; func; func = func->next)
+	// fail if the command is a variable name
+		if (Cvar_FindVar(cmd->cvars, cmd_name, ~0))
 		{
-			if (!strcmp(cmd_name, func->name))
+			Con_Printf("Cmd_AddCommand: %s already defined as a var\n", cmd_name);
+			return;
+		}
+
+		if (function_actual)
+		{
+			// fail if the command already exists in this interpreter
+			for (func = cmd->engine_functions; func; func = func->next)
 			{
-				func->csqcfunc = true; //[515]: csqc
-				return;
+				if (!strcmp(cmd_name, func->name))
+				{
+					// Allow overriding forward to server
+					if(func->function == Cmd_ForwardToServer_f && (func->flags & 8))
+						break;
+					else
+					{
+						Con_Printf("Cmd_AddCommand: %s already defined\n", cmd_name);
+						goto nested_continue;
+					}
+				}
 			}
+
+			func = (cmd_function_t *)Mem_Alloc(cmd->mempool, sizeof(cmd_function_t));
+			func->flags = flags;
+			func->name = cmd_name;
+			func->function = function_actual;
+			func->description = description;
+			func->next = cmd->engine_functions;
+
+			// insert it at the right alphanumeric position
+			for (prev = NULL, current = cmd->engine_functions; current && strcmp(current->name, func->name) < 0; prev = current, current = current->next)
+				;
+			if (prev) {
+				prev->next = func;
+			}
+			else {
+				cmd->engine_functions = func;
+			}
+			func->next = current;
 		}
+		else
+		{
+			// mark csqcfunc if the function already exists in the csqc_functions list
+			for (func = cmd->userdefined->csqc_functions; func; func = func->next)
+			{
+				if (!strcmp(cmd_name, func->name))
+				{
+					func->csqcfunc = true; //[515]: csqc
+					continue;
+				}
+			}
 
 
-		func = (cmd_function_t *)Mem_Alloc(cmd->mempool, sizeof(cmd_function_t));
-		func->name = cmd_name;
-		func->function = function;
-		func->description = description;
-		func->csqcfunc = true; //[515]: csqc
-		func->next = cmd->userdefined->csqc_functions;
+			func = (cmd_function_t *)Mem_Alloc(cmd->mempool, sizeof(cmd_function_t));
+			func->name = cmd_name;
+			func->function = function_actual;
+			func->description = description;
+			func->csqcfunc = true; //[515]: csqc
+			func->next = cmd->userdefined->csqc_functions;
 
-		// insert it at the right alphanumeric position
-		for (prev = NULL, current = cmd->userdefined->csqc_functions; current && strcmp(current->name, func->name) < 0; prev = current, current = current->next)
-			;
-		if (prev) {
-			prev->next = func;
+			// insert it at the right alphanumeric position
+			for (prev = NULL, current = cmd->userdefined->csqc_functions; current && strcmp(current->name, func->name) < 0; prev = current, current = current->next)
+				;
+			if (prev) {
+				prev->next = func;
+			}
+			else {
+				cmd->userdefined->csqc_functions = func;
+			}
+			func->next = current;
 		}
-		else {
-			cmd->userdefined->csqc_functions = func;
-		}
-		func->next = current;
+nested_continue:
+		continue;
 	}
 }
 
@@ -2019,6 +2025,8 @@ void Cmd_ClearCSQCCommands (cmd_state_t *cmd)
 	}
 }
 
+extern cvar_t sv_cheats;
+
 /*
 ============
 Cmd_ExecuteString
@@ -2027,8 +2035,6 @@ A complete command line has been parsed, so try to execute it
 FIXME: lookupnoadd the token to speed search?
 ============
 */
-extern hook_t *csqc_concmd;
-
 void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qboolean lockmutex)
 {
 	int oldpos;
@@ -2050,7 +2056,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	{
 		if (!strcasecmp(cmd->argv[0], func->name))
 		{
-			if (func->csqcfunc && Hook_Call(csqc_concmd, text)->bval)	//[515]: csqc
+			if (func->csqcfunc && CL_VM_ConsoleCommand(text))	//[515]: csqc
 				goto done;
 			break;
 		}
@@ -2071,6 +2077,8 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 			case src_client:
 				if (func->function)
 				{
+					if((func->flags & CMD_CHEAT) && !sv_cheats.integer)
+						SV_ClientPrintf("No cheats allowed. The server must have sv_cheats set to 1\n");
 					func->function(cmd);
 					goto done;
 				}
@@ -2097,13 +2105,8 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	}
 
 // check cvars
-	if (!Cvar_Command(cmd) && host_framecount > 0) {
-		if (cmd == &cmd_clientfromserver) {
-			Con_Printf("Server tried to execute \"%s\"\n", Cmd_Argv(cmd, 0));
-		} else {
-			Con_Printf("Unknown command \"%s\"\n", Cmd_Argv(cmd, 0));
-		}
-	}
+	if (!Cvar_Command(cmd) && host_framecount > 0)
+		Con_Printf("Unknown command \"%s\"\n", Cmd_Argv(cmd, 0));
 done:
 	cmd->tokenizebufferpos = oldpos;
 	if (lockmutex)

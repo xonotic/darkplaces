@@ -48,7 +48,6 @@ cvar_t pr_checkextension = {CVAR_SERVER | CVAR_READONLY, "pr_checkextension", "1
 cvar_t samelevel = {CVAR_SERVER | CVAR_NOTIFY, "samelevel","0", "repeats same level if level ends (due to timelimit or someone hitting an exit)"};
 cvar_t skill = {CVAR_SERVER, "skill","1", "difficulty level of game, affects monster layouts in levels, 0 = easy, 1 = normal, 2 = hard, 3 = nightmare (same layout as hard but monsters fire twice)"};
 cvar_t host_timescale = {CVAR_CLIENT | CVAR_SERVER, "host_timescale", "1.0", "controls game speed, 0.5 is half speed, 2 is double speed"};
-cvar_t slowmo = {CVAR_ALIAS, "slowmo"};
 
 cvar_t sv_accelerate = {CVAR_SERVER, "sv_accelerate", "10", "rate at which a player accelerates to sv_maxspeed"};
 cvar_t sv_aim = {CVAR_SERVER | CVAR_SAVE, "sv_aim", "2", "maximum cosine angle for quake's vertical autoaim, a value above 1 completely disables the autoaim, quake used 0.93"};
@@ -454,14 +453,10 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&csqc_progsize);
 	Cvar_RegisterVariable (&csqc_usedemoprogs);
 
-	Cmd_AddCommand(&cmd_server, "sv_saveentfile", SV_SaveEntFile_f, "save map entities to .ent file (to allow external editing)");
-	Cmd_AddCommand(&cmd_client, "sv_saveentfile", SV_SaveEntFile_f, "save map entities to .ent file (to allow external editing)");
-	Cmd_AddCommand(&cmd_server, "sv_areastats", SV_AreaStats_f, "prints statistics on entity culling during collision traces");
-	Cmd_AddCommand(&cmd_client, "sv_areastats", SV_AreaStats_f, "prints statistics on entity culling during collision traces");
-	Cmd_AddCommand(&cmd_serverfromclient, "sv_startdownload", SV_StartDownload_f, "begins sending a file to the client (network protocol use only)");
-	Cmd_AddCommand(&cmd_serverfromclient, "download", SV_Download_f, "downloads a specified file from the server");
-	Cmd_AddCommand(&cmd_client, "sv_startdownload", Cmd_ForwardToServer_f, "begins sending a file to the client (network protocol use only)");
-	Cmd_AddCommand(&cmd_client, "download", Cmd_ForwardToServer_f, "downloads a specified file from the server");
+	Cmd_AddCommand(CMD_SHARED, "sv_saveentfile", SV_SaveEntFile_f, "save map entities to .ent file (to allow external editing)");
+	Cmd_AddCommand(CMD_SHARED, "sv_areastats", SV_AreaStats_f, "prints statistics on entity culling during collision traces");
+	Cmd_AddCommand(CMD_CLIENT | CMD_SERVER_FROM_CLIENT, "sv_startdownload", SV_StartDownload_f, "begins sending a file to the client (network protocol use only)");
+	Cmd_AddCommand(CMD_CLIENT | CMD_SERVER_FROM_CLIENT, "download", SV_Download_f, "downloads a specified file from the server");
 
 	Cvar_RegisterVariable (&sv_disablenotify);
 	Cvar_RegisterVariable (&coop);
@@ -476,7 +471,8 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&skill);
 	Cvar_RegisterVariable (&host_timescale);
 	Cvar_RegisterCallback (&host_timescale, Host_Timescale_c);
-	Cvar_RegisterAlias (&slowmo, &host_timescale);
+	Cvar_RegisterAlias (&host_timescale, "slowmo");
+	Cvar_RegisterAlias (&host_timescale, "timescale");
 	Cvar_RegisterVariable (&sv_accelerate);
 	Cvar_RegisterVariable (&sv_aim);
 	Cvar_RegisterVariable (&sv_airaccel_qw);

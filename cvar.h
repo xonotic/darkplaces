@@ -76,10 +76,8 @@ interface from being ambiguous.
 #define CVAR_CLIENT 256
 // cvar is accessible in dedicated server
 #define CVAR_SERVER 512
-// cvar is an alias of another cvar
-#define CVAR_ALIAS 1024
 // used to determine if flags is valid
-#define CVAR_MAXFLAGSVAL 2047
+#define CVAR_MAXFLAGSVAL 1023
 // for internal use only!
 #define CVAR_DEFAULTSET (1<<30)
 #define CVAR_ALLOCATED (1<<31)
@@ -135,6 +133,9 @@ typedef struct cvar_s
 
 	void (*callback)(char *value);
 
+	char **aliases;
+	int aliasindex;
+
 	// values at init (for Cvar_RestoreInitState)
 	qboolean initstate; // indicates this existed at init
 	int initflags;
@@ -150,14 +151,18 @@ typedef struct cvar_s
 
 	//menucvar_t menuinfo;
 	struct cvar_s *next;
-	struct cvar_s *nextonhashchain;
-	struct cvar_s *alias;
 } cvar_t;
+
+typedef struct cvar_hash_s
+{
+	cvar_t *cvar;
+	struct cvar_hash_s *next;
+} cvar_hash_t;
 
 typedef struct cvar_state_s
 {
 	cvar_t *vars;
-	cvar_t *hashtable[CVAR_HASHSIZE];
+	cvar_hash_t *hashtable[CVAR_HASHSIZE];
 }
 cvar_state_t;
 
@@ -173,12 +178,13 @@ void Cvar_MenuString(cvar_t *variable, int menu);
 void Cvar_MenuOption(cvar_t *variable, int menu, int value[16], const char *name[16]);
 */
 
-/// registers a cvar that already has the name, string, and optionally the
-/// archive elements set.
-void Cvar_RegisterAlias(cvar_t *source, cvar_t *target);
+
+void Cvar_RegisterAlias(cvar_t *variable, const char *alias );
 
 void Cvar_RegisterCallback(cvar_t *variable, void (*callback)(char *));
 
+/// registers a cvar that already has the name, string, and optionally the
+/// archive elements set.
 void Cvar_RegisterVariable(cvar_t *variable);
 
 qboolean Cvar_Readonly (cvar_t *var, const char *cmd_name);
@@ -214,7 +220,7 @@ const char *Cvar_CompleteVariable (cvar_state_t *cvars, const char *partial, int
 // attempts to match a partial variable name for command line completion
 // returns NULL if nothing fits
 
-void Cvar_PrintHelp(cvar_t *cvar, qboolean full);
+void Cvar_PrintHelp(cvar_t *cvar, const char *name, qboolean full);
 
 void Cvar_CompleteCvarPrint (cvar_state_t *cvars, const char *partial, int neededflags);
 
@@ -236,7 +242,7 @@ void Cvar_WriteVariables (cvar_state_t *cvars, qfile_t *f);
 // Writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
-cvar_t *Cvar_FindVar(cvar_state_t *cvars, const char *var_name, int neededflags, qboolean alias);
+cvar_t *Cvar_FindVar(cvar_state_t *cvars, const char *var_name, int neededflags);
 cvar_t *Cvar_FindVarAfter(cvar_state_t *cvars, const char *prev_var_name, int neededflags);
 
 int Cvar_CompleteCountPossible(cvar_state_t *cvars, const char *partial, int neededflags);

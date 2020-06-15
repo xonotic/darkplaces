@@ -57,7 +57,9 @@ cvar_t con_textsize = {CVAR_CLIENT | CVAR_SAVE, "con_textsize","8", "console tex
 cvar_t con_notifysize = {CVAR_CLIENT | CVAR_SAVE, "con_notifysize","8", "notify text size in virtual 2D pixels"};
 cvar_t con_chatsize = {CVAR_CLIENT | CVAR_SAVE, "con_chatsize","8", "chat text size in virtual 2D pixels (if con_chat is enabled)"};
 cvar_t con_chatsound = {CVAR_CLIENT | CVAR_SAVE, "con_chatsound","1", "enables chat sound to play on message"};
-
+cvar_t con_chatsound_file = {CVAR_CLIENT, "con_chatsound_file","sound/misc/talk.wav", "The sound to play for chat messages"};
+cvar_t con_chatsound_team_file = {CVAR_CLIENT, "con_chatsound_team_file","sound/misc/talk2.wav", "The sound to play for team chat messages"};
+cvar_t con_chatsound_team_mask = {CVAR_CLIENT | CVAR_READONLY, "con_chatsound_team_mask","40","Magic ASCII code that denotes a team chat message"};
 
 cvar_t sys_specialcharactertranslation = {CVAR_CLIENT | CVAR_SERVER, "sys_specialcharactertranslation", "1", "terminal console conchars to ASCII translation (set to 0 if your conchars.tga is for an 8bit character set or if you want raw output)"};
 #ifdef WIN32
@@ -884,6 +886,9 @@ void Con_Init (void)
 	Cvar_RegisterVariable (&con_notifytime);
 	Cvar_RegisterVariable (&con_textsize);
 	Cvar_RegisterVariable (&con_chatsound);
+	Cvar_RegisterVariable (&con_chatsound_file);
+	Cvar_RegisterVariable (&con_chatsound_team_file);
+	Cvar_RegisterVariable (&con_chatsound_team_mask);
 
 	// --blub
 	Cvar_RegisterVariable (&con_nickcompletion);
@@ -896,16 +901,13 @@ void Con_Init (void)
 	Cvar_RegisterVariable (&condump_stripcolors);
 
 	// register our commands
-	Cmd_AddCommand(&cmd_client, "toggleconsole", Con_ToggleConsole_f, "opens or closes the console");
-	Cmd_AddCommand(&cmd_client, "messagemode", Con_MessageMode_f, "input a chat message to say to everyone");
-	Cmd_AddCommand(&cmd_client, "messagemode2", Con_MessageMode2_f, "input a chat message to say to only your team");
-	Cmd_AddCommand(&cmd_client, "commandmode", Con_CommandMode_f, "input a console command");
-	Cmd_AddCommand(&cmd_client, "clear", Con_Clear_f, "clear console history");
-	Cmd_AddCommand(&cmd_client, "maps", Con_Maps_f, "list information about available maps");
-	Cmd_AddCommand(&cmd_client, "condump", Con_ConDump_f, "output console history to a file (see also log_file)");
-
-	Cmd_AddCommand(&cmd_server, "maps", Con_Maps_f, "list information about available maps");
-	Cmd_AddCommand(&cmd_server, "condump", Con_ConDump_f, "output console history to a file (see also log_file)");
+	Cmd_AddCommand(CMD_CLIENT, "toggleconsole", Con_ToggleConsole_f, "opens or closes the console");
+	Cmd_AddCommand(CMD_CLIENT, "messagemode", Con_MessageMode_f, "input a chat message to say to everyone");
+	Cmd_AddCommand(CMD_CLIENT, "messagemode2", Con_MessageMode2_f, "input a chat message to say to only your team");
+	Cmd_AddCommand(CMD_CLIENT, "commandmode", Con_CommandMode_f, "input a console command");
+	Cmd_AddCommand(CMD_SHARED, "clear", Con_Clear_f, "clear console history");
+	Cmd_AddCommand(CMD_SHARED, "maps", Con_Maps_f, "list information about available maps");
+	Cmd_AddCommand(CMD_SHARED, "condump", Con_ConDump_f, "output console history to a file (see also log_file)");
 
 	con_initialized = true;
 	Con_DPrint("Console initialized.\n");
@@ -1159,28 +1161,17 @@ void Con_MaskPrint(int additionalmask, const char *msg)
 				{
 					if (con_chatsound.value)
 					{
-						if(IS_NEXUIZ_DERIVED(gamemode))
-						{
-							if(msg[1] == '\r' && cl.foundtalk2wav)
-								S_LocalSound ("sound/misc/talk2.wav");
-							else
-								S_LocalSound ("sound/misc/talk.wav");
-						}
+						if(msg[1] == con_chatsound_team_mask.integer && cl.foundteamchatsound)
+							S_LocalSound (con_chatsound_team_file.string);
 						else
-						{
-							if (msg[1] == '(' && cl.foundtalk2wav)
-								S_LocalSound ("sound/misc/talk2.wav");
-							else
-								S_LocalSound ("sound/misc/talk.wav");
-						}
+							S_LocalSound (con_chatsound_file.string);
 					}
 				}
-				
 				// Send to chatbox for say/tell (1) and messages (3)
 				// 3 is just so that a message can be sent to the chatbox without a sound.
 				if (*msg == 1 || *msg == 3)
 					mask = CON_MASK_CHAT;
-				
+
 				line[index++] = STRING_COLOR_TAG;
 				line[index++] = '3';
 				msg++;
@@ -3007,11 +2998,11 @@ void Con_CompleteCommandLine (cmd_state_t *cmd)
 		Con_Printf("\n%i possible command%s\n", c, (c > 1) ? "s: " : ":");
 		Cmd_CompleteCommandPrint(cmd, s);
 	}
-	v = Cvar_CompleteCountPossible(cmd->cvars, s, CVAR_CLIENT | CVAR_SERVER | CVAR_ALIAS);
+	v = Cvar_CompleteCountPossible(cmd->cvars, s, CVAR_CLIENT | CVAR_SERVER);
 	if (v)
 	{
 		Con_Printf("\n%i possible variable%s\n", v, (v > 1) ? "s: " : ":");
-		Cvar_CompleteCvarPrint(cmd->cvars, s, CVAR_CLIENT | CVAR_SERVER | CVAR_ALIAS);
+		Cvar_CompleteCvarPrint(cmd->cvars, s, CVAR_CLIENT | CVAR_SERVER);
 	}
 	a = Cmd_CompleteAliasCountPossible(cmd, s);
 	if (a)
@@ -3036,7 +3027,7 @@ void Con_CompleteCommandLine (cmd_state_t *cmd)
 	if (c)
 		text = *(list[0] = Cmd_CompleteBuildList(cmd, s));
 	if (v)
-		text = *(list[1] = Cvar_CompleteBuildList(cmd->cvars, s, (cmd->cvars_flagsmask |= CVAR_ALIAS)));
+		text = *(list[1] = Cvar_CompleteBuildList(cmd->cvars, s, cmd->cvars_flagsmask));
 	if (a)
 		text = *(list[2] = Cmd_CompleteAliasBuildList(cmd, s));
 	if (n)

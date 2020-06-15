@@ -3,16 +3,10 @@
 #define QTYPES_H
 
 #include <stdint.h>
-
-#ifndef __cplusplus
-#ifdef _MSC_VER
-typedef enum {false, true} bool;
-#else
 #include <stdbool.h>
-#endif
-#endif
-typedef bool qboolean;
+#include <inttypes.h>
 
+typedef bool qboolean;
 
 #ifndef NULL
 #define NULL ((void *)0)
@@ -32,9 +26,6 @@ typedef bool qboolean;
 #else
 #define RESTRICT
 #endif
-
-typedef long long dpint64;
-typedef unsigned long long dpuint64;
 
 // LadyHavoc: upgrade the prvm to double precision for better time values
 // LadyHavoc: to be enabled when bugs are worked out...

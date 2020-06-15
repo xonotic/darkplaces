@@ -96,17 +96,6 @@ cvar_t cl_showdate = {CVAR_CLIENT | CVAR_SAVE, "cl_showdate", "0", "shows curren
 cvar_t cl_showdate_format = {CVAR_CLIENT | CVAR_SAVE, "cl_showdate_format", "%Y-%m-%d", "format string for date"};
 cvar_t cl_showtex = {CVAR_CLIENT, "cl_showtex", "0", "shows the name of the texture on the crosshair (for map debugging)"};
 
-cvar_t showfps = {CVAR_ALIAS, "showfps"};
-cvar_t showsound = {CVAR_ALIAS, "showsound"};
-cvar_t showblur = {CVAR_ALIAS, "showblur"};
-cvar_t showspeed = {CVAR_ALIAS, "showspeed"};
-cvar_t showtopspeed = {CVAR_ALIAS, "showtopspeed"};
-cvar_t showtime = {CVAR_ALIAS, "showtime"};
-cvar_t showtime_format = {CVAR_ALIAS, "showtime_format"};
-cvar_t showdate = {CVAR_ALIAS, "showdate"};
-cvar_t showdate_format = {CVAR_ALIAS, "showdate_format"};
-cvar_t showtex = {CVAR_ALIAS, "showtex"};
-
 cvar_t sbar_alpha_bg = {CVAR_CLIENT | CVAR_SAVE, "sbar_alpha_bg", "0.4", "opacity value of the statusbar background image"};
 cvar_t sbar_alpha_fg = {CVAR_CLIENT | CVAR_SAVE, "sbar_alpha_fg", "1", "opacity value of the statusbar weapon/item icons and numbers"};
 cvar_t sbar_hudselector = {CVAR_CLIENT | CVAR_SAVE, "sbar_hudselector", "0", "selects which of the builtin hud layouts to use (meaning is somewhat dependent on gamemode, so nexuiz has a very different set of hud layouts than quake for example)"};
@@ -371,8 +360,8 @@ void Sbar_Init (void)
 {
 	if(gamemode == GAME_NORMAL) // Workaround so Quake doesn't trample on Xonotic.
 	{
-		Cmd_AddCommand(&cmd_client, "+showscores", Sbar_ShowScores_f, "show scoreboard");
-		Cmd_AddCommand(&cmd_client, "-showscores", Sbar_DontShowScores_f, "hide scoreboard");
+		Cmd_AddCommand(CMD_CLIENT, "+showscores", Sbar_ShowScores_f, "show scoreboard");
+		Cmd_AddCommand(CMD_CLIENT, "-showscores", Sbar_DontShowScores_f, "hide scoreboard");
 	}
 	Cvar_RegisterVariable(&cl_showfps);
 	Cvar_RegisterVariable(&cl_showsound);
@@ -385,16 +374,16 @@ void Sbar_Init (void)
 	Cvar_RegisterVariable(&cl_showdate_format);
 	Cvar_RegisterVariable(&cl_showtex);
 	
-	Cvar_RegisterAlias(&showfps, &cl_showfps);
-	Cvar_RegisterAlias(&showsound, &cl_showsound);
-	Cvar_RegisterAlias(&showblur, &cl_showblur);
-	Cvar_RegisterAlias(&showspeed, &cl_showspeed);
-	Cvar_RegisterAlias(&showtopspeed, &cl_showtopspeed);
-	Cvar_RegisterAlias(&showtime, &cl_showtime);
-	Cvar_RegisterAlias(&showtime_format, &cl_showtime_format);
-	Cvar_RegisterAlias(&showdate, &cl_showdate);
-	Cvar_RegisterAlias(&showdate_format, &cl_showdate_format);
-	Cvar_RegisterAlias(&showtex, &cl_showtex);
+	Cvar_RegisterAlias(&cl_showfps, "showfps");
+	Cvar_RegisterAlias(&cl_showsound, "showsound");
+	Cvar_RegisterAlias(&cl_showblur, "showblur");
+	Cvar_RegisterAlias(&cl_showspeed, "showspeed");
+	Cvar_RegisterAlias(&cl_showtopspeed, "showtopspeed");
+	Cvar_RegisterAlias(&cl_showtime, "showtime");
+	Cvar_RegisterAlias(&cl_showtime_format, "showtime_format");
+	Cvar_RegisterAlias(&cl_showdate, "showdate");
+	Cvar_RegisterAlias(&cl_showdate_format, "showdate_format");
+	Cvar_RegisterAlias(&cl_showtex, "showtex");
 	
 	Cvar_RegisterVariable(&sbar_alpha_bg);
 	Cvar_RegisterVariable(&sbar_alpha_fg);
