@@ -1418,10 +1418,10 @@ static void VID_OutputVersion(void)
 #ifdef WIN32
 static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 {
-	static int workWidth;
-	static int workHeight;
-	static int titleBarPixels = 2;
-	static int screenHeight;
+	int workWidth;
+	int workHeight;
+	int titleBarPixels = 2;
+	int screenHeight;
 	RECT workArea;
 	LONG width = mode->width; // vid_width
 	LONG height = mode->height; // vid_height
@@ -1470,7 +1470,9 @@ extern cvar_t gl_info_driver;
 
 static qboolean VID_InitModeGL(viddef_mode_t *mode)
 {
-	int windowflags = SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL;
+	int windowflags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
+	// currently SDL_WINDOWPOS_UNDEFINED behaves exactly like SDL_WINDOWPOS_CENTERED, this might change some day
+	// https://trello.com/c/j56vUcwZ/81-centered-vs-undefined-window-position
 	int xPos = SDL_WINDOWPOS_UNDEFINED;
 	int yPos = SDL_WINDOWPOS_UNDEFINED;
 #ifndef USE_GLES2
@@ -1580,7 +1582,6 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 		VID_Shutdown();
 		return false;
 	}
-	SDL_ShowWindow(window);
 	SDL_GetWindowSize(window, &mode->width, &mode->height);
 	context = SDL_GL_CreateContext(window);
 	if (context == NULL)
