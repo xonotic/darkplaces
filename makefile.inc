@@ -171,7 +171,7 @@ OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMM
 
 
 # Compilation
-CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_D3D) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
+CFLAGS_COMMON=$(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_SND_XMP) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
 CFLAGS_CLIENT=-DCONFIG_MENU $(CFLAGS_VIDEO_CAPTURE)
 CFLAGS_SERVER=
 CFLAGS_DEBUG=-ggdb
@@ -210,7 +210,7 @@ LDFLAGS_RELEASE=$(OPTIM_RELEASE) -DSVNREVISION=`{ test -d .svn && svnversion; } 
 
 LDFLAGS_UNIXCOMMON=-lm $(LIB_ODE) $(LIB_Z) $(LIB_JPEG) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(LIB_SND_XMP)
 LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
-LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl
+LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lxmp
 CFLAGS_UNIX_PRELOAD=-DPREFER_PRELOAD
 
 LDFLAGS_UNIXSDL=$(SDLCONFIG_LIBS)
@@ -261,7 +261,7 @@ WINDRES ?= windres
 # Link
 # see LDFLAGS_WINCOMMON in makefile
 LDFLAGS_WINSV=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) -mconsole -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
-LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) $(LIB_SND_XMP) -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG)
+LDFLAGS_WINSDL=$(LDFLAGS_WINCOMMON) $(LIB_CRYPTO) $(LIB_CRYPTO_RIJNDAEL) $(SDLCONFIG_LIBS) -lwinmm -lws2_32 $(LIB_Z) $(LIB_JPEG) $(LIB_SND_XMP)
 EXE_WINSV=darkplaces-dedicated.exe
 EXE_WINSDL=darkplaces-sdl.exe
 EXE_WINSVNEXUIZ=nexuiz-dedicated.exe
@@ -443,15 +443,6 @@ crypto.o: crypto.c
 mod_skeletal_animatevertices_sse.o: mod_skeletal_animatevertices_sse.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SSE)
-
-#this checks USEXMP when compiling so it needs the XMP flags as well
-snd_main.o: snd_main.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SND_XMP)
-
-snd_mem.o: snd_mem.c
-	$(CHECKLEVEL2)
-	$(DO_CC) $(CFLAGS_SND_XMP)
 
 darkplaces.o: %.o : %.rc
 	$(CHECKLEVEL2)
