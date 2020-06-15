@@ -123,13 +123,13 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 			if (OGG_LoadVorbisFile (namebuffer, sfx))
 				goto loaded;
 		}
+#ifdef USEXMP
 		else if (len >= 1)
 		{
-#ifdef USEXMP
 			if (XMP_LoadModFile (namebuffer, sfx))
 				goto loaded;
-#endif
 		}
+#endif
 	}
 
 	// LadyHavoc: then try without the added sound/ as wav and ogg
@@ -149,13 +149,13 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 		if (OGG_LoadVorbisFile (namebuffer, sfx))
 			goto loaded;
 	}
+#ifdef USEXMP
 	else if (len >= 1)
 	{
-#ifdef USEXMP
 		if (XMP_LoadModFile (namebuffer, sfx))
 			goto loaded;
-#endif
 	}
+#endif
 
 	// Can't load the sound!
 	sfx->flags |= SFXFLAG_FILEMISSING;
