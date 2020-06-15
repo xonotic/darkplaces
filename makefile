@@ -78,7 +78,7 @@ TARGETS_NEXUIZ=sv-nexuiz sdl-nexuiz
 DP_VIDEO_CAPTURE?=enabled
 ifeq ($(DP_VIDEO_CAPTURE), enabled)
 	CFLAGS_VIDEO_CAPTURE=-DCONFIG_VIDEO_CAPTURE
-	OBJ_VIDEO_CAPTURE= cap_avi.o cap_ogg.o
+	OBJ_VIDEO_CAPTURE=cap_avi.o cap_ogg.o
 else
 	CFLAGS_VIDEO_CAPTURE=
 	OBJ_VIDEO_CAPTURE=
@@ -298,13 +298,16 @@ endif
 
 # xmp
 ifeq ($(DP_LINK_XMP), shared)
-	CFLAGS_SND_XMP=-DLINK_TO_LIBXMP
+	OBJ_SND_XMP=snd_xmp.o
 	LIB_SND_XMP=-lxmp
+	CFLAGS_SND_XMP=-DUSEXMP -DLINK_TO_LIBXMP
 endif
 ifeq ($(DP_LINK_XMP), dlopen)
-	CFLAGS_SND_XMP=
+	OBJ_SND_XMP=snd_xmp.o
 	LIB_SND_XMP=
+	CFLAGS_SND_XMP=-DUSEXMP
 endif
+
 
 ##### Extra CFLAGS #####
 

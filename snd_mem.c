@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "snd_main.h"
 #include "snd_ogg.h"
 #include "snd_wav.h"
+#ifdef USEXMP
 #include "snd_xmp.h"
+#endif
 
 
 /*
@@ -123,8 +125,10 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 		}
 		else if (len >= 1)
 		{
+#ifdef USEXMP
 			if (XMP_LoadModFile (namebuffer, sfx))
 				goto loaded;
+#endif
 		}
 	}
 
@@ -147,8 +151,10 @@ qboolean S_LoadSound (sfx_t *sfx, qboolean complain)
 	}
 	else if (len >= 1)
 	{
+#ifdef USEXMP
 		if (XMP_LoadModFile (namebuffer, sfx))
 			goto loaded;
+#endif
 	}
 
 	// Can't load the sound!

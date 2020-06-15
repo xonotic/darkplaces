@@ -16,7 +16,7 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /*
- * libXMP is licensed under the terms of the Lesser General Public License 2.1
+ * libxmp is licensed under the terms of the Lesser General Public License 2.1
  */
 
 
@@ -27,7 +27,7 @@
 #ifdef LINK_TO_LIBXMP
 #include <xmp.h>
 
-/* libXMP API */
+/* libxmp API */
 // Version and player information
 #define qxmp_version xmp_version // const char *xmp_version
 #define qxmp_vercode xmp_vercode // const unsigned int xmp_vercode
@@ -68,13 +68,13 @@
 
 qboolean XMP_OpenLibrary (void)
 {
-//	Con_Printf("Linked against libXMP version %s (0x0%x)\n", qxmp_version, qxmp_vercode);
+	Con_Printf("Linked against libxmp version %s (0x0%x)\n", qxmp_version, qxmp_vercode);
 	return true;
 }
 void XMP_CloseLibrary (void) {}
 #else
 
-/* libXMP ABI */
+/* libxmp ABI */
 /*
 =================================================================
 
@@ -278,7 +278,7 @@ static int         (*qxmp_smix_release_sample) (xmp_context, int);
 
 static dllfunction_t xmpfuncs[] =
 {
-	/* libXMP ABI */
+	/* libxmp ABI */
 	// Version and player information
 	{"xmp_version",                 (void **) &qxmp_version},
 	{"xmp_vercode",                 (void **) &qxmp_vercode},
@@ -325,7 +325,7 @@ static dllfunction_t xmpfuncs[] =
 	{NULL, NULL}
 };
 
-// libXMP DLL handle
+// libxmp DLL handle
 static dllhandle_t xmp_dll = NULL;
 
 
@@ -341,7 +341,7 @@ static dllhandle_t xmp_dll = NULL;
 ====================
 XMP_OpenLibrary
 
-Try to load the libXMP DLL
+Try to load the libxmp DLL
 ====================
 */
 qboolean XMP_OpenLibrary (void)
@@ -388,7 +388,7 @@ qboolean XMP_OpenLibrary (void)
 ====================
 XMP_CloseLibrary
 
-Unload the libXMP DLL
+Unload the libxmp DLL
 ====================
 */
 void XMP_CloseLibrary (void)
@@ -448,7 +448,7 @@ static void XMP_GetSamplesFloat(channel_t *ch, sfx_t *sfx, int firstsampleframe,
 		// create an xmp file context
 		if ((per_ch->playercontext = qxmp_create_context()) == NULL)
 		{
-			//Con_Printf("error getting a libXMP file context; while trying to load file \"%s\"\n", filename);
+			//Con_Printf("error getting a libxmp file context; while trying to load file \"%s\"\n", filename);
 			Mem_Free(per_ch);
 			return;
 		}
@@ -590,7 +590,6 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 #endif
 
 // COMMANDLINEOPTION: Sound: -noxmp disables xmp module sound support
-	// (even if built in; to prefer ModPlug if available)
 	if (COM_CheckParm("-noxmp"))
 		return false;
 
@@ -606,7 +605,7 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 	// Create an xmp file context
 	if ((xc = qxmp_create_context()) == NULL)
 	{
-		Con_Printf("error creating a libXMP file context; while trying to load file \"%s\"\n", filename);
+		Con_Printf("error creating a libxmp file context; while trying to load file \"%s\"\n", filename);
 		Mem_Free(data);
 		return false;
 	}
@@ -651,17 +650,17 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 	if (developer_loading.integer >= 1)
 	{
 		Con_Printf("Decoding module (libxmp):\n"
-			"\tModule name  : %s\n"
-			"\tModule type  : %s\n"
-			"\tModule length: %i patterns\n"
-			"\tPatterns     : %i\n"
-			"\tInstruments  : %i\n"
-			"\tSamples      : %i\n"
-			"\tChannels     : %i\n"
-			"\tInitial Speed: %i\n"
-			"\tInitial BPM  : %i\n"
-			"\tRestart Pos. : %i\n"
-			"\tGlobal Volume: %i\n",
+			"    Module name  : %s\n"
+			"    Module type  : %s\n"
+			"    Module length: %i patterns\n"
+			"    Patterns     : %i\n"
+			"    Instruments  : %i\n"
+			"    Samples      : %i\n"
+			"    Channels     : %i\n"
+			"    Initial Speed: %i\n"
+			"    Initial BPM  : %i\n"
+			"    Restart Pos. : %i\n"
+			"    Global Volume: %i\n",
 			mi.mod->name, mi.mod->type,
 			mi.mod->len, mi.mod->pat, mi.mod->ins, mi.mod->smp, mi.mod->chn,
 			mi.mod->spd, mi.mod->bpm, mi.mod->rst, mi.mod->gvl

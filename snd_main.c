@@ -801,7 +801,9 @@ void S_Init(void)
 	memset(channels, 0, MAX_CHANNELS * sizeof(channel_t));
 
 	OGG_OpenLibrary ();
+#ifdef USEXMP
 	XMP_OpenLibrary ();
+#endif
 }
 
 
@@ -815,7 +817,9 @@ Shutdown and free all resources
 void S_Terminate (void)
 {
 	S_Shutdown ();
+#ifdef USEXMP
 	XMP_CloseLibrary ();
+#endif
 	OGG_CloseLibrary ();
 
 	// Free all SFXs
