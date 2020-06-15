@@ -946,6 +946,7 @@ void Host_Main(void)
 			R_TimeReport("---");
 			Collision_Cache_NewFrame();
 			R_TimeReport("photoncache");
+#ifdef CONFIG_VIDEO_CAPTURE
 			// decide the simulation time
 			if (cls.capturevideo.active)
 			{
@@ -958,7 +959,9 @@ void Host_Main(void)
 					cl.realframetime = max(cl_timer, clframetime);
 				}
 			}
-			else if (vid_activewindow && cl_maxfps.value >= 1 && !cls.timedemo)
+			else
+#endif
+			if (vid_activewindow && cl_maxfps.value >= 1 && !cls.timedemo)
 			{
 				clframetime = cl.realframetime = max(cl_timer, 1.0 / cl_maxfps.value);
 				// when running slow, we need to sleep to keep input responsive
@@ -1352,6 +1355,7 @@ static void Host_Init (void)
 		Cbuf_Execute(&cmd_client);
 	}
 
+#ifdef CONFIG_VIDEO_CAPTURE
 // COMMANDLINEOPTION: Client: -capturedemo <demoname> captures a playdemo and quits
 	i = COM_CheckParm("-capturedemo");
 	if (i && i + 1 < com_argc)
@@ -1382,6 +1386,7 @@ static void Host_Init (void)
 
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
+#endif
 }
 
 
