@@ -666,7 +666,7 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 			mi.mod->spd, mi.mod->bpm, mi.mod->rst, mi.mod->gvl
 		);
 	}
-	else
+	else (developer.integer >= 1)
 		Con_Printf("Decoding module (libxmp) \"%s\" (%s)\n", mi.mod->name, mi.mod->type);
 
 	qxmp_free_context(xc);
