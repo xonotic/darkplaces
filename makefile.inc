@@ -71,10 +71,6 @@ LIB_SND_BSD=$(LIB_SND_XMP)
 OBJ_SND_WIN=$(OBJ_SND_COMMON) snd_win.o
 LIB_SND_WIN=$(LIB_SND_XMP)
 
-# Qantourisc's 3D Realtime Acoustic Lib (3D RAS)
-OBJ_SND_3DRAS=snd_3dras.o
-LIB_SND_3DRAS=
-
 
 ###### Common objects and flags #####
 
