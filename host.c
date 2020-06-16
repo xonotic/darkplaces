@@ -1364,6 +1364,7 @@ static void Host_Init (void)
 		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", com_argv[i + 1]));
 		Cbuf_Execute(&cmd_client);
 	}
+#endif
 
 	if (cls.state == ca_dedicated || COM_CheckParm("-listen"))
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
@@ -1386,7 +1387,6 @@ static void Host_Init (void)
 
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
-#endif
 }
 
 
