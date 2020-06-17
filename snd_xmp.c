@@ -647,7 +647,7 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 //	sfx->volume_peak // for replay gain (highest peak); if set to 0, ReplayGain isn't supported
 
 	qxmp_get_module_info(xc, &mi);
-	if (developer_loading.integer >= 1)
+	if (developer_loading.integer >= 2)
 	{
 		Con_Printf("Decoding module (libxmp):\n"
 			"    Module name  : %s\n"
@@ -666,7 +666,7 @@ qboolean XMP_LoadModFile(const char *filename, sfx_t *sfx)
 			mi.mod->spd, mi.mod->bpm, mi.mod->rst, mi.mod->gvl
 		);
 	}
-	else if (developer.integer >= 1)
+	else if (developer_loading.integer == 1)
 		Con_Printf("Decoding module (libxmp) \"%s\" (%s)\n", mi.mod->name, mi.mod->type);
 
 	qxmp_free_context(xc);
