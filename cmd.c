@@ -1435,7 +1435,7 @@ static void Cmd_Apropos_f(cmd_state_t *cmd)
 		partial = Cmd_Args(cmd);
 	else
 	{
-		Con_Printf("usage: apropos <string>\n");
+		Con_Printf("usage: %s <string>\n",Cmd_Argv(cmd, 0));
 		return;
 	}
 
@@ -1512,7 +1512,7 @@ void Cmd_Init(void)
 	// client console can see server cvars because the user may start a server
 	cmd_client.cvars = &cvars_all;
 	cmd_client.cvars_flagsmask = CVAR_CLIENT | CVAR_SERVER;
-	cmd_client.cmd_flags = CMD_CLIENT | CMD_CLIENT_FROM_SERVER;
+	cmd_client.cmd_flags = CMD_CLIENT | CMD_CLIENT_FROM_SERVER | CMD_SERVER_FROM_CLIENT;
 	cmd_client.userdefined = &cmd_userdefined_all;
 	// dedicated server console can only see server cvars, there is no client
 	cmd_server.cvars = &cvars_all;
@@ -1561,6 +1561,7 @@ void Cmd_Init_Commands(qboolean dedicated_server)
 	Cmd_AddCommand(CMD_SHARED, "cmdlist", Cmd_List_f, "lists all console commands beginning with the specified prefix or matching the specified wildcard pattern");
 	Cmd_AddCommand(CMD_SHARED, "cvarlist", Cvar_List_f, "lists all console variables beginning with the specified prefix or matching the specified wildcard pattern");
 	Cmd_AddCommand(CMD_SHARED, "apropos", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
+	Cmd_AddCommand(CMD_SHARED, "find", Cmd_Apropos_f, "lists all console variables/commands/aliases containing the specified string in the name or description");
 
 	Cmd_AddCommand(CMD_SHARED, "defer", Cmd_Defer_f, "execute a command in the future");
 
@@ -1694,6 +1695,7 @@ void Cmd_AddCommand(int flags, const char *cmd_name, xcommand_t function, const 
 	cmd_function_t *func;
 	cmd_function_t *prev, *current;
 	cmd_state_t *cmd;
+	xcommand_t save = NULL;
 	int i;
 
 	for (i = 0; i < 3; i++)
@@ -1701,6 +1703,11 @@ void Cmd_AddCommand(int flags, const char *cmd_name, xcommand_t function, const 
 		cmd = cmd_iter_all[i].cmd;
 		if (flags & cmd->cmd_flags)
 		{
+			if(cmd == &cmd_client && (flags & CMD_SERVER_FROM_CLIENT) && !(flags & CMD_CLIENT))
+			{
+				save = function;
+				function = Cmd_ForwardToServer_f;
+			}
 			// fail if the command is a variable name
 			if (Cvar_FindVar(cmd->cvars, cmd_name, ~0))
 			{
@@ -1715,14 +1722,8 @@ void Cmd_AddCommand(int flags, const char *cmd_name, xcommand_t function, const 
 				{
 					if (!strcmp(cmd_name, func->name))
 					{
-						// Allow overriding forward to server
-						if(func->function == Cmd_ForwardToServer_f && (func->flags & 8))
-							break;
-						else
-						{
-							Con_Printf("Cmd_AddCommand: %s already defined\n", cmd_name);
-							goto nested_continue;
-						}
+						Con_Printf("Cmd_AddCommand: %s already defined\n", cmd_name);
+						goto next;
 					}
 				}
 
@@ -1775,8 +1776,10 @@ void Cmd_AddCommand(int flags, const char *cmd_name, xcommand_t function, const 
 				}
 				func->next = current;
 			}
+			if (save)
+				function = save;
 		}
-nested_continue:
+next:
 		continue;
 	}
 }
@@ -2072,7 +2075,8 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 				{
 					if((func->flags & CMD_CHEAT) && !sv_cheats.integer)
 						SV_ClientPrintf("No cheats allowed. The server must have sv_cheats set to 1\n");
-					func->function(cmd);
+					else
+						func->function(cmd);
 					goto done;
 				}
 			}
