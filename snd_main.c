@@ -1982,9 +1982,9 @@ static void S_PaintAndSubmit (void)
 		}
 		else
 #endif
-		 if (!soundtimehack)
+		if (!soundtimehack)
 			Con_Printf("S_PaintAndSubmit: WARNING: newsoundtime < soundtime (%u < %u)\n",
-					   newsoundtime, soundtime);
+				newsoundtime, soundtime);
 	}
 	soundtime = newsoundtime;
 #ifdef CONFIG_VIDEO_CAPTURE
