@@ -44,24 +44,10 @@ Memory is cleared / released when a server or client begins, not when they end.
 
 */
 
-// how many frames have occurred
-// (checked by Host_Error and Host_SaveConfig_f)
-int host_framecount = 0;
-
-// Cloudwalk: set when Host_Init is executed
-qboolean host_init = false;
-// LadyHavoc: set when quit is executed
-qboolean host_shuttingdown = false;
-
-// the accumulated mainloop time since application started (with filtering), without any slowmo or clamping
-double realtime;
-// the main loop wall time for this frame
-double host_dirtytime;
-
 // current client
 client_t *host_client;
 
-jmp_buf host_abortframe;
+host_t host;
 
 // pretend frames take this amount of time (in seconds), 0 = realtime
 cvar_t host_framerate = {CVAR_CLIENT | CVAR_SERVER, "host_framerate","0", "locks frame timing to this value in seconds, 0.05 is 20fps for example, note that this can easily run too fast, use cl_maxfps if you want to limit your framerate instead, or sys_ticrate to limit server speed"};
@@ -107,7 +93,7 @@ void Host_AbortCurrentFrame(void)
 	// in case we were previously nice, make us mean again
 	Sys_MakeProcessMean();
 
-	longjmp (host_abortframe, 1);
+	longjmp (host.abortframe, 1);
 }
 
 /*
@@ -136,7 +122,7 @@ void Host_Error (const char *error, ...)
 
 	// LadyHavoc: if crashing very early, or currently shutting down, do
 	// Sys_Error instead
-	if (host_framecount < 3 || host_shuttingdown)
+	if (host.framecount < 3 || host.state == host_shutdown)
 		Sys_Error ("Host_Error: %s", hosterrorstring1);
 
 	if (hosterror)
@@ -193,8 +179,8 @@ static void Host_ServerOptions (void)
 	{
 		cls.state = ca_dedicated;
 		// check for -dedicated specifying how many players
-		if (i && i + 1 < com_argc && atoi (com_argv[i+1]) >= 1)
-			svs.maxclients = atoi (com_argv[i+1]);
+		if (i && i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
+			svs.maxclients = atoi (sys.argv[i+1]);
 		if (COM_CheckParm ("-listen"))
 			Con_Printf ("Only one of -dedicated or -listen can be specified\n");
 		// default sv_public on for dedicated servers (often hosted by serious administrators), off for listen servers (often hosted by clueless users)
@@ -208,8 +194,8 @@ static void Host_ServerOptions (void)
 		if (i)
 		{
 			// default players unless specified
-			if (i + 1 < com_argc && atoi (com_argv[i+1]) >= 1)
-				svs.maxclients = atoi (com_argv[i+1]);
+			if (i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
+				svs.maxclients = atoi (sys.argv[i+1]);
 		}
 		else
 		{
@@ -285,7 +271,7 @@ static void Host_SaveConfig_to(const char *file)
 // dedicated servers initialize the host but don't parse and set the
 // config.cfg cvars
 	// LadyHavoc: don't save a config if it crashed in startup
-	if (host_framecount >= 3 && cls.state != ca_dedicated && !COM_CheckParm("-benchmark") && !COM_CheckParm("-capturedemo"))
+	if (host.framecount >= 3 && cls.state != ca_dedicated && !COM_CheckParm("-benchmark") && !COM_CheckParm("-capturedemo"))
 	{
 		f = FS_OpenRealFile(file, "wb", false);
 		if (!f)
@@ -672,7 +658,7 @@ void Host_Main(void)
 	double time2 = 0;
 	double time3 = 0;
 	double cl_timer = 0, sv_timer = 0;
-	double clframetime, deltacleantime, olddirtytime, dirtytime;
+	double clframetime, time, oldtime, newtime;
 	double wait;
 	int pass1, pass2, pass3, i;
 	char vabuf[1024];
@@ -680,40 +666,41 @@ void Host_Main(void)
 
 	Host_Init();
 
-	realtime = 0;
-	host_dirtytime = Sys_DirtyTime();
-	for (;;)
+	host.realtime = 0;
+	host.dirtytime = Sys_DirtyTime();
+
+	while(host.state != host_shutdown)
 	{
-		if (setjmp(host_abortframe))
+		if (setjmp(host.abortframe))
 		{
 			SCR_ClearLoadingScreen(false);
 			continue;			// something bad happened, or the server disconnected
 		}
 
-		olddirtytime = host_dirtytime;
-		dirtytime = Sys_DirtyTime();
-		deltacleantime = dirtytime - olddirtytime;
-		if (deltacleantime < 0)
+		oldtime = host.dirtytime;
+		newtime = Sys_DirtyTime();
+		time = newtime - oldtime;
+		if (time < 0)
 		{
 			// warn if it's significant
-			if (deltacleantime < -0.01)
-				Con_Warnf("Host_Mingled: time stepped backwards (went from %f to %f, difference %f)\n", olddirtytime, dirtytime, deltacleantime);
-			deltacleantime = 0;
+			if (time < -0.01)
+				Con_Warnf("Host_Mingled: time stepped backwards (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+			time = 0;
 		}
-		else if (deltacleantime >= 1800)
+		else if (time >= 1800)
 		{
-			Con_Warnf("Host_Mingled: time stepped forward (went from %f to %f, difference %f)\n", olddirtytime, dirtytime, deltacleantime);
-			deltacleantime = 0;
+			Con_Warnf("Host_Mingled: time stepped forward (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+			time = 0;
 		}
-		realtime += deltacleantime;
-		host_dirtytime = dirtytime;
+		host.realtime += time;
+		host.dirtytime = newtime;
 
-		cl_timer += deltacleantime;
-		sv_timer += deltacleantime;
+		cl_timer += time;
+		sv_timer += time;
 
 		if (!svs.threaded)
 		{
-			svs.perf_acc_realtime += deltacleantime;
+			svs.perf_acc_realtime += time;
 
 			// Look for clients who have spawned
 			playing = false;
@@ -772,24 +759,16 @@ void Host_Main(void)
 		// check for commands typed to the host
 		Host_GetConsoleCommands();
 
-		// when a server is running we only execute console commands on server frames
-		// (this mainly allows frikbot .way config files to work properly by staying in sync with the server qc)
-		// otherwise we execute them on client frames
-		if (sv.active ? sv_timer > 0 : cl_timer > 0)
-		{
-			// process console commands
-//			R_TimeReport("preconsole");
-			CL_VM_PreventInformationLeaks();
-			Cbuf_Frame(&cmd_client);
-			Cbuf_Frame(&cmd_server);
+		// process console commands
+//		R_TimeReport("preconsole");
+		CL_VM_PreventInformationLeaks();
+		Cbuf_Frame(&cmd_client);
+		Cbuf_Frame(&cmd_server);
 
-			if(sv.active)
-			{
-				Cbuf_Frame(&cmd_serverfromclient);
-			}
+		if(sv.active)
+			Cbuf_Frame(&cmd_serverfromclient);
 
-//			R_TimeReport("console");
-		}
+//		R_TimeReport("console");
 
 		//Con_Printf("%6.0f %6.0f\n", cl_timer * 1000000.0, sv_timer * 1000000.0);
 
@@ -884,7 +863,7 @@ void Host_Main(void)
 
 			if(advancetime > 0)
 			{
-				offset = Sys_DirtyTime() - dirtytime;if (offset < 0 || offset >= 1800) offset = 0;
+				offset = Sys_DirtyTime() - newtime;if (offset < 0 || offset >= 1800) offset = 0;
 				offset += sv_timer;
 				++svs.perf_acc_offset_samples;
 				svs.perf_acc_offset += offset;
@@ -918,8 +897,8 @@ void Host_Main(void)
 			// send all messages to the clients
 			SV_SendClientMessages();
 
-			if (sv.paused == 1 && realtime > sv.pausedstart && sv.pausedstart > 0) {
-				prog->globals.fp[OFS_PARM0] = realtime - sv.pausedstart;
+			if (sv.paused == 1 && host.realtime > sv.pausedstart && sv.pausedstart > 0) {
+				prog->globals.fp[OFS_PARM0] = host.realtime - sv.pausedstart;
 				PRVM_serverglobalfloat(time) = sv.time;
 				prog->ExecuteProgram(prog, PRVM_serverfunction(SV_PausedTic), "QC function SV_PausedTic is missing");
 			}
@@ -1081,8 +1060,10 @@ void Host_Main(void)
 			sv_timer = 0;
 		}
 
-		host_framecount++;
+		host.framecount++;
 	}
+
+	Sys_Quit(0);
 }
 
 //============================================================================
@@ -1114,14 +1095,14 @@ static void Host_InitSession(void)
 	Cvar_RegisterVariable(&locksession);
 
 	// load the session ID into the read-only cvar
-	if ((i = COM_CheckParm("-sessionid")) && (i + 1 < com_argc))
+	if ((i = COM_CheckParm("-sessionid")) && (i + 1 < sys.argc))
 	{
-		if(com_argv[i+1][0] == '.')
-			Cvar_SetQuick(&sessionid, com_argv[i+1]);
+		if(sys.argv[i+1][0] == '.')
+			Cvar_SetQuick(&sessionid, sys.argv[i+1]);
 		else
 		{
-			buf = (char *)Z_Malloc(strlen(com_argv[i+1]) + 2);
-			dpsnprintf(buf, sizeof(buf), ".%s", com_argv[i+1]);
+			buf = (char *)Z_Malloc(strlen(sys.argv[i+1]) + 2);
+			dpsnprintf(buf, sizeof(buf), ".%s", sys.argv[i+1]);
 			Cvar_SetQuick(&sessionid, buf);
 		}
 	}
@@ -1180,7 +1161,7 @@ static void Host_Init (void)
 	qboolean dedicated_server = COM_CheckParm("-dedicated") || !cl_available;
 	cmd_state_t *cmd = &cmd_client;
 
-	host_init = true;
+	host.state = host_init;
 
 	if (COM_CheckParm("-profilegameonly"))
 		Sys_AllowProfiling(false);
@@ -1302,7 +1283,7 @@ static void Host_Init (void)
 	// without crashing the whole game, so this should just be a short-time solution
 
 	// here comes the not so critical stuff
-	if (setjmp(host_abortframe)) {
+	if (setjmp(host.abortframe)) {
 		return;
 	}
 
@@ -1317,7 +1298,7 @@ static void Host_Init (void)
 		Cbuf_Execute(cmd);
 	}
 
-	host_init = false;
+	host.state = host_active;
 
 	// run stuffcmds now, deferred previously because it can crash if a server starts that early
 	Cbuf_AddText(cmd,"stuffcmds\n");
@@ -1338,30 +1319,30 @@ static void Host_Init (void)
 	// check for special benchmark mode
 // COMMANDLINEOPTION: Client: -benchmark <demoname> runs a timedemo and quits, results of any timedemo can be found in gamedir/benchmark.log (for example id1/benchmark.log)
 	i = COM_CheckParm("-benchmark");
-	if (i && i + 1 < com_argc)
+	if (i && i + 1 < sys.argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "timedemo %s\n", com_argv[i + 1]));
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "timedemo %s\n", sys.argv[i + 1]));
 		Cbuf_Execute(&cmd_client);
 	}
 
 	// check for special demo mode
 // COMMANDLINEOPTION: Client: -demo <demoname> runs a playdemo and quits
 	i = COM_CheckParm("-demo");
-	if (i && i + 1 < com_argc)
+	if (i && i + 1 < sys.argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\n", com_argv[i + 1]));
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\n", sys.argv[i + 1]));
 		Cbuf_Execute(&cmd_client);
 	}
 
 #ifdef CONFIG_VIDEO_CAPTURE
 // COMMANDLINEOPTION: Client: -capturedemo <demoname> captures a playdemo and quits
 	i = COM_CheckParm("-capturedemo");
-	if (i && i + 1 < com_argc)
+	if (i && i + 1 < sys.argc)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
-		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", com_argv[i + 1]));
+		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", sys.argv[i + 1]));
 		Cbuf_Execute(&cmd_client);
 	}
 #endif
@@ -1407,7 +1388,7 @@ void Host_Shutdown(void)
 		Con_Print("recursive shutdown\n");
 		return;
 	}
-	if (setjmp(host_abortframe))
+	if (setjmp(host.abortframe))
 	{
 		Con_Print("aborted the quitting frame?!?\n");
 		return;

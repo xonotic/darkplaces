@@ -428,6 +428,9 @@ extern cvar_t sessionid;
 # define USE_RWOPS		1
 # define LINK_TO_ZLIB	1
 # define LINK_TO_LIBVORBIS 1
+#ifdef USEXMP
+# define LINK_TO_LIBXMP 1 // nyov: if someone can test with the android NDK compiled libxmp?
+#endif
 # define DP_MOBILETOUCH	1
 # define DP_FREETYPE_STATIC 1
 #elif TARGET_OS_IPHONE /* must come first because it also defines MACOSX */
@@ -515,13 +518,24 @@ qboolean Sys_HaveSSE2(void);
 #include "glquake.h"
 
 #include "palette.h"
+typedef enum host_state_e
+{
+	host_shutdown,
+	host_init,
+	host_loading,
+	host_active
+} host_state_t;
 
-/// incremented every frame, never reset
-extern int host_framecount;
-/// not bounded in any way, changed at start of every frame, never reset
-extern double realtime;
-/// equal to Sys_DirtyTime() at the start of this host frame
-extern double host_dirtytime;
+typedef struct host_s
+{
+	int state;
+	int framecount; // incremented every frame, never reset (checked by Host_Error and Host_SaveConfig_f)
+	double realtime; // the accumulated mainloop time since application started (with filtering), without any slowmo or clamping
+	double dirtytime; // the main loop wall time for this frame, equal to Sys_DirtyTime() at the start of this host frame
+	jmp_buf abortframe;
+} host_t;
+
+extern host_t host;
 
 void Host_InitCommands(void);
 void Host_Main(void);
