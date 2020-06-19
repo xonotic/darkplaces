@@ -1295,10 +1295,6 @@ static void Host_Init (void)
 
 	Host_AddConfigText(cmd);
 
-#ifdef CONFIG_VIDEO_PLAYBACK
-	Host_StartVideo();
-#endif
-
 	// if quake.rc is missing, use default
 	if (!FS_FileExists("quake.rc"))
 	{
@@ -1368,9 +1364,7 @@ static void Host_Init (void)
 
 	Con_DPrint("========Initialized=========\n");
 
-//#ifdef CONFIG_VIDEO_PLAYBACK
-//	Host_StartVideo();
-//#endif
+	//Host_StartVideo();
 
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
