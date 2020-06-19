@@ -704,7 +704,7 @@ void CL_Effect(vec3_t org, int modelindex, int startframe, int framecount, float
 	}
 }
 
-void CL_AllocLightFlash(entity_render_t *ent, matrix4x4_t *matrix, float radius, float red, float green, float blue, float decay, float lifetime, int cubemapnum, int style, int shadowenable, vec_t corona, vec_t coronasizescale, vec_t ambientscale, vec_t diffusescale, vec_t specularscale, int flags)
+void CL_AllocLightFlash(entity_render_t *ent, matrix4x4_t *matrix, float radius, float red, float green, float blue, float decay, float lifetime, char *cubemapname, int style, int shadowenable, vec_t corona, vec_t coronasizescale, vec_t ambientscale, vec_t diffusescale, vec_t specularscale, int flags)
 {
 	int i;
 	dlight_t *dl;
@@ -741,10 +741,9 @@ void CL_AllocLightFlash(entity_render_t *ent, matrix4x4_t *matrix, float radius,
 		dl->die = cl.time + lifetime;
 	else
 		dl->die = 0;
-	if (cubemapnum > 0)
-		dpsnprintf(dl->cubemapname, sizeof(dl->cubemapname), "cubemaps/%i", cubemapnum);
-	else
-		dl->cubemapname[0] = 0;
+	dl->cubemapname[0] = 0;
+	if (cubemapname && cubemapname[0])
+		strlcpy(dl->cubemapname, cubemapname, sizeof(dl->cubemapname));
 	dl->style = style;
 	dl->shadow = shadowenable;
 	dl->corona = corona;
@@ -2781,5 +2780,6 @@ void CL_Init (void)
 #ifdef CONFIG_VIDEO_PLAYBACK
 		CL_Video_Init();
 #endif
+		Host_StartVideo();
 	}
 }

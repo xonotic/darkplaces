@@ -930,10 +930,10 @@ static void VID_KeyEventForButton(qboolean oldbutton, qboolean newbutton, int ke
 	{
 		if (newbutton)
 		{
-			if (realtime >= *timer)
+			if (host.realtime >= *timer)
 			{
 				Key_Event(key, 0, true);
-				*timer = realtime + 0.1;
+				*timer = host.realtime + 0.1;
 			}
 		}
 		else
@@ -947,7 +947,7 @@ static void VID_KeyEventForButton(qboolean oldbutton, qboolean newbutton, int ke
 		if (newbutton)
 		{
 			Key_Event(key, 0, true);
-			*timer = realtime + 0.5;
+			*timer = host.realtime + 0.5;
 		}
 	}
 }
@@ -1507,25 +1507,26 @@ const char *vidfallbacks[][2] =
 // this is only called once by Host_StartVideo and again on each FS_GameDir_f
 void VID_Start(void)
 {
-	int i, width, height, success;
+	int i = 0;
+	int width, height, success;
 	if (vid_commandlinecheck)
 	{
 		// interpret command-line parameters
 		vid_commandlinecheck = false;
 // COMMANDLINEOPTION: Video: -window performs +vid_fullscreen 0
-		if (COM_CheckParm("-window") || COM_CheckParm("-safe"))
+		if (COM_CheckParm("-window") || COM_CheckParm("-safe") || (i = COM_CheckParm("+vid_fullscreen") != 0 && atoi(sys.argv[i+1]) == 0))
 			Cvar_SetValueQuick(&vid_fullscreen, false);
 // COMMANDLINEOPTION: Video: -fullscreen performs +vid_fullscreen 1
-		if (COM_CheckParm("-fullscreen"))
+		if (COM_CheckParm("-fullscreen") || (i = COM_CheckParm("+vid_fullscreen") != 0 && atoi(sys.argv[i+1]) == 1))
 			Cvar_SetValueQuick(&vid_fullscreen, true);
 		width = 0;
 		height = 0;
 // COMMANDLINEOPTION: Video: -width <pixels> performs +vid_width <pixels> and also +vid_height <pixels*3/4> if only -width is specified (example: -width 1024 sets 1024x768 mode)
-		if ((i = COM_CheckParm("-width")) != 0)
-			width = atoi(com_argv[i+1]);
+		if ((i = COM_CheckParm("-width")) != 0 || (i = COM_CheckParm("+vid_width") != 0))
+			width = atoi(sys.argv[i+1]);
 // COMMANDLINEOPTION: Video: -height <pixels> performs +vid_height <pixels> and also +vid_width <pixels*4/3> if only -height is specified (example: -height 768 sets 1024x768 mode)
-		if ((i = COM_CheckParm("-height")) != 0)
-			height = atoi(com_argv[i+1]);
+		if ((i = COM_CheckParm("-height")) != 0 || (i = COM_CheckParm("+vid_height") != 0))
+			height = atoi(sys.argv[i+1]);
 		if (width == 0)
 			width = height * 4 / 3;
 		if (height == 0)
@@ -1536,13 +1537,13 @@ void VID_Start(void)
 			Cvar_SetValueQuick(&vid_height, height);
 // COMMANDLINEOPTION: Video: -density <multiplier> performs +vid_touchscreen_density <multiplier> (example -density 1 or -density 1.5)
 		if ((i = COM_CheckParm("-density")) != 0)
-			Cvar_SetQuick(&vid_touchscreen_density, com_argv[i+1]);
+			Cvar_SetQuick(&vid_touchscreen_density, sys.argv[i+1]);
 // COMMANDLINEOPTION: Video: -xdpi <dpi> performs +vid_touchscreen_xdpi <dpi> (example -xdpi 160 or -xdpi 320)
 		if ((i = COM_CheckParm("-touchscreen_xdpi")) != 0)
-			Cvar_SetQuick(&vid_touchscreen_xdpi, com_argv[i+1]);
+			Cvar_SetQuick(&vid_touchscreen_xdpi, sys.argv[i+1]);
 // COMMANDLINEOPTION: Video: -ydpi <dpi> performs +vid_touchscreen_ydpi <dpi> (example -ydpi 160 or -ydpi 320)
 		if ((i = COM_CheckParm("-touchscreen_ydpi")) != 0)
-			Cvar_SetQuick(&vid_touchscreen_ydpi, com_argv[i+1]);
+			Cvar_SetQuick(&vid_touchscreen_ydpi, sys.argv[i+1]);
 	}
 
 	success = VID_Mode(vid_fullscreen.integer, vid_width.integer, vid_height.integer, vid_bitsperpixel.integer, vid_refreshrate.value, vid_stereobuffer.integer, vid_samples.integer);

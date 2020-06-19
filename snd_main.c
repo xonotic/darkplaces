@@ -23,6 +23,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "snd_main.h"
 #include "snd_ogg.h"
+#ifdef USEXMP
+#include "snd_xmp.h"
+#endif
 #include "csprogs.h"
 #include "cl_collision.h"
 #include "cdaudio.h"
@@ -147,7 +150,9 @@ static qboolean sound_spatialized = false;
 
 qboolean simsound = false;
 
+#ifdef CONFIG_VIDEO_CAPTURE
 static qboolean recording_sound = false;
+#endif
 
 int snd_blocked = 0;
 static int current_swapstereo = false;
@@ -528,15 +533,15 @@ void S_Startup (void)
 	}
 // COMMANDLINEOPTION: Sound: -sndspeed <hz> chooses sound output rate (supported values are 48000, 44100, 32000, 24000, 22050, 16000, 11025 (quake), 8000)
 	i = COM_CheckParm ("-sndspeed");
-	if (0 < i && i < com_argc - 1)
+	if (0 < i && i < sys.argc - 1)
 	{
-		chosen_fmt.speed = atoi (com_argv[i + 1]);
+		chosen_fmt.speed = atoi (sys.argv[i + 1]);
 	}
 // COMMANDLINEOPTION: Sound: -sndbits <bits> chooses 8 bit or 16 bit or 32bit float sound output
 	i = COM_CheckParm ("-sndbits");
-	if (0 < i && i < com_argc - 1)
+	if (0 < i && i < sys.argc - 1)
 	{
-		chosen_fmt.width = atoi (com_argv[i + 1]) / 8;
+		chosen_fmt.width = atoi (sys.argv[i + 1]) / 8;
 	}
 
 #if 0
@@ -621,7 +626,7 @@ void S_Startup (void)
 	current_channellayout_used = SND_CHANNELLAYOUT_AUTO;
 	S_SetChannelLayout();
 
-	snd_starttime = realtime;
+	snd_starttime = host.realtime;
 
 	// If the sound module has already run, add an extra time to make sure
 	// the sound time doesn't decrease, to not confuse playing SFXs
@@ -640,7 +645,9 @@ void S_Startup (void)
 		extrasoundtime = 0;
 	snd_renderbuffer->startframe = soundtime;
 	snd_renderbuffer->endframe = soundtime;
+#ifdef CONFIG_VIDEO_CAPTURE
 	recording_sound = false;
+#endif
 }
 
 void S_Shutdown(void)
@@ -800,6 +807,9 @@ void S_Init(void)
 	memset(channels, 0, MAX_CHANNELS * sizeof(channel_t));
 
 	OGG_OpenLibrary ();
+#ifdef USEXMP
+	XMP_OpenLibrary ();
+#endif
 }
 
 
@@ -813,6 +823,9 @@ Shutdown and free all resources
 void S_Terminate (void)
 {
 	S_Shutdown ();
+#ifdef USEXMP
+	XMP_CloseLibrary ();
+#endif
 	OGG_CloseLibrary ();
 
 	// Free all SFXs
@@ -1897,19 +1910,25 @@ static void S_PaintAndSubmit (void)
 		usesoundtimehack = 1;
 		newsoundtime = (unsigned int)((double)cl.mtime[0] * (double)snd_renderbuffer->format.speed);
 	}
+#ifdef CONFIG_VIDEO_CAPTURE
 	else if (cls.capturevideo.soundrate && !cls.capturevideo.realtime) // SUPER NASTY HACK to record non-realtime sound
 	{
 		usesoundtimehack = 2;
 		newsoundtime = (unsigned int)((double)cls.capturevideo.frame * (double)snd_renderbuffer->format.speed / (double)cls.capturevideo.framerate);
 	}
+#endif
 	else if (simsound)
 	{
 		usesoundtimehack = 3;
-		newsoundtime = (unsigned int)((realtime - snd_starttime) * (double)snd_renderbuffer->format.speed);
+		newsoundtime = (unsigned int)((host.realtime - snd_starttime) * (double)snd_renderbuffer->format.speed);
 	}
 	else
 	{
+#ifdef CONFIG_VIDEO_CAPTURE
 		snd_usethreadedmixing = snd_threaded && !cls.capturevideo.soundrate;
+#else
+		snd_usethreadedmixing = snd_threaded;
+#endif
 		usesoundtimehack = 0;
 		newsoundtime = SndSys_GetSoundTime();
 	}
@@ -1943,6 +1962,7 @@ static void S_PaintAndSubmit (void)
 	newsoundtime += extrasoundtime;
 	if (newsoundtime < soundtime)
 	{
+#ifdef CONFIG_VIDEO_CAPTURE
 		if ((cls.capturevideo.soundrate != 0) != recording_sound)
 		{
 			unsigned int additionaltime;
@@ -1961,11 +1981,16 @@ static void S_PaintAndSubmit (void)
 						extrasoundtime);
 		}
 		else if (!soundtimehack)
+#else
+		if (!soundtimehack)
+#endif
 			Con_Printf("S_PaintAndSubmit: WARNING: newsoundtime < soundtime (%u < %u)\n",
 					   newsoundtime, soundtime);
 	}
 	soundtime = newsoundtime;
+#ifdef CONFIG_VIDEO_CAPTURE
 	recording_sound = (cls.capturevideo.soundrate != 0);
+#endif
 
 	// Lock submitbuffer
 	if (!simsound && !SndSys_LockRenderBuffer())

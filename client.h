@@ -737,6 +737,7 @@ typedef enum qw_downloadtype_e
 }
 qw_downloadtype_t;
 
+#ifdef CONFIG_VIDEO_CAPTURE
 typedef enum capturevideoformat_e
 {
 	CAPTUREVIDEOFORMAT_AVI_I420,
@@ -788,6 +789,7 @@ typedef struct capturevideostate_s
 	void *formatspecific;
 }
 capturevideostate_t;
+#endif
 
 #define CL_MAX_DOWNLOADACKS 4
 
@@ -917,8 +919,10 @@ typedef struct client_static_s
 	// extra user info for the "connect" command
 	char connect_userinfo[MAX_USERINFO_STRING];
 
+#ifdef CONFIG_VIDEO_CAPTURE
 	// video capture stuff
 	capturevideostate_t capturevideo;
+#endif
 
 	// crypto channel
 	crypto_t crypto;
@@ -1518,7 +1522,7 @@ extern cvar_t cl_locs_enable;
 
 extern client_state_t cl;
 
-extern void CL_AllocLightFlash (entity_render_t *ent, matrix4x4_t *matrix, float radius, float red, float green, float blue, float decay, float lifetime, int cubemapnum, int style, int shadowenable, vec_t corona, vec_t coronasizescale, vec_t ambientscale, vec_t diffusescale, vec_t specularscale, int flags);
+extern void CL_AllocLightFlash (entity_render_t *ent, matrix4x4_t *matrix, float radius, float red, float green, float blue, float decay, float lifetime, char *cubemapname, int style, int shadowenable, vec_t corona, vec_t coronasizescale, vec_t ambientscale, vec_t diffusescale, vec_t specularscale, int flags);
 
 cl_locnode_t *CL_Locs_FindNearest(const vec3_t point);
 void CL_Locs_FindLocationName(char *buffer, size_t buffersize, vec3_t point);
