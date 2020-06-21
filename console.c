@@ -2428,7 +2428,7 @@ static int Nicks_strncasecmp(char *a, char *b, unsigned int a_len)
  */
 static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qboolean isCon)
 {
-	char name[128];
+	char name[MAX_SCOREBOARDNAME];
 	int i, p;
 	int match;
 	int spos;
@@ -2759,7 +2759,7 @@ int Nicks_CompleteChatLine(char *buffer, size_t size, unsigned int pos)
 		msg = Nicks_list[0];
 		len = min(size - Nicks_matchpos - 3, strlen(msg));
 		memcpy(&buffer[Nicks_matchpos], msg, len);
-		if( len < (size - 7) ) // space for color (^[0-9] or ^xrgb) and space and \0
+		if(len < size - 7) // space for color code (^[0-9] or ^xrgb), space and \0
 			len = (int)Nicks_AddLastColor(buffer, Nicks_matchpos+(int)len);
 		buffer[len++] = ' ';
 		buffer[len] = 0;
@@ -3073,7 +3073,7 @@ done:
 
 				memcpy(&key_line[key_linepos] , Nicks_list[0], cmd_len);
 				key_linepos += cmd_len;
-				if(key_linepos < (int)(sizeof(key_line)-4)) // space for ^, X and space and \0
+				if(key_linepos < (int)(sizeof(key_line) - 7)) // space for color code (^[0-9] or ^xrgb), space and \0
 					key_linepos = Nicks_AddLastColor(key_line, key_linepos);
 			}
 			key_line[key_linepos++] = ' ';
