@@ -410,6 +410,10 @@ static void Cmd_StuffCmds_f (cmd_state_t *cmd)
 	int		i, j, l;
 	// this is for all commandline options combined (and is bounds checked)
 	char	build[MAX_INPUTLINE];
+	
+	// come back later so we don't crash
+	if(host.state == host_init)
+		return;
 
 	if (Cmd_Argc (cmd) != 1)
 	{
@@ -1518,10 +1522,7 @@ void Cmd_Init(void)
 	cmd_serverfromclient.cvars_flagsmask = 0;
 	cmd_serverfromclient.cmd_flags = CMD_SERVER_FROM_CLIENT;
 	cmd_serverfromclient.userdefined = &cmd_userdefined_null;
-}
 
-void Cmd_Init_Commands(qboolean dedicated_server)
-{
 //
 // register our commands
 //

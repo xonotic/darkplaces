@@ -1164,7 +1164,6 @@ static void Host_Init (void)
 	int i;
 	const char* os;
 	char vabuf[1024];
-	qboolean dedicated_server = COM_CheckParm("-dedicated") || !cl_available;
 	cmd_state_t *cmd = &cmd_client;
 
 	host.state = host_init;
@@ -1218,8 +1217,6 @@ static void Host_Init (void)
 	// initialize console command/cvar/alias/command execution systems
 	Cmd_Init();
 
-	Cmd_Init_Commands(dedicated_server);
-
 	// initialize memory subsystem cvars/commands
 	Memory_Init_Commands();
 
@@ -1265,8 +1262,6 @@ static void Host_Init (void)
 
 	NetConn_Init();
 	Curl_Init();
-	//PR_Init();
-	//PR_Cmd_Init();
 	PRVM_Init();
 	Mod_Init();
 	World_Init();
@@ -1295,27 +1290,26 @@ static void Host_Init (void)
 
 	Host_AddConfigText(cmd);
 
+	Host_StartVideo();
+
 	// if quake.rc is missing, use default
 	if (!FS_FileExists("quake.rc"))
 	{
-		Cbuf_AddText(cmd, "exec default.cfg\nexec " CONFIGFILENAME "\nexec autoexec.cfg\n");
+		Cbuf_InsertText(cmd, "exec default.cfg\nexec " CONFIGFILENAME "\nexec autoexec.cfg\n");
 		Cbuf_Execute(cmd);
 	}
 
 	host.state = host_active;
 
+	// run stuffcmds now, deferred previously because it can crash if a server starts that early
+	Cbuf_AddText(cmd,"stuffcmds\n");
+	Cbuf_Execute(cmd);
+
 	Log_Start();
-	
+
 	// put up the loading image so the user doesn't stare at a black screen...
 	SCR_BeginLoadingPlaque(true);
-
-#ifdef CONFIG_MENU
-	if (cls.state != ca_dedicated)
-	{
-		MR_Init();
-	}
-#endif
-
+	
 	// check for special benchmark mode
 // COMMANDLINEOPTION: Client: -benchmark <demoname> runs a timedemo and quits, results of any timedemo can be found in gamedir/benchmark.log (for example id1/benchmark.log)
 	i = COM_CheckParm("-benchmark");
@@ -1363,8 +1357,6 @@ static void Host_Init (void)
 	}
 
 	Con_DPrint("========Initialized=========\n");
-
-	//Host_StartVideo();
 
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
@@ -1429,7 +1421,6 @@ void Host_Shutdown(void)
 	S_Terminate ();
 	Curl_Shutdown ();
 	NetConn_Shutdown ();
-	//PR_Shutdown ();
 
 	if (cls.state != ca_dedicated)
 	{

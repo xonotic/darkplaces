@@ -2780,6 +2780,9 @@ void CL_Init (void)
 #ifdef CONFIG_VIDEO_PLAYBACK
 		CL_Video_Init();
 #endif
-		Host_StartVideo();
+
+		#ifdef CONFIG_MENU
+		Cbuf_InsertText(&cmd_client,"menu_start\n");
+		#endif
 	}
 }
