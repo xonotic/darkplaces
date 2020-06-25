@@ -206,6 +206,7 @@ cvar_t r_water_hideplayer = {CVAR_CLIENT | CVAR_SAVE, "r_water_hideplayer", "0",
 
 cvar_t r_lerpsprites = {CVAR_CLIENT | CVAR_SAVE, "r_lerpsprites", "0", "enables animation smoothing on sprites"};
 cvar_t r_lerpmodels = {CVAR_CLIENT | CVAR_SAVE, "r_lerpmodels", "1", "enables animation smoothing on models"};
+cvar_t r_nolerp_list = {CVAR_CLIENT | CVAR_SAVE, "r_nolerp_list", "progs/v_nail.mdl,progs/v_nail2.mdl,progs/flame.mdl,progs/flame2.mdl,progs/braztall.mdl,progs/brazshrt.mdl,progs/longtrch.mdl,progs/flame_pyre.mdl,progs/v_saw.mdl,progs/v_xfist.mdl,progs/h2stuff/newfire.mdl", "comma separated list of models that will not have their animations smoothed"};
 cvar_t r_lerplightstyles = {CVAR_CLIENT | CVAR_SAVE, "r_lerplightstyles", "0", "enable animation smoothing on flickering lights"};
 cvar_t r_waterscroll = {CVAR_CLIENT | CVAR_SAVE, "r_waterscroll", "1", "makes water scroll around, value controls how much"};
 
@@ -1844,7 +1845,7 @@ void R_SetupShader_Surface(const float rtlightambient[3], const float rtlightdif
 		// lightmapped wall
 		if ((t->glowtexture || t->backgroundglowtexture) && r_hdr_glowintensity.value > 0 && !gl_lightmaps.integer)
 			permutation |= SHADERPERMUTATION_GLOW;
-		if (r_refdef.fogenabled)
+		if (r_refdef.fogenabled && !notrippy)
 			permutation |= r_texture_fogheighttexture ? SHADERPERMUTATION_FOGHEIGHTTEXTURE : (r_refdef.fogplaneviewabove ? SHADERPERMUTATION_FOGOUTSIDE : SHADERPERMUTATION_FOGINSIDE);
 		if (t->colormapping)
 			permutation |= SHADERPERMUTATION_COLORMAPPING;
@@ -3422,6 +3423,7 @@ void GL_Main_Init(void)
 
 	Cvar_RegisterVariable(&r_lerpsprites);
 	Cvar_RegisterVariable(&r_lerpmodels);
+	Cvar_RegisterVariable(&r_nolerp_list);
 	Cvar_RegisterVariable(&r_lerplightstyles);
 	Cvar_RegisterVariable(&r_waterscroll);
 	Cvar_RegisterVariable(&r_bloom);
@@ -6956,7 +6958,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	// lightmaps mode looks bad with dlights using actual texturing, so turn
 	// off the colormap and glossmap, but leave the normalmap on as it still
 	// accurately represents the shading involved
-	if (gl_lightmaps.integer)
+	if (gl_lightmaps.integer && ent != &cl_meshentities[MESH_UI].render)
 	{
 		t->basetexture = r_texture_grey128;
 		t->pantstexture = r_texture_black;
@@ -9479,6 +9481,8 @@ static void R_DecalSystem_SplatEntity(entity_render_t *ent, const vec3_t worldor
 			surfaceindex = bih_surfaces[triangleindex];
 			surface = surfaces + surfaceindex;
 			texture = surface->texture;
+			if (!texture)
+				continue;
 			if (texture->currentmaterialflags & (MATERIALFLAG_BLENDED | MATERIALFLAG_NODEPTHTEST | MATERIALFLAG_SKY | MATERIALFLAG_SHORTDEPTHRANGE | MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION))
 				continue;
 			if (texture->surfaceflags & Q3SURFACEFLAG_NOMARKS)
@@ -9497,6 +9501,8 @@ static void R_DecalSystem_SplatEntity(entity_render_t *ent, const vec3_t worldor
 				continue;
 			// skip transparent surfaces
 			texture = surface->texture;
+			if (!texture)
+				continue;
 			if (texture->currentmaterialflags & (MATERIALFLAG_BLENDED | MATERIALFLAG_NODEPTHTEST | MATERIALFLAG_SKY | MATERIALFLAG_SHORTDEPTHRANGE | MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFRACTION))
 				continue;
 			if (texture->surfaceflags & Q3SURFACEFLAG_NOMARKS)

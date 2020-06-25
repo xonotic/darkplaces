@@ -141,10 +141,13 @@ OBJ_COMMON= \
 	r_sky.o \
 	r_sprites.o \
 	sbar.o \
+	sv_ccmds.o \
 	sv_demo.o \
 	sv_main.o \
 	sv_move.o \
 	sv_phys.o \
+	sv_save.o \
+	sv_send.o \
 	sv_user.o \
 	svbsp.o \
 	svvm_cmds.o \

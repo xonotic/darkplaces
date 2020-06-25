@@ -715,7 +715,6 @@ PRVM_ED_Write
 For savegames
 =============
 */
-extern cvar_t developer_entityparsing;
 void PRVM_ED_Write (prvm_prog_t *prog, qfile_t *f, prvm_edict_t *ed)
 {
 	ddef_t	*d;
@@ -2720,7 +2719,7 @@ void PRVM_Breakpoint(prvm_prog_t *prog, int stack_index, const char *text)
 	Con_Printf("PRVM_Breakpoint: %s\n", text);
 	PRVM_PrintState(prog, stack_index);
 	if (prvm_breakpointdump.integer)
-		Host_Savegame_to(prog, va(vabuf, sizeof(vabuf), "breakpoint-%s.dmp", prog->name));
+		SV_Savegame_to(prog, va(vabuf, sizeof(vabuf), "breakpoint-%s.dmp", prog->name));
 }
 
 void PRVM_Watchpoint(prvm_prog_t *prog, int stack_index, const char *text, etype_t type, prvm_eval_t *o, prvm_eval_t *n)

@@ -151,7 +151,7 @@ void Host_Error (const char *error, ...)
 	Cvar_SetValueQuick(&csqc_progsize, -1);
 
 	SV_LockThreadMutex();
-	Host_ShutdownServer ();
+	SV_Shutdown ();
 	SV_UnlockThreadMutex();
 
 	if (cls.state == ca_dedicated)
@@ -216,6 +216,24 @@ static void Host_ServerOptions (void)
 }
 
 /*
+==================
+Host_Quit_f
+==================
+*/
+void Host_Quit_f(cmd_state_t *cmd)
+{
+	if(host.state == host_shutdown)
+		Con_Printf("shutting down already!\n");
+	else
+		host.state = host_shutdown;
+}
+
+static void Host_Version_f(cmd_state_t *cmd)
+{
+	Con_Printf("Version: %s build %s\n", gamename, buildstring);
+}
+
+/*
 =======================
 Host_InitLocal
 ======================
@@ -226,6 +244,8 @@ extern cvar_t sv_writepicture_quality;
 extern cvar_t r_texture_jpeg_fastpicmip;
 static void Host_InitLocal (void)
 {
+	Cmd_AddCommand(CMD_SHARED, "quit", Host_Quit_f, "quit the game");
+	Cmd_AddCommand(CMD_SHARED, "version", Host_Version_f, "print engine version");
 	Cmd_AddCommand(CMD_SHARED, "saveconfig", Host_SaveConfig_f, "save settings to config.cfg (or a specified filename) immediately (also automatic when quitting)");
 	Cmd_AddCommand(CMD_SHARED, "loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
 	Cvar_RegisterVariable (&cl_maxphysicsframesperserverframe);
@@ -337,280 +357,6 @@ void Host_LoadConfig_f(cmd_state_t *cmd)
 	// reset cvars to their defaults, and then exec startup scripts again
 	Host_AddConfigText(&cmd_client);
 }
-
-/*
-=================
-SV_ClientPrint
-
-Sends text across to be displayed
-FIXME: make this just a stuffed echo?
-=================
-*/
-void SV_ClientPrint(const char *msg)
-{
-	if (host_client->netconnection)
-	{
-		MSG_WriteByte(&host_client->netconnection->message, svc_print);
-		MSG_WriteString(&host_client->netconnection->message, msg);
-	}
-}
-
-/*
-=================
-SV_ClientPrintf
-
-Sends text across to be displayed
-FIXME: make this just a stuffed echo?
-=================
-*/
-void SV_ClientPrintf(const char *fmt, ...)
-{
-	va_list argptr;
-	char msg[MAX_INPUTLINE];
-
-	va_start(argptr,fmt);
-	dpvsnprintf(msg,sizeof(msg),fmt,argptr);
-	va_end(argptr);
-
-	SV_ClientPrint(msg);
-}
-
-/*
-=================
-SV_BroadcastPrint
-
-Sends text to all active clients
-=================
-*/
-void SV_BroadcastPrint(const char *msg)
-{
-	int i;
-	client_t *client;
-
-	for (i = 0, client = svs.clients;i < svs.maxclients;i++, client++)
-	{
-		if (client->active && client->netconnection)
-		{
-			MSG_WriteByte(&client->netconnection->message, svc_print);
-			MSG_WriteString(&client->netconnection->message, msg);
-		}
-	}
-
-	if (sv_echobprint.integer && cls.state == ca_dedicated)
-		Con_Print(msg);
-}
-
-/*
-=================
-SV_BroadcastPrintf
-
-Sends text to all active clients
-=================
-*/
-void SV_BroadcastPrintf(const char *fmt, ...)
-{
-	va_list argptr;
-	char msg[MAX_INPUTLINE];
-
-	va_start(argptr,fmt);
-	dpvsnprintf(msg,sizeof(msg),fmt,argptr);
-	va_end(argptr);
-
-	SV_BroadcastPrint(msg);
-}
-
-/*
-=================
-Host_ClientCommands
-
-Send text over to the client to be executed
-=================
-*/
-void Host_ClientCommands(const char *fmt, ...)
-{
-	va_list argptr;
-	char string[MAX_INPUTLINE];
-
-	if (!host_client->netconnection)
-		return;
-
-	va_start(argptr,fmt);
-	dpvsnprintf(string, sizeof(string), fmt, argptr);
-	va_end(argptr);
-
-	MSG_WriteByte(&host_client->netconnection->message, svc_stufftext);
-	MSG_WriteString(&host_client->netconnection->message, string);
-}
-
-/*
-=====================
-SV_DropClient
-
-Called when the player is getting totally kicked off the host
-if (crash = true), don't bother sending signofs
-=====================
-*/
-void SV_DropClient(qboolean crash)
-{
-	prvm_prog_t *prog = SVVM_prog;
-	int i;
-	Con_Printf("Client \"%s\" dropped\n", host_client->name);
-
-	SV_StopDemoRecording(host_client);
-
-	// make sure edict is not corrupt (from a level change for example)
-	host_client->edict = PRVM_EDICT_NUM(host_client - svs.clients + 1);
-
-	if (host_client->netconnection)
-	{
-		// tell the client to be gone
-		if (!crash)
-		{
-			// LadyHavoc: no opportunity for resending, so use unreliable 3 times
-			unsigned char bufdata[8];
-			sizebuf_t buf;
-			memset(&buf, 0, sizeof(buf));
-			buf.data = bufdata;
-			buf.maxsize = sizeof(bufdata);
-			MSG_WriteByte(&buf, svc_disconnect);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
-		}
-	}
-
-	// call qc ClientDisconnect function
-	// LadyHavoc: don't call QC if server is dead (avoids recursive
-	// Host_Error in some mods when they run out of edicts)
-	if (host_client->clientconnectcalled && sv.active && host_client->edict)
-	{
-		// call the prog function for removing a client
-		// this will set the body to a dead frame, among other things
-		int saveSelf = PRVM_serverglobaledict(self);
-		host_client->clientconnectcalled = false;
-		PRVM_serverglobalfloat(time) = sv.time;
-		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(host_client->edict);
-		prog->ExecuteProgram(prog, PRVM_serverfunction(ClientDisconnect), "QC function ClientDisconnect is missing");
-		PRVM_serverglobaledict(self) = saveSelf;
-	}
-
-	if (host_client->netconnection)
-	{
-		// break the net connection
-		NetConn_Close(host_client->netconnection);
-		host_client->netconnection = NULL;
-	}
-
-	// if a download is active, close it
-	if (host_client->download_file)
-	{
-		Con_DPrintf("Download of %s aborted when %s dropped\n", host_client->download_name, host_client->name);
-		FS_Close(host_client->download_file);
-		host_client->download_file = NULL;
-		host_client->download_name[0] = 0;
-		host_client->download_expectedposition = 0;
-		host_client->download_started = false;
-	}
-
-	// remove leaving player from scoreboard
-	host_client->name[0] = 0;
-	host_client->colors = 0;
-	host_client->frags = 0;
-	// send notification to all clients
-	// get number of client manually just to make sure we get it right...
-	i = host_client - svs.clients;
-	MSG_WriteByte (&sv.reliable_datagram, svc_updatename);
-	MSG_WriteByte (&sv.reliable_datagram, i);
-	MSG_WriteString (&sv.reliable_datagram, host_client->name);
-	MSG_WriteByte (&sv.reliable_datagram, svc_updatecolors);
-	MSG_WriteByte (&sv.reliable_datagram, i);
-	MSG_WriteByte (&sv.reliable_datagram, host_client->colors);
-	MSG_WriteByte (&sv.reliable_datagram, svc_updatefrags);
-	MSG_WriteByte (&sv.reliable_datagram, i);
-	MSG_WriteShort (&sv.reliable_datagram, host_client->frags);
-
-	// free the client now
-	if (host_client->entitydatabase)
-		EntityFrame_FreeDatabase(host_client->entitydatabase);
-	if (host_client->entitydatabase4)
-		EntityFrame4_FreeDatabase(host_client->entitydatabase4);
-	if (host_client->entitydatabase5)
-		EntityFrame5_FreeDatabase(host_client->entitydatabase5);
-
-	if (sv.active)
-	{
-		// clear a fields that matter to DP_SV_CLIENTNAME and DP_SV_CLIENTCOLORS, and also frags
-		PRVM_ED_ClearEdict(prog, host_client->edict);
-	}
-
-	// clear the client struct (this sets active to false)
-	memset(host_client, 0, sizeof(*host_client));
-
-	// update server listing on the master because player count changed
-	// (which the master uses for filtering empty/full servers)
-	NetConn_Heartbeat(1);
-
-	if (sv.loadgame)
-	{
-		for (i = 0;i < svs.maxclients;i++)
-			if (svs.clients[i].active && !svs.clients[i].spawned)
-				break;
-		if (i == svs.maxclients)
-		{
-			Con_Printf("Loaded game, everyone rejoined - unpausing\n");
-			sv.paused = sv.loadgame = false; // we're basically done with loading now
-		}
-	}
-}
-
-/*
-==================
-Host_ShutdownServer
-
-This only happens at the end of a game, not between levels
-==================
-*/
-void Host_ShutdownServer(void)
-{
-	prvm_prog_t *prog = SVVM_prog;
-	int i;
-
-	Con_DPrintf("Host_ShutdownServer\n");
-
-	if (!sv.active)
-		return;
-
-	NetConn_Heartbeat(2);
-	NetConn_Heartbeat(2);
-
-// make sure all the clients know we're disconnecting
-	World_End(&sv.world);
-	if(prog->loaded)
-	{
-		if(PRVM_serverfunction(SV_Shutdown))
-		{
-			func_t s = PRVM_serverfunction(SV_Shutdown);
-			PRVM_serverglobalfloat(time) = sv.time;
-			PRVM_serverfunction(SV_Shutdown) = 0; // prevent it from getting called again
-			prog->ExecuteProgram(prog, s,"SV_Shutdown() required");
-		}
-	}
-	for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
-		if (host_client->active)
-			SV_DropClient(false); // server shutdown
-
-	NetConn_CloseServerPorts();
-
-	sv.active = false;
-//
-// clear structures
-//
-	memset(&sv, 0, sizeof(sv));
-	memset(svs.clients, 0, svs.maxclients*sizeof(client_t));
-
-	cl.islocalgame = false;
-}
-
 
 //============================================================================
 
@@ -1228,16 +974,9 @@ static void Host_Init (void)
 	Curl_Init_Commands();
 	Sys_Init_Commands();
 	COM_Init_Commands();
-	FS_Init_Commands();
 
-	// initialize console window (only used by sys_win.c)
-	Sys_InitConsole();
-
-	// initialize the self-pack (must be before COM_InitGameType as it may add command line options)
-	FS_Init_SelfPack();
-
-	// detect gamemode from commandline options or executable name
-	COM_InitGameType();
+	// initialize filesystem (including fs_basedir, fs_gamedir, -game, scr_screenshot_name)
+	FS_Init();
 
 	// construct a version string for the corner of the console
 	os = DP_OS_NAME;
@@ -1249,9 +988,6 @@ static void Host_Init (void)
 
 	// initialize ixtable
 	Mathlib_Init();
-
-	// initialize filesystem (including fs_basedir, fs_gamedir, -game, scr_screenshot_name)
-	FS_Init();
 
 	// register the cvars for session locking
 	Host_InitSession();
@@ -1399,7 +1135,7 @@ void Host_Shutdown(void)
 
 	// shut down local server if active
 	SV_LockThreadMutex();
-	Host_ShutdownServer ();
+	SV_Shutdown ();
 	SV_UnlockThreadMutex();
 
 #ifdef CONFIG_MENU

@@ -1458,13 +1458,13 @@ client_state_t;
 //
 // cvars
 //
-extern cvar_t cl_name;
+extern cvar_t name;
 extern cvar_t cl_color;
-extern cvar_t cl_rate;
-extern cvar_t cl_rate_burstsize;
-extern cvar_t cl_pmodel;
-extern cvar_t cl_playermodel;
-extern cvar_t cl_playerskin;
+extern cvar_t rate;
+extern cvar_t rate_burstsize;
+extern cvar_t pmodel;
+extern cvar_t playermodel;
+extern cvar_t playerskin;
 
 extern cvar_t rcon_password;
 extern cvar_t rcon_address;
@@ -1607,6 +1607,8 @@ void CL_Stop_f(cmd_state_t *cmd);
 void CL_Record_f(cmd_state_t *cmd);
 void CL_PlayDemo_f(cmd_state_t *cmd);
 void CL_TimeDemo_f(cmd_state_t *cmd);
+
+void CL_Demo_Init(void);
 
 //
 // cl_parse.c

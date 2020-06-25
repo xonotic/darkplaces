@@ -211,6 +211,9 @@ void CL_ClearState(void)
 	CL_Screen_NewMap();
 }
 
+extern cvar_t topcolor;
+extern cvar_t bottomcolor;
+
 void CL_SetInfo(const char *key, const char *value, qboolean send, qboolean allowstarkey, qboolean allowmodel, qboolean quiet)
 {
 	int i;
@@ -257,11 +260,13 @@ void CL_SetInfo(const char *key, const char *value, qboolean send, qboolean allo
 		}
 		else if (!strcasecmp(key, "topcolor"))
 		{
-			// don't send anything, the combined color code will be updated manually
+			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", atoi(value), bottomcolor.integer));
 		}
 		else if (!strcasecmp(key, "bottomcolor"))
 		{
-			// don't send anything, the combined color code will be updated manually
+			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", topcolor.integer, atoi(value)));
 		}
 		else if (!strcasecmp(key, "rate"))
 		{
@@ -324,6 +329,8 @@ void CL_ExpandCSQCRenderEntities(int num)
 		}
 	}
 }
+
+extern cvar_t rcon_secure;
 
 /*
 =====================
@@ -405,11 +412,87 @@ void CL_Disconnect(void)
 	SCR_ClearLoadingScreen(false);
 }
 
+/*
+==================
+CL_Reconnect_f
+
+This command causes the client to wait for the signon messages again.
+This is sent just before a server changes levels
+==================
+*/
+void CL_Reconnect_f(cmd_state_t *cmd)
+{
+	char temp[128];
+	// if not connected, reconnect to the most recent server
+	if (!cls.netcon)
+	{
+		// if we have connected to a server recently, the userinfo
+		// will still contain its IP address, so get the address...
+		InfoString_GetValue(cls.userinfo, "*ip", temp, sizeof(temp));
+		if (temp[0])
+			CL_EstablishConnection(temp, -1);
+		else
+			Con_Printf("Reconnect to what server?  (you have not connected to a server yet)\n");
+		return;
+	}
+	// if connected, do something based on protocol
+	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	{
+		// quakeworld can just re-login
+		if (cls.qw_downloadmemory)  // don't change when downloading
+			return;
+
+		S_StopAllSounds();
+
+		if (cls.state == ca_connected)
+		{
+			Con_Printf("Server is changing level...\n");
+			MSG_WriteChar(&cls.netcon->message, qw_clc_stringcmd);
+			MSG_WriteString(&cls.netcon->message, "new");
+		}
+	}
+	else
+	{
+		// netquake uses reconnect on level changes (silly)
+		if (Cmd_Argc(cmd) != 1)
+		{
+			Con_Print("reconnect : wait for signon messages again\n");
+			return;
+		}
+		if (!cls.signon)
+		{
+			Con_Print("reconnect: no signon, ignoring reconnect\n");
+			return;
+		}
+		cls.signon = 0;		// need new connection messages
+	}
+}
+
+/*
+=====================
+CL_Connect_f
+
+User command to connect to server
+=====================
+*/
+static void CL_Connect_f(cmd_state_t *cmd)
+{
+	if (Cmd_Argc(cmd) < 2)
+	{
+		Con_Print("connect <serveraddress> [<key> <value> ...]: connect to a multiplayer game\n");
+		return;
+	}
+	// clear the rcon password, to prevent vulnerability by stuffcmd-ing a connect command
+	if(rcon_secure.integer <= 0)
+		Cvar_SetQuick(&rcon_password, "");
+	CL_EstablishConnection(Cmd_Argv(cmd, 1), 2);
+}
+
 void CL_Disconnect_f(cmd_state_t *cmd)
 {
 	CL_Disconnect ();
 	if (sv.active)
-		Host_ShutdownServer ();
+		SV_Shutdown ();
 }
 
 
@@ -1957,16 +2040,6 @@ void CL_UpdateWorld(void)
 	r_refdef.scene.time = cl.time;
 }
 
-// LadyHavoc: pausedemo command
-static void CL_PauseDemo_f(cmd_state_t *cmd)
-{
-	cls.demopaused = !cls.demopaused;
-	if (cls.demopaused)
-		Con_Print("Demo paused\n");
-	else
-		Con_Print("Demo unpaused\n");
-}
-
 /*
 ======================
 CL_Fog_f
@@ -2711,27 +2784,20 @@ void CL_Init (void)
 		Cvar_RegisterVariable (&cl_itembobspeed);
 		Cvar_RegisterVariable (&cl_itembobheight);
 
+		CL_Demo_Init();
+
 		Cmd_AddCommand(CMD_CLIENT, "entities", CL_PrintEntities_f, "print information on network entities known to client");
 		Cmd_AddCommand(CMD_CLIENT, "disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
-		Cmd_AddCommand(CMD_CLIENT, "record", CL_Record_f, "record a demo");
-		Cmd_AddCommand(CMD_CLIENT, "stop", CL_Stop_f, "stop recording or playing a demo");
-		Cmd_AddCommand(CMD_CLIENT, "playdemo", CL_PlayDemo_f, "watch a demo file");
-		Cmd_AddCommand(CMD_CLIENT, "timedemo", CL_TimeDemo_f, "play back a demo as fast as possible and save statistics to benchmark.log");
+		Cmd_AddCommand(CMD_CLIENT, "connect", CL_Connect_f, "connect to a server by IP address or hostname");
+		Cmd_AddCommand(CMD_CLIENT | CMD_CLIENT_FROM_SERVER, "reconnect", CL_Reconnect_f, "reconnect to the last server you were on, or resets a quakeworld connection (do not use if currently playing on a netquake server)");
 
 		// Support Client-side Model Index List
 		Cmd_AddCommand(CMD_CLIENT, "cl_modelindexlist", CL_ModelIndexList_f, "list information on all models in the client modelindex");
 		// Support Client-side Sound Index List
 		Cmd_AddCommand(CMD_CLIENT, "cl_soundindexlist", CL_SoundIndexList_f, "list all sounds in the client soundindex");
 
-		Cvar_RegisterVariable (&cl_autodemo);
-		Cvar_RegisterVariable (&cl_autodemo_nameformat);
-		Cvar_RegisterVariable (&cl_autodemo_delete);
-
 		Cmd_AddCommand(CMD_CLIENT, "fog", CL_Fog_f, "set global fog parameters (density red green blue [alpha [mindist [maxdist [top [fadedepth]]]]])");
 		Cmd_AddCommand(CMD_CLIENT, "fog_heighttexture", CL_Fog_HeightTexture_f, "set global fog parameters (density red green blue alpha mindist maxdist top depth textures/mapname/fogheight.tga)");
-
-		// LadyHavoc: added pausedemo
-		Cmd_AddCommand(CMD_CLIENT, "pausedemo", CL_PauseDemo_f, "pause demo playback (can also safely pause demo recording if using QUAKE, QUAKEDP or NEHAHRAMOVIE protocol, useful for making movies)");
 
 		Cmd_AddCommand(CMD_CLIENT, "cl_areastats", CL_AreaStats_f, "prints statistics on entity culling during collision traces");
 
