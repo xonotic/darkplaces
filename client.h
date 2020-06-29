@@ -576,7 +576,8 @@ typedef struct entity_render_s
 	// MATERIALFLAG_MODELLIGHT uses these parameters
 	float render_modellight_ambient[3];
 	float render_modellight_diffuse[3];
-	float render_modellight_lightdir[3];
+	float render_modellight_lightdir_world[3];
+	float render_modellight_lightdir_local[3];
 	float render_modellight_specular[3];
 	// lightmap rendering (not MATERIALFLAG_MODELLIGHT)
 	float render_lightmap_ambient[3];
@@ -1458,13 +1459,13 @@ client_state_t;
 //
 // cvars
 //
-extern cvar_t name;
+extern cvar_t cl_name;
 extern cvar_t cl_color;
-extern cvar_t rate;
-extern cvar_t rate_burstsize;
-extern cvar_t pmodel;
-extern cvar_t playermodel;
-extern cvar_t playerskin;
+extern cvar_t cl_rate;
+extern cvar_t cl_rate_burstsize;
+extern cvar_t cl_pmodel;
+extern cvar_t cl_playermodel;
+extern cvar_t cl_playerskin;
 
 extern cvar_t rcon_password;
 extern cvar_t rcon_address;

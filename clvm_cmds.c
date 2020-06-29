@@ -219,8 +219,6 @@ static void VM_CL_sound (prvm_prog_t *prog)
 	else
 		startposition = 0;
 
-	channel = CHAN_USER2ENGINE(channel);
-
 	if (!IS_CHAN(channel))
 	{
 		VM_Warning(prog, "VM_CL_sound: channel must be in range 0-127\n");
@@ -685,8 +683,8 @@ static void VM_CL_ambientsound (prvm_prog_t *prog)
 	vec3_t f;
 	sfx_t	*s;
 	VM_SAFEPARMCOUNT(4, VM_CL_ambientsound);
-	s = S_FindName(PRVM_G_STRING(OFS_PARM0));
-	VectorCopy(PRVM_G_VECTOR(OFS_PARM1), f);
+	VectorCopy(PRVM_G_VECTOR(OFS_PARM0), f);
+	s = S_FindName(PRVM_G_STRING(OFS_PARM1));
 	S_StaticSound (s, f, PRVM_G_FLOAT(OFS_PARM2), PRVM_G_FLOAT(OFS_PARM3)*64);
 }
 
@@ -1872,7 +1870,7 @@ static void VM_CL_copyentity (prvm_prog_t *prog)
 static void VM_CL_effect (prvm_prog_t *prog)
 {
 #if 1
-	Con_Warnf("WARNING: VM_CL_effect not implemented\n"); // FIXME: this needs to take modelname not modelindex, the csqc defs has it as string and so it shall be
+	Con_Printf(CON_WARN "WARNING: VM_CL_effect not implemented\n"); // FIXME: this needs to take modelname not modelindex, the csqc defs has it as string and so it shall be
 #else
 	vec3_t org;
 	VM_SAFEPARMCOUNT(5, VM_CL_effect);

@@ -18,10 +18,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
 
-#include <quakedef.h>
-#include <utf8lib.h>
-#include <server.h>
-#include <sv_demo.h>
+#include "quakedef.h"
+#include "utf8lib.h"
+#include "server.h"
+#include "sv_demo.h"
 
 int current_skill;
 cvar_t sv_cheats = {CVAR_SERVER | CVAR_NOTIFY, "sv_cheats", "0", "enables cheat commands in any game, and cheat impulses in dpmod"};
@@ -163,12 +163,12 @@ static void SV_Restart_f(cmd_state_t *cmd)
 //===========================================================================
 
 // Disable cheats if sv_cheats is turned off
-static void SV_DisableCheats_c(char *value)
+static void SV_DisableCheats_c(cvar_t *var)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	int i = 0;
 
-	if (value[0] == '0' && !value[1])
+	if (var->value == 0)
 	{
 		while (svs.clients[i].edict)
 		{
@@ -1172,7 +1172,7 @@ static void SV_Kick_f(cmd_state_t *cmd)
 			if (cls.state == ca_dedicated)
 				who = "Console";
 			else
-				who = name.string;
+				who = cl_name.string;
 		}
 		else
 			who = save->name;

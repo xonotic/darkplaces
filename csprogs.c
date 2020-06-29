@@ -562,12 +562,10 @@ void CL_VM_Parse_StuffCmd (const char *msg)
 		// temporarily so that it can be set by the cvar command,
 		// and then reprotect it afterwards
 		int crcflags = csqc_progcrc.flags;
-		int sizeflags = csqc_progcrc.flags;
 		csqc_progcrc.flags &= ~CVAR_READONLY;
 		csqc_progsize.flags &= ~CVAR_READONLY;
 		Cmd_ExecuteString(&cmd_client, msg, src_command, true);
-		csqc_progcrc.flags = crcflags;
-		csqc_progsize.flags = sizeflags;
+		csqc_progcrc.flags = csqc_progsize.flags = crcflags;
 		return;
 	}
 
@@ -1033,7 +1031,7 @@ void CL_VM_Init (void)
 		{
 			if (cls.demoplayback)
 			{
-				Con_Warnf("Warning: Your %s is not the same version as the demo was recorded with (CRC/size are %i/%i but should be %i/%i)\n", csqc_progname.string, csprogsdatacrc, (int)csprogsdatasize, requiredcrc, requiredsize);
+				Con_Printf(CON_WARN "Warning: Your %s is not the same version as the demo was recorded with (CRC/size are %i/%i but should be %i/%i)\n", csqc_progname.string, csprogsdatacrc, (int)csprogsdatasize, requiredcrc, requiredsize);
 				// Mem_Free(csprogsdata);
 				// return;
 				// We WANT to continue here, and play the demo with different csprogs!
@@ -1042,7 +1040,7 @@ void CL_VM_Init (void)
 			else
 			{
 				Mem_Free(csprogsdata);
-				Con_Errorf("Your %s is not the same version as the server (CRC is %i/%i but should be %i/%i)\n", csqc_progname.string, csprogsdatacrc, (int)csprogsdatasize, requiredcrc, requiredsize);
+				Con_Printf(CON_ERROR "Your %s is not the same version as the server (CRC is %i/%i but should be %i/%i)\n", csqc_progname.string, csprogsdatacrc, (int)csprogsdatasize, requiredcrc, requiredsize);
 				CL_Disconnect();
 				return;
 			}
@@ -1053,9 +1051,9 @@ void CL_VM_Init (void)
 		if (requiredcrc >= 0)
 		{
 			if (cls.demoplayback)
-				Con_Errorf("CL_VM_Init: demo requires CSQC, but \"%s\" wasn't found\n", csqc_progname.string);
+				Con_Printf(CON_ERROR "CL_VM_Init: demo requires CSQC, but \"%s\" wasn't found\n", csqc_progname.string);
 			else
-				Con_Errorf("CL_VM_Init: server requires CSQC, but \"%s\" wasn't found\n", csqc_progname.string);
+				Con_Printf(CON_ERROR "CL_VM_Init: server requires CSQC, but \"%s\" wasn't found\n", csqc_progname.string);
 			CL_Disconnect();
 		}
 		return;

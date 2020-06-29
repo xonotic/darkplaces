@@ -211,8 +211,8 @@ void CL_ClearState(void)
 	CL_Screen_NewMap();
 }
 
-extern cvar_t topcolor;
-extern cvar_t bottomcolor;
+extern cvar_t cl_topcolor;
+extern cvar_t cl_bottomcolor;
 
 void CL_SetInfo(const char *key, const char *value, qboolean send, qboolean allowstarkey, qboolean allowmodel, qboolean quiet)
 {
@@ -261,12 +261,12 @@ void CL_SetInfo(const char *key, const char *value, qboolean send, qboolean allo
 		else if (!strcasecmp(key, "topcolor"))
 		{
 			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
-			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", atoi(value), bottomcolor.integer));
+			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", atoi(value), cl_bottomcolor.integer));
 		}
 		else if (!strcasecmp(key, "bottomcolor"))
 		{
 			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
-			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", topcolor.integer, atoi(value)));
+			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "color %i %i", cl_topcolor.integer, atoi(value)));
 		}
 		else if (!strcasecmp(key, "rate"))
 		{
@@ -505,7 +505,7 @@ CL_EstablishConnection
 Host should be either "local" or a net address
 =====================
 */
-void CL_EstablishConnection(const char *host, int firstarg)
+void CL_EstablishConnection(const char *address, int firstarg)
 {
 	if (cls.state == ca_dedicated)
 		return;
@@ -525,7 +525,7 @@ void CL_EstablishConnection(const char *host, int firstarg)
 	// make sure the client ports are open before attempting to connect
 	NetConn_UpdateSockets();
 
-	if (LHNETADDRESS_FromString(&cls.connect_address, host, 26000) && (cls.connect_mysocket = NetConn_ChooseClientSocketForAddress(&cls.connect_address)))
+	if (LHNETADDRESS_FromString(&cls.connect_address, address, 26000) && (cls.connect_mysocket = NetConn_ChooseClientSocketForAddress(&cls.connect_address)))
 	{
 		cls.connect_trying = true;
 		cls.connect_remainingtries = 3;
@@ -2270,7 +2270,7 @@ static void CL_Locs_Save_f(cmd_state_t *cmd)
 			if (VectorCompare(loc->mins, loc->maxs))
 				break;
 		if (loc)
-			Con_Warnf("Warning: writing loc file containing a mixture of qizmo-style points and proquake-style boxes may not work in qizmo or proquake!\n");
+			Con_Printf(CON_WARN "Warning: writing loc file containing a mixture of qizmo-style points and proquake-style boxes may not work in qizmo or proquake!\n");
 	}
 	for (loc = cl.locnodes;loc;loc = loc->next)
 	{
@@ -2490,7 +2490,8 @@ static void CL_MeshEntities_Init(void)
 		VectorSet(ent->render.render_modellight_ambient, 1, 1, 1);
 		VectorSet(ent->render.render_modellight_diffuse, 0, 0, 0);
 		VectorSet(ent->render.render_modellight_specular, 0, 0, 0);
-		VectorSet(ent->render.render_modellight_lightdir, 0, 0, 1);
+		VectorSet(ent->render.render_modellight_lightdir_world, 0, 0, 1);
+		VectorSet(ent->render.render_modellight_lightdir_local, 0, 0, 1); // local doesn't matter because no diffuse/specular color
 		VectorSet(ent->render.render_lightmap_ambient, 0, 0, 0);
 		VectorSet(ent->render.render_lightmap_diffuse, 1, 1, 1);
 		VectorSet(ent->render.render_lightmap_specular, 1, 1, 1);
@@ -2666,7 +2667,7 @@ static void CL_UpdateEntityShading_Entity(entity_render_t *ent)
 		ent->render_modellight_ambient[q] = a[q] * ent->colormod[q];
 		ent->render_modellight_diffuse[q] = c[q] * ent->colormod[q];
 		ent->render_modellight_specular[q] = c[q];
-		ent->render_modellight_lightdir[q] = dir[q];
+		ent->render_modellight_lightdir_world[q] = dir[q];
 		ent->render_lightmap_ambient[q] = ent->colormod[q] * r_refdef.scene.ambientintensity;
 		ent->render_lightmap_diffuse[q] = ent->colormod[q] * r_refdef.scene.lightmapintensity;
 		ent->render_lightmap_specular[q] = r_refdef.scene.lightmapintensity;
@@ -2682,9 +2683,12 @@ static void CL_UpdateEntityShading_Entity(entity_render_t *ent)
 		for (q = 0; q < 3; q++)
 			ent->render_rtlight_diffuse[q] = ent->render_rtlight_specular[q] = q;
 
-	if (VectorLength2(ent->render_modellight_lightdir) == 0)
-		VectorSet(ent->render_modellight_lightdir, 0, 0, 1); // have to set SOME valid vector here
-	VectorNormalize(ent->render_modellight_lightdir);
+	if (VectorLength2(ent->render_modellight_lightdir_world) == 0)
+		VectorSet(ent->render_modellight_lightdir_world, 0, 0, 1); // have to set SOME valid vector here
+	VectorNormalize(ent->render_modellight_lightdir_world);
+	// transform into local space for the entity as well
+	Matrix4x4_Transform3x3(&ent->inversematrix, ent->render_modellight_lightdir_world, ent->render_modellight_lightdir_local);
+	VectorNormalize(ent->render_modellight_lightdir_local);
 }
 
 

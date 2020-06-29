@@ -345,7 +345,7 @@ static void SCR_DrawNetGraph (void)
 	graphwidth = 120;
 	graphheight = 70;
 	graphscale = 1.0f / 1500.0f;
-	graphlimit = rate.integer;
+	graphlimit = cl_rate.integer;
 
 	netgraphsperrow = (vid_conwidth.integer + separator2) / (graphwidth * 2 + separator1 + separator2);
 	netgraphsperrow = max(netgraphsperrow, 1);
@@ -1491,7 +1491,7 @@ void SCR_ScreenShot_f(cmd_state_t *cmd)
 		Con_Printf("Wrote %s\n", filename);
 	else
 	{
-		Con_Errorf("Unable to write %s\n", filename);
+		Con_Printf(CON_ERROR "Unable to write %s\n", filename);
 		if(jpeg || png)
 		{
 			if(SCR_ScreenShot (filename, buffer1, buffer2, 0, 0, vid.width, vid.height, false, false, false, false, false, true, scr_screenshot_alpha.integer != 0))
