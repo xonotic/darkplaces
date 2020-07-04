@@ -277,7 +277,7 @@ static void CL_VM_SetTraceGlobals(prvm_prog_t *prog, const trace_t *trace, int s
 #define CL_HitNetworkBrushModels(move) !((move) == MOVE_WORLDONLY)
 #define CL_HitNetworkPlayers(move)     !((move) == MOVE_WORLDONLY || (move) == MOVE_NOMONSTERS)
 
-// #16 void(vector v1, vector v2, float movetype, entity ignore) traceline
+// #16 void(vector v1, vector v2, float movetype, entity ignoreent) traceline
 static void VM_CL_traceline (prvm_prog_t *prog)
 {
 	vec3_t	v1, v2;
@@ -313,7 +313,7 @@ Used for use tracing and shot targeting
 Traces are blocked by bbox and exact bsp entityes, and also slide box entities
 if the tryents flag is set.
 
-tracebox (vector1, vector mins, vector maxs, vector2, tryents)
+tracebox (vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent)
 =================
 */
 // LadyHavoc: added this for my own use, VERY useful, similar to traceline
@@ -452,7 +452,7 @@ static void VM_CL_precache_model (prvm_prog_t *prog)
 	VM_Warning(prog, "VM_CL_precache_model: model \"%s\" not found\n", name);
 }
 
-// #22 entity(vector org, float rad) findradius
+// #22 entity(vector org, float rad[, .entity chainfield]) findradius
 static void VM_CL_findradius (prvm_prog_t *prog)
 {
 	prvm_edict_t	*ent, *chain;
@@ -1208,7 +1208,7 @@ static void VM_CL_getstatf (prvm_prog_t *prog)
 	PRVM_G_FLOAT(OFS_RETURN) =  dat.f;
 }
 
-//#331 float(float stnum) getstati (EXT_CSQC)
+//#331 float(float stnum[, firstbit[, bitcount]]) getstati (EXT_CSQC)
 static void VM_CL_getstati (prvm_prog_t *prog)
 {
 	int i, index;
@@ -1354,7 +1354,7 @@ static void VM_CL_pointparticles (prvm_prog_t *prog)
 	CL_ParticleEffect(i, n, f, f, v, v, NULL, prog->argc >= 5 ? (int)PRVM_G_FLOAT(OFS_PARM4) : 0);
 }
 
-//#502 void(float effectnum, entity own, vector origin_from, vector origin_to, vector dir_from, vector dir_to, float count, float extflags) boxparticles (DP_CSQC_BOXPARTICLES)
+//#502 void(float effectnum, entity own, vector origin_from, vector origin_to, vector dir_from, vector dir_to, float count[, float extflags]) boxparticles (DP_CSQC_BOXPARTICLES)
 static void VM_CL_boxparticles (prvm_prog_t *prog)
 {
 	int effectnum;
@@ -2793,7 +2793,7 @@ static void VM_CL_ParticleThemeFromGlobals(vmparticletheme_t *theme, prvm_prog_t
 }
 
 // init particle spawner interface
-// # float(float max_themes) initparticlespawner
+// #522 float([float max_themes]) initparticlespawner
 static void VM_CL_InitParticleSpawner (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNTRANGE(0, 1, VM_CL_InitParticleSpawner);
@@ -3615,7 +3615,7 @@ static qboolean CL_movestep (prvm_edict_t *ent, vec3_t move, qboolean relink, qb
 ===============
 VM_CL_walkmove
 
-float(float yaw, float dist[, settrace]) walkmove
+float(float yaw, float dist[, float settrace]) walkmove
 ===============
 */
 static void VM_CL_walkmove (prvm_prog_t *prog)
@@ -4175,13 +4175,13 @@ VM_vlen,						// #12 float(vector v) vlen (QUAKE)
 VM_vectoyaw,					// #13 float(vector v) vectoyaw (QUAKE)
 VM_CL_spawn,					// #14 entity() spawn (QUAKE)
 VM_remove,						// #15 void(entity e) remove (QUAKE)
-VM_CL_traceline,				// #16 void(vector v1, vector v2, float tryents, entity ignoreentity) traceline (QUAKE)
+VM_CL_traceline,				// #16 void(vector v1, vector v2, float tryents, entity ignoreent) traceline (QUAKE)
 NULL,							// #17 entity() checkclient (QUAKE)
 VM_find,						// #18 entity(entity start, .string fld, string match) find (QUAKE)
 VM_precache_sound,				// #19 void(string s) precache_sound (QUAKE)
 VM_CL_precache_model,			// #20 void(string s) precache_model (QUAKE)
 NULL,							// #21 void(entity client, string s, ...) stuffcmd (QUAKE)
-VM_CL_findradius,				// #22 entity(vector org, float rad) findradius (QUAKE)
+VM_CL_findradius,				// #22 entity(vector org, float rad[, .entity chainfield]) findradius (QUAKE)
 NULL,							// #23 void(string s, ...) bprint (QUAKE)
 NULL,							// #24 void(entity client, string s, ...) sprint (QUAKE)
 VM_dprint,						// #25 void(string s, ...) dprint (QUAKE)
@@ -4232,7 +4232,7 @@ VM_CL_makestatic,				// #69 void(entity e) makestatic (QUAKE)
 NULL,							// #70 void(string s) changelevel (QUAKE)
 NULL,							// #71 (QUAKE)
 VM_cvar_set,					// #72 void(string var, string val) cvar_set (QUAKE)
-NULL,							// #73 void(entity client, strings) centerprint (QUAKE)
+NULL,							// #73 void(entity client, string s, ...) centerprint (QUAKE)
 VM_CL_ambientsound,				// #74 void(vector pos, string samp, float vol, float atten) ambientsound (QUAKE)
 VM_CL_precache_model,			// #75 string(string s) precache_model2 (QUAKE)
 VM_precache_sound,				// #76 string(string s) precache_sound2 (QUAKE)
@@ -4249,7 +4249,7 @@ NULL,							// #86 (QUAKE)
 NULL,							// #87 (QUAKE)
 NULL,							// #88 (QUAKE)
 NULL,							// #89 (QUAKE)
-VM_CL_tracebox,					// #90 void(vector v1, vector min, vector max, vector v2, float nomonsters, entity forent) tracebox (DP_QC_TRACEBOX)
+VM_CL_tracebox,					// #90 void(vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent) tracebox (DP_QC_TRACEBOX)
 VM_randomvec,					// #91 vector() randomvec (DP_QC_RANDOMVEC)
 VM_CL_getlight,					// #92 vector(vector org) getlight (DP_QC_GETLIGHT)
 VM_registercvar,				// #93 float(string name, string value) registercvar (DP_REGISTERCVAR)
@@ -4479,7 +4479,7 @@ NULL,							// #313
 NULL,							// #314
 VM_drawline,					// #315 void(float width, vector pos1, vector pos2, float flag) drawline (EXT_CSQC)
 VM_iscachedpic,					// #316 float(string name) iscachedpic (EXT_CSQC)
-VM_precache_pic,				// #317 string(string name, float trywad) precache_pic (EXT_CSQC)
+VM_precache_pic,				// #317 string(string pic[, float flags]) precache_pic (EXT_CSQC)
 VM_getimagesize,				// #318 vector(string picname) draw_getimagesize (EXT_CSQC)
 VM_freepic,						// #319 void(string name) freepic (EXT_CSQC)
 VM_drawcharacter,				// #320 float(vector position, float character, vector scale, vector rgb, float alpha, float flag) drawcharacter (EXT_CSQC)
@@ -4488,7 +4488,7 @@ VM_drawpic,						// #322 float(vector position, string pic, vector size, vector 
 VM_drawfill,					// #323 float(vector position, vector size, vector rgb, float alpha, float flag) drawfill (EXT_CSQC)
 VM_drawsetcliparea,				// #324 void(float x, float y, float width, float height) drawsetcliparea
 VM_drawresetcliparea,			// #325 void(void) drawresetcliparea
-VM_drawcolorcodedstring,		// #326 float drawcolorcodedstring(vector position, string text, vector scale, vector rgb, float alpha, float flag) (EXT_CSQC)
+VM_drawcolorcodedstring,		// #326 float drawcolorcodedstring(vector position, string text, vector scale[, vector rgb], vector rgb, float alpha, float flag) (EXT_CSQC)
 VM_stringwidth,                 // #327 // FIXME is this okay?
 VM_drawsubpic,					// #328 // FIXME is this okay?
 VM_drawrotpic,					// #329 // FIXME is this okay?
@@ -4499,7 +4499,7 @@ VM_CL_setmodelindex,			// #333 void(entity e, float mdlindex) setmodelindex (EXT
 VM_CL_modelnameforindex,		// #334 string(float mdlindex) modelnameforindex (EXT_CSQC)
 VM_CL_particleeffectnum,		// #335 float(string effectname) particleeffectnum (EXT_CSQC)
 VM_CL_trailparticles,			// #336 void(entity ent, float effectnum, vector start, vector end) trailparticles (EXT_CSQC)
-VM_CL_pointparticles,			// #337 void(float effectnum, vector origin [, vector dir, float count]) pointparticles (EXT_CSQC)
+VM_CL_pointparticles,			// #337 void(float effectnum, vector origin, vector dir, float count[, float color]) pointparticles (EXT_CSQC)
 VM_centerprint,					// #338 void(string s, ...) centerprint (EXT_CSQC)
 VM_print,						// #339 void(string s, ...) print (EXT_CSQC, DP_SV_PRINT)
 VM_keynumtostring,				// #340 string(float keynum) keynumtostring (EXT_CSQC)
@@ -4519,7 +4519,7 @@ VM_wasfreed,					// #353 float(entity ent) wasfreed (EXT_CSQC) (should be availa
 VM_CL_serverkey,				// #354 string(string key) serverkey (EXT_CSQC)
 VM_CL_videoplaying,				// #355
 VM_findfont,					// #356 float(string fontname) loadfont (DP_GFX_FONTS)
-VM_loadfont,					// #357 float(string fontname, string fontmaps, string sizes, float slot) loadfont (DP_GFX_FONTS)
+VM_loadfont,					// #357 float(string fontname, string fontmaps, string sizes[, float slot[, float scale[, float voffset]]]) loadfont (DP_GFX_FONTS)
 VM_CL_loadcubemap,				// #358 void(string cubemapname) loadcubemap (DP_GFX_)
 NULL,							// #359
 VM_CL_ReadByte,					// #360 float() readbyte (EXT_CSQC)
@@ -4623,7 +4623,7 @@ NULL,							// #456 void(float to, string s) WriteUnterminatedString (DP_SV_WRIT
 VM_CL_te_flamejet,				// #457 void(vector org, vector vel, float howmany) te_flamejet (DP_TE_FLAMEJET)
 NULL,							// #458
 VM_ftoe,						// #459 entity(float num) entitybyindex (DP_QC_EDICT_NUM)
-VM_buf_create,					// #460 float() buf_create (DP_QC_STRINGBUFFERS)
+VM_buf_create,					// #460 float([string format[, float flags]]) buf_create (DP_QC_STRINGBUFFERS)
 VM_buf_del,						// #461 void(float bufhandle) buf_del (DP_QC_STRINGBUFFERS)
 VM_buf_getsize,					// #462 float(float bufhandle) buf_getsize (DP_QC_STRINGBUFFERS)
 VM_buf_copy,					// #463 void(float bufhandle_from, float bufhandle_to) buf_copy (DP_QC_STRINGBUFFERS)
@@ -4676,13 +4676,13 @@ NULL,							// #509
 VM_uri_escape,					// #510 string(string in) uri_escape = #510;
 VM_uri_unescape,				// #511 string(string in) uri_unescape = #511;
 VM_etof,					// #512 float(entity ent) num_for_edict = #512 (DP_QC_NUM_FOR_EDICT)
-VM_uri_get,						// #513 float(string uri, float id, [string post_contenttype, string post_delim, [float buf]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
+VM_uri_get,						// #513 float(string uri, float id[, string post_contenttype[, string post_delim[, float buf[, float keyid]]]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
 VM_tokenize_console,					// #514 float(string str) tokenize_console = #514; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_start_index,					// #515 float(float idx) argv_start_index = #515; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_end_index,						// #516 float(float idx) argv_end_index = #516; (DP_QC_TOKENIZE_CONSOLE)
-VM_buf_cvarlist,						// #517 void(float buf, string prefix, string antiprefix) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
+VM_buf_cvarlist,						// #517 void(float buf, string prefix[, string antiprefix]) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
 VM_cvar_description,					// #518 float(string name) cvar_description = #518; (DP_QC_CVAR_DESCRIPTION)
-VM_gettime,						// #519 float(float timer) gettime = #519; (DP_QC_GETTIME)
+VM_gettime,						// #519 float([float timer]) gettime = #519; (DP_QC_GETTIME)
 VM_keynumtostring,				// #520 string keynumtostring(float keynum)
 VM_findkeysforcommand,			// #521 string findkeysforcommand(string command[, float bindmap])
 VM_CL_InitParticleSpawner,		// #522 void(float max_themes) initparticlespawner (DP_CSQC_SPAWNPARTICLE)
@@ -4699,9 +4699,9 @@ VM_log,							// #532
 VM_getsoundtime,				// #533 float(entity e, float channel) getsoundtime = #533; (DP_SND_GETSOUNDTIME)
 VM_soundlength,					// #534 float(string sample) soundlength = #534; (DP_SND_GETSOUNDTIME)
 VM_buf_loadfile,                // #535 float(string filename, float bufhandle) buf_loadfile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_buf_writefile,               // #536 float(float filehandle, float bufhandle, float startpos, float numstrings) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_bufstr_find,                 // #537 float(float bufhandle, string match, float matchrule, float startpos) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_matchpattern,                // #538 float(string s, string pattern, float matchrule) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_buf_writefile,               // #536 float(float filehandle, float bufhandle[, float startpos[, float numstrings]]) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_bufstr_find,                 // #537 float(float bufhandle, string match, float matchrule[, float startpos[, float step]]) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_matchpattern,                // #538 float(string s, string pattern, float matchrule[, float startpos]) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
 NULL,							// #539
 VM_physics_enable,				// #540 void(entity e, float physics_enabled) physics_enable = #540; (DP_PHYSICS_ODE)
 VM_physics_addforce,			// #541 void(entity e, vector force, vector relative_ofs) physics_addforce = #541; (DP_PHYSICS_ODE)

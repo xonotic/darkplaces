@@ -345,7 +345,7 @@ float(vector v) vlen = #12;
 float(vector v) vectoyaw = #13;
 entity() spawn = #14;
 void(entity e) remove = #15;
-float(vector v1, vector v2, float tryents, entity ignoreentity) traceline = #16;
+float(vector v1, vector v2, float tryents, entity ignoreent) traceline = #16;
 
 entity(entity start, .string fld, string match) find = #18;
 void(string s) precache_sound = #19;
@@ -402,8 +402,7 @@ string(string s) precache_file2 = #77;
 
 float(string s) stof = #81;
 
-
-void(vector v1, vector min, vector max, vector v2, float nomonsters, entity forent) tracebox = #90;
+void(vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent) tracebox = #90;
 vector() randomvec = #91;
 vector(vector org) getlight = #92;
 vector(vector org, float lpflags) getlight2 = #92;
@@ -490,9 +489,10 @@ string(float firststnum) getstats = #332;
 void(entity e, float mdlindex) setmodelindex = #333;
 string(float mdlindex) modelnameforindex = #334;
 float(string effectname) particleeffectnum = #335;
+//void(entity ent, float effectnum, vector start, vector end[, float color]) trailparticles = #336;
 void(entity ent, float effectnum, vector start, vector end) trailparticles = #336;
-//void(float effectnum, vector origin [, vector dir, float count]) pointparticles = #337;
-void(float effectnum, vector origin , vector dir, float count) pointparticles = #337;
+//void(float effectnum, vector origin, vector dir, float count[, float color]) pointparticles = #337;
+void(float effectnum, vector origin, vector dir, float count) pointparticles = #337;
 void(string s, ...) centerprint = #338;
 void(string s, ...) print = #339;
 string(float keynum) keynumtostring = #340;
@@ -683,6 +683,7 @@ float particle_delaycollision;
 float particle_angle;
 float particle_spin;
 // builtin definitions:
+//float() initparticlespawner = #522;
 float(float max_themes) initparticlespawner = #522; // check fields/globals for integration and enable particle spawner, return 1 is succeded, otherwise returns 0
 void() resetparticle = #523; // reset p_ globals to default theme #0
 void(float theme) particletheme = #524; // restore p_ globals from saved theme
@@ -1085,7 +1086,7 @@ float PRECACHE_PIC_MIPMAP = 8; // mipmap the texture for possibly better downsca
 //constant definitions:
 float MOVE_WORLDONLY = 3;
 //description:
-//allows traces to hit only world (ignoring all entities, unlike MOVE_NOMONSTERS which hits all bmodels), use as the nomonsters parameter to trace functions
+//allows traces to hit only world (ignoring all entities, unlike MOVE_NOMONSTERS which hits all bmodels), use as the tryents parameter to trace functions
 
 //DP_SND_GETSOUNDTIME
 //idea: VorteX
@@ -1449,6 +1450,7 @@ vector particles_colormin, particles_colormax;
 float PARTICLES_USEFADE = 4;  // fades the COUNT (fade alpha using alphamin/alphamax)
 float particles_fade;
 float PARTICLES_DRAWASTRAIL = 128;
+//void(float effectindex, entity own, vector org_from, vector org_to, vector dir_from, vector dir_to, float countmultiplier) boxparticles = #502;
 void(float effectindex, entity own, vector org_from, vector org_to, vector dir_from, vector dir_to, float countmultiplier, float flags) boxparticles = #502;
 float trace_networkentity;
 const float RF_FULLBRIGHT	= 256;
