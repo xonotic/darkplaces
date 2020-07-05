@@ -672,7 +672,7 @@ Used for use tracing and shot targeting
 Traces are blocked by bbox and exact bsp entityes, and also slide box entities
 if the tryents flag is set.
 
-tracebox (vector1, vector mins, vector maxs, vector2, tryents)
+tracebox (vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent)
 =================
 */
 // LadyHavoc: added this for my own use, VERY useful, similar to traceline
@@ -3287,7 +3287,7 @@ NULL,							// #86 (QUAKE)
 NULL,							// #87 (QUAKE)
 NULL,							// #88 (QUAKE)
 NULL,							// #89 (QUAKE)
-VM_SV_tracebox,					// #90 void(vector v1, vector min, vector max, vector v2, float nomonsters, entity forent) tracebox (DP_QC_TRACEBOX)
+VM_SV_tracebox,					// #90 void(vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent) tracebox (DP_QC_TRACEBOX)
 VM_randomvec,					// #91 vector() randomvec (DP_QC_RANDOMVEC)
 VM_SV_getlight,					// #92 vector(vector org) getlight (DP_QC_GETLIGHT)
 VM_registercvar,				// #93 float(string name, string value) registercvar (DP_REGISTERCVAR)

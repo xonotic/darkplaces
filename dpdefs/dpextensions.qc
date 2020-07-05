@@ -2,7 +2,7 @@
 //DarkPlaces supported extension list, draft version 1.04
 
 //definitions that id Software left out:
-//these are passed as the 'nomonsters' parameter to traceline/tracebox (yes really this was supported in all quake engines, nomonsters is misnamed)
+//these are passed as the 'tryents' parameter to traceline/tracebox (yes really this was supported in all quake engines)
 float MOVE_NORMAL = 0; // same as FALSE
 float MOVE_NOMONSTERS = 1; // same as TRUE
 float MOVE_MISSILE = 2; // save as movement with .movetype == MOVETYPE_FLYMISSILE
@@ -1104,7 +1104,7 @@ float(float i) argv_end_index = #516;
 //idea: id Software
 //darkplaces implementation: id Software
 //builtin definitions:
-void(vector v1, vector min, vector max, vector v2, float nomonsters, entity forent) tracebox = #90;
+void(vector v1, vector mins, vector maxs, vector v2, float tryents, entity ignoreent) tracebox = #90;
 //description:
 //similar to traceline but much more useful, traces a box of the size specified (technical note: in quake1 and halflife bsp maps the mins and maxs will be rounded up to one of the hull sizes, quake3 bsp does not have this problem, this is the case with normal moving entities as well).
 
@@ -1122,7 +1122,7 @@ void(entity ent, entity ignore) tracetoss = #64;
 //constant definitions:
 float MOVE_HITMODEL = 4;
 //description:
-//allows traces to hit alias models (not sprites!) instead of entity boxes, use as the nomonsters parameter to trace functions, note that you can hit invisible model entities (alpha < 0 or EF_NODRAW or model "", it only checks modelindex)
+//allows traces to hit alias models (not sprites!) instead of entity boxes, use as the tryents parameter to trace functions, note that you can hit invisible model entities (alpha < 0 or EF_NODRAW or model "", it only checks modelindex)
 
 //DP_QC_TRACE_MOVETYPE_WORLDONLY
 //idea: LadyHavoc
@@ -1130,7 +1130,7 @@ float MOVE_HITMODEL = 4;
 //constant definitions:
 float MOVE_WORLDONLY = 3;
 //description:
-//allows traces to hit only world (ignoring all entities, unlike MOVE_NOMONSTERS which hits all bmodels), use as the nomonsters parameter to trace functions
+//allows traces to hit only world (ignoring all entities, unlike MOVE_NOMONSTERS which hits all bmodels), use as the tryents parameter to trace functions
 
 //DP_QC_UNLIMITEDTEMPSTRINGS
 //idea: divVerent
