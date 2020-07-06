@@ -166,7 +166,7 @@ static void VM_M_getkeydest(prvm_prog_t *prog)
 =========
 VM_M_getresolution
 
-vector	getresolution(float number)
+vector	getresolution(float number[, float forfullscreen])
 =========
 */
 static void VM_M_getresolution(prvm_prog_t *prog)
@@ -593,7 +593,7 @@ static void VM_M_setserverlistsort(prvm_prog_t *prog)
 ========================
 VM_M_refreshserverlist
 
-refreshserverlist()
+refreshserverlist([bool reset])
 ========================
 */
 static void VM_M_refreshserverlist(prvm_prog_t *prog)
@@ -1316,7 +1316,7 @@ VM_wasfreed,							// #353 float(entity ent) wasfreed
 NULL,									// #354
 VM_CL_videoplaying,						// #355
 VM_findfont,							// #356 float(string fontname) loadfont (DP_GFX_FONTS)
-VM_loadfont,							// #357 float(string fontname, string fontmaps, string sizes, float slot) loadfont (DP_GFX_FONTS)
+VM_loadfont,							// #357 float(string fontname, string fontmaps, string sizes[, float slot[, float scale[, float voffset]]]) loadfont (DP_GFX_FONTS)
 NULL,									// #358
 NULL,									// #359
 NULL,									// #360
@@ -1399,7 +1399,7 @@ NULL,									// #436
 NULL,									// #437
 NULL,									// #438
 NULL,									// #439
-VM_buf_create,					// #440 float() buf_create (DP_QC_STRINGBUFFERS)
+VM_buf_create,					// #440 float([string format[, float flags]]) buf_create (DP_QC_STRINGBUFFERS)
 VM_buf_del,						// #441 void(float bufhandle) buf_del (DP_QC_STRINGBUFFERS)
 VM_buf_getsize,					// #442 float(float bufhandle) buf_getsize (DP_QC_STRINGBUFFERS)
 VM_buf_copy,					// #443 void(float bufhandle_from, float bufhandle_to) buf_copy (DP_QC_STRINGBUFFERS)
@@ -1472,11 +1472,11 @@ NULL,									// #509
 VM_uri_escape,					// #510 string(string in) uri_escape = #510;
 VM_uri_unescape,				// #511 string(string in) uri_unescape = #511;
 VM_etof,					// #512 float(entity ent) num_for_edict = #512 (DP_QC_NUM_FOR_EDICT)
-VM_uri_get,						// #513 float(string uri, float id, [string post_contenttype, string post_delim, [float buf]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
+VM_uri_get,						// #513 float(string uri, float id[, string post_contenttype[, string post_delim[, float buf[, float keyid]]]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
 VM_tokenize_console,					// #514 float(string str) tokenize_console = #514; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_start_index,					// #515 float(float idx) argv_start_index = #515; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_end_index,						// #516 float(float idx) argv_end_index = #516; (DP_QC_TOKENIZE_CONSOLE)
-VM_buf_cvarlist,						// #517 void(float buf, string prefix, string antiprefix) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
+VM_buf_cvarlist,						// #517 void(float buf, string prefix[, string antiprefix]) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
 VM_cvar_description,					// #518 float(string name) cvar_description = #518; (DP_QC_CVAR_DESCRIPTION)
 NULL,									// #519
 NULL,									// #520
@@ -1495,9 +1495,9 @@ VM_log,									// #532
 VM_getsoundtime,						// #533 float(entity e, float channel) getsoundtime = #533; (DP_SND_GETSOUNDTIME)
 VM_soundlength,							// #534 float(string sample) soundlength = #534; (DP_SND_GETSOUNDTIME)
 VM_buf_loadfile,                        // #535 float(string filename, float bufhandle) buf_loadfile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_buf_writefile,                       // #536 float(float filehandle, float bufhandle, float startpos, float numstrings) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_bufstr_find,                         // #537 float(float bufhandle, string match, float matchrule, float startpos) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_matchpattern,                        // #538 float(string s, string pattern, float matchrule) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_buf_writefile,                       // #536 float(float filehandle, float bufhandle[, float startpos[, float numstrings]]) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_bufstr_find,                         // #537 float(float bufhandle, string match, float matchrule[, float startpos[, float step]]) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_matchpattern,                        // #538 float(string s, string pattern, float matchrule[, float startpos]) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
 NULL,									// #539
 NULL,									// #540
 NULL,									// #541
@@ -1567,7 +1567,7 @@ VM_M_getmousetarget,				// #604 float getmousetarget(void)
 VM_callfunction,				// #605 void callfunction(...)
 VM_writetofile,					// #606 void writetofile(float fhandle, entity ent)
 VM_isfunction,					// #607 float isfunction(string function_name)
-VM_M_getresolution,				// #608 vector getresolution(float number, [float forfullscreen])
+VM_M_getresolution,				// #608 vector getresolution(float number[, float forfullscreen])
 VM_keynumtostring,				// #609 string keynumtostring(float keynum)
 VM_findkeysforcommand,		// #610 string findkeysforcommand(string command[, float bindmap])
 VM_M_getserverliststat,			// #611 float gethostcachevalue(float type)
@@ -1584,7 +1584,7 @@ VM_M_getserverlistnumber,		// #621 float gethostcachenumber(float fld, float hos
 VM_M_getserverlistindexforkey,// #622 float gethostcacheindexforkey(string key)
 VM_M_addwantedserverlistkey,	// #623 void addwantedhostcachekey(string key)
 VM_CL_getextresponse,			// #624 string getextresponse(void)
-VM_netaddress_resolve,          // #625 string netaddress_resolve(string, float)
+VM_netaddress_resolve,          // #625 string netaddress_resolve(string ip[, float port])
 VM_M_getgamedirinfo,            // #626 string getgamedirinfo(float n, float prop)
 VM_sprintf,                     // #627 string sprintf(string format, ...)
 NULL, // #628

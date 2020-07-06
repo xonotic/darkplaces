@@ -365,7 +365,7 @@ VM_SV_sprint
 
 single print to a specific client
 
-sprint(clientent, value)
+sprint(entity client, string s, ...)
 =================
 */
 static void VM_SV_sprint(prvm_prog_t *prog)
@@ -407,7 +407,7 @@ VM_SV_centerprint
 
 single print to a specific client
 
-centerprint(clientent, value)
+centerprint(entity client, string s, ...)
 =================
 */
 static void VM_SV_centerprint(prvm_prog_t *prog)
@@ -948,7 +948,7 @@ VM_SV_stuffcmd
 
 Sends text over to the client's execution buffer
 
-stuffcmd (clientent, value, ...)
+stuffcmd(entity client, string s, ...)
 =================
 */
 static void VM_SV_stuffcmd(prvm_prog_t *prog)
@@ -980,7 +980,7 @@ VM_SV_findradius
 
 Returns a chain of entities that have origins within a spherical area
 
-findradius (origin, radius)
+findradius(vector org, float rad[, .entity chainfield])
 =================
 */
 static void VM_SV_findradius(prvm_prog_t *prog)
@@ -1068,7 +1068,7 @@ static void VM_SV_precache_model(prvm_prog_t *prog)
 ===============
 VM_SV_walkmove
 
-float(float yaw, float dist[, settrace]) walkmove
+float(float yaw, float dist[, float settrace]) walkmove
 ===============
 */
 static void VM_SV_walkmove(prvm_prog_t *prog)
@@ -3213,13 +3213,13 @@ VM_vlen,						// #12 float(vector v) vlen (QUAKE)
 VM_vectoyaw,					// #13 float(vector v) vectoyaw (QUAKE)
 VM_spawn,						// #14 entity() spawn (QUAKE)
 VM_remove,						// #15 void(entity e) remove (QUAKE)
-VM_SV_traceline,				// #16 void(vector v1, vector v2, float tryents) traceline (QUAKE)
+VM_SV_traceline,				// #16 void(vector v1, vector v2, float tryents, entity ignoreent) traceline (QUAKE)
 VM_SV_checkclient,				// #17 entity() checkclient (QUAKE)
 VM_find,						// #18 entity(entity start, .string fld, string match) find (QUAKE)
 VM_SV_precache_sound,			// #19 void(string s) precache_sound (QUAKE)
 VM_SV_precache_model,			// #20 void(string s) precache_model (QUAKE)
 VM_SV_stuffcmd,					// #21 void(entity client, string s, ...) stuffcmd (QUAKE)
-VM_SV_findradius,				// #22 entity(vector org, float rad) findradius (QUAKE)
+VM_SV_findradius,				// #22 entity(vector org, float rad[, .entity chainfield]) findradius (QUAKE)
 VM_bprint,						// #23 void(string s, ...) bprint (QUAKE)
 VM_SV_sprint,					// #24 void(entity client, string s, ...) sprint (QUAKE)
 VM_dprint,						// #25 void(string s, ...) dprint (QUAKE)
@@ -3229,7 +3229,7 @@ VM_coredump,					// #28 void() coredump (QUAKE)
 VM_traceon,						// #29 void() traceon (QUAKE)
 VM_traceoff,					// #30 void() traceoff (QUAKE)
 VM_eprint,						// #31 void(entity e) eprint (QUAKE)
-VM_SV_walkmove,					// #32 float(float yaw, float dist) walkmove (QUAKE)
+VM_SV_walkmove,					// #32 float(float yaw, float dist[, float settrace]) walkmove (QUAKE)
 NULL,							// #33 (QUAKE)
 VM_SV_droptofloor,				// #34 float() droptofloor (QUAKE)
 VM_SV_lightstyle,				// #35 void(float style, string value) lightstyle (QUAKE)
@@ -3270,7 +3270,7 @@ VM_SV_makestatic,				// #69 void(entity e) makestatic (QUAKE)
 VM_changelevel,					// #70 void(string s) changelevel (QUAKE)
 NULL,							// #71 (QUAKE)
 VM_cvar_set,					// #72 void(string var, string val) cvar_set (QUAKE)
-VM_SV_centerprint,				// #73 void(entity client, strings) centerprint (QUAKE)
+VM_SV_centerprint,				// #73 void(entity client, string s, ...) centerprint (QUAKE)
 VM_SV_ambientsound,				// #74 void(vector pos, string samp, float vol, float atten) ambientsound (QUAKE)
 VM_SV_precache_model,			// #75 string(string s) precache_model2 (QUAKE)
 VM_SV_precache_sound,			// #76 string(string s) precache_sound2 (QUAKE)
@@ -3517,12 +3517,12 @@ NULL,							// #313
 NULL,							// #314
 NULL,							// #315 void(float width, vector pos1, vector pos2, float flag) drawline (EXT_CSQC)
 NULL,							// #316 float(string name) iscachedpic (EXT_CSQC)
-NULL,							// #317 string(string name, float trywad) precache_pic (EXT_CSQC)
+NULL,							// #317 string(string pic[, float flags]) precache_pic (EXT_CSQC)
 NULL,							// #318 vector(string picname) draw_getimagesize (EXT_CSQC)
 NULL,							// #319 void(string name) freepic (EXT_CSQC)
 NULL,							// #320 float(vector position, float character, vector scale, vector rgb, float alpha, float flag) drawcharacter (EXT_CSQC)
 NULL,							// #321 float(vector position, string text, vector scale, vector rgb, float alpha, float flag) drawstring (EXT_CSQC)
-NULL,							// #322 float(vector position, string pic, vector size, vector rgb, float alpha, float flag) drawpic (EXT_CSQC)
+NULL,							// #322 float(vector position, string pic, vector size, vector rgb, float alpha[, float flag]) drawpic (EXT_CSQC)
 NULL,							// #323 float(vector position, vector size, vector rgb, float alpha, float flag) drawfill (EXT_CSQC)
 NULL,							// #324 void(float x, float y, float width, float height) drawsetcliparea
 NULL,							// #325 void(void) drawresetcliparea
@@ -3537,12 +3537,12 @@ VM_SV_setmodelindex,			// #333 void(entity e, float mdlindex) setmodelindex (EXT
 VM_SV_modelnameforindex,		// #334 string(float mdlindex) modelnameforindex (EXT_CSQC)
 VM_SV_particleeffectnum,		// #335 float(string effectname) particleeffectnum (EXT_CSQC)
 VM_SV_trailparticles,			// #336 void(entity ent, float effectnum, vector start, vector end) trailparticles (EXT_CSQC)
-VM_SV_pointparticles,			// #337 void(float effectnum, vector origin [, vector dir, float count]) pointparticles (EXT_CSQC)
+VM_SV_pointparticles,			// #337 void(float effectnum, vector origin, vector dir, float count[, float color]) pointparticles (EXT_CSQC)
 NULL,							// #338 void(string s, ...) centerprint (EXT_CSQC)
 VM_print,						// #339 void(string s, ...) print (EXT_CSQC, DP_SV_PRINT)
 NULL,							// #340 string(float keynum) keynumtostring (EXT_CSQC)
 NULL,							// #341 float(string keyname) stringtokeynum (EXT_CSQC)
-NULL,							// #342 string(float keynum) getkeybind (EXT_CSQC)
+NULL,							// #342 string(float keynum[, float bindmap]) getkeybind (EXT_CSQC)
 NULL,							// #343 void(float usecursor) setcursormode (EXT_CSQC)
 NULL,							// #344 vector() getmousepos (EXT_CSQC)
 NULL,							// #345 float(float framenum) getinputstate (EXT_CSQC)
@@ -3661,7 +3661,7 @@ VM_SV_WriteUnterminatedString,	// #456 void(float to, string s) WriteUnterminate
 VM_SV_te_flamejet,				// #457 void(vector org, vector vel, float howmany) te_flamejet = #457 (DP_TE_FLAMEJET)
 NULL,							// #458
 VM_ftoe,						// #459 entity(float num) entitybyindex (DP_QC_EDICT_NUM)
-VM_buf_create,					// #460 float() buf_create (DP_QC_STRINGBUFFERS)
+VM_buf_create,					// #460 float([string format[, float flags]]) buf_create (DP_QC_STRINGBUFFERS)
 VM_buf_del,						// #461 void(float bufhandle) buf_del (DP_QC_STRINGBUFFERS)
 VM_buf_getsize,					// #462 float(float bufhandle) buf_getsize (DP_QC_STRINGBUFFERS)
 VM_buf_copy,					// #463 void(float bufhandle_from, float bufhandle_to) buf_copy (DP_QC_STRINGBUFFERS)
@@ -3714,11 +3714,11 @@ NULL,							// #509
 VM_uri_escape,					// #510 string(string in) uri_escape = #510;
 VM_uri_unescape,				// #511 string(string in) uri_unescape = #511;
 VM_etof,					// #512 float(entity ent) num_for_edict = #512 (DP_QC_NUM_FOR_EDICT)
-VM_uri_get,						// #513 float(string uri, float id, [string post_contenttype, string post_delim, [float buf]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
+VM_uri_get,						// #513 float(string uri, float id[, string post_contenttype[, string post_delim[, float buf[, float keyid]]]]) uri_get = #513; (DP_QC_URI_GET, DP_QC_URI_POST)
 VM_tokenize_console,					// #514 float(string str) tokenize_console = #514; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_start_index,					// #515 float(float idx) argv_start_index = #515; (DP_QC_TOKENIZE_CONSOLE)
 VM_argv_end_index,						// #516 float(float idx) argv_end_index = #516; (DP_QC_TOKENIZE_CONSOLE)
-VM_buf_cvarlist,						// #517 void(float buf, string prefix, string antiprefix) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
+VM_buf_cvarlist,						// #517 void(float buf, string prefix[, string antiprefix]) buf_cvarlist = #517; (DP_QC_STRINGBUFFERS_CVARLIST)
 VM_cvar_description,					// #518 float(string name) cvar_description = #518; (DP_QC_CVAR_DESCRIPTION)
 VM_gettime,						// #519 float(float timer) gettime = #519; (DP_QC_GETTIME)
 NULL,							// #520
@@ -3737,9 +3737,9 @@ VM_log,							// #532
 VM_getsoundtime,				// #533 float(entity e, float channel) getsoundtime = #533; (DP_SND_GETSOUNDTIME)
 VM_soundlength,					// #534 float(string sample) soundlength = #534; (DP_SND_GETSOUNDTIME)
 VM_buf_loadfile,                // #535 float(string filename, float bufhandle) buf_loadfile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_buf_writefile,               // #536 float(float filehandle, float bufhandle, float startpos, float numstrings) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_bufstr_find,                 // #537 float(float bufhandle, string match, float matchrule, float startpos) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
-VM_matchpattern,                // #538 float(string s, string pattern, float matchrule) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_buf_writefile,               // #536 float(float filehandle, float bufhandle[, float startpos[, float numstrings]]) buf_writefile (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_bufstr_find,                 // #537 float(float bufhandle, string match, float matchrule[, float startpos[, float step]]) bufstr_find (DP_QC_STRINGBUFFERS_EXT_WIP)
+VM_matchpattern,                // #538 float(string s, string pattern, float matchrule[, float startpos]) matchpattern (DP_QC_STRINGBUFFERS_EXT_WIP)
 NULL,							// #539
 VM_physics_enable,				// #540 void(entity e, float physics_enabled) physics_enable = #540; (DP_PHYSICS_ODE)
 VM_physics_addforce,			// #541 void(entity e, vector force, vector relative_ofs) physics_addforce = #541; (DP_PHYSICS_ODE)

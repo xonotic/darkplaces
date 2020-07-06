@@ -539,7 +539,7 @@ float FIELD_FUNCTION = 6;
 void coverage() = #642;  // Reports a coverage event. The engine counts for each of the calls to this builtin whether it has been called.
 
 // assorted undocumented extensions
-string(string, float) netaddress_resolve = #625;
+string(string ip, float port) netaddress_resolve = #625;
 string(string search, string replace, string subject) strreplace = #484;
 string(string search, string replace, string subject) strireplace = #485;
 string(float uselocaltime, string format, ...) strftime = #478;

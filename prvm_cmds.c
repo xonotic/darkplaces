@@ -398,7 +398,7 @@ VM_sprint (menu & client but only if server.active == true)
 
 single print to a specific client
 
-sprint(float clientnum,...[string])
+sprint(entity client, string s, ...)
 =================
 */
 void VM_sprint(prvm_prog_t *prog)
@@ -1104,7 +1104,7 @@ entity	findchain(.string field, string match)
 =========
 */
 // chained search for strings in entity fields
-// entity(.string field, string match) findchain = #402;
+// entity(.string field, string match[, .entity chainfield]) findchain = #402;
 void VM_findchain(prvm_prog_t *prog)
 {
 	int		i;
@@ -1154,12 +1154,12 @@ void VM_findchain(prvm_prog_t *prog)
 =========
 VM_findchainfloat
 
-entity	findchainfloat(.string field, float match)
-entity	findchainentity(.string field, entity match)
+entity	findchainfloat(.float field, float match[, .entity chainfield])
+entity	findchainentity(.entity field, entity match[, .entity chainfield])
 =========
 */
 // LadyHavoc: chained search for float, int, and entity reference fields
-// entity(.string field, float match) findchainfloat = #403;
+// entity(.float field, float match[, .entity chainfield]) findchainfloat = #403;
 void VM_findchainfloat(prvm_prog_t *prog)
 {
 	int		i;
@@ -1242,7 +1242,7 @@ void VM_findflags(prvm_prog_t *prog)
 ========================
 VM_findchainflags
 
-entity	findchainflags(.float field, float match)
+entity	findchainflags(.float field, float match[, .entity chainfield])
 ========================
 */
 // LadyHavoc: chained search for flags in float fields
@@ -2856,7 +2856,7 @@ void VM_clientstate(prvm_prog_t *prog)
 =========
 VM_getostype
 
-float	getostype(prvm_prog_t *prog)
+float getostype()
 =========
 */ // not used at the moment -> not included in the common list
 void VM_getostype(prvm_prog_t *prog)
@@ -2882,7 +2882,7 @@ void VM_getostype(prvm_prog_t *prog)
 =========
 VM_gettime
 
-float	gettime(prvm_prog_t *prog)
+float gettime([float timer])
 =========
 */
 float CDAudio_GetPosition(void);
@@ -2928,7 +2928,7 @@ void VM_gettime(prvm_prog_t *prog)
 =========
 VM_getsoundtime
 
-float	getsoundtime(prvm_prog_t *prog)
+float getsoundtime(entity e, float channel)
 =========
 */
 
@@ -3269,7 +3269,7 @@ void VM_iscachedpic(prvm_prog_t *prog)
 =========
 VM_precache_pic
 
-string	precache_pic(string pic)
+string	precache_pic(string pic[, float flags])
 =========
 */
 #define PRECACHE_PIC_FROMWAD 1 /* FTEQW, not supported here */
@@ -3446,9 +3446,7 @@ void VM_drawstring(prvm_prog_t *prog)
 =========
 VM_drawcolorcodedstring
 
-float	drawcolorcodedstring(vector position, string text, vector scale, float alpha, float flag)
-/
-float	drawcolorcodedstring(vector position, string text, vector scale, vector rgb, float alpha, float flag)
+float drawcolorcodedstring(vector position, string text, vector scale[, vector rgb], float alpha, float flag)
 =========
 */
 void VM_drawcolorcodedstring(prvm_prog_t *prog)
@@ -3513,7 +3511,7 @@ void VM_drawcolorcodedstring(prvm_prog_t *prog)
 =========
 VM_stringwidth
 
-float	stringwidth(string text, float allowColorCodes, float size)
+float stringwidth(string text, float allowColorCodes[, float size])
 =========
 */
 void VM_stringwidth(prvm_prog_t *prog)
@@ -3596,7 +3594,7 @@ void VM_findfont(prvm_prog_t *prog)
 =========
 VM_loadfont
 
-float loadfont(string fontname, string fontmaps, string sizes, float slot)
+float loadfont(string fontname, string fontmaps, string sizes[, float slot[, float scale[, float voffset]]])
 =========
 */
 
@@ -3738,7 +3736,7 @@ void VM_loadfont(prvm_prog_t *prog)
 =========
 VM_drawpic
 
-float	drawpic(vector position, string pic, vector size, vector rgb, float alpha, float flag)
+float drawpic(vector position, string pic, vector size, vector rgb, float alpha[, float flag])
 =========
 */
 void VM_drawpic(prvm_prog_t *prog)
@@ -4014,7 +4012,7 @@ void VM_keynumtostring (prvm_prog_t *prog)
 =========
 VM_findkeysforcommand
 
-string	findkeysforcommand(string command, float bindmap)
+string	findkeysforcommand(string command[, float bindmap])
 
 the returned string is an altstring
 =========
@@ -4067,7 +4065,7 @@ void VM_stringtokeynum (prvm_prog_t *prog)
 =========
 VM_getkeybind
 
-string getkeybind(float key, float bindmap)
+string getkeybind(float key[, float bindmap])
 =========
 */
 void VM_getkeybind (prvm_prog_t *prog)
@@ -4086,7 +4084,7 @@ void VM_getkeybind (prvm_prog_t *prog)
 =========
 VM_setkeybind
 
-float setkeybind(float key, string cmd, float bindmap)
+float setkeybind(float key, string bind[, float bindmap])
 =========
 */
 void VM_setkeybind (prvm_prog_t *prog)
@@ -4769,8 +4767,8 @@ void BufStr_Flush(prvm_prog_t *prog)
 ========================
 VM_buf_create
 creates new buffer, and returns it's index, returns -1 if failed
-float buf_create(prvm_prog_t *prog) = #460;
-float newbuf(string format, float flags) = #460;
+
+float buf_create([string format[, float flags]])
 ========================
 */
 
@@ -5204,7 +5202,8 @@ void VM_buf_loadfile(prvm_prog_t *prog)
 ========================
 VM_buf_writefile
 writes stringbuffer to a file, returns 0 or 1
-float buf_writefile(float filehandle, float bufhandle, [, float startpos, float numstrings]) = #468;
+
+float buf_writefile(float filehandle, float bufhandle[, float startpos[, float numstrings]])
 ========================
 */
 
@@ -5367,7 +5366,8 @@ static qboolean match_rule(const char *string, int max_string, const char *patte
 ========================
 VM_bufstr_find
 find an index of bufstring matching rule
-float bufstr_find(float bufhandle, string match, float matchrule, float startpos, float step) = #468;
+
+float bufstr_find(float bufhandle, string match, float matchrule[, float startpos[, float step]])
 ========================
 */
 
@@ -5423,7 +5423,8 @@ void VM_bufstr_find(prvm_prog_t *prog)
 /*
 ========================
 VM_matchpattern
-float matchpattern(string s, string pattern, float matchrule, float startpos) = #468;
+
+float matchpattern(string s, string pattern, float matchrule[, float startpos])
 ========================
 */
 void VM_matchpattern(prvm_prog_t *prog)
@@ -5463,6 +5464,8 @@ void VM_matchpattern(prvm_prog_t *prog)
 /*
 ========================
 VM_buf_cvarlist
+
+void buf_cvarlist(float buf, string prefix[, string antiprefix])
 ========================
 */
 
@@ -5552,6 +5555,8 @@ void VM_buf_cvarlist(prvm_prog_t *prog)
 VM_changeyaw
 
 This was a major timewaster in progs, so it was converted to C
+
+void ChangeYaw()
 ==============
 */
 void VM_changeyaw (prvm_prog_t *prog)
@@ -6227,7 +6232,9 @@ static void uri_to_string_callback(int status, size_t length_received, unsigned 
 	Z_Free(handle);
 }
 
-// uri_get() gets content from an URL and calls a callback "uri_get_callback" with it set as string; an unique ID of the transfer is returned
+// float uri_get(string uri, float id[, string post_contenttype[, string post_delim[, float buf[, float keyid]]]])
+//
+// gets content from an URL and calls a callback "uri_get_callback" with it set as string; an unique ID of the transfer is returned
 // returns 1 on success, and then calls the callback with the ID, 0 or the HTTP status code, and the received data in a string
 void VM_uri_get (prvm_prog_t *prog)
 {
@@ -6392,6 +6399,7 @@ out2:
 	}
 }
 
+// string netaddress_resolve(string ip[, float port])
 void VM_netaddress_resolve (prvm_prog_t *prog)
 {
 	const char *ip;
@@ -6412,7 +6420,8 @@ void VM_netaddress_resolve (prvm_prog_t *prog)
 		PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(prog, "");
 }
 
-//string(prvm_prog_t *prog) getextresponse = #624; // returns the next extResponse packet that was sent to this client
+// string getextresponse() = #624;
+// returns the next extResponse packet that was sent to this client
 void VM_CL_getextresponse (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(0,VM_argv);

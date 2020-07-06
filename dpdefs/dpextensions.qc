@@ -901,7 +901,7 @@ float GETTIME_REALTIME = 1; // current absolute time (OS specific)
 float GETTIME_HIRES = 2; // like REALTIME, but may reset between QC invocations and thus can be higher precision
 float GETTIME_UPTIME = 3; // time of start of frame since start of the engine
 //builtin definitions:
-float(float tmr) gettime = #519;
+float(float timer) gettime = #519;
 //description:
 //some timers to query...
 
@@ -1669,7 +1669,7 @@ float MF_TRACER3 = 128; // purple trail
 //function definitions:
 float(string effectname) particleeffectnum = #335; // same as in CSQC
 void(entity ent, float effectnum, vector start, vector end) trailparticles = #336; // same as in CSQC
-void(float effectnum, vector org, vector vel, float howmany) pointparticles = #337; // same as in CSQC
+void(float effectnum, vector org, vector vel, float count) pointparticles = #337; // same as in CSQC
 //SVC definitions:
 //float svc_trailparticles = 60; // [short] entnum [short] effectnum [vector] start [vector] end
 //float svc_pointparticles = 61; // [short] effectnum [vector] start [vector] velocity [short] count
