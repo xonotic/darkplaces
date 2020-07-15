@@ -2623,3 +2623,9 @@ float MOVETYPE_USER_LAST = 191;
 string __fullspawndata;
 //description:
 // http://icculus.org/finger/marco?date=2019-01-25&time=05-38-02
+
+//DP_QC_FS_SEARCH_PACKFILE
+//idea: Mario
+//darkplaces implementation: Mario
+//description:
+//shows that the engine supports the "packfile" optional parameter in search_begin (only lists file searches within a specified package).

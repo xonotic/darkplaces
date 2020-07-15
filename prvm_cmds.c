@@ -3106,6 +3106,7 @@ void VM_search_begin(prvm_prog_t *prog)
 	caseinsens = (int)PRVM_G_FLOAT(OFS_PARM1);
 	quiet = (int)PRVM_G_FLOAT(OFS_PARM2);
 
+	// optional packfile parameter (DP_QC_FS_SEARCH_PACKFILE)
 	if(prog->argc >= 4)
 		packfile = PRVM_G_STRING(OFS_PARM3);
 
