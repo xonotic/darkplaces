@@ -3094,10 +3094,10 @@ float search_begin(string pattern, float caseinsensitive, float quiet)
 void VM_search_begin(prvm_prog_t *prog)
 {
 	int handle;
-	const char *packfile = NULL, *pattern;
+	const char *pattern;
 	int caseinsens, quiet;
 
-	VM_SAFEPARMCOUNTRANGE(3, 4, VM_search_begin);
+	VM_SAFEPARMCOUNT(3, VM_search_begin);
 
 	pattern = PRVM_G_STRING(OFS_PARM0);
 
@@ -3117,7 +3117,7 @@ void VM_search_begin(prvm_prog_t *prog)
 		return;
 	}
 
-	if(!(prog->opensearches[handle] = FS_Search(pattern,caseinsens, quiet, packfile)))
+	if(!(prog->opensearches[handle] = FS_Search(pattern,caseinsens, quiet, NULL)))
 		PRVM_G_FLOAT(OFS_RETURN) = -1;
 	else
 	{
@@ -3156,7 +3156,7 @@ void VM_search_packfile_begin(prvm_prog_t *prog)
 	if(handle >= PRVM_MAX_OPENSEARCHES)
 	{
 		PRVM_G_FLOAT(OFS_RETURN) = -2;
-		VM_Warning(prog, "VM_search_begin: %s ran out of search handles (%i)\n", prog->name, PRVM_MAX_OPENSEARCHES);
+		VM_Warning(prog, "VM_search_packfile_begin: %s ran out of search handles (%i)\n", prog->name, PRVM_MAX_OPENSEARCHES);
 		return;
 	}
 
