@@ -347,8 +347,6 @@ void VM_search_begin(prvm_prog_t *prog);
 void VM_search_end(prvm_prog_t *prog);
 void VM_search_getsize(prvm_prog_t *prog);
 void VM_search_getfilename(prvm_prog_t *prog);
-// Mario - DP_QC_DP_QC_FS_SEARCH_PACKFILE
-void VM_search_packfile_begin(prvm_prog_t *prog);
 void VM_chr(prvm_prog_t *prog);
 void VM_iscachedpic(prvm_prog_t *prog);
 void VM_precache_pic(prvm_prog_t *prog);

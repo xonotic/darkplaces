@@ -1514,7 +1514,7 @@ NULL,									// #551
 NULL,									// #552
 NULL,									// #553
 NULL,									// #554
-VM_search_packfile_begin,				// #555 float(string pattern, float caseinsensitive, float quiet, string packfile) search_packfile_begin (DP_QC_FS_SEARCH_PACKFILE)
+NULL,									// #555
 NULL,									// #556
 NULL,									// #557
 NULL,									// #558

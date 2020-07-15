@@ -3088,16 +3088,16 @@ static void VM_Search_Reset(prvm_prog_t *prog)
 =========
 VM_search_begin
 
-float search_begin(string pattern, float caseinsensitive, float quiet)
+float search_begin(string pattern, float caseinsensitive, float quiet[, string packfile])
 =========
 */
 void VM_search_begin(prvm_prog_t *prog)
 {
 	int handle;
-	const char *pattern;
+	const char *packfile = NULL, *pattern;
 	int caseinsens, quiet;
 
-	VM_SAFEPARMCOUNT(3, VM_search_begin);
+	VM_SAFEPARMCOUNTRANGE(3, 4, VM_search_begin);
 
 	pattern = PRVM_G_STRING(OFS_PARM0);
 
@@ -3105,6 +3105,9 @@ void VM_search_begin(prvm_prog_t *prog)
 
 	caseinsens = (int)PRVM_G_FLOAT(OFS_PARM1);
 	quiet = (int)PRVM_G_FLOAT(OFS_PARM2);
+
+	if(prog->argc >= 4)
+		packfile = PRVM_G_STRING(OFS_PARM3);
 
 	for(handle = 0; handle < PRVM_MAX_OPENSEARCHES; handle++)
 		if(!prog->opensearches[handle])
@@ -3117,7 +3120,7 @@ void VM_search_begin(prvm_prog_t *prog)
 		return;
 	}
 
-	if(!(prog->opensearches[handle] = FS_Search(pattern,caseinsens, quiet, NULL)))
+	if(!(prog->opensearches[handle] = FS_Search(pattern,caseinsens, quiet, packfile)))
 		PRVM_G_FLOAT(OFS_RETURN) = -1;
 	else
 	{
@@ -3217,49 +3220,6 @@ void VM_search_getfilename(prvm_prog_t *prog)
 	}
 
 	PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(prog, prog->opensearches[handle]->filenames[filenum]);
-}
-
-/*
-=========
-VM_search_packfile_begin (DP_QC_FS_SEARCH_PACKFILE)
-
-float search_packfile_begin(string pattern, float caseinsensitive, float quiet, string packfile)
-=========
-*/
-void VM_search_packfile_begin(prvm_prog_t *prog)
-{
-	int handle;
-	const char *packfile = NULL, *pattern;
-	int caseinsens, quiet;
-
-	VM_SAFEPARMCOUNTRANGE(3, 4, VM_search_begin);
-
-	pattern = PRVM_G_STRING(OFS_PARM0);
-
-	VM_CheckEmptyString(prog, pattern);
-
-	caseinsens = (int)PRVM_G_FLOAT(OFS_PARM1);
-	quiet = (int)PRVM_G_FLOAT(OFS_PARM2);
-	packfile = PRVM_G_STRING(OFS_PARM3);
-
-	for(handle = 0; handle < PRVM_MAX_OPENSEARCHES; handle++)
-		if(!prog->opensearches[handle])
-			break;
-
-	if(handle >= PRVM_MAX_OPENSEARCHES)
-	{
-		PRVM_G_FLOAT(OFS_RETURN) = -2;
-		VM_Warning(prog, "VM_search_packfile_begin: %s ran out of search handles (%i)\n", prog->name, PRVM_MAX_OPENSEARCHES);
-		return;
-	}
-
-	if(!(prog->opensearches[handle] = FS_Search(pattern,caseinsens, quiet, packfile)))
-		PRVM_G_FLOAT(OFS_RETURN) = -1;
-	else
-	{
-		prog->opensearches_origin[handle] = PRVM_AllocationOrigin(prog);
-		PRVM_G_FLOAT(OFS_RETURN) = handle;
-	}
 }
 
 /*
