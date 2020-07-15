@@ -270,7 +270,7 @@ void	loadfromfile(string file) = #69;
 
 float	mod(float val, float m) = #70;
 
-float	search_begin(string pattern, float caseinsensitive, float quiet) = #74;
+float	search_begin(string pattern, float caseinsensitive, float quiet, ...) = #74;
 void	search_end(float handle) = #75;
 float	search_getsize(float handle) = #76;
 string	search_getfilename(float handle, float num) = #77;

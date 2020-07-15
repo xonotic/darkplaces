@@ -96,7 +96,7 @@ float	cvar_type (string)
 		crash()
 		stackdump()
 
-float	search_begin(string pattern, float caseinsensitive, float quiet)
+float	search_begin(string pattern, float caseinsensitive, float quiet, ...[string])
 void	search_end(float handle)
 float	search_getsize(float handle)
 string	search_getfilename(float handle, float num)
