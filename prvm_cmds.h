@@ -96,7 +96,7 @@ float	cvar_type (string)
 		crash()
 		stackdump()
 
-float	search_begin(string pattern, float caseinsensitive, float quiet, ...[string])
+float	search_begin(string pattern, float caseinsensitive, float quiet)
 void	search_end(float handle)
 float	search_getsize(float handle)
 string	search_getfilename(float handle, float num)
@@ -347,6 +347,8 @@ void VM_search_begin(prvm_prog_t *prog);
 void VM_search_end(prvm_prog_t *prog);
 void VM_search_getsize(prvm_prog_t *prog);
 void VM_search_getfilename(prvm_prog_t *prog);
+// Mario - DP_QC_DP_QC_FS_SEARCH_PACKFILE
+void VM_search_packfile_begin(prvm_prog_t *prog);
 void VM_chr(prvm_prog_t *prog);
 void VM_iscachedpic(prvm_prog_t *prog);
 void VM_precache_pic(prvm_prog_t *prog);

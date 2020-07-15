@@ -270,7 +270,7 @@ void	loadfromfile(string file) = #69;
 
 float	mod(float val, float m) = #70;
 
-float	search_begin(string pattern, float caseinsensitive, float quiet, ...) = #74;
+float	search_begin(string pattern, float caseinsensitive, float quiet) = #74;
 void	search_end(float handle) = #75;
 float	search_getsize(float handle) = #76;
 string	search_getfilename(float handle, float num) = #77;
@@ -537,6 +537,15 @@ float FIELD_FUNCTION = 6;
 //darkplaces implementation: divVerent
 //function definitions:
 void coverage() = #642;  // Reports a coverage event. The engine counts for each of the calls to this builtin whether it has been called.
+
+//DP_QC_FS_SEARCH_PACKFILE
+//idea: Mario
+//darkplaces implementation: Mario
+//builtin definitions:
+float(string pattern, float caseinsensitive, float quiet, string packfile) search_packfile_begin = #555;
+//description:
+//extended version of search_begin, search_packfile_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches within the specified packfile.
+//see DP_QC_FS_SEARCH extension
 
 // assorted undocumented extensions
 string(string, float) netaddress_resolve = #625;

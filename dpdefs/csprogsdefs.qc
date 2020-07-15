@@ -566,7 +566,7 @@ vector(entity e, float s, vector p) getsurfaceclippedpoint = #439;
 float(string s) tokenize = #441;
 string(float n) argv = #442;
 void(entity e, entity tagentity, string tagname) setattachment = #443;
-float(string pattern, float caseinsensitive, float quiet, ...) search_begin = #444;
+float(string pattern, float caseinsensitive, float quiet) search_begin = #444;
 void(float handle) search_end = #445;
 float(float handle) search_getsize = #446;
 string(float handle, float num) search_getfilename = #447;
@@ -1434,6 +1434,15 @@ void(entity e, string s) parseentitydata = #608;
 //darkplaces implementation: divVerent
 //function definitions:
 void coverage() = #642;  // Reports a coverage event. The engine counts for each of the calls to this builtin whether it has been called.
+
+//DP_QC_FS_SEARCH_PACKFILE
+//idea: Mario
+//darkplaces implementation: Mario
+//builtin definitions:
+float(string pattern, float caseinsensitive, float quiet, string packfile) search_packfile_begin = #555;
+//description:
+//extended version of search_begin, search_packfile_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches within the specified packfile.
+//see DP_QC_FS_SEARCH extension
 
 // assorted builtins
 const float		STAT_MOVEVARS_TICRATE           = 240;

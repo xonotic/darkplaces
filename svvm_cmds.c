@@ -3646,7 +3646,7 @@ VM_SV_clientcommand,			// #440 void(entity e, string s) clientcommand (KRIMZON_S
 VM_tokenize,					// #441 float(string s) tokenize (KRIMZON_SV_PARSECLIENTCOMMAND)
 VM_argv,						// #442 string(float n) argv (KRIMZON_SV_PARSECLIENTCOMMAND)
 VM_SV_setattachment,			// #443 void(entity e, entity tagentity, string tagname) setattachment (DP_GFX_QUAKE3MODELTAGS)
-VM_search_begin,				// #444 float(string pattern, float caseinsensitive, float quiet, ...) search_begin (DP_QC_FS_SEARCH)
+VM_search_begin,				// #444 float(string pattern, float caseinsensitive, float quiet) search_begin (DP_QC_FS_SEARCH)
 VM_search_end,					// #445 void(float handle) search_end (DP_QC_FS_SEARCH)
 VM_search_getsize,				// #446 float(float handle) search_getsize (DP_QC_FS_SEARCH)
 VM_search_getfilename,			// #447 string(float handle, float num) search_getfilename (DP_QC_FS_SEARCH)
@@ -3757,7 +3757,7 @@ NULL,							// #551
 NULL,							// #552
 NULL,							// #553
 NULL,							// #554
-NULL,							// #555
+VM_search_packfile_begin,		// #555 float(string pattern, float caseinsensitive, float quiet, string packfile) search_packfile_begin (DP_QC_FS_SEARCH_PACKFILE)
 NULL,							// #556
 NULL,							// #557
 NULL,							// #558

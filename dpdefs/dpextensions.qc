@@ -809,12 +809,12 @@ entity(entity start, .float fld, float match) findfloat = #98;
 //idea: Black
 //darkplaces implementation: Black
 //builtin definitions:
-float(string pattern, float caseinsensitive, float quiet, ...) search_begin = #444;
+float(string pattern, float caseinsensitive, float quiet) search_begin = #444;
 void(float handle) search_end = #445;
 float(float handle) search_getsize = #446;
 string(float handle, float num) search_getfilename = #447;
 //description:
-//search_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches in a specified packfile if the optional parameter is used, you should use checkextension("DP_QC_FS_SEARCH_PACKFILE") before accessing the packfile parameter.
+//search_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload).
 //search_end frees a search slot (also done at progs reload).
 //search_getsize returns how many filenames were found.
 //search_getfilename returns a filename from the search.
@@ -2627,5 +2627,8 @@ string __fullspawndata;
 //DP_QC_FS_SEARCH_PACKFILE
 //idea: Mario
 //darkplaces implementation: Mario
+//builtin definitions:
+float(string pattern, float caseinsensitive, float quiet, string packfile) search_packfile_begin = #555;
 //description:
-//shows that the engine supports the "packfile" optional parameter in search_begin (only lists file searches within a specified package).
+//extended version of search_begin, search_packfile_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches within the specified packfile.
+//see DP_QC_FS_SEARCH extension
