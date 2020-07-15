@@ -814,7 +814,7 @@ void(float handle) search_end = #445;
 float(float handle) search_getsize = #446;
 string(float handle, float num) search_getfilename = #447;
 //description:
-//search_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches in a specified packfile if optional parameter is used.
+//search_begin performs a filename search with the specified pattern (for example "maps/*.bsp") and stores the results in a search slot (minimum of 128 supported by any engine with this extension), the other functions take this returned search slot number, be sure to search_free when done (they are also freed on progs reload). Only searches in a specified packfile if the optional parameter is used, you should use checkextension("DP_QC_FS_SEARCH_PACKFILE") before accessing the packfile parameter.
 //search_end frees a search slot (also done at progs reload).
 //search_getsize returns how many filenames were found.
 //search_getfilename returns a filename from the search.
