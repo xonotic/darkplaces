@@ -336,7 +336,7 @@ CFLAGS_NET=
 
 ##### GNU Make specific definitions #####
 
-DO_LD=$(CC) -o ../../../$@ $^ $(LDFLAGS)
+DO_LD=$(CC) -o ../../../$@ $^ $(LDFLAGS) $(LDEXTRA)
 
 
 ##### Definitions shared by all makefiles #####
