@@ -2126,8 +2126,8 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 	default:
 		for (i=0 ; i<prog->numglobaldefs ; i++)
 		{
-			prog->globaldefs[i].type = LittleShort(inglobaldefs16[i].type);
-			prog->globaldefs[i].ofs = LittleShort(inglobaldefs16[i].ofs);
+			prog->globaldefs[i].type = (unsigned short)LittleShort(inglobaldefs16[i].type);
+			prog->globaldefs[i].ofs = (unsigned short)LittleShort(inglobaldefs16[i].ofs);
 			prog->globaldefs[i].s_name = LittleLong(inglobaldefs16[i].s_name);
 			// TODO bounds check ofs, s_name
 		}
