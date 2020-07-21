@@ -52,17 +52,6 @@ cvar_t cl_maxphysicsframesperserverframe = {CVAR_CLIENT, "cl_maxphysicsframesper
 // shows time used by certain subsystems
 cvar_t host_speeds = {CVAR_CLIENT | CVAR_SERVER, "host_speeds","0", "reports how much time is used in server/graphics/sound"};
 cvar_t host_maxwait = {CVAR_CLIENT | CVAR_SERVER, "host_maxwait","1000", "maximum sleep time requested from the operating system in millisecond. Larger sleeps will be done using multiple host_maxwait length sleeps. Lowering this value will increase CPU load, but may help working around problems with accuracy of sleep times."};
-cvar_t cl_minfps = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps", "40", "minimum fps target - while the rendering performance is below this, it will drift toward lower quality"};
-cvar_t cl_minfps_fade = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_fade", "1", "how fast the quality adapts to varying framerate"};
-cvar_t cl_minfps_qualitymax = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymax", "1", "highest allowed drawdistance multiplier"};
-cvar_t cl_minfps_qualitymin = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymin", "0.25", "lowest allowed drawdistance multiplier"};
-cvar_t cl_minfps_qualitymultiply = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitymultiply", "0.2", "multiplier for quality changes in quality change per second render time (1 assumes linearity of quality and render time)"};
-cvar_t cl_minfps_qualityhysteresis = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualityhysteresis", "0.05", "reduce all quality increments by this to reduce flickering"};
-cvar_t cl_minfps_qualitystepmax = {CVAR_CLIENT | CVAR_SAVE, "cl_minfps_qualitystepmax", "0.1", "maximum quality change in a single frame"};
-cvar_t cl_minfps_force = {CVAR_CLIENT, "cl_minfps_force", "0", "also apply quality reductions in timedemo/capturevideo"};
-cvar_t cl_maxfps = {CVAR_CLIENT | CVAR_SAVE, "cl_maxfps", "0", "maximum fps cap, 0 = unlimited, if game is running faster than this it will wait before running another frame (useful to make cpu time available to other programs)"};
-cvar_t cl_maxfps_alwayssleep = {CVAR_CLIENT | CVAR_SAVE, "cl_maxfps_alwayssleep","1", "gives up some processing time to other applications each frame, value in milliseconds, disabled if cl_maxfps is 0"};
-cvar_t cl_maxidlefps = {CVAR_CLIENT | CVAR_SAVE, "cl_maxidlefps", "20", "maximum fps cap when the game is not the active window (makes cpu time available to other programs"};
 
 cvar_t developer = {CVAR_CLIENT | CVAR_SERVER | CVAR_SAVE, "developer","0", "shows debugging messages and information (recommended for all developers and level designers); the value -1 also suppresses buffering and logging these messages"};
 cvar_t developer_extra = {CVAR_CLIENT | CVAR_SERVER, "developer_extra", "0", "prints additional debugging messages, often very verbose!"};
@@ -228,6 +217,12 @@ static void Host_Version_f(cmd_state_t *cmd)
 	Con_Printf("Version: %s build %s\n", gamename, buildstring);
 }
 
+static void Host_Framerate_c(cvar_t *var)
+{
+	if (var->value < 0.00001 && var->value != 0)
+		Cvar_SetValueQuick(var, 0);
+}
+
 /*
 =======================
 Host_InitLocal
@@ -245,19 +240,9 @@ static void Host_InitLocal (void)
 	Cmd_AddCommand(CMD_SHARED, "loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
 	Cvar_RegisterVariable (&cl_maxphysicsframesperserverframe);
 	Cvar_RegisterVariable (&host_framerate);
+	Cvar_RegisterCallback (&host_framerate, Host_Framerate_c);
 	Cvar_RegisterVariable (&host_speeds);
 	Cvar_RegisterVariable (&host_maxwait);
-	Cvar_RegisterVariable (&cl_minfps);
-	Cvar_RegisterVariable (&cl_minfps_fade);
-	Cvar_RegisterVariable (&cl_minfps_qualitymax);
-	Cvar_RegisterVariable (&cl_minfps_qualitymin);
-	Cvar_RegisterVariable (&cl_minfps_qualitystepmax);
-	Cvar_RegisterVariable (&cl_minfps_qualityhysteresis);
-	Cvar_RegisterVariable (&cl_minfps_qualitymultiply);
-	Cvar_RegisterVariable (&cl_minfps_force);
-	Cvar_RegisterVariable (&cl_maxfps);
-	Cvar_RegisterVariable (&cl_maxfps_alwayssleep);
-	Cvar_RegisterVariable (&cl_maxidlefps);
 
 	Cvar_RegisterVariable (&developer);
 	Cvar_RegisterVariable (&developer_extra);
@@ -395,418 +380,144 @@ Runs all active servers
 ==================
 */
 static void Host_Init(void);
-void Host_Main(void)
+double Host_Frame(double time)
 {
-	double time1 = 0;
-	double time2 = 0;
-	double time3 = 0;
-	double cl_timer = 0, sv_timer = 0;
-	double clframetime, time, oldtime, newtime;
-	double wait;
-	int pass1, pass2, pass3, i;
-	char vabuf[1024];
-	qboolean playing;
+	double cl_timer = 0;
+	double sv_timer = 0;
+	static double wait;
 
-	host.restless = false;
+	TaskQueue_Frame(false);
 
-	Host_Init();
+	// keep the random time dependent, but not when playing demos/benchmarking
+	if(!*sv_random_seed.string && !host.restless)
+		rand();
 
-	host.realtime = 0;
-	host.sleeptime = 0;
-	host.dirtytime = oldtime = Sys_DirtyTime();
+	NetConn_UpdateSockets();
 
-	while(host.state != host_shutdown)
-	{
-		if (setjmp(host.abortframe))
-		{
-			SCR_ClearLoadingScreen(false);
-			continue;			// something bad happened, or the server disconnected
-		}
+	Log_DestBuffer_Flush();
 
-		newtime = host.dirtytime = Sys_DirtyTime();
-		time = newtime - oldtime;
-		if (time < 0)
-		{
-			// warn if it's significant
-			if (time < -0.01)
-				Con_Printf(CON_WARN "Host_Mingled: time stepped backwards (went from %f to %f, difference %f)\n", oldtime, newtime, time);
-			time = 0;
-		}
-		else if (time >= 1800)
-		{
-			Con_Printf(CON_WARN "Host_Mingled: time stepped forward (went from %f to %f, difference %f)\n", oldtime, newtime, time);
-			time = 0;
-		}
-		host.realtime += time;
+	Curl_Run();
 
-		if (host_framerate.value < 0.00001 && host_framerate.value != 0)
-			Cvar_SetValueQuick(&host_framerate, 0);
+	// check for commands typed to the host
+	Host_GetConsoleCommands();
 
-		TaskQueue_Frame(false);
-
-		// keep the random time dependent, but not when playing demos/benchmarking
-		if(!*sv_random_seed.string && !cls.demoplayback)
-			rand();
-
-		NetConn_UpdateSockets();
-
-		Log_DestBuffer_Flush();
-
-		Curl_Run();
-
-		// check for commands typed to the host
-		Host_GetConsoleCommands();
-
-		// process console commands
+	// process console commands
 //		R_TimeReport("preconsole");
-		CL_VM_PreventInformationLeaks();
-		Cbuf_Frame(&cmd_client);
-		Cbuf_Frame(&cmd_server);
+	Cbuf_Frame(&cmd_client);
+	Cbuf_Frame(&cmd_server);
 
-		if(sv.active)
-			Cbuf_Frame(&cmd_serverfromclient);
+	if(sv.active)
+		Cbuf_Frame(&cmd_serverfromclient);
 
 //		R_TimeReport("console");
 
-		//Con_Printf("%6.0f %6.0f\n", cl_timer * 1000000.0, sv_timer * 1000000.0);
+	//Con_Printf("%6.0f %6.0f\n", cl_timer * 1000000.0, sv_timer * 1000000.0);
 
-		R_TimeReport("---");
+	R_TimeReport("---");
 
-	//-------------------
-	//
-	// server operations
-	//
-	//-------------------
+	sv_timer = SV_Frame(time);
+	cl_timer = CL_Frame(time);
 
-		// limit the frametime steps to no more than 100ms each
-		if (sv_timer > 0.1)
-		{
-			if (!svs.threaded)
-				svs.perf_acc_lost += (sv_timer - 0.1);
-			sv_timer = 0.1;
-		}
+	Mem_CheckSentinelsGlobal();
 
-		if (!svs.threaded)
-		{
-			svs.perf_acc_sleeptime = host.sleeptime;
-			svs.perf_acc_realtime += time;
+	// if the accumulators haven't become positive yet, wait a while
+	if (cls.state == ca_dedicated)
+		wait = sv_timer * -1000000.0; // dedicated
+	else if (!sv.active || svs.threaded)
+		wait = cl_timer * -1000000.0; // connected to server, main menu, or server is on different thread
+	else
+		wait = max(cl_timer, sv_timer) * -1000000.0; // listen server or singleplayer
 
-			// Look for clients who have spawned
-			playing = false;
-			for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
-				if(host_client->begun)
-					if(host_client->netconnection)
-						playing = true;
-			if(sv.time < 10)
-			{
-				// don't accumulate time for the first 10 seconds of a match
-				// so things can settle
-				svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = host.sleeptime = 0;
-			}
-			else if(svs.perf_acc_realtime > 5)
-			{
-				svs.perf_cpuload = 1 - svs.perf_acc_sleeptime / svs.perf_acc_realtime;
-				svs.perf_lost = svs.perf_acc_lost / svs.perf_acc_realtime;
-				if(svs.perf_acc_offset_samples > 0)
-				{
-					svs.perf_offset_max = svs.perf_acc_offset_max;
-					svs.perf_offset_avg = svs.perf_acc_offset / svs.perf_acc_offset_samples;
-					svs.perf_offset_sdev = sqrt(svs.perf_acc_offset_squared / svs.perf_acc_offset_samples - svs.perf_offset_avg * svs.perf_offset_avg);
-				}
-				if(svs.perf_lost > 0 && developer_extra.integer)
-					if(playing) // only complain if anyone is looking
-						Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
-				svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = host.sleeptime = 0;
-			}
+	if (!host.restless && wait >= 1)
+		return wait;
+	else
+		return 0;
+}
 
-			if (sv.active && sv_timer > 0)
-			{
-				// execute one or more server frames, with an upper limit on how much
-				// execution time to spend on server frames to avoid freezing the game if
-				// the server is overloaded, this execution time limit means the game will
-				// slow down if the server is taking too long.
-				int framecount, framelimit = 1;
-				double advancetime, aborttime = 0;
-				float offset;
-				prvm_prog_t *prog = SVVM_prog;
-				// receive packets on each main loop iteration, as the main loop may
-				// be undersleeping due to select() detecting a new packet
-				if (sv.active && !svs.threaded)
-					NetConn_ServerFrame();
-				// run the world state
-				// don't allow simulation to run too fast or too slow or logic glitches can occur
+static inline void Host_Sleep(double time)
+{
+	double time0, delta;
 
-				// stop running server frames if the wall time reaches this value
-				if (sys_ticrate.value <= 0)
-					advancetime = sv_timer;
-				else if (cl.islocalgame && !sv_fixedframeratesingleplayer.integer)
-				{
-					// synchronize to the client frametime, but no less than 10ms and no more than 100ms
-					advancetime = bound(0.01, cl_timer, 0.1);
-				}
-				else
-				{
-					advancetime = sys_ticrate.value;
-					// listen servers can run multiple server frames per client frame
-					framelimit = cl_maxphysicsframesperserverframe.integer;
-					aborttime = Sys_DirtyTime() + 0.1;
-				}
-				if(host_timescale.value > 0 && host_timescale.value < 1)
-					advancetime = min(advancetime, 0.1 / host_timescale.value);
-				else
-					advancetime = min(advancetime, 0.1);
+	if(host_maxwait.value <= 0)
+		time = min(time, 1000000.0);
+	else
+		time = min(time, host_maxwait.value * 1000.0);
+	if(time < 1)
+		time = 1; // because we cast to int
 
-				if(advancetime > 0)
-				{
-					offset = Sys_DirtyTime() - newtime;if (offset < 0 || offset >= 1800) offset = 0;
-					offset += sv_timer;
-					++svs.perf_acc_offset_samples;
-					svs.perf_acc_offset += offset;
-					svs.perf_acc_offset_squared += offset * offset;
-					if(svs.perf_acc_offset_max < offset)
-						svs.perf_acc_offset_max = offset;
-				}
-
-				// only advance time if not paused
-				// the game also pauses in singleplayer when menu or console is used
-				sv.frametime = advancetime * host_timescale.value;
-				if (host_framerate.value)
-					sv.frametime = host_framerate.value;
-				if (sv.paused || host.paused)
-					sv.frametime = 0;
-
-				for (framecount = 0;framecount < framelimit && sv_timer > 0;framecount++)
-				{
-					sv_timer -= advancetime;
-
-					// move things around and think unless paused
-					if (sv.frametime)
-						SV_Physics();
-
-					// if this server frame took too long, break out of the loop
-					if (framelimit > 1 && Sys_DirtyTime() >= aborttime)
-						break;
-				}
-				R_TimeReport("serverphysics");
-
-				// send all messages to the clients
-				SV_SendClientMessages();
-
-				if (sv.paused == 1 && host.realtime > sv.pausedstart && sv.pausedstart > 0) {
-					prog->globals.fp[OFS_PARM0] = host.realtime - sv.pausedstart;
-					PRVM_serverglobalfloat(time) = sv.time;
-					prog->ExecuteProgram(prog, PRVM_serverfunction(SV_PausedTic), "QC function SV_PausedTic is missing");
-				}
-
-				// send an heartbeat if enough time has passed since the last one
-				NetConn_Heartbeat(0);
-				R_TimeReport("servernetwork");
-			}
-			else
-			{
-				// don't let r_speeds display jump around
-				R_TimeReport("serverphysics");
-				R_TimeReport("servernetwork");
-			}
-		}
-		// if there is some time remaining from this frame, reset the timer
-		if (sv_timer >= 0)
-		{
-			if (!svs.threaded)
-				svs.perf_acc_lost += sv_timer;
-			sv_timer = 0;
-		}
-
-		sv_timer += time;
-
-	//-------------------
-	//
-	// client operations
-	//
-	//-------------------
-
-		// limit the frametime steps to no more than 100ms each
-		if (cl_timer > 0.1)
-			cl_timer = 0.1;
-
-		// get new key events
-		Key_EventQueue_Unblock();
-		SndSys_SendKeyEvents();
-		Sys_SendKeyEvents();
-
-		if (cls.state != ca_dedicated && (cl_timer > 0 || cls.timedemo || ((vid_activewindow ? cl_maxfps : cl_maxidlefps).value < 1)))
-		{
-			R_TimeReport("---");
-			Collision_Cache_NewFrame();
-			R_TimeReport("photoncache");
-#ifdef CONFIG_VIDEO_CAPTURE
-			// decide the simulation time
-			if (cls.capturevideo.active)
-			{
-				//***
-				if (cls.capturevideo.realtime)
-					clframetime = cl.realframetime = max(cl_timer, 1.0 / cls.capturevideo.framerate);
-				else
-				{
-					clframetime = 1.0 / cls.capturevideo.framerate;
-					cl.realframetime = max(cl_timer, clframetime);
-				}
-			}
-			else if (vid_activewindow && cl_maxfps.value >= 1 && !cls.timedemo)
-
-#else
-			if (vid_activewindow && cl_maxfps.value >= 1 && !cls.timedemo)
-#endif
-			{
-				clframetime = cl.realframetime = max(cl_timer, 1.0 / cl_maxfps.value);
-				// when running slow, we need to sleep to keep input responsive
-				wait = bound(0, cl_maxfps_alwayssleep.value * 1000, 100000);
-				if (wait > 0)
-					Sys_Sleep((int)wait);
-			}
-			else if (!vid_activewindow && cl_maxidlefps.value >= 1 && !cls.timedemo)
-				clframetime = cl.realframetime = max(cl_timer, 1.0 / cl_maxidlefps.value);
-			else
-				clframetime = cl.realframetime = cl_timer;
-
-			// apply slowmo scaling
-			clframetime *= cl.movevars_timescale;
-			// scale playback speed of demos by slowmo cvar
-			if (cls.demoplayback)
-			{
-				clframetime *= host_timescale.value;
-				// if demo playback is paused, don't advance time at all
-				if (cls.demopaused)
-					clframetime = 0;
-			}
-			else
-			{
-				// host_framerate overrides all else
-				if (host_framerate.value)
-					clframetime = host_framerate.value;
-
-				if (cl.paused || host.paused)
-					clframetime = 0;
-			}
-
-			if (cls.timedemo)
-				clframetime = cl.realframetime = cl_timer;
-
-			// deduct the frame time from the accumulator
-			cl_timer -= cl.realframetime;
-
-			cl.oldtime = cl.time;
-			cl.time += clframetime;
-
-			// update video
-			if (host_speeds.integer)
-				time1 = Sys_DirtyTime();
-			R_TimeReport("pre-input");
-
-			// Collect input into cmd
-			CL_Input();
-
-			R_TimeReport("input");
-
-			// check for new packets
-			NetConn_ClientFrame();
-
-			// read a new frame from a demo if needed
-			CL_ReadDemoMessage();
-			R_TimeReport("clientnetwork");
-
-			// now that packets have been read, send input to server
-			CL_SendMove();
-			R_TimeReport("sendmove");
-
-			// update client world (interpolate entities, create trails, etc)
-			CL_UpdateWorld();
-			R_TimeReport("lerpworld");
-
-			CL_Video_Frame();
-
-			R_TimeReport("client");
-
-			CL_UpdateScreen();
-			R_TimeReport("render");
-
-			if (host_speeds.integer)
-				time2 = Sys_DirtyTime();
-
-			// update audio
-			if(cl.csqc_usecsqclistener)
-			{
-				S_Update(&cl.csqc_listenermatrix);
-				cl.csqc_usecsqclistener = false;
-			}
-			else
-				S_Update(&r_refdef.view.matrix);
-
-			CDAudio_Update();
-			R_TimeReport("audio");
-
-			// reset gathering of mouse input
-			in_mouse_x = in_mouse_y = 0;
-
-			if (host_speeds.integer)
-			{
-				pass1 = (int)((time1 - time3)*1000000);
-				time3 = Sys_DirtyTime();
-				pass2 = (int)((time2 - time1)*1000000);
-				pass3 = (int)((time3 - time2)*1000000);
-				Con_Printf("%6ius total %6ius server %6ius gfx %6ius snd\n",
-							pass1+pass2+pass3, pass1, pass2, pass3);
-			}
-		}
-
-		// if there is some time remaining from this frame, reset the timer
-		if (cl_timer >= 0)
-			cl_timer = 0;
-
-		cl_timer += time;
-
-#if MEMPARANOIA
-		Mem_CheckSentinelsGlobal();
-#else
-		if (developer_memorydebug.integer)
-			Mem_CheckSentinelsGlobal();
-#endif
-
-		// if the accumulators haven't become positive yet, wait a while
-		wait = max(cl_timer, sv_timer) * -1000000.0;
-
-		if (!host.restless && wait >= 1)
-		{
-			double time0, delta;
-
-			if(host_maxwait.value <= 0)
-				wait = min(wait, 1000000.0);
-			else
-				wait = min(wait, host_maxwait.value * 1000.0);
-			if(wait < 1)
-				wait = 1; // because we cast to int
-
-			time0 = Sys_DirtyTime();
-			if (sv_checkforpacketsduringsleep.integer && !sys_usenoclockbutbenchmark.integer && !svs.threaded) {
-				NetConn_SleepMicroseconds((int)wait);
-				if (cls.state != ca_dedicated)
-					NetConn_ClientFrame(); // helps server browser get good ping values
-				// TODO can we do the same for ServerFrame? Probably not.
-			}
-			else
-				Sys_Sleep((int)wait);
-			delta = Sys_DirtyTime() - time0;
-			if (delta < 0 || delta >= 1800) 
-				delta = 0;
-			host.sleeptime += delta;
+	time0 = Sys_DirtyTime();
+	if (sv_checkforpacketsduringsleep.integer && !sys_usenoclockbutbenchmark.integer && !svs.threaded) {
+		NetConn_SleepMicroseconds((int)time);
+		if (cls.state != ca_dedicated)
+			NetConn_ClientFrame(); // helps server browser get good ping values
+		// TODO can we do the same for ServerFrame? Probably not.
+	}
+	else
+		Sys_Sleep((int)time);
+	delta = Sys_DirtyTime() - time0;
+	if (delta < 0 || delta >= 1800) 
+		delta = 0;
+	host.sleeptime += delta;
 //			R_TimeReport("sleep");
+	return;
+}
+
+// Cloudwalk: Most overpowered function declaration...
+static inline double Host_UpdateTime (double newtime, double oldtime)
+{
+	double time = newtime - oldtime;
+
+	if (time < 0)
+	{
+		// warn if it's significant
+		if (time < -0.01)
+			Con_Printf(CON_WARN "Host_GetTime: time stepped backwards (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+		time = 0;
+	}
+	else if (time >= 1800)
+	{
+		Con_Printf(CON_WARN "Host_GetTime: time stepped forward (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+		time = 0;
+	}
+
+	return time;
+}
+
+void Host_Main(void)
+{
+	double time, newtime, oldtime, sleeptime;
+
+	Host_Init(); // Start!
+
+	host.realtime = 0;
+	oldtime = Sys_DirtyTime();
+
+	// Main event loop
+	while(host.state != host_shutdown)
+	{
+		// Something bad happened, or the server disconnected
+		if (setjmp(host.abortframe))
+		{
+			host.state = host_active; // In case we were loading
+			continue;
+		}
+
+		newtime = host.dirtytime = Sys_DirtyTime();
+		host.realtime += time = Host_UpdateTime(newtime, oldtime);
+
+		sleeptime = Host_Frame(time);
+		oldtime = newtime;
+
+		if (sleeptime)
+		{
+			Host_Sleep(sleeptime);
+			continue;
 		}
 
 		host.framecount++;
-		oldtime = newtime;
 	}
 
-	Sys_Quit(0);
+	return;
 }
 
 //============================================================================
@@ -1035,7 +746,7 @@ static void Host_Init (void)
 
 	// put up the loading image so the user doesn't stare at a black screen...
 	SCR_BeginLoadingPlaque(true);
-	
+
 	// check for special benchmark mode
 // COMMANDLINEOPTION: Client: -benchmark <demoname> runs a timedemo and quits, results of any timedemo can be found in gamedir/benchmark.log (for example id1/benchmark.log)
 	i = COM_CheckParm("-benchmark");

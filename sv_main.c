@@ -96,7 +96,6 @@ cvar_t sv_debugmove = {CVAR_SERVER | CVAR_NOTIFY, "sv_debugmove", "0", "disables
 cvar_t sv_echobprint = {CVAR_SERVER | CVAR_SAVE, "sv_echobprint", "1", "prints gamecode bprint() calls to server console"};
 cvar_t sv_edgefriction = {CVAR_SERVER, "edgefriction", "1", "how much you slow down when nearing a ledge you might fall off, multiplier of sv_friction (Quake used 2, QuakeWorld used 1 due to a bug in physics code)"};
 cvar_t sv_entpatch = {CVAR_SERVER, "sv_entpatch", "1", "enables loading of .ent files to override entities in the bsp (for example Threewave CTF server pack contains .ent patch files enabling play of CTF on id1 maps)"};
-cvar_t sv_fixedframeratesingleplayer = {CVAR_SERVER, "sv_fixedframeratesingleplayer", "1", "allows you to use server-style timing system in singleplayer (don't run faster than sys_ticrate)"};
 cvar_t sv_freezenonclients = {CVAR_SERVER | CVAR_NOTIFY, "sv_freezenonclients", "0", "freezes time, except for players, allowing you to walk around and take screenshots of explosions"};
 cvar_t sv_friction = {CVAR_SERVER | CVAR_NOTIFY, "sv_friction","4", "how fast you slow down"};
 cvar_t sv_gameplayfix_blowupfallenzombies = {CVAR_SERVER, "sv_gameplayfix_blowupfallenzombies", "1", "causes findradius to detect SOLID_NOT entities such as zombies and corpses on the floor, allowing splash damage to apply to them"};
@@ -142,7 +141,7 @@ cvar_t sv_playerphysicsqc = {CVAR_SERVER | CVAR_NOTIFY, "sv_playerphysicsqc", "1
 cvar_t sv_progs = {CVAR_SERVER, "sv_progs", "progs.dat", "selects which quakec progs.dat file to run" };
 cvar_t sv_protocolname = {CVAR_SERVER, "sv_protocolname", "DP7", "selects network protocol to host for (values include QUAKE, QUAKEDP, NEHAHRAMOVIE, DP1 and up)"};
 cvar_t sv_random_seed = {CVAR_SERVER, "sv_random_seed", "", "random seed; when set, on every map start this random seed is used to initialize the random number generator. Don't touch it unless for benchmarking or debugging"};
-cvar_t sv_ratelimitlocalplayer = {CVAR_SERVER, "sv_ratelimitlocalplayer", "0", "whether to apply rate limiting to the local player in a listen server (only useful for testing)"};
+cvar_t host_limitlocal = {CVAR_SERVER, "host_limitlocal", "0", "whether to apply rate limiting to the local player in a listen server (only useful for testing)"};
 cvar_t sv_sound_land = {CVAR_SERVER, "sv_sound_land", "demon/dland2.wav", "sound to play when MOVETYPE_STEP entity hits the ground at high speed (empty cvar disables the sound)"};
 cvar_t sv_sound_watersplash = {CVAR_SERVER, "sv_sound_watersplash", "misc/h2ohit1.wav", "sound to play when MOVETYPE_FLY/TOSS/BOUNCE/STEP entity enters or leaves water (empty cvar disables the sound)"};
 cvar_t sv_stepheight = {CVAR_SERVER | CVAR_NOTIFY, "sv_stepheight", "18", "how high you can step up (TW_SV_STEPCONTROL extension)"};
@@ -518,7 +517,6 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_echobprint);
 	Cvar_RegisterVariable (&sv_edgefriction);
 	Cvar_RegisterVariable (&sv_entpatch);
-	Cvar_RegisterVariable (&sv_fixedframeratesingleplayer);
 	Cvar_RegisterVariable (&sv_freezenonclients);
 	Cvar_RegisterVariable (&sv_friction);
 	Cvar_RegisterVariable (&sv_gameplayfix_blowupfallenzombies);
@@ -564,7 +562,8 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_progs);
 	Cvar_RegisterVariable (&sv_protocolname);
 	Cvar_RegisterVariable (&sv_random_seed);
-	Cvar_RegisterVariable (&sv_ratelimitlocalplayer);
+	Cvar_RegisterVariable (&host_limitlocal);
+	Cvar_RegisterAlias(&host_limitlocal, "sv_ratelimitlocalplayer");
 	Cvar_RegisterVariable (&sv_sound_land);
 	Cvar_RegisterVariable (&sv_sound_watersplash);
 	Cvar_RegisterVariable (&sv_stepheight);
@@ -2536,7 +2535,7 @@ static void SV_SendClientDatagram (client_t *client)
 		break;
 	}
 
-	if (LHNETADDRESS_GetAddressType(&host_client->netconnection->peeraddress) == LHNETADDRESSTYPE_LOOP && !sv_ratelimitlocalplayer.integer)
+	if (LHNETADDRESS_GetAddressType(&host_client->netconnection->peeraddress) == LHNETADDRESSTYPE_LOOP && !host_limitlocal.integer)
 	{
 		// for good singleplayer, send huge packets
 		maxsize = sizeof(sv_sendclientdatagram_buf);
@@ -4104,6 +4103,154 @@ static void SV_VM_Setup(void)
 
 extern cvar_t host_maxwait;
 extern cvar_t host_framerate;
+extern cvar_t cl_maxphysicsframesperserverframe;
+double SV_Frame(double time)
+{
+	static double sv_timer;
+	int i;
+	qboolean playing;
+	char vabuf[1024];
+
+	if((sv_timer += time) < 0)
+		return sv_timer;
+	// limit the frametime steps to no more than 100ms each
+	if (sv_timer > 0.1)
+	{
+		if (!svs.threaded)
+			svs.perf_acc_lost += (sv_timer - 0.1);
+		sv_timer = 0.1;
+	}
+
+	if (!svs.threaded)
+	{
+		svs.perf_acc_sleeptime = host.sleeptime;
+		svs.perf_acc_realtime += time;
+
+		// Look for clients who have spawned
+		playing = false;
+		for (i = 0, host_client = svs.clients;i < svs.maxclients;i++, host_client++)
+			if(host_client->begun)
+				if(host_client->netconnection)
+					playing = true;
+		if(sv.time < 10)
+		{
+			// don't accumulate time for the first 10 seconds of a match
+			// so things can settle
+			svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = host.sleeptime = 0;
+		}
+		else if(svs.perf_acc_realtime > 5)
+		{
+			svs.perf_cpuload = 1 - svs.perf_acc_sleeptime / svs.perf_acc_realtime;
+			svs.perf_lost = svs.perf_acc_lost / svs.perf_acc_realtime;
+			if(svs.perf_acc_offset_samples > 0)
+			{
+				svs.perf_offset_max = svs.perf_acc_offset_max;
+				svs.perf_offset_avg = svs.perf_acc_offset / svs.perf_acc_offset_samples;
+				svs.perf_offset_sdev = sqrt(svs.perf_acc_offset_squared / svs.perf_acc_offset_samples - svs.perf_offset_avg * svs.perf_offset_avg);
+			}
+			if(svs.perf_lost > 0 && developer_extra.integer)
+				if(playing) // only complain if anyone is looking
+					Con_DPrintf("Server can't keep up: %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
+			svs.perf_acc_realtime = svs.perf_acc_sleeptime = svs.perf_acc_lost = svs.perf_acc_offset = svs.perf_acc_offset_squared = svs.perf_acc_offset_max = svs.perf_acc_offset_samples = host.sleeptime = 0;
+		}
+
+		if (sv.active && sv_timer > 0)
+		{
+			// execute one or more server frames, with an upper limit on how much
+			// execution time to spend on server frames to avoid freezing the game if
+			// the server is overloaded, this execution time limit means the game will
+			// slow down if the server is taking too long.
+			int framecount, framelimit = 1;
+			double advancetime, aborttime = 0;
+			float offset;
+			prvm_prog_t *prog = SVVM_prog;
+			// receive packets on each main loop iteration, as the main loop may
+			// be undersleeping due to select() detecting a new packet
+			if (sv.active && !svs.threaded)
+				NetConn_ServerFrame();
+			// run the world state
+			// don't allow simulation to run too fast or too slow or logic glitches can occur
+
+			// stop running server frames if the wall time reaches this value
+			if (sys_ticrate.value <= 0)
+				advancetime = sv_timer;
+			else
+			{
+				advancetime = sys_ticrate.value;
+				// listen servers can run multiple server frames per client frame
+				framelimit = cl_maxphysicsframesperserverframe.integer;
+				aborttime = Sys_DirtyTime() + 0.1;
+			}
+			if(host_timescale.value > 0 && host_timescale.value < 1)
+				advancetime = min(advancetime, 0.1 / host_timescale.value);
+			else
+				advancetime = min(advancetime, 0.1);
+
+			if(advancetime > 0)
+			{
+				offset = Sys_DirtyTime() - host.dirtytime;
+				if (offset < 0 || offset >= 1800)
+					offset = 0;
+				offset += sv_timer;
+				++svs.perf_acc_offset_samples;
+				svs.perf_acc_offset += offset;
+				svs.perf_acc_offset_squared += offset * offset;
+				if(svs.perf_acc_offset_max < offset)
+					svs.perf_acc_offset_max = offset;
+			}
+
+			// only advance time if not paused
+			// the game also pauses in singleplayer when menu or console is used
+			sv.frametime = advancetime * host_timescale.value;
+			if (host_framerate.value)
+				sv.frametime = host_framerate.value;
+			if (sv.paused || host.paused)
+				sv.frametime = 0;
+
+			for (framecount = 0;framecount < framelimit && sv_timer > 0;framecount++)
+			{
+				sv_timer -= advancetime;
+
+				// move things around and think unless paused
+				if (sv.frametime)
+					SV_Physics();
+
+				// if this server frame took too long, break out of the loop
+				if (framelimit > 1 && Sys_DirtyTime() >= aborttime)
+					break;
+			}
+			R_TimeReport("serverphysics");
+
+			// send all messages to the clients
+			SV_SendClientMessages();
+
+			if (sv.paused == 1 && host.realtime > sv.pausedstart && sv.pausedstart > 0) {
+				prog->globals.fp[OFS_PARM0] = host.realtime - sv.pausedstart;
+				PRVM_serverglobalfloat(time) = sv.time;
+				prog->ExecuteProgram(prog, PRVM_serverfunction(SV_PausedTic), "QC function SV_PausedTic is missing");
+			}
+
+			// send an heartbeat if enough time has passed since the last one
+			NetConn_Heartbeat(0);
+			R_TimeReport("servernetwork");
+		}
+		else
+		{
+			// don't let r_speeds display jump around
+			R_TimeReport("serverphysics");
+			R_TimeReport("servernetwork");
+		}
+	}
+	// if there is some time remaining from this frame, reset the timer
+	if (sv_timer >= 0)
+	{
+		if (!svs.threaded)
+			svs.perf_acc_lost += sv_timer;
+		sv_timer = 0;
+	}
+	return sv_timer;
+}
+
 static int SV_ThreadFunc(void *voiddata)
 {
 	prvm_prog_t *prog = SVVM_prog;

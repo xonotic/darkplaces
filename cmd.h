@@ -114,7 +114,7 @@ typedef struct cmd_state_s
 
 	sizebuf_t text;
 	unsigned char text_buf[CMDBUFSIZE];
-	Thread_SpinLock text_lock;
+	void *text_mutex;
 
 	int argc;
 	const char *argv[MAX_ARGS];
@@ -168,7 +168,7 @@ void Cbuf_InsertText (cmd_state_t *cmd, const char *text);
  * \note Do not call inside a command function!
  */
 void Cbuf_Execute (cmd_state_t *cmd);
-/*! Performs deferred commands and runs Cbuf_Execute, called by Host_Main */
+/*! Performs deferred commands and runs Cbuf_Execute, called by Host_Frame */
 void Cbuf_Frame (cmd_state_t *cmd);
 
 //===========================================================================
