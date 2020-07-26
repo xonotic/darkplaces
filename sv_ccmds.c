@@ -1507,6 +1507,210 @@ static void SV_SendCvar_f(cmd_state_t *cmd)
 	host_client = old;
 }
 
+static void SV_Ent_Create_f(cmd_state_t *cmd)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	prvm_edict_t *ed;
+	mdef_t *key;
+	int i;
+	qboolean haveorigin;
+
+	qboolean expectval = false;
+	void (*print)(const char *, ...) = (cmd->source == src_client ? SV_ClientPrintf : Con_Printf);
+
+	if(!Cmd_Argc(cmd))
+		return;
+
+	ed = PRVM_ED_Alloc(SVVM_prog);
+
+	PRVM_ED_ParseEpair(prog, ed, PRVM_ED_FindField(prog, "classname"), Cmd_Argv(cmd, 1), false);
+
+	// Spawn where the player is aiming. We need a view matrix first.
+	if(cmd->source == src_client)
+	{
+		vec3_t org, temp, dest;
+		matrix4x4_t view;
+		trace_t trace;
+		char buf[128];
+
+		SV_GetEntityMatrix(prog, host_client->edict, &view, true);
+
+		Matrix4x4_OriginFromMatrix(&view, org);
+		VectorSet(temp, 65536, 0, 0);
+		Matrix4x4_Transform(&view, temp, dest);		
+
+		trace = SV_TraceLine(org, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, 0, 0, collision_extendmovelength.value);
+
+		dpsnprintf(buf, sizeof(buf), "%g %g %g", trace.endpos[0], trace.endpos[1], trace.endpos[2]);
+		PRVM_ED_ParseEpair(prog, ed, PRVM_ED_FindField(prog, "origin"), buf, false);
+
+		haveorigin = true;
+	}
+	// Or spawn at a specified origin.
+	else
+	{
+		print = Con_Printf;
+		haveorigin = false;
+	}
+
+	// Allow more than one key/value pair by cycling between expecting either one.
+	for(i = 2; i < Cmd_Argc(cmd); i++)
+	{
+		if(!expectval)
+		{
+			if(!(key = PRVM_ED_FindField(prog, Cmd_Argv(cmd, i))))
+			{
+				print("Key %s not found!\n", Cmd_Argv(cmd, i));
+				PRVM_ED_Free(prog, ed);
+				return;
+			}
+
+			/*
+			 * This is mostly for dedicated server console, but if the
+			 * player gave a custom origin, we can ignore the traceline.
+			 */
+			if(!strcmp(Cmd_Argv(cmd, i), "origin"))
+				haveorigin = true;
+
+			expectval = true;
+		}
+		else
+		{
+			PRVM_ED_ParseEpair(prog, ed, key, Cmd_Argv(cmd, i), false);
+			expectval = false;
+		}
+	}
+
+	if(!haveorigin)
+	{
+		print("Missing origin\n");
+		PRVM_ED_Free(prog, ed);
+		return;
+	}
+
+	// Spawn it
+	PRVM_ED_CallPrespawnFunction(prog, ed);
+	
+	if(!PRVM_ED_CallSpawnFunction(prog, ed, NULL, NULL))
+	{
+		print("Could not spawn a \"%s\". No such entity or it has no spawn function\n", Cmd_Argv(cmd, 1));
+		if(cmd->source == src_client)
+			Con_Printf("%s tried to spawn a \"%s\"\n", host_client->name, Cmd_Argv(cmd, 1));
+		// CallSpawnFunction already freed the edict for us.
+		return;
+	}
+
+	PRVM_ED_CallPostspawnFunction(prog, ed);	
+
+	// Make it appear in the world
+	SV_LinkEdict(ed);
+
+	if(cmd->source == src_client)
+		Con_Printf("%s spawned a \"%s\"\n", host_client->name, Cmd_Argv(cmd, 1));
+}
+
+static void SV_Ent_Remove_f(cmd_state_t *cmd)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	prvm_edict_t *ed;
+	int i, ednum;
+	void (*print)(const char *, ...) = (cmd->source == src_client ? SV_ClientPrintf : Con_Printf);
+
+	if(!Cmd_Argc(cmd))
+		return;
+
+	// Allow specifying edict by number
+	if(Cmd_Argc(cmd) > 1 && Cmd_Argv(cmd, 1))
+	{
+		ednum = atoi(Cmd_Argv(cmd, 1));
+		if(!ednum)
+		{
+			print("Cannot remove the world\n");
+			return;
+		}
+	}
+	// Or trace a line if it's a client who didn't specify one.
+	else if(cmd->source == src_client)
+	{
+		vec3_t org, temp, dest;
+		matrix4x4_t view;
+		trace_t trace;
+
+		SV_GetEntityMatrix(prog, host_client->edict, &view, true);
+
+		Matrix4x4_OriginFromMatrix(&view, org);
+		VectorSet(temp, 65536, 0, 0);
+		Matrix4x4_Transform(&view, temp, dest);		
+
+		trace = SV_TraceLine(org, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, 0, 0, collision_extendmovelength.value);
+		
+		if(trace.ent)
+			ednum = (int)PRVM_EDICT_TO_PROG(trace.ent);
+		if(!trace.ent || !ednum)
+			// Don't remove the world, but don't annoy players with a print if they miss
+			return;
+	}
+	else
+	{
+		// Only a dedicated server console should be able to reach this.
+		print("No edict given\n");
+		return;
+	}
+
+	ed = PRVM_EDICT_NUM(ednum);
+
+	if(ed)
+	{
+		// Skip players
+		for (i = 0; i < svs.maxclients; i++)
+		{
+			if(ed == svs.clients[i].edict)
+				return;
+		}
+
+		if(!ed->priv.required->free)
+		{
+			print("Removed a \"%s\"\n", PRVM_GetString(prog, PRVM_serveredictstring(ed, classname)));
+			PRVM_ED_ClearEdict(prog, ed);
+			PRVM_ED_Free(prog, ed);
+		}
+	}
+	else
+	{
+		// This should only be reachable if an invalid edict number was given
+		print("No such entity\n");
+		return;
+	}
+}
+
+static void SV_Ent_Remove_All_f(cmd_state_t *cmd)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	int i, rmcount;
+	prvm_edict_t *ed;
+	void (*print)(const char *, ...) = (cmd->source == src_client ? SV_ClientPrintf : Con_Printf);
+
+	for (i = 0, rmcount = 0, ed = PRVM_EDICT_NUM(i); i < prog->num_edicts; i++, ed = PRVM_NEXT_EDICT(ed))
+	{
+		if(!ed->priv.required->free && !strcmp(PRVM_GetString(prog, PRVM_serveredictstring(ed, classname)), Cmd_Argv(cmd, 1)))
+		{
+			if(!i)
+			{
+				print("Cannot remove the world\n");
+				return;
+			}
+			PRVM_ED_ClearEdict(prog, ed);
+			PRVM_ED_Free(prog, ed);
+			rmcount++;
+		}
+	}
+
+	if(!rmcount)
+		print("No \"%s\" found\n", Cmd_Argv(cmd, 1));
+	else
+		print("Removed %i of \"%s\"\n", rmcount, Cmd_Argv(cmd, 1));
+}
+
 void SV_InitOperatorCommands(void)
 {
 	Cvar_RegisterVariable(&sv_cheats);
@@ -1556,5 +1760,9 @@ void SV_InitOperatorCommands(void)
 	Cmd_AddCommand(CMD_USERINFO, "rate_burstsize", SV_Rate_BurstSize_f, "change your network connection speed");
 	Cmd_AddCommand(CMD_USERINFO, "pmodel", SV_PModel_f, "(Nehahra-only) change your player model choice");
 	Cmd_AddCommand(CMD_USERINFO, "playermodel", SV_Playermodel_f, "change your player model");
-	Cmd_AddCommand(CMD_USERINFO, "playerskin", SV_Playerskin_f, "change your player skin number");	
+	Cmd_AddCommand(CMD_USERINFO, "playerskin", SV_Playerskin_f, "change your player skin number");
+
+	Cmd_AddCommand(CMD_CHEAT | CMD_SERVER_FROM_CLIENT, "ent_create", SV_Ent_Create_f, "Creates an entity at the specified coordinate, of the specified classname. If executed from a server, origin has to be specified manually.");
+	Cmd_AddCommand(CMD_CHEAT | CMD_SERVER_FROM_CLIENT, "ent_remove_all", SV_Ent_Remove_All_f, "Removes all entities of the specified classname");
+	Cmd_AddCommand(CMD_CHEAT | CMD_SERVER_FROM_CLIENT, "ent_remove", SV_Ent_Remove_f, "Removes an entity by number, or the entity you're aiming at");
 }

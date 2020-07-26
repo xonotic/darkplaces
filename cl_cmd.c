@@ -26,6 +26,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "image.h"
 #include <time.h>
 
+#include "cl_collision.h"
+
 cvar_t cl_name = {CVAR_CLIENT | CVAR_SAVE | CVAR_USERINFO, "name", "player", "change your player name"};
 cvar_t cl_rate = {CVAR_CLIENT | CVAR_SAVE | CVAR_USERINFO, "rate", "20000", "change your connection speed"};
 cvar_t cl_rate_burstsize = {CVAR_CLIENT | CVAR_SAVE | CVAR_USERINFO, "rate_burstsize", "1024", "internal storage cvar for current rate control burst size (changed by rate_burstsize command)"};
@@ -219,7 +221,7 @@ static void CL_SendCvar_f(cmd_state_t *cmd)
 CL_Color_f
 ==================
 */
-cvar_t cl_color = {CVAR_READONLY | CVAR_CLIENT | CVAR_SAVE, "_cl_color", "0", "internal storage cvar for current player colors (changed by color command)"};
+cvar_t cl_color = {CVAR_CLIENT | CVAR_SAVE, "_cl_color", "0", "internal storage cvar for current player colors (changed by color command)"};
 
 // Ignore the callbacks so this two-to-three way synchronization doesn't cause an infinite loop.
 static void CL_Color_c(cvar_t *var)

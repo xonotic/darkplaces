@@ -436,7 +436,8 @@ double Host_Frame(double time)
 
 static inline void Host_Sleep(double time)
 {
-	double time0, delta;
+	static double delta;
+	double time0;
 
 	if(host_maxwait.value <= 0)
 		time = min(time, 1000000.0);
@@ -528,8 +529,10 @@ void Host_StartVideo(void)
 	if (!vid_opened && cls.state != ca_dedicated)
 	{
 		vid_opened = true;
+#ifdef WIN32
 		// make sure we open sockets before opening video because the Windows Firewall "unblock?" dialog can screw up the graphics context on some graphics drivers
 		NetConn_UpdateSockets();
+#endif
 		VID_Start();
 		CDAudio_Startup();
 	}

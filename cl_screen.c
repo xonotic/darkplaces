@@ -2260,14 +2260,11 @@ static void SCR_DrawScreen (void)
 		if ((key_dest == key_game || key_dest == key_message) && !r_letterbox.value && !scr_loading)
 			Con_DrawNotify ();	// only draw notify in game
 
-	if(cl.islocalgame)
-	{
-		if (key_dest != key_game || key_consoleactive)
-			host.paused = true;
-		else
-			host.paused = false;
-	}
-	
+	if (cl.islocalgame && (key_dest != key_game || key_consoleactive))
+		host.paused = true;
+	else
+		host.paused = false;
+
 	if (cls.signon == SIGNONS)
 	{
 		SCR_DrawNet ();
@@ -2634,7 +2631,7 @@ void SCR_UpdateLoadingScreen (qboolean clear, qboolean startup)
 
 #ifdef USE_GLES2
 	SCR_DrawLoadingScreen_SharedSetup(clear);
-	SCR_DrawLoadingScreen(clear);
+	SCR_DrawLoadingScreen();
 #else
 	SCR_DrawLoadingScreen_SharedSetup(clear);
 	if (vid.stereobuffer)
