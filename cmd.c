@@ -47,14 +47,14 @@ qboolean host_stuffcmdsrun = false;
 
 //=============================================================================
 
-void Cbuf_Lock(cmd_state_t *cmd)
+void Cbuf_Lock(cbuf_t *cbuf)
 {
-	Thread_LockMutex(cmd->text_mutex);
+	Thread_LockMutex(cbuf->lock);
 }
 
-void Cbuf_Unlock(cmd_state_t *cmd)
+void Cbuf_Unlock(cbuf_t *cbuf)
 {
-	Thread_UnlockMutex(cmd->text_mutex);
+	Thread_UnlockMutex(cbuf->lock);
 }
 
 
@@ -69,7 +69,7 @@ bind g "impulse 5 ; +attack ; wait ; -attack ; impulse 2"
 */
 static void Cmd_Wait_f (cmd_state_t *cmd)
 {
-	cmd->wait = true;
+	cmd->cbuf->wait = true;
 }
 
 /*
@@ -182,6 +182,106 @@ static void Cmd_Centerprint_f (cmd_state_t *cmd)
 
 /*
 ============
+Cbuf_ParseText
+
+Parses Quake console command-line
+Allocates a cbuf_cmd_t for each individual
+command. Returns a pointer to the last element.
+============
+*/
+static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, cbuf_t *cbuf, cbuf_cmd_t **start, const char *text)
+{
+	int i = 0;
+	cbuf_cmd_t *current = NULL;
+	cbuf_cmd_t *end = NULL;
+	qboolean quotes = false;
+	qboolean comment = false;
+	qboolean escaped = false;
+	qboolean mark = false;
+	char *offset = NULL;
+	size_t cmdsize = 0;
+
+	// It has to be NULL because it writes into it first
+	if(*start)
+		Sys_Error("Cbuf_ParseText: 'start' is non-NULL. This should never happen. Please report this to a developer.\n");
+
+	while(text[i])
+	{
+		switch (text[i])
+		{
+			case '"':
+				if (!escaped)
+					quotes = !quotes;
+				break;
+			case '\\':
+				if (!escaped && quotes)
+					escaped = true;
+				break;
+			case '/':
+				if (!quotes && !comment && text[i+1] == '/' && (i == 0 || ISWHITESPACE(text[i-1])))
+					comment = true;
+				break;
+			case ';':
+				if(!comment && !quotes)
+					mark = true;
+				break;
+			case '\r':
+			case '\n':
+				mark = true;
+				break;
+			default:
+			// If there's no trailing newline, mark for allocation
+				if(text[i+1] == 0)
+				{
+					mark = true;
+					cmdsize++;
+				}
+				break;
+		}
+
+		if(!offset && !comment && !mark)
+			offset = (char *)&text[i];
+
+		if(!comment && !mark && offset)
+			cmdsize++;
+
+		if(mark)
+		{
+			comment = false;
+			quotes = false;
+			escaped = false;
+
+			if(offset)
+			{
+				current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
+				if(end)
+					end->next = current;
+				if(!*start)
+					*start = current;
+				current->prev = end;
+
+				current->text = (char *)Z_Malloc(cmdsize + 1);
+				memcpy(current->text, offset, cmdsize);
+				current->source = cmd;
+
+				end = current;
+				end->next = NULL;
+				current = end->next;
+				offset = NULL;
+				cbuf->size += cmdsize;
+			}
+
+			cmdsize = 0;
+			mark = false;
+		}
+		i++;
+	}
+
+	return end;
+}
+
+/*
+============
 Cbuf_AddText
 
 Adds command text at the end of the buffer
@@ -189,16 +289,33 @@ Adds command text at the end of the buffer
 */
 void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 {
-	int		l;
+	size_t l = strlen(text);
+	cbuf_t *cbuf = cmd->cbuf;
+	cbuf_cmd_t *add = NULL, *newend = NULL;
 
-	l = (int)strlen(text);
+	Cbuf_Lock(cbuf);
 
-	Cbuf_Lock(cmd);
-	if (cmd->text.maxsize - cmd->text.cursize <= l)
+	if (cbuf->maxsize - cbuf->size <= l)
 		Con_Print("Cbuf_AddText: overflow\n");
 	else
-		SZ_Write(&cmd->text, (const unsigned char *)text, l);
-	Cbuf_Unlock(cmd);
+	{
+		newend = Cbuf_ParseText(cmd, cbuf, &add, text);
+		if(!newend)
+		{
+			Con_Printf("Cbuf_InsertText: newend = NULL\n");
+			return;
+		}
+
+		if(!cbuf->start)
+			cbuf->start = add;
+		if(cbuf->end)
+		{
+			cbuf->end->next = add;
+			add->prev = cbuf->end;
+		}
+		cbuf->end = newend;	
+	}
+	Cbuf_Unlock(cbuf);
 }
 
 
@@ -213,19 +330,35 @@ FIXME: actually change the command buffer to do less copying
 */
 void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 {
+	cbuf_t *cbuf = cmd->cbuf;
+	cbuf_cmd_t *insert = NULL, *oldstart = NULL, *newend = NULL;
 	size_t l = strlen(text);
-	Cbuf_Lock(cmd);
+
+	Cbuf_Lock(cbuf);
+
 	// we need to memmove the existing text and stuff this in before it...
-	if (cmd->text.cursize + l >= (size_t)cmd->text.maxsize)
+	if (cmd->cbuf->size + l >= (size_t)cmd->cbuf->maxsize)
 		Con_Print("Cbuf_InsertText: overflow\n");
 	else
 	{
-		// we don't have a SZ_Prepend, so...
-		memmove(cmd->text.data + l, cmd->text.data, cmd->text.cursize);
-		cmd->text.cursize += (int)l;
-		memcpy(cmd->text.data, text, l);
+		newend = Cbuf_ParseText(cmd, cbuf, &insert, text);
+		if(!newend)
+		{
+			Con_Printf("Cbuf_InsertText: newend = NULL\n");
+			return;
+		}
+
+		oldstart = cbuf->start;
+		cbuf->start = insert;
+		
+		if(!cbuf->end)
+			cbuf->end = newend;
+		if(oldstart)
+			oldstart->prev = newend;
+		newend->next = oldstart;
 	}
-	Cbuf_Unlock(cmd);
+
+	Cbuf_Unlock(cbuf);
 }
 
 /*
@@ -275,80 +408,24 @@ Cbuf_Execute
 ============
 */
 static qboolean Cmd_PreprocessString(cmd_state_t *cmd, const char *intext, char *outtext, unsigned maxoutlen, cmdalias_t *alias );
-void Cbuf_Execute (cmd_state_t *cmd)
+void Cbuf_Execute (cbuf_t *cbuf)
 {
-	int i;
-	char *text;
-	char line[MAX_INPUTLINE];
+	cbuf_cmd_t *current;
 	char preprocessed[MAX_INPUTLINE];
 	char *firstchar;
-	qboolean quotes;
-	char *comment;
 
 	// LadyHavoc: making sure the tokenizebuffer doesn't get filled up by repeated crashes
-	cmd->tokenizebufferpos = 0;
+	//current->tokenizebufferpos = 0;
 
-	while (cmd->text.cursize)
+	while (cbuf->start)
 	{
-// find a \n or ; line break
-		text = (char *)cmd->text.data;
 
-		quotes = false;
-		comment = NULL;
-		for (i=0 ; i < cmd->text.cursize ; i++)
-		{
-			if(!comment)
-			{
-				if (text[i] == '"')
-					quotes = !quotes;
-
-				if(quotes)
-				{
-					// make sure i doesn't get > cursize which causes a negative
-					// size in memmove, which is fatal --blub
-					if (i < (cmd->text.cursize-1) && (text[i] == '\\' && (text[i+1] == '"' || text[i+1] == '\\')))
-						i++;
-				}
-				else
-				{
-					if(text[i] == '/' && text[i + 1] == '/' && (i == 0 || ISWHITESPACE(text[i-1])))
-						comment = &text[i];
-					if(text[i] == ';')
-						break;	// don't break if inside a quoted string or comment
-				}
-			}
-
-			if (text[i] == '\r' || text[i] == '\n')
-				break;
-		}
-
-		// better than CRASHING on overlong input lines that may SOMEHOW enter the buffer
-		if(i >= MAX_INPUTLINE)
-		{
-			Con_Printf(CON_WARN "Warning: console input buffer had an overlong line. Ignored.\n");
-			line[0] = 0;
-		}
-		else
-		{
-			memcpy (line, text, comment ? (comment - text) : i);
-			line[comment ? (comment - text) : i] = 0;
-		}
-
-// delete the text from the command buffer and move remaining commands down
-// this is necessary because commands (exec, alias) can insert data at the
-// beginning of the text buffer
-
-		if (i == cmd->text.cursize)
-			cmd->text.cursize = 0;
-		else
-		{
-			i++;
-			cmd->text.cursize -= i;
-			memmove (cmd->text.data, text+i, cmd->text.cursize);
-		}
-
-// execute the command line
-		firstchar = line;
+	// delete the text from the command buffer and move remaining commands down
+	// this is necessary because commands (exec, alias) can insert data at the
+	// beginning of the text buffer
+		current = cbuf->start;
+		cbuf->start = current->next;		
+		firstchar = current->text;
 		while(*firstchar && ISWHITESPACE(*firstchar))
 			++firstchar;
 		if(
@@ -359,30 +436,34 @@ void Cbuf_Execute (cmd_state_t *cmd)
 			(strncmp(firstchar, "in_bind", 7) || !ISWHITESPACE(firstchar[7]))
 		)
 		{
-			if(Cmd_PreprocessString( cmd, line, preprocessed, sizeof(preprocessed), NULL ))
-				Cmd_ExecuteString (cmd, preprocessed, src_command, false);
+			if(Cmd_PreprocessString( current->source, current->text, preprocessed, sizeof(preprocessed), NULL ))
+				Cmd_ExecuteString ( current->source, preprocessed, src_command, false);
 		}
 		else
 		{
-			Cmd_ExecuteString (cmd, line, src_command, false);
+			Cmd_ExecuteString (current->source, current->text, src_command, false);
 		}
 
-		if (cmd->wait)
+		cbuf->size -= strlen(current->text);
+		Z_Free(current);
+
+		if (cbuf->wait)
 		{	// skip out while text still remains in buffer, leaving it
 			// for next frame
-			cmd->wait = false;
-			break;
+			cbuf->wait = false;
+			return;
 		}
 	}
+	cbuf->end = NULL;
 }
 
-void Cbuf_Frame(cmd_state_t *cmd)
+void Cbuf_Frame(cbuf_t *cbuf)
 {
-	Cbuf_Execute_Deferred(cmd);
-	if (cmd->text.cursize)
+	//Cbuf_Execute_Deferred(cmd);
+	if (cbuf->size)
 	{
 		SV_LockThreadMutex();
-		Cbuf_Execute(cmd);
+		Cbuf_Execute(cbuf);
 		SV_UnlockThreadMutex();
 	}
 }
@@ -491,9 +572,6 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 	if (isdefaultcfg)
 		Cbuf_InsertText(cmd, "\ncvar_lockdefaults\n");
 
-	// insert newline after the text to make sure the last line is terminated (some text editors omit the trailing newline)
-	// (note: insertion order here is backwards from execution order, so this adds it after the text, by calling it before...)
-	Cbuf_InsertText (cmd, "\n");
 	Cbuf_InsertText (cmd, f);
 	Mem_Free(f);
 
@@ -1497,14 +1575,17 @@ Cmd_Init
 void Cmd_Init(void)
 {
 	cmd_iter_t *cmd_iter;
+	cbuf_t *cbuf = (cbuf_t *)Z_Malloc(sizeof(cbuf_t));
+	cbuf->maxsize = 655360;
+	cbuf->lock = Thread_CreateMutex();
+	host.cbuf = cbuf;
+
 	for (cmd_iter = cmd_iter_all; cmd_iter->cmd; cmd_iter++)
 	{
 		cmd_state_t *cmd = cmd_iter->cmd;
 		cmd->mempool = Mem_AllocPool("commands", 0, NULL);
 		// space for commands and script files
-		cmd->text.data = cmd->text_buf;
-		cmd->text.maxsize = sizeof(cmd->text_buf);
-		cmd->text.cursize = 0;
+		cmd->cbuf = cbuf;
 		cmd->null_string = "";
 	}
 	// client console can see server cvars because the user may start a server
@@ -1514,7 +1595,6 @@ void Cmd_Init(void)
 	cmd_client.auto_flags = CMD_SERVER_FROM_CLIENT;
 	cmd_client.auto_function = CL_ForwardToServer_f; // FIXME: Move this to the client.
 	cmd_client.userdefined = &cmd_userdefined_all;
-	cmd_client.text_mutex = Thread_CreateMutex();
 	// dedicated server console can only see server cvars, there is no client
 	cmd_server.cvars = &cvars_all;
 	cmd_server.cvars_flagsmask = CVAR_SERVER;
@@ -1522,7 +1602,6 @@ void Cmd_Init(void)
 	cmd_server.auto_flags = 0;
 	cmd_server.auto_function = NULL;
 	cmd_server.userdefined = &cmd_userdefined_all;
-	cmd_server.text_mutex = Thread_CreateMutex();
 	// server commands received from clients have no reason to access cvars, cvar expansion seems perilous.
 	cmd_serverfromclient.cvars = &cvars_null;
 	cmd_serverfromclient.cvars_flagsmask = 0;
@@ -1530,7 +1609,6 @@ void Cmd_Init(void)
 	cmd_serverfromclient.auto_flags = 0;
 	cmd_serverfromclient.auto_function = NULL;
 	cmd_serverfromclient.userdefined = &cmd_userdefined_null;
-	cmd_serverfromclient.text_mutex = Thread_CreateMutex();
 
 //
 // register our commands
@@ -1588,7 +1666,7 @@ void Cmd_Shutdown(void)
 		if (cmd->text_mutex)
 		{
 			// we usually have this locked when we get here from Host_Quit_f
-			Cbuf_Unlock(cmd);
+			Cbuf_Unlock(cmd->cbuf);
 		}
 
 		Mem_FreePool(&cmd->mempool);
@@ -2047,7 +2125,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	cmd_function_t *func;
 	cmdalias_t *a;
 	if (lockmutex)
-		Cbuf_Lock(cmd);
+		Cbuf_Lock(cmd->cbuf);
 	oldpos = cmd->tokenizebufferpos;
 	cmd->source = src;
 
@@ -2117,7 +2195,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 done:
 	cmd->tokenizebufferpos = oldpos;
 	if (lockmutex)
-		Cbuf_Unlock(cmd);
+		Cbuf_Unlock(cmd->cbuf);
 }
 
 /*

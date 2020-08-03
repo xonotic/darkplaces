@@ -123,6 +123,8 @@ typedef struct cmd_state_s
 	const char *args;
 	cmd_source_t source;
 
+	struct cbuf_s *cbuf;
+
 	cmd_userdefined_t *userdefined; // possible csqc functions and aliases to execute
 
 	cmd_function_t *engine_functions;
@@ -144,6 +146,23 @@ typedef struct cmd_state_s
 }
 cmd_state_t;
 
+typedef struct cbuf_cmd_s
+{
+	struct cbuf_cmd_s *prev, *next;
+	cmd_state_t *source;
+	char *text;
+	double defer;
+} cbuf_cmd_t;
+
+typedef struct cbuf_s
+{
+	cbuf_cmd_t *start, *end;
+	qboolean wait;
+	size_t maxsize;
+	size_t size;
+	void *lock;
+} cbuf_t;
+
 extern cmd_userdefined_t cmd_userdefined_all; // aliases and csqc functions
 extern cmd_userdefined_t cmd_userdefined_null; // intentionally empty
 
@@ -159,8 +178,8 @@ extern cmd_state_t cmd_serverfromclient;
 
 extern qboolean host_stuffcmdsrun;
 
-void Cbuf_Lock(cmd_state_t *cmd);
-void Cbuf_Unlock(cmd_state_t *cmd);
+void Cbuf_Lock(cbuf_t *cbuf);
+void Cbuf_Unlock(cbuf_t *cbuf);
 
 /*! as new commands are generated from the console or keybindings,
  * the text is added to the end of the command buffer.
@@ -178,9 +197,9 @@ void Cbuf_InsertText (cmd_state_t *cmd, const char *text);
  * Normally called once per frame, but may be explicitly invoked.
  * \note Do not call inside a command function!
  */
-void Cbuf_Execute (cmd_state_t *cmd);
+void Cbuf_Execute (cbuf_t *cbuf);
 /*! Performs deferred commands and runs Cbuf_Execute, called by Host_Frame */
-void Cbuf_Frame (cmd_state_t *cmd);
+void Cbuf_Frame (cbuf_t *cbuf);
 
 //===========================================================================
 
