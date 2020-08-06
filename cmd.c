@@ -185,13 +185,17 @@ static void Cmd_Centerprint_f (cmd_state_t *cmd)
 Cbuf_ParseText
 
 Parses Quake console command-line
-Allocates a cbuf_cmd_t for each individual
-command. Returns a pointer to the last element.
+Allocates a cyclic doubly linked list node
+for each individual command. Returns a
+pointer to the head.
 ============
 */
-static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, cbuf_t *cbuf, cbuf_cmd_t **start, const char *text)
+
+static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 {
 	int i = 0;
+	cbuf_t *cbuf = cmd->cbuf;
+	cbuf_cmd_t *start = NULL;
 	cbuf_cmd_t *current = NULL;
 	cbuf_cmd_t *end = NULL;
 	qboolean quotes = false;
@@ -201,10 +205,11 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, cbuf_t *cbuf, cbuf_cmd_t **s
 	char *offset = NULL;
 	size_t cmdsize = 0;
 
-	// It has to be NULL because it writes into it first
-	if(*start)
-		Sys_Error("Cbuf_ParseText: 'start' is non-NULL. This should never happen. Please report this to a developer.\n");
-
+	/*
+	 * Allow escapes in quotes. Ignore newlines and
+	 * comments. Return NULL if input consists solely
+	 * of either of those, and ignore blank input.
+	 */
 	while(text[i])
 	{
 		switch (text[i])
@@ -212,72 +217,98 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, cbuf_t *cbuf, cbuf_cmd_t **s
 			case '"':
 				if (!escaped)
 					quotes = !quotes;
+				else
+					escaped = false;
 				break;
 			case '\\':
 				if (!escaped && quotes)
 					escaped = true;
+				else if (escaped)
+					escaped = false;
 				break;
 			case '/':
-				if (!quotes && !comment && text[i+1] == '/' && (i == 0 || ISWHITESPACE(text[i-1])))
+				if(!quotes && text[i+1] == '/' && (i == 0 || ISWHITESPACE(text[i-1])))
 					comment = true;
+				if(offset)
+					mark = true;
 				break;
 			case ';':
-				if(!comment && !quotes)
+				if(offset && !quotes && !comment)
 					mark = true;
 				break;
 			case '\r':
 			case '\n':
-				mark = true;
+				comment = false;
+				quotes = false;
+				if(offset)
+					mark = true;
 				break;
 			default:
-			// If there's no trailing newline, mark for allocation
-				if(text[i+1] == 0)
+				if (!comment)
 				{
-					mark = true;
-					cmdsize++;
+					if(!offset)
+						offset = (char *)&text[i];
 				}
 				break;
 		}
 
-		if(!offset && !comment && !mark)
-			offset = (char *)&text[i];
-
-		if(!comment && !mark && offset)
+		// Got a valid command.
+		if(offset)
+		{
 			cmdsize++;
 
-		if(mark)
-		{
-			comment = false;
-			quotes = false;
-			escaped = false;
+			// If there's no trailing newline, mark it as pending
+			if(!mark && text[i+1] == 0)
+				mark = true;
 
-			if(offset)
+			if(mark)
 			{
-				current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
-				if(end)
-					end->next = current;
-				if(!*start)
-					*start = current;
-				current->prev = end;
+				// Create a cyclic doubly linked list.
+				if(cbuf->free)
+				{
+					current = cbuf->free;
+					cbuf->free = current->next;
+					cbuf->free->prev = current->prev;
+					cbuf->free->prev->next = cbuf->free;
+					if(cbuf->free == current)
+						cbuf->free = NULL;
+					current->size = 0;
+				}
+				else
+					current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
 
-				current->text = (char *)Z_Malloc(cmdsize + 1);
-				memcpy(current->text, offset, cmdsize);
+				if(!start)
+				{
+					start = current;
+					end = start;
+				}
+
+				// Data write stage
+				current->size = strlcpy(current->text, offset, cmdsize + 1);
 				current->source = cmd;
 
+				// Link stage
+				current->prev = end;
+				end->next = current;
 				end = current;
-				end->next = NULL;
-				current = end->next;
-				offset = NULL;
-				cbuf->size += cmdsize;
-			}
+				end->next = start;
+				start->prev = end;
 
-			cmdsize = 0;
-			mark = false;
+				cbuf->size += current->size;
+
+				// Reset stage
+				current = NULL;
+				offset = NULL;
+				cmdsize = 0;
+				escaped = false;
+				mark = false;
+			}
 		}
+
 		i++;
 	}
 
-	return end;
+	return start;
 }
 
 /*
@@ -291,7 +322,7 @@ void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 {
 	size_t l = strlen(text);
 	cbuf_t *cbuf = cmd->cbuf;
-	cbuf_cmd_t *add = NULL, *newend = NULL;
+	cbuf_cmd_t *add = NULL, *temp;
 
 	Cbuf_Lock(cbuf);
 
@@ -299,63 +330,65 @@ void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 		Con_Print("Cbuf_AddText: overflow\n");
 	else
 	{
-		newend = Cbuf_ParseText(cmd, cbuf, &add, text);
-		if(!newend)
-		{
-			Con_Printf("Cbuf_InsertText: newend = NULL\n");
+		add = Cbuf_ParseText(cmd, text);
+		if(!add)
 			return;
-		}
 
 		if(!cbuf->start)
 			cbuf->start = add;
-		if(cbuf->end)
+		else
 		{
-			cbuf->end->next = add;
-			add->prev = cbuf->end;
+			temp = add->prev;
+			add->prev->next = cbuf->start;
+			add->prev = cbuf->start->prev;
+			cbuf->start->prev->next = add;
+			cbuf->start->prev = temp;
 		}
-		cbuf->end = newend;	
 	}
+
 	Cbuf_Unlock(cbuf);
 }
-
 
 /*
 ============
 Cbuf_InsertText
 
 Adds command text immediately after the current command
-Adds a \n to the text
 FIXME: actually change the command buffer to do less copying
 ============
 */
 void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 {
 	cbuf_t *cbuf = cmd->cbuf;
-	cbuf_cmd_t *insert = NULL, *oldstart = NULL, *newend = NULL;
+	cbuf_cmd_t *insert = NULL, *temp;
 	size_t l = strlen(text);
 
 	Cbuf_Lock(cbuf);
 
 	// we need to memmove the existing text and stuff this in before it...
-	if (cmd->cbuf->size + l >= (size_t)cmd->cbuf->maxsize)
+	if (cbuf->size + l >= (size_t)cbuf->maxsize)
 		Con_Print("Cbuf_InsertText: overflow\n");
 	else
 	{
-		newend = Cbuf_ParseText(cmd, cbuf, &insert, text);
-		if(!newend)
-		{
-			Con_Printf("Cbuf_InsertText: newend = NULL\n");
+		insert = Cbuf_ParseText(cmd, text);
+		if(!insert)
 			return;
-		}
 
-		oldstart = cbuf->start;
-		cbuf->start = insert;
-		
-		if(!cbuf->end)
-			cbuf->end = newend;
-		if(oldstart)
-			oldstart->prev = newend;
-		newend->next = oldstart;
+		if(!cbuf->start)
+			cbuf->start = insert;
+		else
+		{
+			/*
+			 * We need temp because start may be one self-recursive
+			 * node, and that could screw up the new head's prev pointer.
+			 */
+			temp = cbuf->start->prev;
+			cbuf->start->prev->next = insert;
+			cbuf->start->prev = insert->prev;
+			insert->prev->next = cbuf->start;
+			insert->prev = temp;
+			cbuf->start = insert;
+		}
 	}
 
 	Cbuf_Unlock(cbuf);
@@ -410,21 +443,24 @@ Cbuf_Execute
 static qboolean Cmd_PreprocessString(cmd_state_t *cmd, const char *intext, char *outtext, unsigned maxoutlen, cmdalias_t *alias );
 void Cbuf_Execute (cbuf_t *cbuf)
 {
-	cbuf_cmd_t *current;
+	cbuf_cmd_t *current, *temp;
 	char preprocessed[MAX_INPUTLINE];
 	char *firstchar;
 
 	// LadyHavoc: making sure the tokenizebuffer doesn't get filled up by repeated crashes
 	//current->tokenizebufferpos = 0;
 
-	while (cbuf->start)
+	while (cbuf->size)
 	{
 
 	// delete the text from the command buffer and move remaining commands down
 	// this is necessary because commands (exec, alias) can insert data at the
 	// beginning of the text buffer
 		current = cbuf->start;
-		cbuf->start = current->next;		
+		cbuf->start = current->next;
+		cbuf->start->prev = current->prev;
+		cbuf->start->prev->next = cbuf->start;
+
 		firstchar = current->text;
 		while(*firstchar && ISWHITESPACE(*firstchar))
 			++firstchar;
@@ -444,17 +480,33 @@ void Cbuf_Execute (cbuf_t *cbuf)
 			Cmd_ExecuteString (current->source, current->text, src_command, false);
 		}
 
-		cbuf->size -= strlen(current->text);
-		Z_Free(current);
+		cbuf->size -= current->size;
+
+		// Recycle
+		current->prev = current->next = current;
+
+		if(!cbuf->free)
+			cbuf->free = current;
+		else
+		{
+			temp = current->prev;
+			current->prev->next = cbuf->free;
+			current->prev = cbuf->free->prev;
+			cbuf->free->prev->next = current;
+			cbuf->free->prev = temp;
+		}
+
+		current = NULL;
 
 		if (cbuf->wait)
-		{	// skip out while text still remains in buffer, leaving it
+		{
+			// skip out while text still remains in buffer, leaving it
 			// for next frame
 			cbuf->wait = false;
 			return;
 		}
 	}
-	cbuf->end = NULL;
+	cbuf->start = NULL;
 }
 
 void Cbuf_Frame(cbuf_t *cbuf)

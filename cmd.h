@@ -150,13 +150,15 @@ typedef struct cbuf_cmd_s
 {
 	struct cbuf_cmd_s *prev, *next;
 	cmd_state_t *source;
-	char *text;
+	size_t size;
+	char text[MAX_INPUTLINE];
 	double defer;
 } cbuf_cmd_t;
 
 typedef struct cbuf_s
 {
-	cbuf_cmd_t *start, *end;
+	cbuf_cmd_t *start;
+	cbuf_cmd_t *free;
 	qboolean wait;
 	size_t maxsize;
 	size_t size;
