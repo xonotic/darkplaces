@@ -180,6 +180,22 @@ static void Cmd_Centerprint_f (cmd_state_t *cmd)
 =============================================================================
 */
 
+static void Cbuf_LinkAdd(cbuf_cmd_t *add, cbuf_cmd_t *list)
+{
+	cbuf_cmd_t *temp = add->prev;
+	add->prev->next = list;
+	add->prev = list->prev;
+	list->prev->next = add;
+	list->prev = temp;
+}
+
+static cbuf_cmd_t *Cbuf_LinkInsert(cbuf_cmd_t *insert, cbuf_cmd_t *list)
+{
+	// Same algorithm, but backwards
+	Cbuf_LinkAdd(list, insert);
+	return insert;
+}
+
 /*
 ============
 Cbuf_ParseText
@@ -337,13 +353,7 @@ void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 		if(!cbuf->start)
 			cbuf->start = add;
 		else
-		{
-			temp = add->prev;
-			add->prev->next = cbuf->start;
-			add->prev = cbuf->start->prev;
-			cbuf->start->prev->next = add;
-			cbuf->start->prev = temp;
-		}
+			Cbuf_LinkAdd(add, cbuf->start);
 	}
 
 	Cbuf_Unlock(cbuf);
@@ -377,18 +387,7 @@ void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 		if(!cbuf->start)
 			cbuf->start = insert;
 		else
-		{
-			/*
-			 * We need temp because start may be one self-recursive
-			 * node, and that could screw up the new head's prev pointer.
-			 */
-			temp = cbuf->start->prev;
-			cbuf->start->prev->next = insert;
-			cbuf->start->prev = insert->prev;
-			insert->prev->next = cbuf->start;
-			insert->prev = temp;
-			cbuf->start = insert;
-		}
+			cbuf->start = Cbuf_LinkInsert(insert, cbuf->start);
 	}
 
 	Cbuf_Unlock(cbuf);
@@ -488,13 +487,7 @@ void Cbuf_Execute (cbuf_t *cbuf)
 		if(!cbuf->free)
 			cbuf->free = current;
 		else
-		{
-			temp = current->prev;
-			current->prev->next = cbuf->free;
-			current->prev = cbuf->free->prev;
-			cbuf->free->prev->next = current;
-			cbuf->free->prev = temp;
-		}
+			Cbuf_LinkAdd(current, cbuf->free);
 
 		current = NULL;
 
