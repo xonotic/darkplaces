@@ -300,7 +300,8 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 				}
 
 				// Data write stage
-				current->size = strlcpy(current->text, offset, cmdsize + 1);
+				current->size = cmdsize + 1;
+				strlcpy(current->text, offset, current->size);
 				current->source = cmd;
 
 				// Link stage
