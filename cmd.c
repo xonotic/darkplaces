@@ -253,13 +253,6 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 					mark = true;
 				}
 				break;
-			case ';':
-				if(!quotes && !comment)
-				{
-					cbuf->pending = false;
-					mark = true;
-				}
-				break;
 			case '\r':
 			case '\n':
 				comment = false;
@@ -267,36 +260,47 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 				cbuf->pending = false;
 				mark = true;
 				break;
-			default:
-				if(!comment)
-				{
-					switch(text[i])
+		}
+
+		if(!comment)
+		{
+			switch (text[i])
+			{
+				case ';':
+					if(!quotes)
 					{
-						case '"':
-							if (!escaped)
-								quotes = !quotes;
-							else
-								escaped = false;
-							break;
-						case '\\':
-							if (!escaped && quotes)
-								escaped = true;
-							else if (escaped)
-								escaped = false;
-							break;
-					}
-					// If there's no trailing newline, mark it as pending
-					if(!mark && text[i+1] == 0)
-					{
-						cbuf->pending = true;
+						cbuf->pending = false;
 						mark = true;
 					}
+					break;
+				case '"':
+					if (!escaped)
+						quotes = !quotes;
+					else
+						escaped = false;
+					break;
+				case '\\':
+					if (!escaped && quotes)
+						escaped = true;
+					else if (escaped)
+						escaped = false;
+					break;
+			}
 
-					if(!offset)
-						// Allow i to run until the end of a comment
-						offset = (char *)&text[i];
-					cmdsize++;
+			if(!mark)
+			{
+				// If there's no trailing newline, mark it as pending
+				if(text[i+1] == 0)
+				{
+					cbuf->pending = true;
+					mark = true;
 				}
+
+				if(!offset)
+					// Allow i to run until the end of a comment
+					offset = (char *)&text[i];
+				cmdsize++;
+			}
 		}
 
 		if(!current)
@@ -316,7 +320,10 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 					current->size = 0;
 				}
 				else
+				{
 					current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
+					current->size = 0;
+				}
 			}
 		}
 
@@ -337,13 +344,13 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 					else
 						Cbuf_LinkAdd(current, head);
 				}
+				cbuf->size += cmdsize;
+				cmdsize = 0;
 			}
 
 			// Reset stage
 			offset = NULL;
 			escaped = false;
-			cbuf->size += cmdsize;
-			cmdsize = 0;
 			mark = false;
 			current = NULL;
 		}
@@ -475,42 +482,47 @@ void Cbuf_Execute (cbuf_t *cbuf)
 	// LadyHavoc: making sure the tokenizebuffer doesn't get filled up by repeated crashes
 	cbuf->tokenizebufferpos = 0;
 
-	// Assume we're rolling with the current command-line.
-	cbuf->pending = false;
-
-	while (cbuf->size)
+	while (cbuf->start)
 	{
+		/*
+		 * Assume we're rolling with the current command-line and
+		 * always set this false because alias expansion or cbuf insertion
+		 * without a newline may set this true, and cause weirdness.
+		 */
+		cbuf->pending = false;
 
-	// delete the text from the command buffer and move remaining commands down
-	// this is necessary because commands (exec, alias) can insert data at the
-	// beginning of the text buffer
+		/*
+		 * Delete the text from the command buffer and move remaining
+		 * commands down. This is necessary because commands (exec, alias)
+		 * can insert data at the beginning of the text buffer
+		 */
 		current = cbuf->start;
 		cbuf->start = current->next;
 		cbuf->start->prev = current->prev;
 		cbuf->start->prev->next = cbuf->start;
 
+		cbuf->size -= current->size;
+
+		// Infinite loop if aliases expand without this
+		if(cbuf->size == 0)
+			cbuf->start = NULL;
+
 		firstchar = current->text;
 		while(*firstchar && ISWHITESPACE(*firstchar))
 			++firstchar;
-		if(
-			(strncmp(firstchar, "alias", 5) || !ISWHITESPACE(firstchar[5]))
-			&&
-			(strncmp(firstchar, "bind", 4) || !ISWHITESPACE(firstchar[4]))
-			&&
-			(strncmp(firstchar, "in_bind", 7) || !ISWHITESPACE(firstchar[7]))
-		)
+		if((strncmp(firstchar, "alias", 5)   || !ISWHITESPACE(firstchar[5])) &&
+		   (strncmp(firstchar, "bind", 4)    || !ISWHITESPACE(firstchar[4])) &&
+		   (strncmp(firstchar, "in_bind", 7) || !ISWHITESPACE(firstchar[7])))
 		{
-			if(Cmd_PreprocessString( current->source, current->text, preprocessed, sizeof(preprocessed), NULL ))
-				Cmd_ExecuteString ( current->source, preprocessed, src_command, false);
+			if(Cmd_PreprocessString(current->source, current->text, preprocessed, sizeof(preprocessed), NULL ))
+				Cmd_ExecuteString(current->source, preprocessed, src_command, false);
 		}
 		else
 		{
 			Cmd_ExecuteString (current->source, current->text, src_command, false);
 		}
 
-		cbuf->size -= current->size;
-
-		// Recycle
+		// Recycle memory so using WASD doesn't cause a malloc and free
 		current->prev = current->next = current;
 
 		if(!cbuf->free)
@@ -522,13 +534,14 @@ void Cbuf_Execute (cbuf_t *cbuf)
 
 		if (cbuf->wait)
 		{
-			// skip out while text still remains in buffer, leaving it
-			// for next frame
+			/*
+			 * Skip out while text still remains in
+			 * buffer, leaving it for next frame
+			 */
 			cbuf->wait = false;
-			return;
+			break;
 		}
 	}
-	cbuf->start = NULL;
 }
 
 void Cbuf_Frame(cbuf_t *cbuf)
