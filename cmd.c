@@ -196,6 +196,13 @@ static cbuf_cmd_t *Cbuf_LinkInsert(cbuf_cmd_t *insert, cbuf_cmd_t *list)
 	return insert;
 }
 
+static void Cbuf_LinkWrite(cmd_state_t *cmd, cbuf_cmd_t *node, const char *text, size_t size)
+{
+	strlcpy(&node->text[node->size], text, size + 1);
+	node->size += size;
+	node->source = cmd;
+}
+
 /*
 ============
 Cbuf_ParseText
@@ -206,20 +213,26 @@ for each individual command. Returns a
 pointer to the head.
 ============
 */
-
 static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 {
 	int i = 0;
 	cbuf_t *cbuf = cmd->cbuf;
-	cbuf_cmd_t *start = NULL;
+	cbuf_cmd_t *head = NULL;
 	cbuf_cmd_t *current = NULL;
-	cbuf_cmd_t *end = NULL;
 	qboolean quotes = false;
 	qboolean comment = false;
 	qboolean escaped = false;
 	qboolean mark = false;
+	qboolean noalloc;
 	char *offset = NULL;
 	size_t cmdsize = 0;
+
+	if(cbuf->pending)
+	{
+		// If not from the same interpreter, weird things could happen.
+		if(cbuf->start->source != cmd)
+			cbuf->pending = false;
+	}
 
 	/*
 	 * Allow escapes in quotes. Ignore newlines and
@@ -228,58 +241,70 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 	 */
 	while(text[i])
 	{
+		noalloc = cbuf->pending;
+
 		switch (text[i])
 		{
-			case '"':
-				if (!escaped)
-					quotes = !quotes;
-				else
-					escaped = false;
-				break;
-			case '\\':
-				if (!escaped && quotes)
-					escaped = true;
-				else if (escaped)
-					escaped = false;
-				break;
 			case '/':
 				if(!quotes && text[i+1] == '/' && (i == 0 || ISWHITESPACE(text[i-1])))
+				{
 					comment = true;
-				if(offset)
+					cbuf->pending = false;
 					mark = true;
+				}
 				break;
 			case ';':
-				if(offset && !quotes && !comment)
+				if(!quotes && !comment)
+				{
+					cbuf->pending = false;
 					mark = true;
+				}
 				break;
 			case '\r':
 			case '\n':
 				comment = false;
 				quotes = false;
-				if(offset)
-					mark = true;
+				cbuf->pending = false;
+				mark = true;
 				break;
 			default:
-				if (!comment)
+				if(!comment)
 				{
+					switch(text[i])
+					{
+						case '"':
+							if (!escaped)
+								quotes = !quotes;
+							else
+								escaped = false;
+							break;
+						case '\\':
+							if (!escaped && quotes)
+								escaped = true;
+							else if (escaped)
+								escaped = false;
+							break;
+					}
+					// If there's no trailing newline, mark it as pending
+					if(!mark && text[i+1] == 0)
+					{
+						cbuf->pending = true;
+						mark = true;
+					}
+
 					if(!offset)
+						// Allow i to run until the end of a comment
 						offset = (char *)&text[i];
+					cmdsize++;
 				}
-				break;
 		}
 
-		// Got a valid command.
-		if(offset)
+		if(!current)
 		{
-			cmdsize++;
-
-			// If there's no trailing newline, mark it as pending
-			if(!mark && text[i+1] == 0)
-				mark = true;
-
-			if(mark)
+			if(noalloc)
+				current = cbuf->start;
+			else if(offset)
 			{
-				// Create a cyclic doubly linked list.
 				if(cbuf->free)
 				{
 					current = cbuf->free;
@@ -292,40 +317,40 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 				}
 				else
 					current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
-
-				if(!start)
-				{
-					start = current;
-					end = start;
-				}
-
-				// Data write stage
-				current->size = cmdsize + 1;
-				strlcpy(current->text, offset, current->size);
-				current->source = cmd;
-
-				// Link stage
-				current->prev = end;
-				end->next = current;
-				end = current;
-				end->next = start;
-				start->prev = end;
-
-				cbuf->size += current->size;
-
-				// Reset stage
-				current = NULL;
-				offset = NULL;
-				cmdsize = 0;
-				escaped = false;
-				mark = false;
 			}
 		}
 
+		// Create a cyclic doubly linked list.
+		if(mark)
+		{
+			// Data write stage
+			if(offset)
+			{
+				Cbuf_LinkWrite(cmd, current, offset, cmdsize);
+
+				if(!noalloc)
+				{
+					// Link stage
+					current->prev = current->next = current;
+					if(!head)
+						head = current;
+					else
+						Cbuf_LinkAdd(current, head);
+				}
+			}
+
+			// Reset stage
+			offset = NULL;
+			escaped = false;
+			cbuf->size += cmdsize;
+			cmdsize = 0;
+			mark = false;
+			current = NULL;
+		}
 		i++;
 	}
 
-	return start;
+	return head;
 }
 
 /*
@@ -339,7 +364,7 @@ void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 {
 	size_t l = strlen(text);
 	cbuf_t *cbuf = cmd->cbuf;
-	cbuf_cmd_t *add = NULL, *temp;
+	cbuf_cmd_t *add = NULL;
 
 	Cbuf_Lock(cbuf);
 
@@ -371,7 +396,7 @@ FIXME: actually change the command buffer to do less copying
 void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 {
 	cbuf_t *cbuf = cmd->cbuf;
-	cbuf_cmd_t *insert = NULL, *temp;
+	cbuf_cmd_t *insert = NULL;
 	size_t l = strlen(text);
 
 	Cbuf_Lock(cbuf);
@@ -443,12 +468,15 @@ Cbuf_Execute
 static qboolean Cmd_PreprocessString(cmd_state_t *cmd, const char *intext, char *outtext, unsigned maxoutlen, cmdalias_t *alias );
 void Cbuf_Execute (cbuf_t *cbuf)
 {
-	cbuf_cmd_t *current, *temp;
+	cbuf_cmd_t *current;
 	char preprocessed[MAX_INPUTLINE];
 	char *firstchar;
 
 	// LadyHavoc: making sure the tokenizebuffer doesn't get filled up by repeated crashes
-	//current->tokenizebufferpos = 0;
+	cbuf->tokenizebufferpos = 0;
+
+	// Assume we're rolling with the current command-line.
+	cbuf->pending = false;
 
 	while (cbuf->size)
 	{
@@ -1624,6 +1652,8 @@ void Cmd_Init(void)
 	cbuf_t *cbuf = (cbuf_t *)Z_Malloc(sizeof(cbuf_t));
 	cbuf->maxsize = 655360;
 	cbuf->lock = Thread_CreateMutex();
+	cbuf->pending = false;
+	cbuf->wait = false;
 	host.cbuf = cbuf;
 
 	for (cmd_iter = cmd_iter_all; cmd_iter->cmd; cmd_iter++)
@@ -1797,14 +1827,14 @@ static void Cmd_TokenizeString (cmd_state_t *cmd, const char *text)
 		if (cmd->argc < MAX_ARGS)
 		{
 			l = (int)strlen(com_token) + 1;
-			if (cmd->tokenizebufferpos + l > CMD_TOKENIZELENGTH)
+			if (cmd->cbuf->tokenizebufferpos + l > CMD_TOKENIZELENGTH)
 			{
 				Con_Printf("Cmd_TokenizeString: ran out of %i character buffer space for command arguments\n", CMD_TOKENIZELENGTH);
 				break;
 			}
-			memcpy (cmd->tokenizebuffer + cmd->tokenizebufferpos, com_token, l);
-			cmd->argv[cmd->argc] = cmd->tokenizebuffer + cmd->tokenizebufferpos;
-			cmd->tokenizebufferpos += l;
+			memcpy (cmd->cbuf->tokenizebuffer + cmd->cbuf->tokenizebufferpos, com_token, l);
+			cmd->argv[cmd->argc] = cmd->cbuf->tokenizebuffer + cmd->cbuf->tokenizebufferpos;
+			cmd->cbuf->tokenizebufferpos += l;
 			cmd->argc++;
 		}
 	}
@@ -2172,7 +2202,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	cmdalias_t *a;
 	if (lockmutex)
 		Cbuf_Lock(cmd->cbuf);
-	oldpos = cmd->tokenizebufferpos;
+	oldpos = cmd->cbuf->tokenizebufferpos;
 	cmd->source = src;
 
 	Cmd_TokenizeString (cmd, text);
@@ -2239,7 +2269,7 @@ void Cmd_ExecuteString (cmd_state_t *cmd, const char *text, cmd_source_t src, qb
 	if (!Cvar_Command(cmd) && host.framecount > 0)
 		Con_Printf("Unknown command \"%s\"\n", Cmd_Argv(cmd, 0));
 done:
-	cmd->tokenizebufferpos = oldpos;
+	cmd->cbuf->tokenizebufferpos = oldpos;
 	if (lockmutex)
 		Cbuf_Unlock(cmd->cbuf);
 }

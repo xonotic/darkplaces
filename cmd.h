@@ -107,9 +107,6 @@ typedef struct cmd_state_s
 
 	mempool_t *mempool;
 
-	char tokenizebuffer[CMD_TOKENIZELENGTH];
-	int tokenizebufferpos;
-
 	cmddeferred_t *deferred_list;
 	double deferred_oldrealtime;
 
@@ -159,9 +156,12 @@ typedef struct cbuf_s
 {
 	cbuf_cmd_t *start;
 	cbuf_cmd_t *free;
+	qboolean pending;
 	qboolean wait;
 	size_t maxsize;
 	size_t size;
+	char tokenizebuffer[CMD_TOKENIZELENGTH];
+	int tokenizebufferpos;
 	void *lock;
 } cbuf_t;
 
