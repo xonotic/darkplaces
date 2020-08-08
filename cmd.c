@@ -79,50 +79,55 @@ Cmd_Defer_f
 Cause a command to be executed after a delay.
 ============
 */
+static void Cbuf_LinkInsert(cbuf_cmd_t *insert, cbuf_cmd_t **list);
 static void Cmd_Defer_f (cmd_state_t *cmd)
 {
+	cbuf_cmd_t *current;
+	cbuf_t *cbuf = cmd->cbuf;
+
 	if(Cmd_Argc(cmd) == 1)
 	{
-		cmddeferred_t *next = cmd->deferred_list;
-		if(!next)
+		current = cbuf->deferred;
+		if(!current)
 			Con_Printf("No commands are pending.\n");
-		while(next)
+		else if (current->next == current)
+			goto print_delay;
+		else
 		{
-			Con_Printf("-> In %9.2f: %s\n", next->delay, next->value);
-			next = next->next;
+			while(current->next != current)
+			{
+print_delay:
+				Con_Printf("-> In %9.2f: %s\n", current->delay, current->text);
+				current = current->next;
+			}
 		}
-	} else if(Cmd_Argc(cmd) == 2 && !strcasecmp("clear", Cmd_Argv(cmd, 1)))
+	}
+	else if(Cmd_Argc(cmd) == 2 && !strcasecmp("clear", Cmd_Argv(cmd, 1)))
 	{
-		while(cmd->deferred_list)
+		while(cbuf->deferred)
 		{
-			cmddeferred_t *defcmd = cmd->deferred_list;
-			cmd->deferred_list = defcmd->next;
-			Mem_Free(defcmd->value);
-			Mem_Free(defcmd);
+			current = cbuf->deferred;
+			cbuf->deferred = current->next;
+			Mem_Free(current);
 		}
-	} else if(Cmd_Argc(cmd) == 3)
+	}
+	else if(Cmd_Argc(cmd) == 3)
 	{
-		const char *value = Cmd_Argv(cmd, 2);
-		cmddeferred_t *defcmd = (cmddeferred_t*)Mem_Alloc(tempmempool, sizeof(*defcmd));
-		size_t len = strlen(value);
+		const char *text = Cmd_Argv(cmd, 2);
+		size_t len = strlen(text);
+		current = (cbuf_cmd_t *)Z_Malloc(sizeof(cbuf_cmd_t));
 
-		defcmd->delay = atof(Cmd_Argv(cmd, 1));
-		defcmd->value = (char*)Mem_Alloc(tempmempool, len+1);
-		memcpy(defcmd->value, value, len+1);
-		defcmd->next = NULL;
+		current->delay = atof(Cmd_Argv(cmd, 1));
+		memcpy(current->text, text, len+1);
+		current->source = cmd;
 
-		if(cmd->deferred_list)
-		{
-			cmddeferred_t *next = cmd->deferred_list;
-			while(next->next)
-				next = next->next;
-			next->next = defcmd;
-		} else
-			cmd->deferred_list = defcmd;
-		/* Stupid me... this changes the order... so commands with the same delay go blub :S
-		  defcmd->next = cmd_deferred_list;
-		  cmd_deferred_list = defcmd;*/
-	} else {
+		current->prev = current->next = current;
+
+		Cbuf_LinkInsert(current, &cbuf->deferred);
+
+	}
+	else
+	{
 		Con_Printf("usage: defer <seconds> <command>\n"
 			   "       defer clear\n");
 		return;
@@ -427,39 +432,29 @@ void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 Cbuf_Execute_Deferred --blub
 ============
 */
-static void Cbuf_Execute_Deferred (cmd_state_t *cmd)
+static void Cbuf_Execute_Deferred (cbuf_t *cbuf)
 {
-	cmddeferred_t *defcmd, *prev;
+	cbuf_cmd_t *current;
 	double eat;
-	if (host.realtime - cmd->deferred_oldrealtime < 0 || host.realtime - cmd->deferred_oldrealtime > 1800) cmd->deferred_oldrealtime = host.realtime;
-	eat = host.realtime - cmd->deferred_oldrealtime;
+
+	if (host.realtime - cbuf->deferred_oldtime < 0 || host.realtime - cbuf->deferred_oldtime > 1800)
+		cbuf->deferred_oldtime = host.realtime;
+	eat = host.realtime - cbuf->deferred_oldtime;
 	if (eat < (1.0 / 120.0))
 		return;
-	cmd->deferred_oldrealtime = host.realtime;
-	prev = NULL;
-	defcmd = cmd->deferred_list;
-	while(defcmd)
-	{
-		defcmd->delay -= eat;
-		if(defcmd->delay <= 0)
-		{
-			Cbuf_AddText(cmd, defcmd->value);
-			Cbuf_AddText(cmd, ";\n");
-			Mem_Free(defcmd->value);
+	cbuf->deferred_oldtime = host.realtime;
 
-			if(prev) {
-				prev->next = defcmd->next;
-				Mem_Free(defcmd);
-				defcmd = prev->next;
-			} else {
-				cmd->deferred_list = defcmd->next;
-				Mem_Free(defcmd);
-				defcmd = cmd->deferred_list;
-			}
-			continue;
+	if(cbuf->deferred)
+	{
+		current = cbuf->deferred;
+		current->delay -= eat;
+		if(current->delay <= 0)
+		{
+			Cbuf_AddText(current->source, current->text);
+			Cbuf_AddText(current->source, ";\n");
+
+			current = Cbuf_LinkPop(current, &cbuf->deferred);
 		}
-		prev = defcmd;
-		defcmd = defcmd->next;
 	}
 }
 
@@ -536,7 +531,7 @@ void Cbuf_Execute (cbuf_t *cbuf)
 
 void Cbuf_Frame(cbuf_t *cbuf)
 {
-	//Cbuf_Execute_Deferred(cmd);
+	Cbuf_Execute_Deferred(cbuf);
 	if (cbuf->size)
 	{
 		SV_LockThreadMutex();
