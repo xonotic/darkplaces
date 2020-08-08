@@ -1742,7 +1742,7 @@ void Cmd_Shutdown(void)
 	{
 		cmd_state_t *cmd = cmd_iter->cmd;
 
-		if (cmd->text_mutex)
+		if (cmd->cbuf->lock)
 		{
 			// we usually have this locked when we get here from Host_Quit_f
 			Cbuf_Unlock(cmd->cbuf);
