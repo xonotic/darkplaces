@@ -180,27 +180,37 @@ static void Cmd_Centerprint_f (cmd_state_t *cmd)
 =============================================================================
 */
 
-static void Cbuf_LinkAdd(cbuf_cmd_t *add, cbuf_cmd_t *list)
+static void Cbuf_LinkAdd(cbuf_cmd_t *add, cbuf_cmd_t **list)
 {
-	cbuf_cmd_t *temp = add->prev;
-	add->prev->next = list;
-	add->prev = list->prev;
-	list->prev->next = add;
-	list->prev = temp;
+	if(!*list)
+		*list = add;
+	else
+	{
+		cbuf_cmd_t *temp = add->prev;
+		add->prev->next = *list;
+		add->prev = (*list)->prev;
+		(*list)->prev->next = add;
+		(*list)->prev = temp;
+	}
 }
 
-static cbuf_cmd_t *Cbuf_LinkInsert(cbuf_cmd_t *insert, cbuf_cmd_t *list)
+static void Cbuf_LinkInsert(cbuf_cmd_t *insert, cbuf_cmd_t **list)
 {
 	// Same algorithm, but backwards
-	Cbuf_LinkAdd(list, insert);
-	return insert;
+	if(*list)
+		Cbuf_LinkAdd(*list, &insert);
+	*list = insert;
 }
 
-static void Cbuf_LinkWrite(cmd_state_t *cmd, cbuf_cmd_t *node, const char *text, size_t size)
+static cbuf_cmd_t *Cbuf_LinkPop(cbuf_cmd_t *node, cbuf_cmd_t **list)
 {
-	strlcpy(&node->text[node->size], text, size + 1);
-	node->size += size;
-	node->source = cmd;
+	node = *list;
+	*list = node->next;
+	(*list)->prev = node->prev;
+	(*list)->prev->next = *list;
+	if(*list == node)
+		*list = NULL;
+	return node;
 }
 
 /*
@@ -311,12 +321,7 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 			{
 				if(cbuf->free)
 				{
-					current = cbuf->free;
-					cbuf->free = current->next;
-					cbuf->free->prev = current->prev;
-					cbuf->free->prev->next = cbuf->free;
-					if(cbuf->free == current)
-						cbuf->free = NULL;
+					current = Cbuf_LinkPop(current, &cbuf->free);
 					current->size = 0;
 				}
 				else
@@ -330,19 +335,18 @@ static cbuf_cmd_t *Cbuf_ParseText(cmd_state_t *cmd, const char *text)
 		// Create a cyclic doubly linked list.
 		if(mark)
 		{
-			// Data write stage
 			if(offset)
 			{
-				Cbuf_LinkWrite(cmd, current, offset, cmdsize);
+				// Data write stage
+				strlcpy(&current->text[current->size], offset, cmdsize + 1);
+				current->size += cmdsize;
+				current->source = cmd;
 
 				if(!noalloc)
 				{
 					// Link stage
 					current->prev = current->next = current;
-					if(!head)
-						head = current;
-					else
-						Cbuf_LinkAdd(current, head);
+					Cbuf_LinkAdd(current, &head);
 				}
 				cbuf->size += cmdsize;
 				cmdsize = 0;
@@ -379,14 +383,10 @@ void Cbuf_AddText (cmd_state_t *cmd, const char *text)
 		Con_Print("Cbuf_AddText: overflow\n");
 	else
 	{
-		add = Cbuf_ParseText(cmd, text);
-		if(!add)
+		if(!(add = Cbuf_ParseText(cmd, text)))
 			return;
 
-		if(!cbuf->start)
-			cbuf->start = add;
-		else
-			Cbuf_LinkAdd(add, cbuf->start);
+		Cbuf_LinkAdd(add, &cbuf->start);
 	}
 
 	Cbuf_Unlock(cbuf);
@@ -413,14 +413,10 @@ void Cbuf_InsertText (cmd_state_t *cmd, const char *text)
 		Con_Print("Cbuf_InsertText: overflow\n");
 	else
 	{
-		insert = Cbuf_ParseText(cmd, text);
-		if(!insert)
+		if(!(insert = Cbuf_ParseText(cmd, text)))
 			return;
 
-		if(!cbuf->start)
-			cbuf->start = insert;
-		else
-			cbuf->start = Cbuf_LinkInsert(insert, cbuf->start);
+		Cbuf_LinkInsert(insert, &cbuf->start);
 	}
 
 	Cbuf_Unlock(cbuf);
@@ -496,10 +492,7 @@ void Cbuf_Execute (cbuf_t *cbuf)
 		 * commands down. This is necessary because commands (exec, alias)
 		 * can insert data at the beginning of the text buffer
 		 */
-		current = cbuf->start;
-		cbuf->start = current->next;
-		cbuf->start->prev = current->prev;
-		cbuf->start->prev->next = cbuf->start;
+		current = Cbuf_LinkPop(current, &cbuf->start);
 
 		cbuf->size -= current->size;
 
@@ -525,10 +518,7 @@ void Cbuf_Execute (cbuf_t *cbuf)
 		// Recycle memory so using WASD doesn't cause a malloc and free
 		current->prev = current->next = current;
 
-		if(!cbuf->free)
-			cbuf->free = current;
-		else
-			Cbuf_LinkAdd(current, cbuf->free);
+		Cbuf_LinkAdd(current, &cbuf->free);
 
 		current = NULL;
 
