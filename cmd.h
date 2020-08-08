@@ -103,16 +103,7 @@ cmd_userdefined_t;
 /// command interpreter state - the tokenizing and execution of commands, as well as pointers to which cvars and aliases they can access
 typedef struct cmd_state_s
 {
-	qboolean wait;
-
 	mempool_t *mempool;
-
-	cmddeferred_t *deferred_list;
-	double deferred_oldrealtime;
-
-	sizebuf_t text;
-	unsigned char text_buf[CMDBUFSIZE];
-	void *text_mutex;
 
 	int argc;
 	const char *argv[MAX_ARGS];
@@ -147,14 +138,15 @@ typedef struct cbuf_cmd_s
 {
 	struct cbuf_cmd_s *prev, *next;
 	cmd_state_t *source;
+	double delay;
 	size_t size;
 	char text[MAX_INPUTLINE];
-	double defer;
 } cbuf_cmd_t;
 
 typedef struct cbuf_s
 {
 	cbuf_cmd_t *start;
+	cbuf_cmd_t *deferred;
 	cbuf_cmd_t *free;
 	qboolean pending;
 	qboolean wait;
@@ -162,6 +154,7 @@ typedef struct cbuf_s
 	size_t size;
 	char tokenizebuffer[CMD_TOKENIZELENGTH];
 	int tokenizebufferpos;
+	double deferred_oldtime;
 	void *lock;
 } cbuf_t;
 
