@@ -473,6 +473,8 @@ typedef struct rsurfacestate_s
 	skeleton_t *skeleton;
 	// view location in model space
 	vec3_t localvieworigin;
+	// view directoion in model space
+	vec3_t localviewdirection;
 	// polygon offset data for submodels
 	float basepolygonfactor;
 	float basepolygonoffset;

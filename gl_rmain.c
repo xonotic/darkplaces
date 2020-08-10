@@ -201,6 +201,7 @@ cvar_t r_water_reflectdistort = {CVAR_CLIENT | CVAR_SAVE, "r_water_reflectdistor
 cvar_t r_water_scissormode = {CVAR_CLIENT, "r_water_scissormode", "3", "scissor (1) or cull (2) or both (3) water renders"};
 cvar_t r_water_lowquality = {CVAR_CLIENT, "r_water_lowquality", "0", "special option to accelerate water rendering: 1 disables all dynamic lights, 2 disables particles too"};
 cvar_t r_water_hideplayer = {CVAR_CLIENT | CVAR_SAVE, "r_water_hideplayer", "0", "if set to 1 then player will be hidden in refraction views, if set to 2 then player will also be hidden in reflection views, player is always visible in camera views"};
+cvar_t r_water_clipplayerinreflection = {CVAR_CLIENT | CVAR_SAVE, "r_water_clipplayerinreflection", "-1", "if set to -1 the player will not be clipped in the reflection view, else it will be clipped at the given value"};
 
 cvar_t r_lerpsprites = {CVAR_CLIENT | CVAR_SAVE, "r_lerpsprites", "0", "enables animation smoothing on sprites"};
 cvar_t r_lerpmodels = {CVAR_CLIENT | CVAR_SAVE, "r_lerpmodels", "1", "enables animation smoothing on models"};
@@ -771,6 +772,7 @@ typedef struct r_glsl_permutation_s
 	int loc_DeferredMod_Specular;
 	int loc_DistortScaleRefractReflect;
 	int loc_EyePosition;
+	int loc_EyeDirection;
 	int loc_FogColor;
 	int loc_FogHeightFade;
 	int loc_FogPlane;
@@ -1206,6 +1208,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		p->loc_DeferredMod_Specular       = qglGetUniformLocation(p->program, "DeferredMod_Specular");
 		p->loc_DistortScaleRefractReflect = qglGetUniformLocation(p->program, "DistortScaleRefractReflect");
 		p->loc_EyePosition                = qglGetUniformLocation(p->program, "EyePosition");
+		p->loc_EyeDirection               = qglGetUniformLocation(p->program, "EyeDirection");
 		p->loc_FogColor                   = qglGetUniformLocation(p->program, "FogColor");
 		p->loc_FogHeightFade              = qglGetUniformLocation(p->program, "FogHeightFade");
 		p->loc_FogPlane                   = qglGetUniformLocation(p->program, "FogPlane");
@@ -1988,6 +1991,7 @@ void R_SetupShader_Surface(const float rtlightambient[3], const float rtlightdif
 		if (r_glsl_permutation->loc_Color_Glow >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Glow, t->render_glowmod[0], t->render_glowmod[1], t->render_glowmod[2]);
 		if (r_glsl_permutation->loc_Alpha >= 0) qglUniform1f(r_glsl_permutation->loc_Alpha, t->currentalpha * ((t->basematerialflags & MATERIALFLAG_WATERSHADER && r_fb.water.enabled && !r_refdef.view.isoverlay) ? t->r_water_wateralpha : 1));
 		if (r_glsl_permutation->loc_EyePosition >= 0) qglUniform3f(r_glsl_permutation->loc_EyePosition, rsurface.localvieworigin[0], rsurface.localvieworigin[1], rsurface.localvieworigin[2]);
+		if (r_glsl_permutation->loc_EyeDirection >= 0) qglUniform3f(r_glsl_permutation->loc_EyeDirection, rsurface.localviewdirection[0], rsurface.localviewdirection[1], rsurface.localviewdirection[2]);
 		if (r_glsl_permutation->loc_Color_Pants >= 0)
 		{
 			if (t->pantstexture)
@@ -3369,6 +3373,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_water_scissormode);
 	Cvar_RegisterVariable(&r_water_lowquality);
 	Cvar_RegisterVariable(&r_water_hideplayer);
+	Cvar_RegisterVariable(&r_water_clipplayerinreflection);
 
 	Cvar_RegisterVariable(&r_lerpsprites);
 	Cvar_RegisterVariable(&r_lerpmodels);
@@ -4444,10 +4449,7 @@ static void R_View_UpdateWithScissor(const int *myscissor)
 
 static void R_View_Update(void)
 {
-	R_Main_ResizeViewCache();
-	R_View_SetFrustum(NULL);
-	R_View_WorldVisibility(!r_refdef.view.usevieworiginculling);
-	R_View_UpdateEntityVisible();
+	R_View_UpdateWithScissor(NULL);
 }
 
 float viewscalefpsadjusted = 1.0f;
@@ -4829,6 +4831,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 	r_waterstate_waterplane_t *p;
 	vec3_t visorigin;
 	r_rendertarget_t *rt;
+	float dotProduct, normalLength, planeDist;
 
 	originalview = r_refdef.view;
 
@@ -4899,6 +4902,17 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			r_refdef.view.clipplane = p->plane;
 			// reflected view origin may be in solid, so don't cull with it
 			r_refdef.view.usevieworiginculling = false;
+
+			dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			normalLength = VectorLength(p->plane.normal);
+			planeDist = dotProduct/normalLength - p->plane.dist;
+			if(planeDist > 100)
+				r_refdef.view.clipplane.dist += 100.0;
+			else if(planeDist < -100)
+				r_refdef.view.clipplane.dist -= 100.0;
+			else
+				r_refdef.view.clipplane.dist += 0.95*planeDist;
+
 			// reverse the cullface settings for this render
 			r_refdef.view.cullface_front = GL_FRONT;
 			r_refdef.view.cullface_back = GL_BACK;
@@ -4912,7 +4926,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 					memset(r_refdef.viewcache.world_pvsbits, 0xFF, r_refdef.scene.worldmodel->brush.num_pvsclusterbytes);
 			}
 
-			r_fb.water.hideplayer = ((r_water_hideplayer.integer >= 2) && !chase_active.integer);
+			r_fb.water.hideplayer = ((r_water_hideplayer.integer >= 2) && !chase_active.integer) || (abs(planeDist) < r_water_clipplayerinreflection.value);
 			R_ResetViewRendering3D(rt->fbo, rt->depthtexture, rt->colortexture[0], 0, 0, rt->texturewidth, rt->textureheight);
 			GL_ScissorTest(false);
 			R_ClearScreen(r_refdef.fogenabled);
@@ -4965,6 +4979,15 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 			r_refdef.view.clipplane = p->plane;
 			VectorNegate(r_refdef.view.clipplane.normal, r_refdef.view.clipplane.normal);
 			r_refdef.view.clipplane.dist = -r_refdef.view.clipplane.dist;
+			dotProduct = DotProduct(p->plane.normal, r_refdef.view.origin);
+			normalLength = VectorLength(p->plane.normal);
+			planeDist = dotProduct/normalLength - p->plane.dist;
+			if(planeDist > 100)
+				r_refdef.view.clipplane.dist -= 100.0;
+			else if(planeDist < -100)
+				r_refdef.view.clipplane.dist += 100.0;
+			else
+				r_refdef.view.clipplane.dist -= 0.95*planeDist;
 
 			if((p->materialflags & MATERIALFLAG_CAMERA) && p->camera_entity)
 			{
@@ -6986,6 +7009,7 @@ void RSurf_ActiveModelEntity(const entity_render_t *ent, qboolean wantnormals, q
 	rsurface.inversematrixscale = 1.0f / rsurface.matrixscale;
 	R_EntityMatrix(&rsurface.matrix);
 	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.origin, rsurface.localvieworigin);
+	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.forward, rsurface.localviewdirection);
 	Matrix4x4_TransformStandardPlane(&rsurface.inversematrix, r_refdef.fogplane[0], r_refdef.fogplane[1], r_refdef.fogplane[2], r_refdef.fogplane[3], rsurface.fogplane);
 	rsurface.fogplaneviewdist = r_refdef.fogplaneviewdist * rsurface.inversematrixscale;
 	rsurface.fograngerecip = r_refdef.fograngerecip * rsurface.matrixscale;
@@ -7225,6 +7249,7 @@ void RSurf_ActiveCustomEntity(const matrix4x4_t *matrix, const matrix4x4_t *inve
 	rsurface.inversematrixscale = 1.0f / rsurface.matrixscale;
 	R_EntityMatrix(&rsurface.matrix);
 	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.origin, rsurface.localvieworigin);
+	Matrix4x4_Transform(&rsurface.inversematrix, r_refdef.view.forward, rsurface.localviewdirection);
 	Matrix4x4_TransformStandardPlane(&rsurface.inversematrix, r_refdef.fogplane[0], r_refdef.fogplane[1], r_refdef.fogplane[2], r_refdef.fogplane[3], rsurface.fogplane);
 	rsurface.fogplaneviewdist *= rsurface.inversematrixscale;
 	rsurface.fograngerecip = r_refdef.fograngerecip * rsurface.matrixscale;
