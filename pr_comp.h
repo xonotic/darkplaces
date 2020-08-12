@@ -295,25 +295,25 @@ typedef struct dprograms_s
 	int		version;
 	int		crc;			// check of header file
 
-	int		ofs_statements;
-	int		numstatements;	// statement 0 is an error
+	unsigned int		ofs_statements;
+	unsigned int		numstatements;	// statement 0 is an error
 
-	int		ofs_globaldefs;
-	int		numglobaldefs;
+	unsigned int		ofs_globaldefs;
+	unsigned int		numglobaldefs;
 
-	int		ofs_fielddefs;
-	int		numfielddefs;
+	unsigned int		ofs_fielddefs;
+	unsigned int		numfielddefs;
 
-	int		ofs_functions;
-	int		numfunctions;	// function 0 is an empty
+	unsigned int		ofs_functions;
+	unsigned int		numfunctions;	// function 0 is an empty
 
-	int		ofs_strings;
-	int		numstrings;		// first string is a null string
+	unsigned int		ofs_strings;
+	unsigned int		numstrings;		// first string is a null string
 
-	int		ofs_globals;
-	int		numglobals;
+	unsigned int		ofs_globals;
+	unsigned int		numglobals;
 
-	int		entityfields;
+	unsigned int		entityfields;
 }
 dprograms_t;
 
