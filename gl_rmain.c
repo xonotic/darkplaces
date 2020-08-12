@@ -3224,10 +3224,17 @@ static void gl_main_newmap(void)
 
 void GL_Main_Init(void)
 {
-	int i;
 	r_main_mempool = Mem_AllocPool("Renderer", 0, NULL);
 	R_InitShaderModeInfo();
 
+	if (gamemode == GAME_NEHAHRA || gamemode == GAME_TENEBRAE)
+		Cvar_SetValue(&cvars_all, "r_fullbrights", 0);
+
+	R_RegisterModule("GL_Main", gl_main_start, gl_main_shutdown, gl_main_newmap, NULL, NULL);
+}
+
+void GL_Main_Init_Commands(void)
+{
 	Cmd_AddCommand(CMD_CLIENT, "r_glsl_restart", R_GLSL_Restart_f, "unloads GLSL shaders, they will then be reloaded as needed");
 	Cmd_AddCommand(CMD_CLIENT, "r_glsl_dumpshader", R_GLSL_DumpShader_f, "dumps the engine internal default.glsl shader into glsl/default.glsl");
 	// FIXME: the client should set up r_refdef.fog stuff including the fogmasktable
@@ -3406,11 +3413,9 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_glsl_saturation_redcompensate);
 	Cvar_RegisterVariable(&r_glsl_vertextextureblend_usebothalphas);
 	Cvar_RegisterVariable(&r_framedatasize);
-	for (i = 0;i < R_BUFFERDATA_COUNT;i++)
+	for (int i = 0;i < R_BUFFERDATA_COUNT;i++)
 		Cvar_RegisterVariable(&r_buffermegs[i]);
 	Cvar_RegisterVariable(&r_batch_dynamicbuffer);
-	if (gamemode == GAME_NEHAHRA || gamemode == GAME_TENEBRAE)
-		Cvar_SetValue(&cvars_all, "r_fullbrights", 0);
 #ifdef DP_MOBILETOUCH
 	// GLES devices have terrible depth precision in general, so...
 	Cvar_SetValueQuick(&r_nearclip, 4);
@@ -3418,7 +3423,6 @@ void GL_Main_Init(void)
 	Cvar_SetValueQuick(&r_farclip_world, 0);
 	Cvar_SetValueQuick(&r_useinfinitefarclip, 0);
 #endif
-	R_RegisterModule("GL_Main", gl_main_start, gl_main_shutdown, gl_main_newmap, NULL, NULL);
 }
 
 void Render_Init(void)
@@ -3430,12 +3434,28 @@ void Render_Init(void)
 	GL_Draw_Init();
 	R_Shadow_Init();
 	R_Sky_Init();
-	GL_Surf_Init();
+	//GL_Surf_Init();
 	Sbar_Init();
 	R_Particles_Init();
 	R_Explosion_Init();
 	R_LightningBeams_Init();
 	Mod_RenderInit();
+}
+
+void Render_Init_Commands(void)
+{
+	gl_backend_init_Commands();
+	R_Textures_Init_Commands();
+	GL_Main_Init_Commands();
+	Font_Init_Commands();
+	GL_Draw_Init_Commands();
+	R_Shadow_Init_Commands();
+	R_Sky_Init_Commands();
+	GL_Surf_Init();
+	Sbar_Init_Commands();
+	R_Particles_Init_Commands();
+	R_Explosion_Init_Commands();
+	R_LightningBeams_Init_Commands();
 }
 
 int R_CullBox(const vec3_t mins, const vec3_t maxs)

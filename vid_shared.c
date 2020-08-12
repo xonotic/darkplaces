@@ -1256,6 +1256,13 @@ static dllhandle_t xinputdll_dll = NULL;
 
 void VID_Shared_Init(void)
 {
+#ifdef WIN32
+	Sys_LoadLibrary(xinputdllnames, &xinputdll_dll, xinputdllfuncs);
+#endif
+}
+
+void VID_Shared_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&gl_info_vendor);
 	Cvar_RegisterVariable(&gl_info_renderer);
 	Cvar_RegisterVariable(&gl_info_version);
@@ -1358,11 +1365,6 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&joy_x360_sensitivitypitch);
 	Cvar_RegisterVariable(&joy_x360_sensitivityyaw);
 	//Cvar_RegisterVariable(&joy_x360_sensitivityroll);
-
-#ifdef WIN32
-	Sys_LoadLibrary(xinputdllnames, &xinputdll_dll, xinputdllfuncs);
-#endif
-
 	Cmd_AddCommand(CMD_CLIENT, "force_centerview", Force_CenterView_f, "recenters view (stops looking up/down)");
 	Cmd_AddCommand(CMD_CLIENT, "vid_restart", VID_Restart_f, "restarts video system (closes and reopens the window, restarts renderer)");
 }

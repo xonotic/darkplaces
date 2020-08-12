@@ -735,19 +735,6 @@ void GL_Draw_Init (void)
 {
 	int i, j;
 
-	Cvar_RegisterVariable(&r_font_postprocess_blur);
-	Cvar_RegisterVariable(&r_font_postprocess_outline);
-	Cvar_RegisterVariable(&r_font_postprocess_shadow_x);
-	Cvar_RegisterVariable(&r_font_postprocess_shadow_y);
-	Cvar_RegisterVariable(&r_font_postprocess_shadow_z);
-	Cvar_RegisterVariable(&r_font_hinting);
-	Cvar_RegisterVariable(&r_font_antialias);
-	Cvar_RegisterVariable(&r_textshadow);
-	Cvar_RegisterVariable(&r_textbrightness);
-	Cvar_RegisterVariable(&r_textcontrast);
-	Cvar_RegisterVariable(&r_nearest_2d);
-	Cvar_RegisterVariable(&r_nearest_conchars);
-
 	// allocate fonts storage
 	fonts_mempool = Mem_AllocPool("FONTS", 0, NULL);
 	dp_fonts.maxsize = MAX_FONTS;
@@ -768,8 +755,24 @@ void GL_Draw_Init (void)
 		if(!FONT_USER(i)->title[0])
 			dpsnprintf(FONT_USER(i)->title, sizeof(FONT_USER(i)->title), "user%d", j++);
 
-	Cmd_AddCommand(CMD_CLIENT, "loadfont", LoadFont_f, "loadfont function tganame loads a font; example: loadfont console gfx/veramono; loadfont without arguments lists the available functions");
 	R_RegisterModule("GL_Draw", gl_draw_start, gl_draw_shutdown, gl_draw_newmap, NULL, NULL);
+}
+
+void GL_Draw_Init_Commands(void)
+{
+	Cvar_RegisterVariable(&r_font_postprocess_blur);
+	Cvar_RegisterVariable(&r_font_postprocess_outline);
+	Cvar_RegisterVariable(&r_font_postprocess_shadow_x);
+	Cvar_RegisterVariable(&r_font_postprocess_shadow_y);
+	Cvar_RegisterVariable(&r_font_postprocess_shadow_z);
+	Cvar_RegisterVariable(&r_font_hinting);
+	Cvar_RegisterVariable(&r_font_antialias);
+	Cvar_RegisterVariable(&r_textshadow);
+	Cvar_RegisterVariable(&r_textbrightness);
+	Cvar_RegisterVariable(&r_textcontrast);
+	Cvar_RegisterVariable(&r_nearest_2d);
+	Cvar_RegisterVariable(&r_nearest_conchars);
+	Cmd_AddCommand(CMD_CLIENT, "loadfont", LoadFont_f, "loadfont function tganame loads a font; example: loadfont console gfx/veramono; loadfont without arguments lists the available functions");
 }
 
 void DrawQ_Start(void)

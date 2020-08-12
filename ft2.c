@@ -422,6 +422,12 @@ void font_newmap(void)
 
 void Font_Init(void)
 {
+	// let's open it at startup already
+	Font_OpenLibrary();
+}
+
+void Font_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&r_font_nonpoweroftwo);
 	Cvar_RegisterVariable(&r_font_disable_freetype);
 	Cvar_RegisterVariable(&r_font_use_alpha_textures);
@@ -430,9 +436,6 @@ void Font_Init(void)
 	Cvar_RegisterVariable(&r_font_diskcache);
 	Cvar_RegisterVariable(&r_font_compress);
 	Cvar_RegisterVariable(&developer_font);
-
-	// let's open it at startup already
-	Font_OpenLibrary();
 }
 
 /*

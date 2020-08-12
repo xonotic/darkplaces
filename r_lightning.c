@@ -95,6 +95,11 @@ static void r_lightningbeams_newmap(void)
 
 void R_LightningBeams_Init(void)
 {
+	R_RegisterModule("R_LightningBeams", r_lightningbeams_start, r_lightningbeams_shutdown, r_lightningbeams_newmap, NULL, NULL);
+}
+
+void R_LightningBeams_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&r_lightningbeam_thickness);
 	Cvar_RegisterVariable(&r_lightningbeam_scroll);
 	Cvar_RegisterVariable(&r_lightningbeam_repeatdistance);
@@ -102,7 +107,6 @@ void R_LightningBeams_Init(void)
 	Cvar_RegisterVariable(&r_lightningbeam_color_green);
 	Cvar_RegisterVariable(&r_lightningbeam_color_blue);
 	Cvar_RegisterVariable(&r_lightningbeam_qmbtexture);
-	R_RegisterModule("R_LightningBeams", r_lightningbeams_start, r_lightningbeams_shutdown, r_lightningbeams_newmap, NULL, NULL);
 }
 
 static void CL_Beam_AddQuad(dp_model_t *mod, msurface_t *surf, const vec3_t start, const vec3_t end, const vec3_t offset, float t1, float t2)

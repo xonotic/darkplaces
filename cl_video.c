@@ -689,6 +689,13 @@ void CL_Video_Init( void )
 	bgra.i = 0;bgra.b[1] = 0xFF;cl_videogmask = bgra.i;
 	bgra.i = 0;bgra.b[2] = 0xFF;cl_videormask = bgra.i;
 
+	R_RegisterModule( "CL_Video", cl_video_start, cl_video_shutdown, cl_video_newmap, NULL, NULL );
+
+	LibAvW_OpenLibrary();
+}
+
+void CL_Video_Init_Commands(void)
+{
 	Cmd_AddCommand(CMD_CLIENT, "playvideo", CL_PlayVideo_f, "play a .dpv video file" );
 	Cmd_AddCommand(CMD_CLIENT, "stopvideo", CL_StopVideo_f, "stop playing a .dpv video file" );
 
@@ -704,10 +711,6 @@ void CL_Video_Init( void )
 	Cvar_RegisterVariable(&cl_video_fadeout);
 
 	Cvar_RegisterVariable(&v_glslgamma_video);
-
-	R_RegisterModule( "CL_Video", cl_video_start, cl_video_shutdown, cl_video_newmap, NULL, NULL );
-
-	LibAvW_OpenLibrary();
 }
 
 void CL_Video_Shutdown( void )

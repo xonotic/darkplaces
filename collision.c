@@ -24,6 +24,12 @@ mempool_t *collision_mempool;
 
 void Collision_Init (void)
 {
+	collision_mempool = Mem_AllocPool("collision cache", 0, NULL);
+	Collision_Cache_Init(collision_mempool);
+}
+
+void Collision_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&collision_impactnudge);
 	Cvar_RegisterVariable(&collision_extendmovelength);
 	Cvar_RegisterVariable(&collision_extendtracelinelength);
@@ -33,11 +39,7 @@ void Collision_Init (void)
 	Cvar_RegisterVariable(&collision_triangle_bevelsides);
 	Cvar_RegisterVariable(&collision_triangle_axialsides);
 	Cvar_RegisterVariable(&collision_bih_fullrecursion);
-	collision_mempool = Mem_AllocPool("collision cache", 0, NULL);
-	Collision_Cache_Init(collision_mempool);
 }
-
-
 
 
 

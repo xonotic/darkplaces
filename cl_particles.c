@@ -2438,13 +2438,17 @@ void R_Particles_Init (void)
 		particle_elements[i*6+5] = i*4+3;
 	}
 
+	R_RegisterModule("R_Particles", r_part_start, r_part_shutdown, r_part_newmap, NULL, NULL);
+}
+
+void R_Particles_Init_Commands (void)
+{
 	Cvar_RegisterVariable(&r_drawparticles);
 	Cvar_RegisterVariable(&r_drawparticles_drawdistance);
 	Cvar_RegisterVariable(&r_drawparticles_nearclip_min);
 	Cvar_RegisterVariable(&r_drawparticles_nearclip_max);
 	Cvar_RegisterVariable(&r_drawdecals);
 	Cvar_RegisterVariable(&r_drawdecals_drawdistance);
-	R_RegisterModule("R_Particles", r_part_start, r_part_shutdown, r_part_newmap, NULL, NULL);
 }
 
 static void R_DrawParticle_TransparentCallback(const entity_render_t *ent, const rtlight_t *rtlight, int numsurfaces, int *surfacelist)

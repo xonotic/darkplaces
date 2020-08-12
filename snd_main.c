@@ -703,6 +703,31 @@ S_Init
 */
 void S_Init(void)
 {
+// COMMANDLINEOPTION: Sound: -nosound disables sound (including CD audio)
+	if (COM_CheckParm("-nosound"))
+		return;
+
+	snd_mempool = Mem_AllocPool("sound", 0, NULL);
+
+// COMMANDLINEOPTION: Sound: -simsound runs sound mixing but with no output
+	if (COM_CheckParm("-simsound"))
+		simsound = true;
+
+	Cvar_SetValueQuick(&snd_initialized, true);
+
+	known_sfx = NULL;
+
+	total_channels = MAX_DYNAMIC_CHANNELS + NUM_AMBIENTS;	// no statics
+	memset(channels, 0, MAX_CHANNELS * sizeof(channel_t));
+
+	OGG_OpenLibrary ();
+#ifdef USEXMP
+	XMP_OpenLibrary ();
+#endif
+}
+
+void S_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&volume);
 	Cvar_RegisterVariable(&bgmvolume);
 	Cvar_RegisterVariable(&mastervolume);
@@ -773,8 +798,6 @@ void S_Init(void)
 
 	Cvar_RegisterVariable(&snd_identicalsoundrandomization_time);
 	Cvar_RegisterVariable(&snd_identicalsoundrandomization_tics);
-
-// COMMANDLINEOPTION: Sound: -nosound disables sound (including CD audio)
 	if (COM_CheckParm("-nosound"))
 	{
 		// dummy out Play and Play2 because mods stuffcmd that
@@ -782,12 +805,6 @@ void S_Init(void)
 		Cmd_AddCommand(CMD_CLIENT, "play2", Host_NoOperation_f, "does nothing because -nosound was specified");
 		return;
 	}
-
-	snd_mempool = Mem_AllocPool("sound", 0, NULL);
-
-// COMMANDLINEOPTION: Sound: -simsound runs sound mixing but with no output
-	if (COM_CheckParm("-simsound"))
-		simsound = true;
 
 	Cmd_AddCommand(CMD_CLIENT, "play", S_Play_f, "play a sound at your current location (not heard by anyone else)");
 	Cmd_AddCommand(CMD_CLIENT, "play2", S_Play2_f, "play a sound globally throughout the level (not heard by anyone else)");
@@ -812,20 +829,7 @@ void S_Init(void)
 	Cvar_RegisterVariable(&snd_swapstereo); // for people with backwards sound wiring
 	Cvar_RegisterVariable(&snd_channellayout);
 	Cvar_RegisterVariable(&snd_soundradius);
-
-	Cvar_SetValueQuick(&snd_initialized, true);
-
-	known_sfx = NULL;
-
-	total_channels = MAX_DYNAMIC_CHANNELS + NUM_AMBIENTS;	// no statics
-	memset(channels, 0, MAX_CHANNELS * sizeof(channel_t));
-
-	OGG_OpenLibrary ();
-#ifdef USEXMP
-	XMP_OpenLibrary ();
-#endif
 }
-
 
 /*
 ================

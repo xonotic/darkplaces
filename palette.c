@@ -366,6 +366,10 @@ static void Palette_Load(void)
 void Palette_Init(void)
 {
 	R_RegisterModule("Palette", Palette_Load, Palette_Shutdown, Palette_NewMap, NULL, NULL);
-	Cvar_RegisterVariable(&r_colormap_palette);
 	Palette_Load();
+}
+
+void Palette_Init_Commands(void)
+{
+	Cvar_RegisterVariable(&r_colormap_palette);
 }

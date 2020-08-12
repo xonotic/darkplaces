@@ -359,11 +359,18 @@ static void sbar_newmap(void)
 
 void Sbar_Init (void)
 {
+	// FIXME: Don't know what game we're running until after cvars are initialized.
+	// So we're not doing this in our Init_Commands function yet.
 	if(gamemode == GAME_NORMAL) // Workaround so Quake doesn't trample on Xonotic.
 	{
 		Cmd_AddCommand(CMD_CLIENT, "+showscores", Sbar_ShowScores_f, "show scoreboard");
 		Cmd_AddCommand(CMD_CLIENT, "-showscores", Sbar_DontShowScores_f, "hide scoreboard");
 	}
+	R_RegisterModule("sbar", sbar_start, sbar_shutdown, sbar_newmap, NULL, NULL);
+}
+
+void Sbar_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&cl_showfps);
 	Cvar_RegisterVariable(&cl_showsound);
 	Cvar_RegisterVariable(&cl_showblur);
@@ -404,10 +411,7 @@ void Sbar_Init (void)
 
 	Cvar_RegisterVariable(&sbar_flagstatus_right); // (GAME_NEXUZI ONLY)
 	Cvar_RegisterVariable(&sbar_flagstatus_pos); // (GAME_NEXUIZ ONLY)
-
-	R_RegisterModule("sbar", sbar_start, sbar_shutdown, sbar_newmap, NULL, NULL);
 }
-
 
 //=============================================================================
 

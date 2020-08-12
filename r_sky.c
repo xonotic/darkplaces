@@ -463,13 +463,16 @@ static void r_sky_newmap(void)
 
 void R_Sky_Init(void)
 {
-	Cmd_AddCommand(CMD_CLIENT, "loadsky", &LoadSky_f, "load a skybox by basename (for example loadsky mtnsun_ loads mtnsun_ft.tga and so on)");
-	Cvar_RegisterVariable (&r_sky);
-	Cvar_RegisterVariable (&r_skyscroll1);
-	Cvar_RegisterVariable (&r_skyscroll2);
-	Cvar_RegisterVariable (&r_sky_scissor);
 	memset(&skyboxskinframe, 0, sizeof(skyboxskinframe));
 	skyname[0] = 0;
 	R_RegisterModule("R_Sky", r_sky_start, r_sky_shutdown, r_sky_newmap, NULL, NULL);
 }
 
+void R_Sky_Init_Commands(void)
+{
+	Cmd_AddCommand(CMD_CLIENT, "loadsky", &LoadSky_f, "load a skybox by basename (for example loadsky mtnsun_ loads mtnsun_ft.tga and so on)");
+	Cvar_RegisterVariable (&r_sky);
+	Cvar_RegisterVariable (&r_skyscroll1);
+	Cvar_RegisterVariable (&r_skyscroll2);
+	Cvar_RegisterVariable (&r_sky_scissor);
+}

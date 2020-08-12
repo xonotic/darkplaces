@@ -1537,6 +1537,7 @@ double CL_Frame(double time);
 
 void CL_Shutdown (void);
 void CL_Init (void);
+void CL_Init_Commands(void);
 
 void CL_EstablishConnection(const char *host, int firstarg);
 
@@ -1605,7 +1606,7 @@ void CL_ForwardToServer (const char *s);
 /// things like godmode, noclip, etc, are commands directed to the server,
 /// so when they are typed in at the console, they will need to be forwarded.
 void CL_ForwardToServer_f (cmd_state_t *cmd);
-void CL_InitCommands(void);
+void CL_InitServer_Commands(void);
 
 
 //

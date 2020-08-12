@@ -32,10 +32,17 @@ line of sight checks trace->inopen and trace->inwater, but bullets don't
 */
 
 static void World_Physics_Init(void);
+static void World_Physics_Init_Commands(void);
 void World_Init(void)
 {
 	Collision_Init();
 	World_Physics_Init();
+}
+
+void World_Init_Commands(void)
+{
+	Collision_Init_Commands();
+	World_Physics_Init_Commands();
 }
 
 static void World_Physics_Shutdown(void);
@@ -1494,36 +1501,6 @@ static void World_Physics_Init(void)
 	};
 #endif
 
-	Cvar_RegisterVariable(&physics_ode_quadtree_depth);
-	Cvar_RegisterVariable(&physics_ode_contactsurfacelayer);
-	Cvar_RegisterVariable(&physics_ode_worldstep_iterations);
-	Cvar_RegisterVariable(&physics_ode_contact_mu);
-	Cvar_RegisterVariable(&physics_ode_contact_erp);
-	Cvar_RegisterVariable(&physics_ode_contact_cfm);
-	Cvar_RegisterVariable(&physics_ode_contact_maxpoints);
-	Cvar_RegisterVariable(&physics_ode_world_erp);
-	Cvar_RegisterVariable(&physics_ode_world_cfm);
-	Cvar_RegisterVariable(&physics_ode_world_damping);
-	Cvar_RegisterVariable(&physics_ode_world_damping_linear);
-	Cvar_RegisterVariable(&physics_ode_world_damping_linear_threshold);
-	Cvar_RegisterVariable(&physics_ode_world_damping_angular);
-	Cvar_RegisterVariable(&physics_ode_world_damping_angular_threshold);
-	Cvar_RegisterVariable(&physics_ode_world_gravitymod);
-	Cvar_RegisterVariable(&physics_ode_iterationsperframe);
-	Cvar_RegisterVariable(&physics_ode_constantstep);
-	Cvar_RegisterVariable(&physics_ode_movelimit);
-	Cvar_RegisterVariable(&physics_ode_spinlimit);
-	Cvar_RegisterVariable(&physics_ode_trick_fixnan);
-	Cvar_RegisterVariable(&physics_ode_autodisable);
-	Cvar_RegisterVariable(&physics_ode_autodisable_steps);
-	Cvar_RegisterVariable(&physics_ode_autodisable_time);
-	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_linear);
-	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_angular);
-	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_samples);
-	Cvar_RegisterVariable(&physics_ode_printstats);
-	Cvar_RegisterVariable(&physics_ode_allowconvex);
-	Cvar_RegisterVariable(&physics_ode);
-
 #ifndef LINK_TO_LIBODE
 	// Load the DLL
 	if (Sys_LoadLibrary (dllnames, &ode_dll, odefuncs))
@@ -1557,6 +1534,41 @@ static void World_Physics_Init(void)
 		}
 #endif
 	}
+#endif
+}
+
+static void World_Physics_Init_Commands(void)
+{
+#ifdef USEODE
+	Cvar_RegisterVariable(&physics_ode_quadtree_depth);
+	Cvar_RegisterVariable(&physics_ode_contactsurfacelayer);
+	Cvar_RegisterVariable(&physics_ode_worldstep_iterations);
+	Cvar_RegisterVariable(&physics_ode_contact_mu);
+	Cvar_RegisterVariable(&physics_ode_contact_erp);
+	Cvar_RegisterVariable(&physics_ode_contact_cfm);
+	Cvar_RegisterVariable(&physics_ode_contact_maxpoints);
+	Cvar_RegisterVariable(&physics_ode_world_erp);
+	Cvar_RegisterVariable(&physics_ode_world_cfm);
+	Cvar_RegisterVariable(&physics_ode_world_damping);
+	Cvar_RegisterVariable(&physics_ode_world_damping_linear);
+	Cvar_RegisterVariable(&physics_ode_world_damping_linear_threshold);
+	Cvar_RegisterVariable(&physics_ode_world_damping_angular);
+	Cvar_RegisterVariable(&physics_ode_world_damping_angular_threshold);
+	Cvar_RegisterVariable(&physics_ode_world_gravitymod);
+	Cvar_RegisterVariable(&physics_ode_iterationsperframe);
+	Cvar_RegisterVariable(&physics_ode_constantstep);
+	Cvar_RegisterVariable(&physics_ode_movelimit);
+	Cvar_RegisterVariable(&physics_ode_spinlimit);
+	Cvar_RegisterVariable(&physics_ode_trick_fixnan);
+	Cvar_RegisterVariable(&physics_ode_autodisable);
+	Cvar_RegisterVariable(&physics_ode_autodisable_steps);
+	Cvar_RegisterVariable(&physics_ode_autodisable_time);
+	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_linear);
+	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_angular);
+	Cvar_RegisterVariable(&physics_ode_autodisable_threshold_samples);
+	Cvar_RegisterVariable(&physics_ode_printstats);
+	Cvar_RegisterVariable(&physics_ode_allowconvex);
+	Cvar_RegisterVariable(&physics_ode);
 #endif
 }
 

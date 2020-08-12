@@ -2190,8 +2190,6 @@ void FS_Init(void)
 {
 	fs_mempool = Mem_AllocPool("file management", 0, NULL);
 
-	FS_Init_Commands();
-
 	PK3_OpenLibrary ();
 
 	// initialize the self-pack (must be before COM_InitGameType as it may add command line options)

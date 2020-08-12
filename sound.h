@@ -59,6 +59,7 @@ extern cvar_t snd_mutewhenidle;
 // ====================================================================
 
 void S_Init (void);
+void S_Init_Commands(void);
 void S_Terminate (void);
 
 void S_Startup (void);

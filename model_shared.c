@@ -181,7 +181,13 @@ void Mod_Init (void)
 
 	Mod_BrushInit();
 	Mod_AliasInit();
-	Mod_SpriteInit();
+}
+
+void Mod_Init_Commands(void)
+{
+	Mod_BrushInit_Commands();
+	Mod_AliasInit_Commands();
+	Mod_SpriteInit_Commands();
 
 	Cvar_RegisterVariable(&r_mipskins);
 	Cvar_RegisterVariable(&r_mipnormalmaps);

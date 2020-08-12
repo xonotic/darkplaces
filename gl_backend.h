@@ -61,6 +61,7 @@ extern cvar_t gl_printcheckerror;
 
 // adds console variables and registers the render module (only call from GL_Init)
 void gl_backend_init(void);
+void gl_backend_init_Commands(void);
 
 // starts mesh rendering for the frame
 void R_Mesh_Start(void);

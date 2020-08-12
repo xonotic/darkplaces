@@ -2915,25 +2915,19 @@ CL_Init
 void CL_Init (void)
 {
 	if (cls.state == ca_dedicated)
-	{
-		Cmd_AddCommand(CMD_SERVER, "disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
-	}
+		return;
 	else
 	{
 		Con_Printf("Initializing client\n");
 
-		R_Modules_Init();
 		Palette_Init();
-#ifdef CONFIG_MENU
-		MR_Init_Commands();
-#endif
+
 		VID_Shared_Init();
 		VID_Init();
 		Render_Init();
 		S_Init();
 		CDAudio_Init();
 		Key_Init();
-		V_Init();
 
 		cls.levelmempool = Mem_AllocPool("client (per-level memory)", 0, NULL);
 		cls.permanentmempool = Mem_AllocPool("client (long term memory)", 0, NULL);
@@ -2947,12 +2941,53 @@ void CL_Init (void)
 		r_refdef.scene.maxtempentities = MAX_TEMPENTITIES;
 		r_refdef.scene.tempentities = (entity_render_t *)Mem_Alloc(cls.permanentmempool, sizeof(entity_render_t) * r_refdef.scene.maxtempentities);
 
-		CL_InitInput ();
+		Cvar_SetValueQuick(&qport, (rand() * RAND_MAX + rand()) & 0xffff);
 
-	//
-	// register our commands
-	//
-		CL_InitCommands();
+		CL_Screen_Init();
+		CL_MeshEntities_Init();
+
+		CL_Video_Init();
+
+		host.hook.ConnectLocal = CL_EstablishConnection_Local;
+
+		#ifdef CONFIG_MENU
+		Cbuf_InsertText(&cmd_client,"menu_start\n");
+		#endif
+	}
+}
+
+void CL_Init_Commands(void)
+{
+	if (cls.state == ca_dedicated)
+	{
+		Cmd_AddCommand(CMD_SERVER, "disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
+	}
+	else
+	{
+		//
+		// register our commands
+		//
+		R_Modules_Init();
+		Palette_Init_Commands();
+#ifdef CONFIG_MENU
+		MR_Init_Commands();
+#endif
+		VID_Shared_Init_Commands();
+		VID_Init_Commands();
+		Render_Init_Commands();
+		S_Init_Commands();
+		CDAudio_Init_Commands();
+		Key_Init_Commands();
+		V_Init();
+
+		CL_InitInput();
+		CL_Demo_Init();
+		CL_Parse_Init();
+		CL_Particles_Init();
+		CL_Screen_Init_Commands();
+		CL_Video_Init_Commands();
+
+		CL_InitServer_Commands();
 
 		Cvar_RegisterVariable (&cl_upspeed);
 		Cvar_RegisterVariable (&cl_forwardspeed);
@@ -2980,9 +3015,6 @@ void CL_Init (void)
 
 		Cvar_RegisterVariable (&cl_itembobspeed);
 		Cvar_RegisterVariable (&cl_itembobheight);
-
-		CL_Demo_Init();
-
 		Cmd_AddCommand(CMD_CLIENT, "entities", CL_PrintEntities_f, "print information on network entities known to client");
 		Cmd_AddCommand(CMD_CLIENT, "disconnect", CL_Disconnect_f, "disconnect from server (or disconnect all clients if running a server)");
 		Cmd_AddCommand(CMD_CLIENT, "connect", CL_Connect_f, "connect to a server by IP address or hostname");
@@ -3021,7 +3053,6 @@ void CL_Init (void)
 
 		// for QW connections
 		Cvar_RegisterVariable(&qport);
-		Cvar_SetValueQuick(&qport, (rand() * RAND_MAX + rand()) & 0xffff);
 
 		Cmd_AddCommand(CMD_CLIENT, "timerefresh", CL_TimeRefresh_f, "turn quickly and print rendering statistcs");
 
@@ -3046,18 +3077,5 @@ void CL_Init (void)
 		Cvar_RegisterVariable (&cl_maxfps);
 		Cvar_RegisterVariable (&cl_maxfps_alwayssleep);
 		Cvar_RegisterVariable (&cl_maxidlefps);
-
-		CL_Parse_Init();
-		CL_Particles_Init();
-		CL_Screen_Init();
-		CL_MeshEntities_Init();
-
-		CL_Video_Init();
-
-		host.hook.ConnectLocal = CL_EstablishConnection_Local;
-
-		#ifdef CONFIG_MENU
-		Cbuf_InsertText(&cmd_client,"menu_start\n");
-		#endif
 	}
 }

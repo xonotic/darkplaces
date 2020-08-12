@@ -39,10 +39,10 @@ cvar_t r_track_sprites_scaleh = {CVAR_CLIENT | CVAR_SAVE, "r_track_sprites_scale
 
 /*
 ===============
-Mod_SpriteInit
+Mod_SpriteInit_Commands
 ===============
 */
-void Mod_SpriteInit (void)
+void Mod_SpriteInit_Commands (void)
 {
 	Cvar_RegisterVariable(&r_mipsprites);
 	Cvar_RegisterVariable(&r_labelsprites_scale);

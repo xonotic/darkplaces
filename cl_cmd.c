@@ -633,7 +633,7 @@ static void CL_PingPLReport_f(cmd_state_t *cmd)
 	}
 }
 
-void CL_InitCommands(void)
+void CL_InitServer_Commands(void)
 {
 	dpsnprintf(cls.userinfo, sizeof(cls.userinfo), "\\name\\player\\team\\none\\topcolor\\0\\bottomcolor\\0\\rate\\10000\\msg\\1\\noaim\\1\\*ver\\dp");
 

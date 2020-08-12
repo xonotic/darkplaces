@@ -1279,6 +1279,19 @@ void CL_Screen_Shutdown(void)
 
 void CL_Screen_Init(void)
 {
+	// if we want no console, turn it off here too
+	if (COM_CheckParm ("-noconsole"))
+		Cvar_SetQuick(&scr_conforcewhiledisconnected, "0");
+
+#ifdef CONFIG_VIDEO_CAPTURE
+	SCR_CaptureVideo_Ogg_Init();
+#endif
+
+	scr_initialized = true;
+}
+
+void CL_Screen_Init_Commands(void)
+{
 	int i;
 	Cvar_RegisterVariable (&scr_fov);
 	Cvar_RegisterVariable (&scr_viewsize);
@@ -1366,22 +1379,11 @@ void CL_Screen_Init(void)
 	Cvar_RegisterVariable(&r_speeds_graph_height);
 	Cvar_RegisterVariable(&r_speeds_graph_maxtimedelta);
 	Cvar_RegisterVariable(&r_speeds_graph_maxdefault);
-
-	// if we want no console, turn it off here too
-	if (COM_CheckParm ("-noconsole"))
-		Cvar_SetQuick(&scr_conforcewhiledisconnected, "0");
-
 	Cmd_AddCommand(CMD_CLIENT, "sizeup",SCR_SizeUp_f, "increase view size (increases viewsize cvar)");
 	Cmd_AddCommand(CMD_CLIENT, "sizedown",SCR_SizeDown_f, "decrease view size (decreases viewsize cvar)");
 	Cmd_AddCommand(CMD_CLIENT, "screenshot",SCR_ScreenShot_f, "takes a screenshot of the next rendered frame");
 	Cmd_AddCommand(CMD_CLIENT, "envmap", R_Envmap_f, "render a cubemap (skybox) of the current scene");
 	Cmd_AddCommand(CMD_CLIENT, "infobar", SCR_InfoBar_f, "display a text in the infobar (usage: infobar expiretime string)");
-
-#ifdef CONFIG_VIDEO_CAPTURE
-	SCR_CaptureVideo_Ogg_Init();
-#endif
-
-	scr_initialized = true;
 }
 
 /*

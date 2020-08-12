@@ -225,14 +225,14 @@ static void Host_Framerate_c(cvar_t *var)
 
 /*
 =======================
-Host_InitLocal
+Host_InitLocal_Commands
 ======================
 */
 void Host_SaveConfig_f(cmd_state_t *cmd);
 void Host_LoadConfig_f(cmd_state_t *cmd);
 extern cvar_t sv_writepicture_quality;
 extern cvar_t r_texture_jpeg_fastpicmip;
-static void Host_InitLocal (void)
+static void Host_InitLocal_Commands (void)
 {
 	Cmd_AddCommand(CMD_SHARED, "quit", Host_Quit_f, "quit the game");
 	Cmd_AddCommand(CMD_SHARED, "version", Host_Version_f, "print engine version");
@@ -659,20 +659,42 @@ static void Host_Init (void)
 	if (COM_CheckParm("-nostdout"))
 		sys_nostdout = 1;
 
+	/* FIXME: We don't know if we're dedicated until after cvars are initialized
+	 * yet we use this to gate off some cvars. Setting this early.
+	 */
+	if(!cl_available)
+		cls.state = ca_dedicated;
+
 	// initialize console command/cvar/alias/command execution systems
 	Cmd_Init();
 
 	// initialize memory subsystem cvars/commands
 	Memory_Init_Commands();
 
-	// initialize console and logging and its cvars/commands
-	Con_Init();
-
+	// initialize console cvars/commands
+	Con_Init_Commands();
 	// initialize various cvars that could not be initialized earlier
-	u8_Init();
-	Curl_Init_Commands();
+	u8_Init_Commands();
 	Sys_Init_Commands();
 	COM_Init_Commands();
+	FS_Init_Commands();
+	Crypto_Init_Commands();
+	NetConn_Init_Commands();
+	Curl_Init_Commands();
+	PRVM_Init_Commands();
+	Mod_Init_Commands();
+	World_Init_Commands();
+	SV_Init_Commands();
+	Host_InitLocal_Commands();
+	TaskQueue_Init_Commands();
+	CL_Init_Commands();
+
+	// register the cvars for session locking
+	Host_InitSession();
+
+	// initialize console and logging
+	Con_Init();
+	COM_Init();
 
 	// initialize filesystem (including fs_basedir, fs_gamedir, -game, scr_screenshot_name)
 	FS_Init();
@@ -688,12 +710,8 @@ static void Host_Init (void)
 	// initialize ixtable
 	Mathlib_Init();
 
-	// register the cvars for session locking
-	Host_InitSession();
-
 	// must be after FS_Init
 	Crypto_Init();
-	Crypto_Init_Commands();
 
 	NetConn_Init();
 	Curl_Init();
@@ -701,11 +719,9 @@ static void Host_Init (void)
 	Mod_Init();
 	World_Init();
 	SV_Init();
-	Host_InitLocal();
 	Host_ServerOptions();
 
 	Thread_Init();
-	TaskQueue_Init();
 
 	CL_Init();
 

@@ -557,10 +557,17 @@ int CDAudio_Init (void)
 		*remap[i] = 0;
 #endif
 
-	Cvar_RegisterVariable(&cdaudioinitialized);
 	Cvar_SetValueQuick(&cdaudioinitialized, true);
 	enabled = true;
 
+	return 0;
+}
+
+void CDAudio_Init_Commands(void)
+{
+	int i;
+
+	Cvar_RegisterVariable(&cdaudioinitialized);
 	Cvar_RegisterVariable(&music_playlist_index);
 	for (i = 0;i < MAX_PLAYLISTS;i++)
 	{
@@ -571,8 +578,6 @@ int CDAudio_Init (void)
 	}
 
 	Cmd_AddCommand(CMD_CLIENT | CMD_CLIENT_FROM_SERVER, "cd", CD_f, "execute a CD drive command (cd on/off/reset/remap/close/play/loop/stop/pause/resume/eject/info) - use cd by itself for usage");
-
-	return 0;
 }
 
 int CDAudio_Startup (void)

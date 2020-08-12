@@ -1320,15 +1320,9 @@ static qboolean vid_sdl_initjoysticksystem = false;
 
 void VID_Init (void)
 {
-#ifndef __IPHONEOS__
-#ifdef MACOSX
-	Cvar_RegisterVariable(&apple_mouse_noaccel);
-#endif
-#endif
 #ifdef DP_MOBILETOUCH
 	Cvar_SetValueQuick(&vid_touchscreen, 1);
 #endif
-	Cvar_RegisterVariable(&joy_sdl2_trigger_deadzone);
 
 #ifdef SDL_R_RESTART
 	R_RegisterModule("SDL", sdl_start, sdl_shutdown, sdl_newmap, NULL, NULL);
@@ -1340,6 +1334,16 @@ void VID_Init (void)
 	if (!vid_sdl_initjoysticksystem)
 		Con_Printf(CON_ERROR "Failed to init SDL joystick subsystem: %s\n", SDL_GetError());
 	vid_isfullscreen = false;
+}
+
+void VID_Init_Commands(void)
+{
+#ifndef __IPHONEOS__
+#ifdef MACOSX
+	Cvar_RegisterVariable(&apple_mouse_noaccel);
+#endif
+#endif
+	Cvar_RegisterVariable(&joy_sdl2_trigger_deadzone);
 }
 
 static int vid_sdljoystickindex = -1;

@@ -31,6 +31,10 @@ cvar_t snd_mutewhenidle = {CVAR_SAVE, "snd_mutewhenidle", "1", "whether to disab
 
 void S_Init (void)
 {
+}
+
+void S_Init_Commands (void)
+{
 	Cvar_RegisterVariable(&bgmvolume);
 	Cvar_RegisterVariable(&mastervolume);
 	Cvar_RegisterVariable(&volume);

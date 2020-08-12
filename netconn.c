@@ -3870,6 +3870,45 @@ void NetConn_Init(void)
 	int i;
 	lhnetaddress_t tempaddress;
 	netconn_mempool = Mem_AllocPool("network connections", 0, NULL);
+
+// COMMANDLINEOPTION: Server: -ip <ipaddress> sets the ip address of this machine for purposes of networking (default 0.0.0.0 also known as INADDR_ANY), use only if you have multiple network adapters and need to choose one specifically.
+	if ((i = COM_CheckParm("-ip")) && i + 1 < sys.argc)
+	{
+		if (LHNETADDRESS_FromString(&tempaddress, sys.argv[i + 1], 0) == 1)
+		{
+			Con_Printf("-ip option used, setting net_address to \"%s\"\n", sys.argv[i + 1]);
+			Cvar_SetQuick(&net_address, sys.argv[i + 1]);
+		}
+		else
+			Con_Printf(CON_ERROR "-ip option used, but unable to parse the address \"%s\"\n", sys.argv[i + 1]);
+	}
+// COMMANDLINEOPTION: Server: -port <portnumber> sets the port to use for a server (default 26000, the same port as QUAKE itself), useful if you host multiple servers on your machine
+	if (((i = COM_CheckParm("-port")) || (i = COM_CheckParm("-ipport")) || (i = COM_CheckParm("-udpport"))) && i + 1 < sys.argc)
+	{
+		i = atoi(sys.argv[i + 1]);
+		if (i >= 0 && i < 65536)
+		{
+			Con_Printf("-port option used, setting port cvar to %i\n", i);
+			Cvar_SetValueQuick(&sv_netport, i);
+		}
+		else
+			Con_Printf(CON_ERROR "-port option used, but %i is not a valid port number\n", i);
+	}
+	cl_numsockets = 0;
+	sv_numsockets = 0;
+	cl_message.data = cl_message_buf;
+	cl_message.maxsize = sizeof(cl_message_buf);
+	cl_message.cursize = 0;
+	sv_message.data = sv_message_buf;
+	sv_message.maxsize = sizeof(sv_message_buf);
+	sv_message.cursize = 0;
+	LHNET_Init();
+	if (Thread_HasThreads())
+		netconn_mutex = Thread_CreateMutex();
+}
+
+void NetConn_Init_Commands(void)
+{
 	Cmd_AddCommand(CMD_SHARED, "net_stats", Net_Stats_f, "print network statistics");
 #ifdef CONFIG_MENU
 	Cmd_AddCommand(CMD_CLIENT, "net_slist", Net_Slist_f, "query dp master servers and print all server information");
@@ -3915,45 +3954,11 @@ void NetConn_Init(void)
 	Cvar_RegisterVariable(&sv_public);
 	Cvar_RegisterVariable(&sv_public_rejectreason);
 	Cvar_RegisterVariable(&sv_heartbeatperiod);
-	for (i = 0;sv_masters[i].name;i++)
+	for (int i = 0;sv_masters[i].name;i++)
 		Cvar_RegisterVariable(&sv_masters[i]);
 	Cvar_RegisterVariable(&gameversion);
 	Cvar_RegisterVariable(&gameversion_min);
 	Cvar_RegisterVariable(&gameversion_max);
-// COMMANDLINEOPTION: Server: -ip <ipaddress> sets the ip address of this machine for purposes of networking (default 0.0.0.0 also known as INADDR_ANY), use only if you have multiple network adapters and need to choose one specifically.
-	if ((i = COM_CheckParm("-ip")) && i + 1 < sys.argc)
-	{
-		if (LHNETADDRESS_FromString(&tempaddress, sys.argv[i + 1], 0) == 1)
-		{
-			Con_Printf("-ip option used, setting net_address to \"%s\"\n", sys.argv[i + 1]);
-			Cvar_SetQuick(&net_address, sys.argv[i + 1]);
-		}
-		else
-			Con_Printf(CON_ERROR "-ip option used, but unable to parse the address \"%s\"\n", sys.argv[i + 1]);
-	}
-// COMMANDLINEOPTION: Server: -port <portnumber> sets the port to use for a server (default 26000, the same port as QUAKE itself), useful if you host multiple servers on your machine
-	if (((i = COM_CheckParm("-port")) || (i = COM_CheckParm("-ipport")) || (i = COM_CheckParm("-udpport"))) && i + 1 < sys.argc)
-	{
-		i = atoi(sys.argv[i + 1]);
-		if (i >= 0 && i < 65536)
-		{
-			Con_Printf("-port option used, setting port cvar to %i\n", i);
-			Cvar_SetValueQuick(&sv_netport, i);
-		}
-		else
-			Con_Printf(CON_ERROR "-port option used, but %i is not a valid port number\n", i);
-	}
-	cl_numsockets = 0;
-	sv_numsockets = 0;
-	cl_message.data = cl_message_buf;
-	cl_message.maxsize = sizeof(cl_message_buf);
-	cl_message.cursize = 0;
-	sv_message.data = sv_message_buf;
-	sv_message.maxsize = sizeof(sv_message_buf);
-	sv_message.cursize = 0;
-	LHNET_Init();
-	if (Thread_HasThreads())
-		netconn_mutex = Thread_CreateMutex();
 }
 
 void NetConn_Shutdown(void)

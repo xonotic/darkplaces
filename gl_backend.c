@@ -365,6 +365,11 @@ void gl_backend_init(void)
 	for (i = 0;i < QUADELEMENTS_MAXQUADS*6;i++)
 		quadelement3i[i] = quadelement3s[i];
 
+	R_RegisterModule("GL_Backend", gl_backend_start, gl_backend_shutdown, gl_backend_newmap, gl_backend_devicelost, gl_backend_devicerestored);
+}
+
+void gl_backend_init_Commands(void)
+{
 	Cvar_RegisterVariable(&r_render);
 	Cvar_RegisterVariable(&r_renderview);
 	Cvar_RegisterVariable(&r_waterwarp);
@@ -375,8 +380,6 @@ void gl_backend_init(void)
 	Cvar_RegisterVariable(&gl_printcheckerror);
 
 	Cmd_AddCommand(CMD_CLIENT, "gl_vbostats", GL_VBOStats_f, "prints a list of all buffer objects (vertex data and triangle elements) and total video memory used by them");
-
-	R_RegisterModule("GL_Backend", gl_backend_start, gl_backend_shutdown, gl_backend_newmap, gl_backend_devicelost, gl_backend_devicerestored);
 }
 
 void GL_SetMirrorState(qboolean state);

@@ -918,17 +918,10 @@ float Com_CalcRoll (const vec3_t angles, const vec3_t velocity, const vec_t angl
 COM_Init
 ================
 */
-void COM_Init_Commands (void)
+void COM_Init (void)
 {
 	int i, j, n;
 	char com_cmdline[MAX_INPUTLINE];
-
-	Cvar_RegisterVariable (&registered);
-	Cvar_RegisterVariable (&cmdline);
-	Cvar_RegisterVariable(&cl_playermodel);
-	Cvar_RegisterAlias(&cl_playermodel, "_cl_playermodel");
-	Cvar_RegisterVariable(&cl_playerskin);
-	Cvar_RegisterAlias(&cl_playerskin, "_cl_playerskin");
 
 	// reconstitute the command line for the cmdline externally visible cvar
 	n = 0;
@@ -964,6 +957,16 @@ void COM_Init_Commands (void)
 	}
 	com_cmdline[n] = 0;
 	Cvar_SetQuick(&cmdline, com_cmdline);
+}
+
+void COM_Init_Commands (void)
+{
+	Cvar_RegisterVariable (&registered);
+	Cvar_RegisterVariable (&cmdline);
+	Cvar_RegisterVariable(&cl_playermodel);
+	Cvar_RegisterAlias(&cl_playermodel, "_cl_playermodel");
+	Cvar_RegisterVariable(&cl_playerskin);
+	Cvar_RegisterAlias(&cl_playerskin, "_cl_playerskin");
 }
 
 /*

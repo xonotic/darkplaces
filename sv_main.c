@@ -439,6 +439,11 @@ SV_Init
 */
 void SV_Init (void)
 {
+	sv_mempool = Mem_AllocPool("server", 0, NULL);
+}
+
+void SV_Init_Commands(void)
+{
 	// init the csqc progs cvars, since they are updated/used by the server code
 	// TODO: fix this since this is a quick hack to make some of [515]'s broken code run ;) [9/13/2006 Black]
 	extern cvar_t csqc_progname;	//[515]: csqc crc check and right csprogs name according to progs.dat
@@ -632,8 +637,6 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_mapformat_is_quake3);
 
 	SV_InitOperatorCommands();
-
-	sv_mempool = Mem_AllocPool("server", 0, NULL);
 }
 
 static void SV_SaveEntFile_f(cmd_state_t *cmd)

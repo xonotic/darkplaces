@@ -700,6 +700,11 @@ static void r_textures_devicerestored(void)
 
 void R_Textures_Init (void)
 {
+	R_RegisterModule("R_Textures", r_textures_start, r_textures_shutdown, r_textures_newmap, r_textures_devicelost, r_textures_devicerestored);
+}
+
+void R_Textures_Init_Commands(void)
+{
 	Cmd_AddCommand(CMD_CLIENT, "gl_texturemode", &GL_TextureMode_f, "set texture filtering mode (GL_NEAREST, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, etc); an additional argument 'force' forces the texture mode even in cases where it may not be appropriate");
 	Cmd_AddCommand(CMD_CLIENT, "r_texturestats", R_TextureStats_f, "print information about all loaded textures and some statistics");
 	Cvar_RegisterVariable (&gl_max_size);
@@ -728,8 +733,6 @@ void R_Textures_Init (void)
 	Cvar_RegisterVariable (&r_texture_dds_load_alphamode);
 	Cvar_RegisterVariable (&r_texture_dds_load_logfailure);
 	Cvar_RegisterVariable (&r_texture_dds_swdecode);
-
-	R_RegisterModule("R_Textures", r_textures_start, r_textures_shutdown, r_textures_newmap, r_textures_devicelost, r_textures_devicerestored);
 }
 
 void R_Textures_Frame (void)

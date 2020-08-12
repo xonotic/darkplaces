@@ -38,6 +38,7 @@ void BuildGammaTable8(float prescale, float gamma, float scale, float base, floa
 void BuildGammaTable16(float prescale, float gamma, float scale, float base, float contrastboost, unsigned short *out, int rampsize);
 
 void Palette_Init(void);
+void Palette_Init_Commands(void);
 
 #endif
 

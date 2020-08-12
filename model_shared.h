@@ -1099,6 +1099,7 @@ extern cvar_t mod_q3bsp_lightgrid_world_surfaces;
 extern cvar_t mod_q3bsp_lightgrid_bsp_surfaces;
 
 void Mod_Init (void);
+void Mod_Init_Commands (void);
 void Mod_Reload (void);
 dp_model_t *Mod_LoadModel(dp_model_t *mod, qboolean crash, qboolean checkdisk);
 dp_model_t *Mod_FindName (const char *name, const char *parentname);
@@ -1195,6 +1196,7 @@ qboolean Mod_AllocLightmap_Block(mod_alloclightmap_state_t *state, int blockwidt
 
 // bsp models
 void Mod_BrushInit(void);
+void Mod_BrushInit_Commands(void);
 // used for talking to the QuakeC mainly
 int Mod_Q1BSP_NativeContentsFromSuperContents(int supercontents);
 int Mod_Q1BSP_SuperContentsFromNativeContents(int nativecontents);
@@ -1241,6 +1243,7 @@ bih_t *Mod_MakeCollisionBIH(dp_model_t *model, qboolean userendersurfaces, bih_t
 struct frameblend_s;
 struct skeleton_s;
 void Mod_AliasInit(void);
+void Mod_AliasInit_Commands(void);
 int Mod_Alias_GetTagMatrix(const dp_model_t *model, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, int tagindex, matrix4x4_t *outmatrix);
 int Mod_Alias_GetTagIndexForName(const dp_model_t *model, unsigned int skin, const char *tagname);
 int Mod_Alias_GetExtendedTagInfoForIndex(const dp_model_t *model, unsigned int skin, const struct frameblend_s *frameblend, const struct skeleton_s *skeleton, int tagindex, int *parentindex, const char **tagname, matrix4x4_t *tag_localmatrix);
@@ -1248,7 +1251,7 @@ int Mod_Alias_GetExtendedTagInfoForIndex(const dp_model_t *model, unsigned int s
 void Mod_Skeletal_FreeBuffers(void);
 
 // sprite models
-void Mod_SpriteInit(void);
+void Mod_SpriteInit_Commands(void);
 
 // loaders
 void Mod_2PSB_Load(dp_model_t *mod, void *buffer, void *bufferend);

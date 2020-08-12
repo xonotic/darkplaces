@@ -1707,7 +1707,11 @@ Key_Init (void)
 {
 	Key_History_Init();
 	key_linepos = Key_ClearEditLine(true);
+}
 
+void
+Key_Init_Commands (void)
+{
 //
 // register our functions
 //

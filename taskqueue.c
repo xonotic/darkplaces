@@ -50,7 +50,7 @@ taskqueue_state_t;
 
 static taskqueue_state_t taskqueue_state;
 
-void TaskQueue_Init(void)
+void TaskQueue_Init_Commands(void)
 {
 	Cvar_RegisterVariable(&taskqueue_minthreads);
 	Cvar_RegisterVariable(&taskqueue_maxthreads);

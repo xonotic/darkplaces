@@ -77,6 +77,39 @@ static qboolean Mod_Q3BSP_TraceLineOfSight(struct model_s *model, const vec3_t s
 
 void Mod_BrushInit(void)
 {
+	// these games were made for older DP engines and are no longer
+	// maintained; use this hack to show their textures properly
+	if(gamemode == GAME_NEXUIZ)
+		Cvar_SetQuick(&mod_q3shader_force_addalpha, "1");
+
+	memset(&mod_q1bsp_texture_solid, 0, sizeof(mod_q1bsp_texture_solid));
+	strlcpy(mod_q1bsp_texture_solid.name, "solid" , sizeof(mod_q1bsp_texture_solid.name));
+	mod_q1bsp_texture_solid.surfaceflags = 0;
+	mod_q1bsp_texture_solid.supercontents = SUPERCONTENTS_SOLID;
+
+	mod_q1bsp_texture_sky = mod_q1bsp_texture_solid;
+	strlcpy(mod_q1bsp_texture_sky.name, "sky", sizeof(mod_q1bsp_texture_sky.name));
+	mod_q1bsp_texture_sky.surfaceflags = Q3SURFACEFLAG_SKY | Q3SURFACEFLAG_NOIMPACT | Q3SURFACEFLAG_NOMARKS | Q3SURFACEFLAG_NODLIGHT | Q3SURFACEFLAG_NOLIGHTMAP;
+	mod_q1bsp_texture_sky.supercontents = SUPERCONTENTS_SKY | SUPERCONTENTS_NODROP;
+
+	mod_q1bsp_texture_lava = mod_q1bsp_texture_solid;
+	strlcpy(mod_q1bsp_texture_lava.name, "*lava", sizeof(mod_q1bsp_texture_lava.name));
+	mod_q1bsp_texture_lava.surfaceflags = Q3SURFACEFLAG_NOMARKS;
+	mod_q1bsp_texture_lava.supercontents = SUPERCONTENTS_LAVA | SUPERCONTENTS_NODROP;
+
+	mod_q1bsp_texture_slime = mod_q1bsp_texture_solid;
+	strlcpy(mod_q1bsp_texture_slime.name, "*slime", sizeof(mod_q1bsp_texture_slime.name));
+	mod_q1bsp_texture_slime.surfaceflags = Q3SURFACEFLAG_NOMARKS;
+	mod_q1bsp_texture_slime.supercontents = SUPERCONTENTS_SLIME;
+
+	mod_q1bsp_texture_water = mod_q1bsp_texture_solid;
+	strlcpy(mod_q1bsp_texture_water.name, "*water", sizeof(mod_q1bsp_texture_water.name));
+	mod_q1bsp_texture_water.surfaceflags = Q3SURFACEFLAG_NOMARKS;
+	mod_q1bsp_texture_water.supercontents = SUPERCONTENTS_WATER;
+}
+
+void Mod_BrushInit_Commands(void)
+{
 //	Cvar_RegisterVariable(&r_subdivide_size);
 	Cvar_RegisterVariable(&mod_bsp_portalize);
 	Cvar_RegisterVariable(&r_novis);
@@ -116,36 +149,6 @@ void Mod_BrushInit(void)
 	Cvar_RegisterVariable(&mod_q3shader_force_terrain_alphaflag);
 	Cvar_RegisterVariable(&mod_q1bsp_polygoncollisions);
 	Cvar_RegisterVariable(&mod_recalculatenodeboxes);
-
-	// these games were made for older DP engines and are no longer
-	// maintained; use this hack to show their textures properly
-	if(gamemode == GAME_NEXUIZ)
-		Cvar_SetQuick(&mod_q3shader_force_addalpha, "1");
-
-	memset(&mod_q1bsp_texture_solid, 0, sizeof(mod_q1bsp_texture_solid));
-	strlcpy(mod_q1bsp_texture_solid.name, "solid" , sizeof(mod_q1bsp_texture_solid.name));
-	mod_q1bsp_texture_solid.surfaceflags = 0;
-	mod_q1bsp_texture_solid.supercontents = SUPERCONTENTS_SOLID;
-
-	mod_q1bsp_texture_sky = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_sky.name, "sky", sizeof(mod_q1bsp_texture_sky.name));
-	mod_q1bsp_texture_sky.surfaceflags = Q3SURFACEFLAG_SKY | Q3SURFACEFLAG_NOIMPACT | Q3SURFACEFLAG_NOMARKS | Q3SURFACEFLAG_NODLIGHT | Q3SURFACEFLAG_NOLIGHTMAP;
-	mod_q1bsp_texture_sky.supercontents = SUPERCONTENTS_SKY | SUPERCONTENTS_NODROP;
-
-	mod_q1bsp_texture_lava = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_lava.name, "*lava", sizeof(mod_q1bsp_texture_lava.name));
-	mod_q1bsp_texture_lava.surfaceflags = Q3SURFACEFLAG_NOMARKS;
-	mod_q1bsp_texture_lava.supercontents = SUPERCONTENTS_LAVA | SUPERCONTENTS_NODROP;
-
-	mod_q1bsp_texture_slime = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_slime.name, "*slime", sizeof(mod_q1bsp_texture_slime.name));
-	mod_q1bsp_texture_slime.surfaceflags = Q3SURFACEFLAG_NOMARKS;
-	mod_q1bsp_texture_slime.supercontents = SUPERCONTENTS_SLIME;
-
-	mod_q1bsp_texture_water = mod_q1bsp_texture_solid;
-	strlcpy(mod_q1bsp_texture_water.name, "*water", sizeof(mod_q1bsp_texture_water.name));
-	mod_q1bsp_texture_water.surfaceflags = Q3SURFACEFLAG_NOMARKS;
-	mod_q1bsp_texture_water.supercontents = SUPERCONTENTS_WATER;
 }
 
 static mleaf_t *Mod_BSP_PointInLeaf(dp_model_t *model, const vec3_t p)

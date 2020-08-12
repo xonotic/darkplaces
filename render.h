@@ -729,6 +729,7 @@ dp_font_t *FindFont(const char *title, qboolean allocate_new);
 void LoadFont(qboolean override, const char *name, dp_font_t *fnt, float scale, float voffset);
 
 void Render_Init(void);
+void Render_Init_Commands(void);
 
 // these are called by Render_Init
 void R_Textures_Init(void);
@@ -744,6 +745,18 @@ void Sbar_Init(void);
 void R_LightningBeams_Init(void);
 void Mod_RenderInit(void);
 void Font_Init(void);
+
+void R_Textures_Init_Commands(void);
+void GL_Draw_Init_Commands(void);
+void GL_Main_Init_Commands(void);
+void R_Shadow_Init_Commands(void);
+void R_Sky_Init_Commands(void);
+void R_Particles_Init_Commands(void);
+void R_Explosion_Init_Commands(void);
+void gl_backend_init_Commands(void);
+void Sbar_Init_Commands(void);
+void R_LightningBeams_Init_Commands(void);
+void Font_Init_Commands(void);
 
 qboolean R_CompileShader_CheckStaticParms(void);
 void R_GLSL_Restart_f(cmd_state_t *cmd);

@@ -64,6 +64,10 @@ void VID_Init(void)
 	InitSig(); // trap evil signals
 }
 
+void VID_Init_Commands(void)
+{
+}
+
 qboolean VID_InitMode(viddef_mode_t *mode)
 {
 	return false;

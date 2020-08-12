@@ -873,18 +873,26 @@ void Con_Init (void)
 	logqueue = (unsigned char *)Mem_Alloc (tempmempool, logq_size);
 	logq_ind = 0;
 
+	// support for the classic Quake option
+// COMMANDLINEOPTION: Console: -condebug logs console messages to qconsole.log, see also log_file
+	if (COM_CheckParm ("-condebug") != 0)
+		Cvar_SetQuick (&log_file, "qconsole.log");
+
+	con_initialized = true;
+	// initialize console window (only used by sys_win.c)
+	Sys_InitConsole();
+	
+	Con_Print("Console initialized.\n");
+}
+
+void Con_Init_Commands(void)
+{
 	Cvar_RegisterVariable (&sys_colortranslation);
 	Cvar_RegisterVariable (&sys_specialcharactertranslation);
 
 	Cvar_RegisterVariable (&log_file);
 	Cvar_RegisterVariable (&log_file_stripcolors);
 	Cvar_RegisterVariable (&log_dest_udp);
-
-	// support for the classic Quake option
-// COMMANDLINEOPTION: Console: -condebug logs console messages to qconsole.log, see also log_file
-	if (COM_CheckParm ("-condebug") != 0)
-		Cvar_SetQuick (&log_file, "qconsole.log");
-
 	// register our cvars
 	Cvar_RegisterVariable (&con_chat);
 	Cvar_RegisterVariable (&con_chatpos);
@@ -928,12 +936,6 @@ void Con_Init (void)
 	Cmd_AddCommand(CMD_SHARED, "clear", Con_Clear_f, "clear console history");
 	Cmd_AddCommand(CMD_SHARED, "maps", Con_Maps_f, "list information about available maps");
 	Cmd_AddCommand(CMD_SHARED, "condump", Con_ConDump_f, "output console history to a file (see also log_file)");
-
-	con_initialized = true;
-	// initialize console window (only used by sys_win.c)
-	Sys_InitConsole();
-	
-	Con_Print("Console initialized.\n");
 }
 
 void Con_Shutdown (void)

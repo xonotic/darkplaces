@@ -193,11 +193,14 @@ qboolean GL_ExtensionSupported(const char *name);
 
 void VID_Shared_Init(void);
 
+void VID_Shared_Init_Commands(void);
+
 void GL_Setup(void);
 
 void VID_ClearExtensions(void);
 
 void VID_Init (void);
+void VID_Init_Commands(void);
 // Called at startup
 
 void VID_Shutdown (void);

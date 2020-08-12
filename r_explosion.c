@@ -157,6 +157,14 @@ void R_Explosion_Init(void)
 #endif
 }
 
+void R_Explosion_Init_Commands(void)
+{
+	Cvar_RegisterVariable(&r_explosionclip);
+#ifdef MAX_EXPLOSIONS
+	Cvar_RegisterVariable(&r_drawexplosions);
+#endif
+}
+
 void R_NewExplosion(const vec3_t org)
 {
 #ifdef MAX_EXPLOSIONS

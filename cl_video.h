@@ -82,6 +82,7 @@ void		CL_PurgeOwner( int owner );
 
 void		CL_Video_Frame( void ); // update all videos
 void		CL_Video_Init( void );
+void		CL_Video_Init_Commands( void );
 void		CL_Video_Shutdown( void );
 
 // old interface

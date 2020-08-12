@@ -602,6 +602,42 @@ static void r_shadow_newmap(void)
 
 void R_Shadow_Init(void)
 {
+	Mem_ExpandableArray_NewArray(&r_shadow_worldlightsarray, r_main_mempool, sizeof(dlight_t), 128);
+	r_shadow_scenemaxlights = 0;
+	r_shadow_scenenumlights = 0;
+	r_shadow_scenelightlist = NULL;
+	maxshadowtriangles = 0;
+	shadowelements = NULL;
+	maxshadowvertices = 0;
+	shadowvertex3f = NULL;
+	maxvertexupdate = 0;
+	vertexupdate = NULL;
+	vertexremap = NULL;
+	vertexupdatenum = 0;
+	maxshadowmark = 0;
+	numshadowmark = 0;
+	shadowmark = NULL;
+	shadowmarklist = NULL;
+	shadowmarkcount = 0;
+	maxshadowsides = 0;
+	numshadowsides = 0;
+	shadowsides = NULL;
+	shadowsideslist = NULL;
+	r_shadow_buffer_numleafpvsbytes = 0;
+	r_shadow_buffer_visitingleafpvs = NULL;
+	r_shadow_buffer_leafpvs = NULL;
+	r_shadow_buffer_leaflist = NULL;
+	r_shadow_buffer_numsurfacepvsbytes = 0;
+	r_shadow_buffer_surfacepvs = NULL;
+	r_shadow_buffer_surfacelist = NULL;
+	r_shadow_buffer_surfacesides = NULL;
+	r_shadow_buffer_shadowtrispvs = NULL;
+	r_shadow_buffer_lighttrispvs = NULL;
+	R_RegisterModule("R_Shadow", r_shadow_start, r_shadow_shutdown, r_shadow_newmap, NULL, NULL);
+}
+
+void R_Shadow_Init_Commands(void)
+{
 	Cvar_RegisterVariable(&r_shadow_bumpscale_basetexture);
 	Cvar_RegisterVariable(&r_shadow_bumpscale_bumpmap);
 	Cvar_RegisterVariable(&r_shadow_usebihculling);
@@ -698,39 +734,8 @@ void R_Shadow_Init(void)
 	Cvar_RegisterVariable(&r_coronas_occlusionsizescale);
 	Cvar_RegisterVariable(&r_coronas_occlusionquery);
 	Cvar_RegisterVariable(&gl_flashblend);
+
 	R_Shadow_EditLights_Init();
-	Mem_ExpandableArray_NewArray(&r_shadow_worldlightsarray, r_main_mempool, sizeof(dlight_t), 128);
-	r_shadow_scenemaxlights = 0;
-	r_shadow_scenenumlights = 0;
-	r_shadow_scenelightlist = NULL;
-	maxshadowtriangles = 0;
-	shadowelements = NULL;
-	maxshadowvertices = 0;
-	shadowvertex3f = NULL;
-	maxvertexupdate = 0;
-	vertexupdate = NULL;
-	vertexremap = NULL;
-	vertexupdatenum = 0;
-	maxshadowmark = 0;
-	numshadowmark = 0;
-	shadowmark = NULL;
-	shadowmarklist = NULL;
-	shadowmarkcount = 0;
-	maxshadowsides = 0;
-	numshadowsides = 0;
-	shadowsides = NULL;
-	shadowsideslist = NULL;
-	r_shadow_buffer_numleafpvsbytes = 0;
-	r_shadow_buffer_visitingleafpvs = NULL;
-	r_shadow_buffer_leafpvs = NULL;
-	r_shadow_buffer_leaflist = NULL;
-	r_shadow_buffer_numsurfacepvsbytes = 0;
-	r_shadow_buffer_surfacepvs = NULL;
-	r_shadow_buffer_surfacelist = NULL;
-	r_shadow_buffer_surfacesides = NULL;
-	r_shadow_buffer_shadowtrispvs = NULL;
-	r_shadow_buffer_lighttrispvs = NULL;
-	R_RegisterModule("R_Shadow", r_shadow_start, r_shadow_shutdown, r_shadow_newmap, NULL, NULL);
 }
 
 matrix4x4_t matrix_attenuationxyz =

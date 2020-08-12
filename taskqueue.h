@@ -43,7 +43,7 @@ void TaskQueue_Setup(taskqueue_task_t *t, taskqueue_task_t *preceding, void(*fun
 // t->p[0] = array of taskqueue_task_t to check
 void TaskQueue_Task_CheckTasksDone(taskqueue_task_t *t);
 
-void TaskQueue_Init(void);
+void TaskQueue_Init_Commands(void);
 void TaskQueue_Shutdown(void);
 void TaskQueue_Frame(qboolean shutdown);
 

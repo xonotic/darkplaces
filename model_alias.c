@@ -189,6 +189,12 @@ static void Mod_Skeletal_AnimateVertices(const dp_model_t * RESTRICT model, cons
 void Mod_AliasInit (void)
 {
 	int i;
+	for (i = 0;i < 320;i++)
+		mod_md3_sin[i] = sin(i * M_PI * 2.0f / 256.0);
+}
+
+void Mod_AliasInit_Commands(void)
+{
 	Cvar_RegisterVariable(&r_skeletal_debugbone);
 	Cvar_RegisterVariable(&r_skeletal_debugbonecomponent);
 	Cvar_RegisterVariable(&r_skeletal_debugbonevalue);
@@ -197,8 +203,6 @@ void Mod_AliasInit (void)
 	Cvar_RegisterVariable(&r_skeletal_debugtranslatez);
 	Cvar_RegisterVariable(&mod_alias_supporttagscale);
 	Cvar_RegisterVariable(&mod_alias_force_animated);
-	for (i = 0;i < 320;i++)
-		mod_md3_sin[i] = sin(i * M_PI * 2.0f / 256.0);
 #ifdef SSE_POSSIBLE
 	if(Sys_HaveSSE())
 	{
