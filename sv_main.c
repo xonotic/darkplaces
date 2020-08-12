@@ -161,6 +161,9 @@ cvar_t teamplay = {CVAR_SERVER | CVAR_NOTIFY, "teamplay","0", "teamplay mode, va
 cvar_t timelimit = {CVAR_SERVER | CVAR_NOTIFY, "timelimit","0", "ends level at this time (in minutes)"};
 cvar_t sv_threaded = {CVAR_SERVER, "sv_threaded", "0", "enables a separate thread for server code, improving performance, especially when hosting a game while playing, EXPERIMENTAL, may be crashy"};
 
+cvar_t sv_rollspeed = {CVAR_CLIENT, "sv_rollspeed", "200", "how much strafing is necessary to tilt the view"};
+cvar_t sv_rollangle = {CVAR_CLIENT, "sv_rollangle", "2.0", "how much to tilt the view when strafing"};
+
 cvar_t saved1 = {CVAR_SERVER | CVAR_SAVE, "saved1", "0", "unused cvar in quake that is saved to config.cfg on exit, can be used by mods"};
 cvar_t saved2 = {CVAR_SERVER | CVAR_SAVE, "saved2", "0", "unused cvar in quake that is saved to config.cfg on exit, can be used by mods"};
 cvar_t saved3 = {CVAR_SERVER | CVAR_SAVE, "saved3", "0", "unused cvar in quake that is saved to config.cfg on exit, can be used by mods"};
@@ -582,6 +585,9 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&teamplay);
 	Cvar_RegisterVariable (&timelimit);
 	Cvar_RegisterVariable (&sv_threaded);
+
+	Cvar_RegisterVariable (&sv_rollangle);
+	Cvar_RegisterVariable (&sv_rollspeed);
 
 	Cvar_RegisterVariable (&saved1);
 	Cvar_RegisterVariable (&saved2);
@@ -2648,18 +2654,7 @@ static void SV_UpdateToReliableMessages (void)
 		//strlcpy (host_client->name, name, sizeof (host_client->name));
 		if (name != host_client->name) // prevent buffer overlap SIGABRT on Mac OSX
 			strlcpy (host_client->name, name, sizeof (host_client->name));
-		PRVM_serveredictstring(host_client->edict, netname) = PRVM_SetEngineString(prog, host_client->name);
-		if (strcmp(host_client->old_name, host_client->name))
-		{
-			if (host_client->begun)
-				SV_BroadcastPrintf("%s ^7changed name to %s\n", host_client->old_name, host_client->name);
-			strlcpy(host_client->old_name, host_client->name, sizeof(host_client->old_name));
-			// send notification to all clients
-			MSG_WriteByte (&sv.reliable_datagram, svc_updatename);
-			MSG_WriteByte (&sv.reliable_datagram, i);
-			MSG_WriteString (&sv.reliable_datagram, host_client->name);
-			SV_WriteNetnameIntoDemo(host_client);
-		}
+		SV_Name(i);
 
 		// DP_SV_CLIENTCOLORS
 		host_client->colors = (int)PRVM_serveredictfloat(host_client->edict, clientcolors);
@@ -3424,7 +3419,7 @@ void SV_SpawnServer (const char *map)
 		dpsnprintf (modelname, sizeof(modelname), "maps/%s", map);
 		if (!FS_FileExists(modelname))
 		{
-			Con_Printf("SpawnServer: no map file named maps/%s.bsp\n", map);
+			Con_Printf("SpawnServer: no map file named %s\n", modelname);
 			return;
 		}
 	}

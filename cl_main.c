@@ -569,6 +569,11 @@ void CL_EstablishConnection(const char *address, int firstarg)
 	}
 }
 
+static void CL_EstablishConnection_Local(void)
+{
+	CL_EstablishConnection("local:1", -2);
+}
+
 /*
 ==============
 CL_PrintEntities_f
@@ -2928,7 +2933,7 @@ void CL_Init (void)
 		S_Init();
 		CDAudio_Init();
 		Key_Init();
-
+		V_Init();
 
 		cls.levelmempool = Mem_AllocPool("client (per-level memory)", 0, NULL);
 		cls.permanentmempool = Mem_AllocPool("client (long term memory)", 0, NULL);
@@ -3048,6 +3053,8 @@ void CL_Init (void)
 		CL_MeshEntities_Init();
 
 		CL_Video_Init();
+
+		host.hook.ConnectLocal = CL_EstablishConnection_Local;
 
 		#ifdef CONFIG_MENU
 		Cbuf_InsertText(&cmd_client,"menu_start\n");

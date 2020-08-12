@@ -592,7 +592,7 @@ void VM_SV_MoveToGoal(prvm_prog_t *prog);
 
 void SV_ApplyClientMove (void);
 void SV_SaveSpawnparms (void);
-void SV_SpawnServer (const char *server);
+void SV_SpawnServer (const char *map);
 
 void SV_CheckVelocity (prvm_edict_t *ent);
 
@@ -610,7 +610,7 @@ void SV_StopThread(void);
 
 void VM_CustomStats_Clear(void);
 void VM_SV_UpdateCustomStats(client_t *client, prvm_edict_t *ent, sizebuf_t *msg, int *stats);
-
+void SV_Name(int clientnum);
 void SV_InitOperatorCommands(void);
 
 void SV_Savegame_to(prvm_prog_t *prog, const char *name);

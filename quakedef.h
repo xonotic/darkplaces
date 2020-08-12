@@ -548,6 +548,12 @@ typedef struct host_s
 	double sleeptime; // time spent sleeping overall
 	qboolean restless; // don't sleep
 	qboolean paused; // global paused state, pauses both client and server
+	cbuf_t *cbuf;
+
+	struct
+	{
+		void (*ConnectLocal)(void);
+	} hook;
 } host_t;
 
 extern host_t host;

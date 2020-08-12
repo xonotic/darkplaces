@@ -316,7 +316,7 @@ static void Host_AddConfigText(cmd_state_t *cmd)
 		Cbuf_InsertText(cmd, "alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec teu.rc\n");
 	else
 		Cbuf_InsertText(cmd, "alias startmap_sp \"map start\"\nalias startmap_dm \"map start\"\nexec " STARTCONFIGFILENAME "\n");
-	Cbuf_Execute(cmd);
+	Cbuf_Execute(cmd->cbuf);
 }
 
 /*
@@ -403,11 +403,8 @@ double Host_Frame(double time)
 
 	// process console commands
 //		R_TimeReport("preconsole");
-	Cbuf_Frame(&cmd_client);
-	Cbuf_Frame(&cmd_server);
 
-	if(sv.active)
-		Cbuf_Frame(&cmd_serverfromclient);
+	Cbuf_Frame(host.cbuf);
 
 //		R_TimeReport("console");
 
@@ -472,12 +469,12 @@ static inline double Host_UpdateTime (double newtime, double oldtime)
 	{
 		// warn if it's significant
 		if (time < -0.01)
-			Con_Printf(CON_WARN "Host_GetTime: time stepped backwards (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+			Con_Printf(CON_WARN "Host_UpdateTime: time stepped backwards (went from %f to %f, difference %f)\n", oldtime, newtime, time);
 		time = 0;
 	}
 	else if (time >= 1800)
 	{
-		Con_Printf(CON_WARN "Host_GetTime: time stepped forward (went from %f to %f, difference %f)\n", oldtime, newtime, time);
+		Con_Printf(CON_WARN "Host_UpdateTime: time stepped forward (went from %f to %f, difference %f)\n", oldtime, newtime, time);
 		time = 0;
 	}
 
@@ -662,9 +659,6 @@ static void Host_Init (void)
 	if (COM_CheckParm("-nostdout"))
 		sys_nostdout = 1;
 
-	// used by everything
-	Memory_Init();
-
 	// initialize console command/cvar/alias/command execution systems
 	Cmd_Init();
 
@@ -707,7 +701,6 @@ static void Host_Init (void)
 	Mod_Init();
 	World_Init();
 	SV_Init();
-	V_Init(); // some cvars needed by server player physics (cl_rollangle etc)
 	Host_InitLocal();
 	Host_ServerOptions();
 
@@ -736,14 +729,14 @@ static void Host_Init (void)
 	if (!FS_FileExists("quake.rc"))
 	{
 		Cbuf_InsertText(cmd, "exec default.cfg\nexec " CONFIGFILENAME "\nexec autoexec.cfg\n");
-		Cbuf_Execute(cmd);
+		Cbuf_Execute(cmd->cbuf);
 	}
 
 	host.state = host_active;
 
 	// run stuffcmds now, deferred previously because it can crash if a server starts that early
 	Cbuf_AddText(cmd,"stuffcmds\n");
-	Cbuf_Execute(cmd);
+	Cbuf_Execute(cmd->cbuf);
 
 	Log_Start();
 
@@ -757,7 +750,7 @@ static void Host_Init (void)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "timedemo %s\n", sys.argv[i + 1]));
-		Cbuf_Execute(&cmd_client);
+		Cbuf_Execute((&cmd_client)->cbuf);
 	}
 
 	// check for special demo mode
@@ -767,7 +760,7 @@ static void Host_Init (void)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\n", sys.argv[i + 1]));
-		Cbuf_Execute(&cmd_client);
+		Cbuf_Execute((&cmd_client)->cbuf);
 	}
 
 #ifdef CONFIG_VIDEO_CAPTURE
@@ -777,7 +770,7 @@ static void Host_Init (void)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 		Cbuf_AddText(&cmd_client, va(vabuf, sizeof(vabuf), "playdemo %s\ncl_capturevideo 1\n", sys.argv[i + 1]));
-		Cbuf_Execute(&cmd_client);
+		Cbuf_Execute((&cmd_client)->cbuf);
 	}
 #endif
 
@@ -785,7 +778,7 @@ static void Host_Init (void)
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
 	{
 		Cbuf_AddText(&cmd_client, "startmap_dm\n");
-		Cbuf_Execute(&cmd_client);
+		Cbuf_Execute((&cmd_client)->cbuf);
 	}
 
 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
@@ -793,7 +786,7 @@ static void Host_Init (void)
 #ifdef CONFIG_MENU
 		Cbuf_AddText(&cmd_client, "togglemenu 1\n");
 #endif
-		Cbuf_Execute(&cmd_client);
+		Cbuf_Execute((&cmd_client)->cbuf);
 	}
 
 	Con_DPrint("========Initialized=========\n");
