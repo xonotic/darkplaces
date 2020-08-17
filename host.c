@@ -737,9 +737,9 @@ static void Host_Init (void)
 		return;
 	}
 
-	Host_AddConfigText(cmd);
-
 	Host_StartVideo();
+
+	Host_AddConfigText(cmd);
 
 	// if quake.rc is missing, use default
 	if (!FS_FileExists("quake.rc"))
