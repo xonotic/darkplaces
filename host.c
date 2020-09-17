@@ -30,7 +30,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "sv_demo.h"
 #include "snd_main.h"
 #include "taskqueue.h"
-#include "thread.h"
 #include "utf8lib.h"
 
 /*
@@ -616,6 +615,9 @@ static void Host_Init (void)
 
 	host.state = host_init;
 
+	if (setjmp(host.abortframe)) // Huh?!
+		Sys_Error("Engine initialization failed. Check the console (if available) for additional information.\n");
+
 	if (Sys_CheckParm("-profilegameonly"))
 		Sys_AllowProfiling(false);
 
@@ -717,9 +719,6 @@ static void Host_Init (void)
 	// without crashing the whole game, so this should just be a short-time solution
 
 	// here comes the not so critical stuff
-	if (setjmp(host.abortframe)) {
-		return;
-	}
 
 	Host_AddConfigText(cmd);
 
