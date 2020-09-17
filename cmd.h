@@ -151,6 +151,36 @@ typedef struct cmd_state_s
 }
 cmd_state_t;
 
+typedef enum cmd_type_e
+{
+	cmdtype_command,
+	cmdtype_cvar,
+	cmdtype_alias
+} cmd_type_t;
+
+typedef struct cmd_object_s
+{
+	cmd_type_t type;
+	int flags;
+	void *object;
+	char *name;
+	char *description;
+} cmd_object_t;
+
+typedef struct cmd_s
+{
+	mempool_t *mempool;
+	
+	cmd_state_t state;
+	cmd_buf_t buffer;
+	cmd_object_t *objects;
+
+	int cmd_flagsmask;
+	int cvar_flagsmask;
+	int auto_flagsmask; // Automatically add command if it matches these flags...
+	xcommand_t *auto_function; // ...with this function.
+} cmd_t;
+
 typedef struct cmd_input_s
 {
 	llist_t list;
