@@ -431,7 +431,7 @@ extern cvar_t net_usesizelimit;
 extern cvar_t net_burstreserve;
 
 qbool NetConn_CanSend(netconn_t *conn);
-int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolversion_t protocol, int rate, int burstsize, qbool quakesignon_suppressreliables);
+int NetConn_Transmit(netconn_t *conn, sizebuf_t *data, protocolversion_t protocol, int rate, int burstsize, qbool quakesignon_suppressreliables);
 qbool NetConn_HaveClientPorts(void);
 qbool NetConn_HaveServerPorts(void);
 void NetConn_CloseClientPorts(void);

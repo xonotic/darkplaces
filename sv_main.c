@@ -1190,9 +1190,9 @@ void SV_DropClient(qbool crash)
 			buf.data = bufdata;
 			buf.maxsize = sizeof(bufdata);
 			MSG_WriteByte(&buf, svc_disconnect);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
-			NetConn_SendUnreliableMessage(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
+			NetConn_Transmit(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
+			NetConn_Transmit(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
+			NetConn_Transmit(host_client->netconnection, &buf, sv.protocol, 10000, 0, false);
 		}
 	}
 
@@ -2620,7 +2620,7 @@ static void SV_SendClientDatagram (client_t *client)
 	SV_WriteDemoMessage(client, &msg, false);
 
 // send the datagram
-	NetConn_SendUnreliableMessage (client->netconnection, &msg, sv.protocol, clientrate, client->rate_burstsize, client->sendsignon == 2);
+	NetConn_Transmit (client->netconnection, &msg, sv.protocol, clientrate, client->rate_burstsize, client->sendsignon == 2);
 	if (client->sendsignon == 1 && !client->netconnection->message.cursize)
 		client->sendsignon = 2; // prevent reliable until client sends prespawn (this is the keepalive phase)
 }

@@ -723,7 +723,7 @@ static int NetConn_AddCryptoFlag(crypto_t *crypto)
 	return flag;
 }
 
-int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolversion_t protocol, int rate, int burstsize, qbool quakesignon_suppressreliables)
+int NetConn_Transmit(netconn_t *conn, sizebuf_t *data, protocolversion_t protocol, int rate, int burstsize, qbool quakesignon_suppressreliables)
 {
 	int totallen = 0;
 	unsigned char sendbuffer[NET_HEADERSIZE+NET_MAXMESSAGE];
@@ -774,7 +774,7 @@ int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolvers
 		}
 		if (packetLen + (sendreliable ? conn->sendMessageLength : 0) > 1400)
 		{
-			Con_Printf ("NetConn_SendUnreliableMessage: reliable message too big %u\n", data->cursize);
+			Con_Printf ("NetConn_Transmit: reliable message too big %u\n", data->cursize);
 			return -1;
 		}
 
@@ -849,7 +849,7 @@ int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolvers
 		{
 			if (conn->message.cursize > (int)sizeof(conn->sendMessage))
 			{
-				Con_Printf("NetConn_SendUnreliableMessage: reliable message too big (%u > %u)\n", conn->message.cursize, (int)sizeof(conn->sendMessage));
+				Con_Printf("NetConn_Transmit: reliable message too big (%u > %u)\n", conn->message.cursize, (int)sizeof(conn->sendMessage));
 				conn->message.overflowed = true;
 				return -1;
 			}
@@ -903,7 +903,7 @@ int NetConn_SendUnreliableMessage(netconn_t *conn, sizebuf_t *data, protocolvers
 
 			if (packetLen > (int)sizeof(sendbuffer))
 			{
-				Con_Printf("NetConn_SendUnreliableMessage: message too big %u\n", data->cursize);
+				Con_Printf("NetConn_Transmit: message too big %u\n", data->cursize);
 				return -1;
 			}
 
@@ -1559,7 +1559,7 @@ static void NetConn_ConnectionEstablished(lhnetsocket_t *mysocket, lhnetaddress_
 		msg.data = buf;
 		msg.maxsize = sizeof(buf);
 		MSG_WriteChar(&msg, clc_nop);
-		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, 0, false);
+		NetConn_Transmit(cls.netcon, &msg, cls.protocol, 10000, 0, false);
 	}
 }
 

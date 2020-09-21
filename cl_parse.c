@@ -368,7 +368,7 @@ void CL_KeepaliveMessage (qbool readmessages)
 		msg.data = buf;
 		msg.maxsize = sizeof(buf);
 		MSG_WriteChar(&msg, clc_nop);
-		NetConn_SendUnreliableMessage(cls.netcon, &msg, cls.protocol, 10000, 0, false);
+		NetConn_Transmit(cls.netcon, &msg, cls.protocol, 10000, 0, false);
 	}
 
 	recursive = thisrecursive;
