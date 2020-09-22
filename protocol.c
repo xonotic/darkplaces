@@ -321,7 +321,7 @@ protocol_t *Protocol_ForName(const char *name)
 	int i;
 	for(i = 0; &protocols[i]; i++)
 	{
-		if(!strncmp(name, protocols[i]->name, strlen(protocols[i]->name)))
+		if(!strncmp(name, protocols[i]->name, strlen(name)))
 			break;
 	}
 	return protocols[i];
