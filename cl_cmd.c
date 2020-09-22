@@ -64,10 +64,8 @@ void CL_ForwardToServer (const char *s)
 	// LadyHavoc: thanks to Fuh for bringing the pure evil of SZ_Print to my
 	// attention, it has been eradicated from here, its only (former) use in
 	// all of darkplaces.
-	if (cls.protocol == &protocol_quakeworld)
-		MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
-	else
-		MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+	MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+
 	if ((!strncmp(s, "say ", 4) || !strncmp(s, "say_team ", 9)) && cl_locs_enable.integer)
 	{
 		// say/say_team commands can replace % character codes with status info
