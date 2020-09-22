@@ -794,7 +794,7 @@ void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int n
 	}
 	else
 		MSG_WriteShort (dest, (ent<<3) | channel);
-	if ((field_mask & SND_LARGESOUND) || sv.protocol == &protocol_nehahrabjp2)
+	if ((field_mask & SND_LARGESOUND) || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 		MSG_WriteShort (dest, sound_num);
 	else
 		MSG_WriteByte (dest, sound_num);
@@ -3015,7 +3015,7 @@ SV_ModelIndex
 */
 int SV_ModelIndex(const char *s, int precachemode)
 {
-	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3) ? 256 : MAX_MODELS);
+	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie) ? 256 : MAX_MODELS);
 	char filename[MAX_QPATH];
 	if (!s || !*s)
 		return 0;
@@ -3078,7 +3078,7 @@ SV_SoundIndex
 */
 int SV_SoundIndex(const char *s, int precachemode)
 {
-	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3) ? 256 : MAX_SOUNDS);
+	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp) ? 256 : MAX_SOUNDS);
 	char filename[MAX_QPATH];
 	if (!s || !*s)
 		return 0;

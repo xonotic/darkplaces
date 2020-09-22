@@ -59,7 +59,7 @@ static void Netmsg_svc_setview (protocol_t *protocol)		// [short] entity number
 
 static void Netmsg_svc_sound (protocol_t *protocol)			// <see code>
 {
-	CL_ParseStartSoundPacket(false);
+	CL_ParseStartSoundPacket(protocol == &protocol_nehahrabjp2 || protocol == &protocol_nehahrabjp3 ? true : false);
 }
 
 static void Netmsg_svc_time (protocol_t *protocol)			// [float] server time
@@ -255,7 +255,7 @@ static void Netmsg_svc_foundsecret (protocol_t *protocol)
 
 static void Netmsg_svc_spawnstaticsound (protocol_t *protocol)
 {
-	CL_ParseStaticSound (false);
+	CL_ParseStaticSound (protocol == &protocol_nehahrabjp2 || protocol == &protocol_nehahrabjp3 ? true : false);
 }
 
 static void Netmsg_svc_intermission (protocol_t *protocol)

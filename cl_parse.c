@@ -2170,7 +2170,7 @@ void CL_ParseStaticSound (int large)
 	int			sound_num, vol, atten;
 
 	cls.protocol->ReadVector(&cl_message, org);
-	if (large || cls.protocol == &protocol_nehahrabjp2)
+	if (large)
 		sound_num = (unsigned short) MSG_ReadShort(&cl_message);
 	else
 		sound_num = MSG_ReadByte(&cl_message);
