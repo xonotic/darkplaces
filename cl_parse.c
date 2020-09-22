@@ -1580,7 +1580,8 @@ void CL_ParseServerInfo (void)
 		return;
 	}
 	// hack for unmarked Nehahra movie demos which had a custom protocol
-	if (protocol == &protocol_quakedp && cls.demoplayback && gamemode == GAME_NEHAHRA)
+	// FIXME: Remove hack once we get some .fmf-like system going?
+	if (protocol->num == PROTOCOL_QUAKE && cls.demoplayback && gamemode == GAME_NEHAHRA)
 		protocol = &protocol_nehahramovie;
 	cls.protocol = protocol;
 	Con_Printf("Server protocol is %s\n", protocol->name);

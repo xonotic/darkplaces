@@ -31,10 +31,12 @@ static void Netmsg_svc_updatestat (protocol_t *protocol)
 static void Netmsg_svc_version (protocol_t *protocol)		// [int] server version
 {
 	int i = MSG_ReadLong(&cl_message);
-	if (!Protocol_ForNumber(i))
+	protocol = Protocol_ForNumber(i);
+	if (!protocol)
 		Host_Error("CL_ParseServerMessage: Server is unrecognized protocol number (%i)", i);
 	// hack for unmarked Nehahra movie demos which had a custom protocol
-	if (protocol == &protocol_quakedp && cls.demoplayback && gamemode == GAME_NEHAHRA)
+	// FIXME: Remove hack once we get some .fmf-like system going?
+	if (protocol->num == PROTOCOL_QUAKE && cls.demoplayback && gamemode == GAME_NEHAHRA)
 		protocol = &protocol_nehahramovie;
 	cls.protocol = protocol;
 }
