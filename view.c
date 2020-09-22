@@ -268,7 +268,7 @@ void V_ParseDamage (void)
 
 	armor = MSG_ReadByte(&cl_message);
 	blood = MSG_ReadByte(&cl_message);
-	MSG_ReadVector(&cl_message, from, cls.protocol);
+	cls.protocol->ReadVector(&cl_message, from);
 
 	// Send the Dmg Globals to CSQC
 	CL_VM_UpdateDmgGlobals(blood, armor, from);
@@ -523,7 +523,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	if (clintermission)
 	{
 		// entity is a fixed camera, just copy the matrix
-		if (cls.protocol == PROTOCOL_QUAKEWORLD)
+		if (cls.protocol == &protocol_quakeworld)
 			Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.qw_intermission_origin[0], cl.qw_intermission_origin[1], cl.qw_intermission_origin[2], cl.qw_intermission_angles[0], cl.qw_intermission_angles[1], cl.qw_intermission_angles[2], 1);
 		else
 		{

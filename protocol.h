@@ -22,12 +22,81 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
-// protocolversion_t is defined in common.h
+enum
+{
+	PROTOCOL_UNKNOWN,
+	PROTOCOL_QUAKE = 15, ///< quake (aka netquake/normalquake/nq) protocol
+	PROTOCOL_QUAKEDP = 15, ///< darkplaces extended quake protocol (used by TomazQuake and others), backwards compatible as long as no extended features are used
+	PROTOCOL_QUAKEWORLD = 28, ///< quakeworld protocol
+	PROTOCOL_DARKPLACES1 = 96, ///< uses EntityFrame entity snapshot encoder/decoder which is a QuakeWorld-like entity snapshot delta compression method
+	PROTOCOL_DARKPLACES2 = 97, ///< various changes
+	PROTOCOL_NEHAHRAMOVIE = 250, ///< Nehahra movie protocol, a big nasty hack dating back to early days of the Quake Standards Group (but only ever used by neh_gl.exe), this is potentially backwards compatible with quake protocol as long as no extended features are used (but in actuality the neh_gl.exe which wrote this protocol ALWAYS wrote the extended information)
+	PROTOCOL_DARKPLACES3 = 3500, ///< uses EntityFrame4 entity snapshot encoder/decoder which is broken, this attempted to do partial snapshot updates on a QuakeWorld-like protocol, but it is broken and impossible to fix
+	PROTOCOL_DARKPLACES4 = 3501, ///< various changes
+	PROTOCOL_DARKPLACES5 = 3502, ///< uses EntityFrame5 entity snapshot encoder/decoder which is based on a Tribes networking article at http://www.garagegames.com/articles/networking1/
+	PROTOCOL_DARKPLACES6 = 3503, ///< various changes
+	PROTOCOL_DARKPLACES7 = 3504, ///< added QuakeWorld-style movement protocol to allow more consistent prediction
+	PROTOCOL_NEHAHRABJP = 10000, ///< same as QUAKEDP but with 16bit modelindex
+	PROTOCOL_NEHAHRABJP2 = 10001, ///< same as NEHAHRABJP but with 16bit soundindex
+	PROTOCOL_NEHAHRABJP3 = 10002 ///< same as NEHAHRABJP2 but with some changes
+};
 
-protocolversion_t Protocol_EnumForName(const char *s);
-const char *Protocol_NameForEnum(protocolversion_t p);
-protocolversion_t Protocol_EnumForNumber(int n);
-int Protocol_NumberForEnum(protocolversion_t p);
+typedef struct protocol_netmsg_s protocol_netmsg_t;
+typedef struct protocol_s protocol_t;
+
+struct protocol_s
+{
+	const char *name;
+	const int num;
+
+	void (*WriteCoord)(sizebuf_t *, float);
+	void (*WriteAngle)(sizebuf_t *, float);
+	void (*WriteVector)(sizebuf_t *, const vec3_t);
+	float (*ReadCoord)(sizebuf_t *);
+	float (*ReadAngle)(sizebuf_t *);
+	void (*ReadVector)(sizebuf_t *, vec3_t);
+
+	// TODO: Other info?
+	const int max_svcmsg;
+	struct protocol_netmsg_s *svcmsg;
+	const int max_clcmsg;
+	struct protocol_netmsg_s *clcmsg;
+};
+
+struct protocol_netmsg_s
+{
+	const char *name;
+	void (*func)(struct protocol_s *);
+};
+
+typedef struct protocol_s protocol_t;
+typedef struct protocol_netmsg_s protocol_netmsg_t;
+
+extern protocol_t protocol_netquake;
+extern protocol_t protocol_quakedp;
+extern protocol_t protocol_quakeworld;
+extern protocol_t protocol_dpp1;
+extern protocol_t protocol_dpp2;
+extern protocol_t protocol_dpp3;
+extern protocol_t protocol_dpp4;
+extern protocol_t protocol_dpp5;
+extern protocol_t protocol_dpp6;
+extern protocol_t protocol_dpp7;
+extern protocol_t protocol_nehahramovie;
+extern protocol_t protocol_nehahrabjp;
+extern protocol_t protocol_nehahrabjp2;
+extern protocol_t protocol_nehahrabjp3;
+
+extern protocol_netmsg_t netmsg_nq_svc[];
+extern protocol_netmsg_t netmsg_qw_svc[];
+extern protocol_netmsg_t netmsg_dpext_svc[];
+extern protocol_netmsg_t netmsg_base_clc[];
+
+#define PF_PREDICTION (1<<0)
+#define PF_MOVE_CROUCH (1<<1)
+
+protocol_t *Protocol_ForName(const char *name);
+protocol_t *Protocol_ForNumber(int num);
 void Protocol_Names(char *buffer, size_t buffersize);
 
 #define ENTITYSIZEPROFILING_START(msg, num, flags) \
@@ -278,9 +347,12 @@ void Protocol_Names(char *buffer, size_t buffersize);
 //
 #define	clc_bad			0
 #define	clc_nop 		1
-#define	clc_disconnect	2
-#define	clc_move		3			// [usercmd_t]
+#define	clc_disconnect	2		// (NETQUAKE)
+#define	clc_move		3		// [usercmd_t]
 #define	clc_stringcmd	4		// [string] message
+#define clc_delta		5		// (QUAKEWORLD) [byte] sequence number, requests delta compression of message
+#define clc_tmove		6		// (QUAKEWORLD) teleport request, spectator only
+#define clc_upload		7		// (QUAKEWORLD) teleport request, spectator only
 
 // LadyHavoc: my clc_ range, 50-59
 #define clc_ackframe	50		// [int] framenumber
@@ -453,7 +525,7 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 void EntityFrameQuake_ISeeDeadEntities(void);
 
 /*
-PROTOCOL_DARKPLACES3
+&protocol_dpp3
 server updates entities according to some (unmentioned) scheme.
 
 a frame consists of all visible entities, some of which are up to date,
@@ -485,7 +557,7 @@ if server receives ack message in put packet it performs these steps:
 */
 
 /*
-PROTOCOL_DARKPLACES4
+&protocol_dpp4
 a frame consists of some visible entities in a range (this is stored as start and end, note that end may be less than start if it wrapped).
 
 these entities are stored in a range (firstentity/endentity) of structs in the entitydata[] buffer.
@@ -906,15 +978,7 @@ extern cvar_t developer_networkentities;
 #define qw_svc_setinfo			51		// setinfo on a client
 #define qw_svc_serverinfo		52		// serverinfo
 #define qw_svc_updatepl			53		// [byte] [byte]
-// QUAKEWORLD
-// client to server
-#define qw_clc_bad			0
-#define qw_clc_nop			1
-#define qw_clc_move			3		// [[usercmd_t]
-#define qw_clc_stringcmd	4		// [string] message
-#define qw_clc_delta		5		// [byte] sequence number, requests delta compression of message
-#define qw_clc_tmove		6		// teleport request, spectator only
-#define qw_clc_upload		7		// teleport request, spectator only
+
 // QUAKEWORLD
 // playerinfo flags from server
 // playerinfo always sends: playernum, flags, origin[] and framenumber

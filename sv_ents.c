@@ -84,7 +84,7 @@ void EntityState_WriteExtendBits(sizebuf_t *msg, unsigned int bits)
 
 void EntityState_WriteFields(const entity_state_t *ent, sizebuf_t *msg, unsigned int bits)
 {
-	if (sv.protocol == PROTOCOL_DARKPLACES2)
+	if (sv.protocol == &protocol_dpp2)
 	{
 		if (bits & E_ORIGIN1)
 			MSG_WriteCoord16i(msg, ent->origin[0]);
@@ -117,7 +117,7 @@ void EntityState_WriteFields(const entity_state_t *ent, sizebuf_t *msg, unsigned
 				MSG_WriteCoord32f(msg, ent->origin[2]);
 		}
 	}
-	if ((sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4) && (ent->flags & RENDER_LOWPRECISION))
+	if ((sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4) && (ent->flags & RENDER_LOWPRECISION))
 	{
 		if (bits & E_ANGLE1)
 			MSG_WriteAngle8i(msg, ent->angles[0]);
@@ -159,7 +159,7 @@ void EntityState_WriteFields(const entity_state_t *ent, sizebuf_t *msg, unsigned
 		MSG_WriteByte(msg, ent->glowsize);
 	if (bits & E_GLOWCOLOR)
 		MSG_WriteByte(msg, ent->glowcolor);
-	if (sv.protocol == PROTOCOL_DARKPLACES2)
+	if (sv.protocol == &protocol_dpp2)
 		if (bits & E_FLAGS)
 			MSG_WriteByte(msg, ent->flags);
 	if (bits & E_TAGATTACHMENT)

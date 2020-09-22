@@ -863,7 +863,7 @@ typedef struct client_static_s
 	lhnetaddress_t rcon_address;
 	// protocol version of the server we're connected to
 	// (kept outside client_state_t because it's used between levels)
-	protocolversion_t protocol;
+	protocol_t *protocol;
 
 #define MAX_RCONS 16
 	int rcon_trying;
@@ -1452,6 +1452,8 @@ typedef struct client_state_s
 
 	// used by EntityState5_ReadUpdate
 	skeleton_t *engineskeletonobjects;
+
+	qbool qwplayerupdatereceived;
 }
 client_state_t;
 

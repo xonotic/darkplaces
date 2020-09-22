@@ -1809,7 +1809,7 @@ static float Sbar_PrintScoreboardItem(scoreboard_t *s, float x, float y)
 		if((s->colors & 15) == (cl.scores[cl.playerentity - 1].colors & 15))
 			myself = true;
 
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 	{
 		if (s->qw_spectator)
 		{
@@ -1874,12 +1874,12 @@ void Sbar_DeathmatchOverlay (void)
 	if (cl.last_ping_request < host.realtime - 2 && cls.netcon)
 	{
 		cl.last_ping_request = host.realtime;
-		if (cls.protocol == PROTOCOL_QUAKEWORLD)
+		if (cls.protocol == &protocol_quakeworld)
 		{
-			MSG_WriteByte(&cls.netcon->message, qw_clc_stringcmd);
+			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
 			MSG_WriteString(&cls.netcon->message, "pings");
 		}
-		else if (cls.protocol == PROTOCOL_QUAKE || cls.protocol == PROTOCOL_QUAKEDP || cls.protocol == PROTOCOL_NEHAHRAMOVIE || cls.protocol == PROTOCOL_NEHAHRABJP || cls.protocol == PROTOCOL_NEHAHRABJP2 || cls.protocol == PROTOCOL_NEHAHRABJP3 || cls.protocol == PROTOCOL_DARKPLACES1 || cls.protocol == PROTOCOL_DARKPLACES2 || cls.protocol == PROTOCOL_DARKPLACES3 || cls.protocol == PROTOCOL_DARKPLACES4 || cls.protocol == PROTOCOL_DARKPLACES5 || cls.protocol == PROTOCOL_DARKPLACES6/* || cls.protocol == PROTOCOL_DARKPLACES7*/)
+		else if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5 || cls.protocol == &protocol_dpp6/* || cls.protocol == &protocol_dpp7*/)
 		{
 			// these servers usually lack the pings command and so a less efficient "ping" command must be sent, which on modern DP servers will also reply with a pingplreport command after the ping listing
 			static int ping_anyway_counter = 0;
@@ -1911,7 +1911,7 @@ void Sbar_DeathmatchOverlay (void)
 	ymin = 8;
 	ymax = 40 + 8 + (Sbar_IsTeammatch() ? (teamlines * 8 + 5): 0) + scoreboardlines * 8 - 1;
 
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 		xmin = (int) (vid_conwidth.integer - (26 + 15) * 8 * FONT_SBAR->maxwidth) / 2; // 26 characters until name, then we assume 15 character names (they can be longer but usually aren't)
 	else
 		xmin = (int) (vid_conwidth.integer - (16 + 25) * 8 * FONT_SBAR->maxwidth) / 2; // 16 characters until name, then we assume 25 character names (they can be longer but usually aren't)
@@ -1924,7 +1924,7 @@ void Sbar_DeathmatchOverlay (void)
 
 	// draw the text
 	y = 40;
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 	{
 		DrawQ_String(xmin, y, va(vabuf, sizeof(vabuf), "ping pl%% time frags team  name"), 0, 8, 8, 1, 1, 1, 1 * sbar_alpha_fg.value, 0, NULL, false, FONT_SBAR );
 	}

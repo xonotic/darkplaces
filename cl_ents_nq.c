@@ -9,7 +9,7 @@ void EntityFrameQuake_ReadEntity(int bits)
 
 	if (bits & U_MOREBITS)
 		bits |= (MSG_ReadByte(&cl_message)<<8);
-	if ((bits & U_EXTEND1) && cls.protocol != PROTOCOL_NEHAHRAMOVIE)
+	if ((bits & U_EXTEND1) && cls.protocol != &protocol_nehahramovie)
 	{
 		bits |= MSG_ReadByte(&cl_message) << 16;
 		if (bits & U_EXTEND2)
@@ -54,7 +54,7 @@ void EntityFrameQuake_ReadEntity(int bits)
 	s.flags = 0;
 	if (bits & U_MODEL)
 	{
-		if (cls.protocol == PROTOCOL_NEHAHRABJP || cls.protocol == PROTOCOL_NEHAHRABJP2 || cls.protocol == PROTOCOL_NEHAHRABJP3)
+		if (cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3)
 							s.modelindex = (unsigned short) MSG_ReadShort(&cl_message);
 		else
 							s.modelindex = (s.modelindex & 0xFF00) | MSG_ReadByte(&cl_message);
@@ -63,12 +63,12 @@ void EntityFrameQuake_ReadEntity(int bits)
 	if (bits & U_COLORMAP)	s.colormap = MSG_ReadByte(&cl_message);
 	if (bits & U_SKIN)		s.skin = MSG_ReadByte(&cl_message);
 	if (bits & U_EFFECTS)	s.effects = (s.effects & 0xFF00) | MSG_ReadByte(&cl_message);
-	if (bits & U_ORIGIN1)	s.origin[0] = MSG_ReadCoord(&cl_message, cls.protocol);
-	if (bits & U_ANGLE1)	s.angles[0] = MSG_ReadAngle(&cl_message, cls.protocol);
-	if (bits & U_ORIGIN2)	s.origin[1] = MSG_ReadCoord(&cl_message, cls.protocol);
-	if (bits & U_ANGLE2)	s.angles[1] = MSG_ReadAngle(&cl_message, cls.protocol);
-	if (bits & U_ORIGIN3)	s.origin[2] = MSG_ReadCoord(&cl_message, cls.protocol);
-	if (bits & U_ANGLE3)	s.angles[2] = MSG_ReadAngle(&cl_message, cls.protocol);
+	if (bits & U_ORIGIN1)	s.origin[0] = cls.protocol->ReadCoord(&cl_message);
+	if (bits & U_ANGLE1)	s.angles[0] = cls.protocol->ReadAngle(&cl_message);
+	if (bits & U_ORIGIN2)	s.origin[1] = cls.protocol->ReadCoord(&cl_message);
+	if (bits & U_ANGLE2)	s.angles[1] = cls.protocol->ReadAngle(&cl_message);
+	if (bits & U_ORIGIN3)	s.origin[2] = cls.protocol->ReadCoord(&cl_message);
+	if (bits & U_ANGLE3)	s.angles[2] = cls.protocol->ReadAngle(&cl_message);
 	if (bits & U_STEP)		s.flags |= RENDER_STEP;
 	if (bits & U_ALPHA)		s.alpha = MSG_ReadByte(&cl_message);
 	if (bits & U_SCALE)		s.scale = MSG_ReadByte(&cl_message);
@@ -83,7 +83,7 @@ void EntityFrameQuake_ReadEntity(int bits)
 	if (bits & U_EXTERIORMODEL)	s.flags |= RENDER_EXTERIORMODEL;
 
 	// LadyHavoc: to allow playback of the Nehahra movie
-	if (cls.protocol == PROTOCOL_NEHAHRAMOVIE && (bits & U_EXTEND1))
+	if (cls.protocol == &protocol_nehahramovie && (bits & U_EXTEND1))
 	{
 		// LadyHavoc: evil format
 		int i = (int)MSG_ReadFloat(&cl_message);

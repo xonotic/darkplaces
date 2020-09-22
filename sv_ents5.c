@@ -516,7 +516,7 @@ qbool EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_database
 
 	packetlog = NULL;
 	// write stat updates
-	if (sv.protocol != PROTOCOL_QUAKE && sv.protocol != PROTOCOL_QUAKEDP && sv.protocol != PROTOCOL_NEHAHRAMOVIE && sv.protocol != PROTOCOL_NEHAHRABJP && sv.protocol != PROTOCOL_NEHAHRABJP2 && sv.protocol != PROTOCOL_NEHAHRABJP3 && sv.protocol != PROTOCOL_DARKPLACES1 && sv.protocol != PROTOCOL_DARKPLACES2 && sv.protocol != PROTOCOL_DARKPLACES3 && sv.protocol != PROTOCOL_DARKPLACES4 && sv.protocol != PROTOCOL_DARKPLACES5)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5)
 	{
 		for (i = 0;i < MAX_CL_STATS && msg->cursize + 6 + 11 <= maxsize;i++)
 		{
@@ -569,7 +569,7 @@ qbool EntityFrame5_WriteFrame(sizebuf_t *msg, int maxsize, entityframe5_database
 	d->latestframenum = framenum;
 	MSG_WriteByte(msg, svc_entities);
 	MSG_WriteLong(msg, framenum);
-	if (sv.protocol != PROTOCOL_QUAKE && sv.protocol != PROTOCOL_QUAKEDP && sv.protocol != PROTOCOL_NEHAHRAMOVIE && sv.protocol != PROTOCOL_DARKPLACES1 && sv.protocol != PROTOCOL_DARKPLACES2 && sv.protocol != PROTOCOL_DARKPLACES3 && sv.protocol != PROTOCOL_DARKPLACES4 && sv.protocol != PROTOCOL_DARKPLACES5 && sv.protocol != PROTOCOL_DARKPLACES6)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5 && sv.protocol != &protocol_dpp6)
 		MSG_WriteLong(msg, movesequence);
 	for (priority = ENTITYFRAME5_PRIORITYLEVELS - 1;priority >= 0 && packetlog->numstates < ENTITYFRAME5_MAXSTATES;priority--)
 	{

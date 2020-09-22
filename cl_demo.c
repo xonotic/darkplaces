@@ -443,7 +443,7 @@ void CL_PlayDemo_f(cmd_state_t *cmd)
 	// update networking ports (this is mainly just needed at startup)
 	NetConn_UpdateSockets();
 
-	cls.protocol = PROTOCOL_QUAKE;
+	cls.protocol = &protocol_netquake;
 
 	Con_Printf("Playing demo %s.\n", name);
 	cls.demofile = f;

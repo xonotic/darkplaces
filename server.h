@@ -85,7 +85,7 @@ typedef struct server_s
 	qbool loadgame;
 
 	/// one of the PROTOCOL_ values
-	protocolversion_t protocol;
+	protocol_t *protocol;
 
 	double time;
 

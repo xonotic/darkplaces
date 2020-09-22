@@ -1663,14 +1663,14 @@ static void VM_CL_ReadLong (prvm_prog_t *prog)
 static void VM_CL_ReadCoord (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(0, VM_CL_ReadCoord);
-	PRVM_G_FLOAT(OFS_RETURN) = MSG_ReadCoord(&cl_message, cls.protocol);
+	PRVM_G_FLOAT(OFS_RETURN) = cls.protocol->ReadCoord(&cl_message);
 }
 
 //#365 float() readangle (EXT_CSQC)
 static void VM_CL_ReadAngle (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(0, VM_CL_ReadAngle);
-	PRVM_G_FLOAT(OFS_RETURN) = MSG_ReadAngle(&cl_message, cls.protocol);
+	PRVM_G_FLOAT(OFS_RETURN) = cls.protocol->ReadAngle(&cl_message);
 }
 
 //#366 string() readstring (EXT_CSQC)

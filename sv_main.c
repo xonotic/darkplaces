@@ -670,9 +670,7 @@ void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count)
 	if (sv.datagram.cursize > MAX_PACKETFRAGMENT-18)
 		return;
 	MSG_WriteByte (&sv.datagram, svc_particle);
-	MSG_WriteCoord (&sv.datagram, org[0], sv.protocol);
-	MSG_WriteCoord (&sv.datagram, org[1], sv.protocol);
-	MSG_WriteCoord (&sv.datagram, org[2], sv.protocol);
+	sv.protocol->WriteVector(&sv.datagram, org);
 	for (i=0 ; i<3 ; i++)
 		MSG_WriteChar (&sv.datagram, (int)bound(-128, dir[i]*16, 127));
 	MSG_WriteByte (&sv.datagram, count);
@@ -694,9 +692,7 @@ void SV_StartEffect (vec3_t org, int modelindex, int startframe, int framecount,
 		if (sv.datagram.cursize > MAX_PACKETFRAGMENT-19)
 			return;
 		MSG_WriteByte (&sv.datagram, svc_effect2);
-		MSG_WriteCoord (&sv.datagram, org[0], sv.protocol);
-		MSG_WriteCoord (&sv.datagram, org[1], sv.protocol);
-		MSG_WriteCoord (&sv.datagram, org[2], sv.protocol);
+		sv.protocol->WriteVector(&sv.datagram, org);
 		MSG_WriteShort (&sv.datagram, modelindex);
 		MSG_WriteShort (&sv.datagram, startframe);
 		MSG_WriteByte (&sv.datagram, framecount);
@@ -707,9 +703,7 @@ void SV_StartEffect (vec3_t org, int modelindex, int startframe, int framecount,
 		if (sv.datagram.cursize > MAX_PACKETFRAGMENT-17)
 			return;
 		MSG_WriteByte (&sv.datagram, svc_effect);
-		MSG_WriteCoord (&sv.datagram, org[0], sv.protocol);
-		MSG_WriteCoord (&sv.datagram, org[1], sv.protocol);
-		MSG_WriteCoord (&sv.datagram, org[2], sv.protocol);
+		sv.protocol->WriteVector(&sv.datagram, org);
 		MSG_WriteByte (&sv.datagram, modelindex);
 		MSG_WriteByte (&sv.datagram, startframe);
 		MSG_WriteByte (&sv.datagram, framecount);
@@ -800,12 +794,12 @@ void SV_StartSound (prvm_edict_t *entity, int channel, const char *sample, int n
 	}
 	else
 		MSG_WriteShort (dest, (ent<<3) | channel);
-	if ((field_mask & SND_LARGESOUND) || sv.protocol == PROTOCOL_NEHAHRABJP2)
+	if ((field_mask & SND_LARGESOUND) || sv.protocol == &protocol_nehahrabjp2)
 		MSG_WriteShort (dest, sound_num);
 	else
 		MSG_WriteByte (dest, sound_num);
 	for (i = 0;i < 3;i++)
-		MSG_WriteCoord (dest, PRVM_serveredictvector(entity, origin)[i]+0.5*(PRVM_serveredictvector(entity, mins)[i]+PRVM_serveredictvector(entity, maxs)[i]), sv.protocol);
+		sv.protocol->WriteCoord (dest, PRVM_serveredictvector(entity, origin)[i]+0.5*(PRVM_serveredictvector(entity, mins)[i]+PRVM_serveredictvector(entity, maxs)[i]));
 
 	// TODO do we have to do anything here when dest is &sv.reliable_datagram?
 	if(!reliable)
@@ -827,7 +821,7 @@ function, therefore the check for it is omitted.
 */
 void SV_StartPointSound (vec3_t origin, const char *sample, int nvolume, float attenuation, float speed)
 {
-	int sound_num, field_mask, i, speed4000;
+	int sound_num, field_mask, speed4000;
 
 	if (nvolume < 0 || nvolume > 255)
 	{
@@ -875,8 +869,7 @@ void SV_StartPointSound (vec3_t origin, const char *sample, int nvolume, float a
 		MSG_WriteShort (&sv.datagram, sound_num);
 	else
 		MSG_WriteByte (&sv.datagram, sound_num);
-	for (i = 0;i < 3;i++)
-		MSG_WriteCoord (&sv.datagram, origin[i], sv.protocol);
+	sv.protocol->WriteVector(&sv.datagram, origin);
 	SV_FlushBroadcastMessages();
 }
 
@@ -928,11 +921,11 @@ void SV_SendServerinfo (client_t *client)
 	memset(client->stats, 0, sizeof(client->stats));
 	memset(client->statsdeltabits, 0, sizeof(client->statsdeltabits));
 
-	if (sv.protocol != PROTOCOL_QUAKE && sv.protocol != PROTOCOL_QUAKEDP && sv.protocol != PROTOCOL_NEHAHRAMOVIE && sv.protocol != PROTOCOL_NEHAHRABJP && sv.protocol != PROTOCOL_NEHAHRABJP2 && sv.protocol != PROTOCOL_NEHAHRABJP3)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
 	{
-		if (sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3)
+		if (sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3)
 			client->entitydatabase = EntityFrame_AllocDatabase(sv_mempool);
-		else if (sv.protocol == PROTOCOL_DARKPLACES4)
+		else if (sv.protocol == &protocol_dpp4)
 			client->entitydatabase4 = EntityFrame4_AllocDatabase(sv_mempool);
 		else
 			client->entitydatabase5 = EntityFrame5_AllocDatabase(sv_mempool);
@@ -994,7 +987,7 @@ void SV_SendServerinfo (client_t *client)
 			sb.data = (unsigned char *) buf;
 			sb.maxsize = sizeof(buf);
 			k = 0;
-			while(MakeDownloadPacket(sv.csqc_progname, svs.csqc_progdata, sv.csqc_progsize, sv.csqc_progcrc, k++, &sb, sv.protocol))
+			while(MakeDownloadPacket(sv.csqc_progname, svs.csqc_progdata, sv.csqc_progsize, sv.csqc_progcrc, k++, &sb, sv.protocol->num))
 				SV_WriteDemoMessage(client, &sb, false);
 		}
 
@@ -1024,7 +1017,7 @@ void SV_SendServerinfo (client_t *client)
 	}
 
 	MSG_WriteByte (&client->netconnection->message, svc_serverinfo);
-	MSG_WriteLong (&client->netconnection->message, Protocol_NumberForEnum(sv.protocol));
+	MSG_WriteLong (&client->netconnection->message, sv.protocol->num);
 	MSG_WriteByte (&client->netconnection->message, svs.maxclients);
 
 	if (!coop.integer && deathmatch.integer)
@@ -1822,7 +1815,7 @@ static void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 		// always send world submodels in newer protocols because they don't
 		// generate much traffic (in old protocols they hog bandwidth)
 		// but only if sv_cullentities_nevercullbmodels is off
-		else if (!(s->effects & EF_NODEPTHTEST) && (!isbmodel || !sv_cullentities_nevercullbmodels.integer || sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE))
+		else if (!(s->effects & EF_NODEPTHTEST) && (!isbmodel || !sv_cullentities_nevercullbmodels.integer || sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie))
 		{
 			// entity has survived every check so far, check if visible
 			ed = PRVM_EDICT_NUM(s->number);
@@ -2150,7 +2143,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, dmg_save));
 		MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, dmg_take));
 		for (i=0 ; i<3 ; i++)
-			MSG_WriteCoord (msg, PRVM_serveredictvector(other, origin)[i] + 0.5*(PRVM_serveredictvector(other, mins)[i] + PRVM_serveredictvector(other, maxs)[i]), sv.protocol);
+			sv.protocol->WriteCoord (msg, PRVM_serveredictvector(other, origin)[i] + 0.5*(PRVM_serveredictvector(other, mins)[i] + PRVM_serveredictvector(other, maxs)[i]));
 
 		PRVM_serveredictfloat(ent, dmg_take) = 0;
 		PRVM_serveredictfloat(ent, dmg_save) = 0;
@@ -2177,7 +2170,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	{
 		MSG_WriteByte (msg, svc_setangle);
 		for (i=0 ; i < 3 ; i++)
-			MSG_WriteAngle (msg, host_client->fixangle_angles[i], sv.protocol);
+			sv.protocol->WriteAngle (msg, host_client->fixangle_angles[i]);
 		host_client->fixangle_angles_set = false;
 	}
 
@@ -2214,7 +2207,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	{
 		if (PRVM_serveredictvector(ent, punchangle)[i])
 			bits |= (SU_PUNCH1<<i);
-		if (sv.protocol != PROTOCOL_QUAKE && sv.protocol != PROTOCOL_QUAKEDP && sv.protocol != PROTOCOL_NEHAHRAMOVIE && sv.protocol != PROTOCOL_NEHAHRABJP && sv.protocol != PROTOCOL_NEHAHRABJP2 && sv.protocol != PROTOCOL_NEHAHRABJP3)
+		if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
 			if (punchvector[i])
 				bits |= (SU_PUNCHVEC1<<i);
 		if (PRVM_serveredictvector(ent, velocity)[i])
@@ -2289,15 +2282,15 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		statsf[STAT_MOVEVARS_AIRACCEL_SIDEWAYS_FRICTION] = sv_airaccel_sideways_friction.value;
 	}
 
-	if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4 || sv.protocol == PROTOCOL_DARKPLACES5)
+	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5)
 	{
 		if (stats[STAT_VIEWHEIGHT] != DEFAULT_VIEWHEIGHT) bits |= SU_VIEWHEIGHT;
 		bits |= SU_ITEMS;
 		if (stats[STAT_WEAPONFRAME]) bits |= SU_WEAPONFRAME;
 		if (stats[STAT_ARMOR]) bits |= SU_ARMOR;
 		bits |= SU_WEAPON;
-		// FIXME: which protocols support this?  does PROTOCOL_DARKPLACES3 support viewzoom?
-		if (sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4 || sv.protocol == PROTOCOL_DARKPLACES5)
+		// FIXME: which protocols support this?  does &protocol_dpp3 support viewzoom?
+		if (sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5)
 			if (viewzoom != 255)
 				bits |= SU_VIEWZOOM;
 	}
@@ -2325,21 +2318,21 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	{
 		if (bits & (SU_PUNCH1<<i))
 		{
-			if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 				MSG_WriteChar(msg, (int)PRVM_serveredictvector(ent, punchangle)[i]);
 			else
 				MSG_WriteAngle16i(msg, PRVM_serveredictvector(ent, punchangle)[i]);
 		}
 		if (bits & (SU_PUNCHVEC1<<i))
 		{
-			if (sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4)
+			if (sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 				MSG_WriteCoord16i(msg, punchvector[i]);
 			else
 				MSG_WriteCoord32f(msg, punchvector[i]);
 		}
 		if (bits & (SU_VELOCITY1<<i))
 		{
-			if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4)
+			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 				MSG_WriteChar(msg, (int)(PRVM_serveredictvector(ent, velocity)[i] * (1.0f / 16.0f)));
 			else
 				MSG_WriteCoord32f(msg, PRVM_serveredictvector(ent, velocity)[i]);
@@ -2349,7 +2342,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	if (bits & SU_ITEMS)
 		MSG_WriteLong (msg, stats[STAT_ITEMS]);
 
-	if (sv.protocol == PROTOCOL_DARKPLACES5)
+	if (sv.protocol == &protocol_dpp5)
 	{
 		if (bits & SU_WEAPONFRAME)
 			MSG_WriteShort (msg, stats[STAT_WEAPONFRAME]);
@@ -2367,7 +2360,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		if (bits & SU_VIEWZOOM)
 			MSG_WriteShort (msg, bound(0, stats[STAT_VIEWZOOM], 65535));
 	}
-	else if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4)
+	else if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 	{
 		if (bits & SU_WEAPONFRAME)
 			MSG_WriteByte (msg, stats[STAT_WEAPONFRAME]);
@@ -2375,7 +2368,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 			MSG_WriteByte (msg, stats[STAT_ARMOR]);
 		if (bits & SU_WEAPON)
 		{
-			if (sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+			if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 				MSG_WriteShort (msg, stats[STAT_WEAPON]);
 			else
 				MSG_WriteByte (msg, stats[STAT_WEAPON]);
@@ -2397,7 +2390,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 			MSG_WriteByte (msg, stats[STAT_ACTIVEWEAPON]);
 		if (bits & SU_VIEWZOOM)
 		{
-			if (sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4)
+			if (sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 				MSG_WriteByte (msg, bound(0, stats[STAT_VIEWZOOM], 255));
 			else
 				MSG_WriteShort (msg, bound(0, stats[STAT_VIEWZOOM], 65535));
@@ -2473,7 +2466,7 @@ static void SV_SendClientDatagram (client_t *client)
 	if (!NetConn_CanSend(client->netconnection))
 		return;
 
-	// PROTOCOL_DARKPLACES5 and later support packet size limiting of updates
+	// &protocol_dpp5 and later support packet size limiting of updates
 	maxrate = max(NET_MINRATE, sv_maxrate.integer);
 	if (sv_maxrate.integer != maxrate)
 		Cvar_SetValueQuick(&sv_maxrate, maxrate);
@@ -2482,10 +2475,9 @@ static void SV_SendClientDatagram (client_t *client)
 	// (how long to wait before sending another, based on this packet's size)
 	clientrate = bound(NET_MINRATE, client->rate, maxrate);
 
-	switch (sv.protocol)
+	switch (sv.protocol->num)
 	{
 	case PROTOCOL_QUAKE:
-	case PROTOCOL_QUAKEDP:
 	case PROTOCOL_NEHAHRAMOVIE:
 	case PROTOCOL_NEHAHRABJP:
 	case PROTOCOL_NEHAHRABJP2:
@@ -2735,7 +2727,7 @@ void SV_SendClientMessages(void)
 {
 	int i, prepared = false;
 
-	if (sv.protocol == PROTOCOL_QUAKEWORLD)
+	if (sv.protocol == &protocol_quakeworld)
 		Sys_Error("SV_SendClientMessages: no quakeworld support\n");
 
 	SV_FlushBroadcastMessages();
@@ -3023,7 +3015,7 @@ SV_ModelIndex
 */
 int SV_ModelIndex(const char *s, int precachemode)
 {
-	int i, limit = ((sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3) ? 256 : MAX_MODELS);
+	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3) ? 256 : MAX_MODELS);
 	char filename[MAX_QPATH];
 	if (!s || !*s)
 		return 0;
@@ -3037,7 +3029,7 @@ int SV_ModelIndex(const char *s, int precachemode)
 		{
 			if (precachemode)
 			{
-				if (sv.state != ss_loading && (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4 || sv.protocol == PROTOCOL_DARKPLACES5))
+				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5))
 				{
 					Con_Printf("SV_ModelIndex(\"%s\"): precache_model can only be done in spawn functions\n", filename);
 					return 0;
@@ -3086,7 +3078,7 @@ SV_SoundIndex
 */
 int SV_SoundIndex(const char *s, int precachemode)
 {
-	int i, limit = ((sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3) ? 256 : MAX_SOUNDS);
+	int i, limit = ((sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3) ? 256 : MAX_SOUNDS);
 	char filename[MAX_QPATH];
 	if (!s || !*s)
 		return 0;
@@ -3100,7 +3092,7 @@ int SV_SoundIndex(const char *s, int precachemode)
 		{
 			if (precachemode)
 			{
-				if (sv.state != ss_loading && (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3 || sv.protocol == PROTOCOL_DARKPLACES4 || sv.protocol == PROTOCOL_DARKPLACES5))
+				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5))
 				{
 					Con_Printf("SV_SoundIndex(\"%s\"): precache_sound can only be done in spawn functions\n", filename);
 					return 0;
@@ -3278,7 +3270,7 @@ static void SV_CreateBaseline (void)
 		if (svent->priv.server->baseline.modelindex & 0xFF00 || svent->priv.server->baseline.frame & 0xFF00)
 		{
 			large = true;
-			if (sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+			if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 				large = false;
 		}
 
@@ -3294,7 +3286,7 @@ static void SV_CreateBaseline (void)
 			MSG_WriteShort (&sv.signon, svent->priv.server->baseline.modelindex);
 			MSG_WriteShort (&sv.signon, svent->priv.server->baseline.frame);
 		}
-		else if (sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+		else if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 		{
 			MSG_WriteShort (&sv.signon, svent->priv.server->baseline.modelindex);
 			MSG_WriteByte (&sv.signon, svent->priv.server->baseline.frame);
@@ -3308,8 +3300,8 @@ static void SV_CreateBaseline (void)
 		MSG_WriteByte (&sv.signon, svent->priv.server->baseline.skin);
 		for (i=0 ; i<3 ; i++)
 		{
-			MSG_WriteCoord(&sv.signon, svent->priv.server->baseline.origin[i], sv.protocol);
-			MSG_WriteAngle(&sv.signon, svent->priv.server->baseline.angles[i], sv.protocol);
+			sv.protocol->WriteCoord(&sv.signon, svent->priv.server->baseline.origin[i]);
+			sv.protocol->WriteAngle(&sv.signon, svent->priv.server->baseline.angles[i]);
 		}
 	}
 }
@@ -3533,13 +3525,13 @@ void SV_SpawnServer (const char *map)
 	Cvar_SetQuick(&sv_worldnamenoextension, sv.worldnamenoextension);
 	Cvar_SetQuick(&sv_worldbasename, sv.worldbasename);
 
-	sv.protocol = Protocol_EnumForName(sv_protocolname.string);
-	if (sv.protocol == PROTOCOL_UNKNOWN)
+	sv.protocol = Protocol_ForName(sv_protocolname.string);
+	if (!sv.protocol)
 	{
 		char buffer[1024];
 		Protocol_Names(buffer, sizeof(buffer));
 		Con_Printf(CON_ERROR "Unknown sv_protocolname \"%s\", valid values are:\n%s\n", sv_protocolname.string, buffer);
-		sv.protocol = PROTOCOL_QUAKE;
+		sv.protocol = &protocol_netquake;
 	}
 
 // load progs to get entity field count
@@ -3660,7 +3652,7 @@ void SV_SpawnServer (const char *map)
 		Mod_PurgeUnused();
 
 // create a baseline for more efficient communications
-	if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 		SV_CreateBaseline ();
 
 	sv.state = ss_active; // LadyHavoc: workaround for svc_precache bug
@@ -3917,13 +3909,13 @@ static void SV_VM_Setup(void)
 	prog->builtins = vm_sv_builtins;
 	prog->numbuiltins = vm_sv_numbuiltins;
 	prog->max_edicts = 512;
-	if (sv.protocol == PROTOCOL_QUAKE)
+	if (sv.protocol == &protocol_netquake)
 		prog->limit_edicts = 640; // before quake mission pack 1 this was 512
-	else if (sv.protocol == PROTOCOL_QUAKEDP)
+	else if (sv.protocol == &protocol_quakedp)
 		prog->limit_edicts = 2048; // guessing
-	else if (sv.protocol == PROTOCOL_NEHAHRAMOVIE)
+	else if (sv.protocol == &protocol_nehahramovie)
 		prog->limit_edicts = 2048; // guessing!
-	else if (sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+	else if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 		prog->limit_edicts = 4096; // guessing!
 	else
 		prog->limit_edicts = MAX_EDICTS;

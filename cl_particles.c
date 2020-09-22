@@ -1769,7 +1769,7 @@ void CL_ParseParticleEffect (void)
 	vec3_t org, dir;
 	int i, count, msgcount, color;
 
-	MSG_ReadVector(&cl_message, org, cls.protocol);
+	cls.protocol->ReadVector(&cl_message, org);
 	for (i=0 ; i<3 ; i++)
 		dir[i] = MSG_ReadChar(&cl_message) * (1.0 / 16.0);
 	msgcount = MSG_ReadByte(&cl_message);

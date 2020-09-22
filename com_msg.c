@@ -201,23 +201,25 @@ void MSG_WriteCoord32f (sizebuf_t *sb, float f)
 	MSG_WriteFloat (sb, f);
 }
 
-void MSG_WriteCoord (sizebuf_t *sb, float f, protocolversion_t protocol)
+void MSG_WriteVector13i (sizebuf_t *sb, const vec3_t v)
 {
-	if (protocol == PROTOCOL_QUAKE || protocol == PROTOCOL_QUAKEDP || protocol == PROTOCOL_NEHAHRAMOVIE || protocol == PROTOCOL_NEHAHRABJP || protocol == PROTOCOL_NEHAHRABJP2 || protocol == PROTOCOL_NEHAHRABJP3 || protocol == PROTOCOL_QUAKEWORLD)
-		MSG_WriteCoord13i (sb, f);
-	else if (protocol == PROTOCOL_DARKPLACES1)
-		MSG_WriteCoord32f (sb, f);
-	else if (protocol == PROTOCOL_DARKPLACES2 || protocol == PROTOCOL_DARKPLACES3 || protocol == PROTOCOL_DARKPLACES4)
-		MSG_WriteCoord16i (sb, f);
-	else
-		MSG_WriteCoord32f (sb, f);
+	MSG_WriteCoord13i (sb, v[0]);
+	MSG_WriteCoord13i (sb, v[1]);
+	MSG_WriteCoord13i (sb, v[2]);
 }
 
-void MSG_WriteVector (sizebuf_t *sb, const vec3_t v, protocolversion_t protocol)
+void MSG_WriteVector16i (sizebuf_t *sb, const vec3_t v)
 {
-	MSG_WriteCoord (sb, v[0], protocol);
-	MSG_WriteCoord (sb, v[1], protocol);
-	MSG_WriteCoord (sb, v[2], protocol);
+	MSG_WriteCoord16i (sb, v[0]);
+	MSG_WriteCoord16i (sb, v[1]);
+	MSG_WriteCoord16i (sb, v[2]);
+}
+
+void MSG_WriteVector32f (sizebuf_t *sb, const vec3_t v)
+{
+	MSG_WriteCoord32f (sb, v[0]);
+	MSG_WriteCoord32f (sb, v[1]);
+	MSG_WriteCoord32f (sb, v[2]);
 }
 
 // LadyHavoc: round to nearest value, rather than rounding toward zero, fixes crosshair problem
@@ -240,14 +242,6 @@ void MSG_WriteAngle16i (sizebuf_t *sb, float f)
 void MSG_WriteAngle32f (sizebuf_t *sb, float f)
 {
 	MSG_WriteFloat (sb, f);
-}
-
-void MSG_WriteAngle (sizebuf_t *sb, float f, protocolversion_t protocol)
-{
-	if (protocol == PROTOCOL_QUAKE || protocol == PROTOCOL_QUAKEDP || protocol == PROTOCOL_NEHAHRAMOVIE || protocol == PROTOCOL_NEHAHRABJP || protocol == PROTOCOL_NEHAHRABJP2 || protocol == PROTOCOL_NEHAHRABJP3 || protocol == PROTOCOL_DARKPLACES1 || protocol == PROTOCOL_DARKPLACES2 || protocol == PROTOCOL_DARKPLACES3 || protocol == PROTOCOL_DARKPLACES4 || protocol == PROTOCOL_QUAKEWORLD)
-		MSG_WriteAngle8i (sb, f);
-	else
-		MSG_WriteAngle16i (sb, f);
 }
 
 //
@@ -381,23 +375,25 @@ float MSG_ReadCoord32f (sizebuf_t *sb)
 	return MSG_ReadLittleFloat(sb);
 }
 
-float MSG_ReadCoord (sizebuf_t *sb, protocolversion_t protocol)
+void MSG_ReadVector13i (sizebuf_t *sb, vec3_t v)
 {
-	if (protocol == PROTOCOL_QUAKE || protocol == PROTOCOL_QUAKEDP || protocol == PROTOCOL_NEHAHRAMOVIE || protocol == PROTOCOL_NEHAHRABJP || protocol == PROTOCOL_NEHAHRABJP2 || protocol == PROTOCOL_NEHAHRABJP3 || protocol == PROTOCOL_QUAKEWORLD)
-		return MSG_ReadCoord13i(sb);
-	else if (protocol == PROTOCOL_DARKPLACES1)
-		return MSG_ReadCoord32f(sb);
-	else if (protocol == PROTOCOL_DARKPLACES2 || protocol == PROTOCOL_DARKPLACES3 || protocol == PROTOCOL_DARKPLACES4)
-		return MSG_ReadCoord16i(sb);
-	else
-		return MSG_ReadCoord32f(sb);
+	v[0] = MSG_ReadCoord13i(sb);
+	v[1] = MSG_ReadCoord13i(sb);
+	v[2] = MSG_ReadCoord13i(sb);
 }
 
-void MSG_ReadVector (sizebuf_t *sb, vec3_t v, protocolversion_t protocol)
+void MSG_ReadVector16i (sizebuf_t *sb, vec3_t v)
 {
-	v[0] = MSG_ReadCoord(sb, protocol);
-	v[1] = MSG_ReadCoord(sb, protocol);
-	v[2] = MSG_ReadCoord(sb, protocol);
+	v[0] = MSG_ReadCoord16i(sb);
+	v[1] = MSG_ReadCoord16i(sb);
+	v[2] = MSG_ReadCoord16i(sb);
+}
+
+void MSG_ReadVector32f (sizebuf_t *sb, vec3_t v)
+{
+	v[0] = MSG_ReadCoord32f(sb);
+	v[1] = MSG_ReadCoord32f(sb);
+	v[2] = MSG_ReadCoord32f(sb);
 }
 
 // LadyHavoc: round to nearest value, rather than rounding toward zero, fixes crosshair problem
@@ -414,12 +410,4 @@ float MSG_ReadAngle16i (sizebuf_t *sb)
 float MSG_ReadAngle32f (sizebuf_t *sb)
 {
 	return MSG_ReadFloat (sb);
-}
-
-float MSG_ReadAngle (sizebuf_t *sb, protocolversion_t protocol)
-{
-	if (protocol == PROTOCOL_QUAKE || protocol == PROTOCOL_QUAKEDP || protocol == PROTOCOL_NEHAHRAMOVIE || protocol == PROTOCOL_NEHAHRABJP || protocol == PROTOCOL_NEHAHRABJP2 || protocol == PROTOCOL_NEHAHRABJP3 || protocol == PROTOCOL_DARKPLACES1 || protocol == PROTOCOL_DARKPLACES2 || protocol == PROTOCOL_DARKPLACES3 || protocol == PROTOCOL_DARKPLACES4 || protocol == PROTOCOL_QUAKEWORLD)
-		return MSG_ReadAngle8i (sb);
-	else
-		return MSG_ReadAngle16i (sb);
 }

@@ -39,80 +39,249 @@ entity_state_t defaultstate =
 
 // LadyHavoc: I own protocol ranges 96, 97, 3500-3599
 
-struct protocolversioninfo_s
+protocol_t protocol_netquake =
 {
-	int number;
-	protocolversion_t version;
-	const char *name;
-}
-protocolversioninfo[] =
-{
-	{ 3504, PROTOCOL_DARKPLACES7 , "DP7"},
-	{ 3503, PROTOCOL_DARKPLACES6 , "DP6"},
-	{ 3502, PROTOCOL_DARKPLACES5 , "DP5"},
-	{ 3501, PROTOCOL_DARKPLACES4 , "DP4"},
-	{ 3500, PROTOCOL_DARKPLACES3 , "DP3"},
-	{   97, PROTOCOL_DARKPLACES2 , "DP2"},
-	{   96, PROTOCOL_DARKPLACES1 , "DP1"},
-	{   15, PROTOCOL_QUAKEDP     , "QUAKEDP"},
-	{   15, PROTOCOL_QUAKE       , "QUAKE"},
-	{   28, PROTOCOL_QUAKEWORLD  , "QW"},
-	{  250, PROTOCOL_NEHAHRAMOVIE, "NEHAHRAMOVIE"},
-	{10000, PROTOCOL_NEHAHRABJP  , "NEHAHRABJP"},
-	{10001, PROTOCOL_NEHAHRABJP2 , "NEHAHRABJP2"},
-	{10002, PROTOCOL_NEHAHRABJP3 , "NEHAHRABJP3"},
-	{    0, PROTOCOL_UNKNOWN     , NULL}
+	.name = "QUAKE",
+	.num = 15,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 34,
+	.svcmsg = netmsg_nq_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
 };
 
-protocolversion_t Protocol_EnumForName(const char *s)
+protocol_t protocol_quakedp =
 {
-	int i;
-	for (i = 0;protocolversioninfo[i].name;i++)
-		if (!strcasecmp(s, protocolversioninfo[i].name))
-			return protocolversioninfo[i].version;
-	return PROTOCOL_UNKNOWN;
-}
+	.name = "QUAKEDP",
+	.num = 15,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
 
-const char *Protocol_NameForEnum(protocolversion_t p)
+protocol_t protocol_quakeworld =
 {
-	int i;
-	for (i = 0;protocolversioninfo[i].name;i++)
-		if (protocolversioninfo[i].version == p)
-			return protocolversioninfo[i].name;
-	return "UNKNOWN";
-}
+	.name = "QW",
+	.num = 28,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 53,
+	.svcmsg = netmsg_qw_svc,
+	.max_clcmsg = 59,
+	.clcmsg = NULL
+};
 
-protocolversion_t Protocol_EnumForNumber(int n)
+protocol_t protocol_dpp1 =
 {
-	int i;
-	for (i = 0;protocolversioninfo[i].name;i++)
-		if (protocolversioninfo[i].number == n)
-			return protocolversioninfo[i].version;
-	return PROTOCOL_UNKNOWN;
-}
+	.name = "DP1",
+	.num = 96,
+	.WriteCoord = MSG_WriteCoord32f,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector32f,
+	.ReadCoord = MSG_ReadCoord32f,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector32f,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
 
-int Protocol_NumberForEnum(protocolversion_t p)
+protocol_t protocol_dpp2 =
 {
-	int i;
-	for (i = 0;protocolversioninfo[i].name;i++)
-		if (protocolversioninfo[i].version == p)
-			return protocolversioninfo[i].number;
-	return 0;
-}
+	.name = "DP2",
+	.num = 97,
+	.WriteCoord = MSG_WriteCoord16i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector16i,
+	.ReadCoord = MSG_ReadCoord16i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector16i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
 
-void Protocol_Names(char *buffer, size_t buffersize)
+protocol_t protocol_dpp3 =
 {
-	int i;
-	if (buffersize < 1)
-		return;
-	buffer[0] = 0;
-	for (i = 0;protocolversioninfo[i].name;i++)
-	{
-		if (i > 1)
-			strlcat(buffer, " ", buffersize);
-		strlcat(buffer, protocolversioninfo[i].name, buffersize);
-	}
-}
+	.name = "DP3",
+	.num = 3500,
+	.WriteCoord = MSG_WriteCoord16i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector16i,
+	.ReadCoord = MSG_ReadCoord16i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector16i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_dpp4 =
+{
+	.name = "DP4",
+	.num = 3501,
+	.WriteCoord = MSG_WriteCoord16i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector16i,
+	.ReadCoord = MSG_ReadCoord16i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector16i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_dpp5 =
+{
+	.name = "DP5",
+	.num = 3502,
+	.WriteCoord = MSG_WriteCoord32f,
+	.WriteAngle = MSG_WriteAngle16i,
+	.WriteVector = MSG_WriteVector32f,
+	.ReadCoord = MSG_ReadCoord32f,
+	.ReadAngle = MSG_ReadAngle16i,
+	.ReadVector = MSG_ReadVector32f,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_dpp6 =
+{
+	.name = "DP6",
+	.num = 3503,
+	.WriteCoord = MSG_WriteCoord32f,
+	.WriteAngle = MSG_WriteAngle16i,
+	.WriteVector = MSG_WriteVector32f,
+	.ReadCoord = MSG_ReadCoord32f,
+	.ReadAngle = MSG_ReadAngle16i,
+	.ReadVector = MSG_ReadVector32f,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_dpp7 =
+{
+	.name = "DP7",
+	.num = 3504,
+	.WriteCoord = MSG_WriteCoord32f,
+	.WriteAngle = MSG_WriteAngle16i,
+	.WriteVector = MSG_WriteVector32f,
+	.ReadCoord = MSG_ReadCoord32f,
+	.ReadAngle = MSG_ReadAngle16i,
+	.ReadVector = MSG_ReadVector32f,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+
+};
+
+protocol_t protocol_nehahramovie =
+{
+	.name = "NEHAHRAMOVIE",
+	.num = 250,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_nehahrabjp =
+{
+	.name = "NEHAHRABJP",
+	.num = 10000,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_nehahrabjp2 =
+{
+	.name = "NEHAHRABJP2",
+	.num = 10001,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t protocol_nehahrabjp3 =
+{
+	.name = "NEHAHRABJP3",
+	.num = 10002,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle8i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.max_svcmsg = 62,
+	.svcmsg = netmsg_dpext_svc,
+	.max_clcmsg = 59,
+	.clcmsg = netmsg_base_clc
+};
+
+protocol_t *protocols[] =
+{
+	&protocol_netquake,
+	&protocol_quakedp,
+	&protocol_quakeworld,
+	&protocol_dpp1,
+	&protocol_dpp2,
+	&protocol_dpp3,
+	&protocol_dpp4,
+	&protocol_dpp5,
+	&protocol_dpp6,
+	&protocol_dpp7,
+	&protocol_nehahramovie,
+	&protocol_nehahrabjp,
+	&protocol_nehahrabjp2,
+	&protocol_nehahrabjp3,
+	NULL
+};
 
 void Protocol_UpdateClientStats(const int *stats)
 {
@@ -147,6 +316,42 @@ STAT_VIEWZOOM, // this rarely changes
 -1,
 };
 
+protocol_t *Protocol_ForName(const char *name)
+{
+	int i;
+	for(i = 0; &protocols[i]; i++)
+	{
+		if(!strncmp(name, protocols[i]->name, strlen(protocols[i]->name)))
+			break;
+	}
+	return protocols[i];
+}
+
+protocol_t *Protocol_ForNumber(int num)
+{
+	int i;
+	for(i = 0; &protocols[i]; i++)
+	{
+		if(protocols[i]->num == num)
+			break;
+	}
+	return protocols[i];
+}
+
+void Protocol_Names(char *buffer, size_t buffersize)
+{
+	int i;
+	if (buffersize < 1)
+		return;
+	buffer[0] = 0;
+	for (i = 0; protocols[i]; i++)
+	{
+		if (i > 1)
+			strlcat(buffer, " ", buffersize);
+		strlcat(buffer, protocols[i]->name, buffersize);
+	}
+}
+
 void Protocol_WriteStatsReliable(void)
 {
 	int i, j;
@@ -165,7 +370,7 @@ void Protocol_WriteStatsReliable(void)
 		{
 			host_client->statsdeltabits[i >> 3] -= (1 << (i & 7));
 			// send the stat as a byte if possible
-			if (sv.protocol == PROTOCOL_QUAKEWORLD)
+			if (sv.protocol == &protocol_quakeworld)
 			{
 				if (host_client->stats[i] >= 0 && host_client->stats[i] < 256)
 				{

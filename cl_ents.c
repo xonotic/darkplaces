@@ -20,7 +20,7 @@ int EntityState_ReadExtendBits(void)
 
 void EntityState_ReadFields(entity_state_t *e, unsigned int bits)
 {
-	if (cls.protocol == PROTOCOL_DARKPLACES2)
+	if (cls.protocol == &protocol_dpp2)
 	{
 		if (bits & E_ORIGIN1)
 			e->origin[0] = MSG_ReadCoord16i(&cl_message);
@@ -52,7 +52,7 @@ void EntityState_ReadFields(entity_state_t *e, unsigned int bits)
 				e->origin[2] = MSG_ReadCoord32f(&cl_message);
 		}
 	}
-	if ((cls.protocol == PROTOCOL_DARKPLACES5 || cls.protocol == PROTOCOL_DARKPLACES6) && !(e->flags & RENDER_LOWPRECISION))
+	if ((cls.protocol == &protocol_dpp5 || cls.protocol == &protocol_dpp6) && !(e->flags & RENDER_LOWPRECISION))
 	{
 		if (bits & E_ANGLE1)
 			e->angles[0] = MSG_ReadAngle16i(&cl_message);
@@ -94,7 +94,7 @@ void EntityState_ReadFields(entity_state_t *e, unsigned int bits)
 		e->glowsize = MSG_ReadByte(&cl_message);
 	if (bits & E_GLOWCOLOR)
 		e->glowcolor = MSG_ReadByte(&cl_message);
-	if (cls.protocol == PROTOCOL_DARKPLACES2)
+	if (cls.protocol == &protocol_dpp2)
 		if (bits & E_FLAGS)
 			e->flags = MSG_ReadByte(&cl_message);
 	if (bits & E_TAGATTACHMENT)

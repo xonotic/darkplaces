@@ -71,7 +71,7 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 		if (baseline.modelindex != s->modelindex)
 		{
 			bits |= U_MODEL;
-			if ((s->modelindex & 0xFF00) && sv.protocol != PROTOCOL_NEHAHRABJP && sv.protocol != PROTOCOL_NEHAHRABJP2 && sv.protocol != PROTOCOL_NEHAHRABJP3)
+			if ((s->modelindex & 0xFF00) && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
 				bits |= U_MODEL2;
 		}
 		if (baseline.alpha != s->alpha)
@@ -86,9 +86,9 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 			bits |= U_COLORMOD;
 
 		// if extensions are disabled, clear the relevant update flags
-		if (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_NEHAHRAMOVIE)
+		if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_nehahramovie)
 			bits &= 0x7FFF;
-		if (sv.protocol == PROTOCOL_NEHAHRAMOVIE)
+		if (sv.protocol == &protocol_nehahramovie)
 			if (s->alpha != 255 || s->effects & EF_FULLBRIGHT)
 				bits |= U_EXTEND1;
 
@@ -106,7 +106,7 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 
 			MSG_WriteByte (&buf, bits);
 			if (bits & U_MOREBITS)		MSG_WriteByte(&buf, bits>>8);
-			if (sv.protocol != PROTOCOL_NEHAHRAMOVIE)
+			if (sv.protocol != &protocol_nehahramovie)
 			{
 				if (bits & U_EXTEND1)	MSG_WriteByte(&buf, bits>>16);
 				if (bits & U_EXTEND2)	MSG_WriteByte(&buf, bits>>24);
@@ -116,7 +116,7 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 
 			if (bits & U_MODEL)
 			{
-				if (sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3)
+				if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 					MSG_WriteShort(&buf, s->modelindex);
 				else
 					MSG_WriteByte(&buf, s->modelindex);
@@ -125,12 +125,12 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 			if (bits & U_COLORMAP)		MSG_WriteByte(&buf, s->colormap);
 			if (bits & U_SKIN)			MSG_WriteByte(&buf, s->skin);
 			if (bits & U_EFFECTS)		MSG_WriteByte(&buf, s->effects);
-			if (bits & U_ORIGIN1)		MSG_WriteCoord(&buf, s->origin[0], sv.protocol);
-			if (bits & U_ANGLE1)		MSG_WriteAngle(&buf, s->angles[0], sv.protocol);
-			if (bits & U_ORIGIN2)		MSG_WriteCoord(&buf, s->origin[1], sv.protocol);
-			if (bits & U_ANGLE2)		MSG_WriteAngle(&buf, s->angles[1], sv.protocol);
-			if (bits & U_ORIGIN3)		MSG_WriteCoord(&buf, s->origin[2], sv.protocol);
-			if (bits & U_ANGLE3)		MSG_WriteAngle(&buf, s->angles[2], sv.protocol);
+			if (bits & U_ORIGIN1)		sv.protocol->WriteCoord(&buf, s->origin[0]);
+			if (bits & U_ANGLE1)		sv.protocol->WriteAngle(&buf, s->angles[0]);
+			if (bits & U_ORIGIN2)		sv.protocol->WriteCoord(&buf, s->origin[1]);
+			if (bits & U_ANGLE2)		sv.protocol->WriteAngle(&buf, s->angles[1]);
+			if (bits & U_ORIGIN3)		sv.protocol->WriteCoord(&buf, s->origin[2]);
+			if (bits & U_ANGLE3)		sv.protocol->WriteAngle(&buf, s->angles[2]);
 			if (bits & U_ALPHA)			MSG_WriteByte(&buf, s->alpha);
 			if (bits & U_SCALE)			MSG_WriteByte(&buf, s->scale);
 			if (bits & U_EFFECTS2)		MSG_WriteByte(&buf, s->effects >> 8);
@@ -141,7 +141,7 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 			if (bits & U_MODEL2)		MSG_WriteByte(&buf, s->modelindex >> 8);
 
 			// the nasty protocol
-			if ((bits & U_EXTEND1) && sv.protocol == PROTOCOL_NEHAHRAMOVIE)
+			if ((bits & U_EXTEND1) && sv.protocol == &protocol_nehahramovie)
 			{
 				if (s->effects & EF_FULLBRIGHT)
 				{

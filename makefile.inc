@@ -91,6 +91,9 @@ OBJ_COMMON= \
 	cl_main.o \
 	cl_parse.o \
 	cl_particles.o \
+	cl_protocol_dpp7.o \
+	cl_protocol_nq.o \
+	cl_protocol_qw.o \
 	cl_screen.o \
 	cl_video.o \
 	cl_video_libavw.o \
@@ -162,6 +165,7 @@ OBJ_COMMON= \
 	sv_main.o \
 	sv_move.o \
 	sv_phys.o \
+	sv_protocol.o \
 	sv_save.o \
 	sv_send.o \
 	sv_user.o \

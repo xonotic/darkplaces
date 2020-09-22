@@ -748,13 +748,13 @@ static void VM_M_WriteLong (prvm_prog_t *prog)
 static void VM_M_WriteAngle (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(1, VM_M_WriteAngle);
-	MSG_WriteAngle (VM_M_WriteDest(prog), PRVM_G_FLOAT(OFS_PARM0), sv.protocol);
+	sv.protocol->WriteAngle (VM_M_WriteDest(prog), PRVM_G_FLOAT(OFS_PARM0));
 }
 
 static void VM_M_WriteCoord (prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(1, VM_M_WriteCoord);
-	MSG_WriteCoord (VM_M_WriteDest(prog), PRVM_G_FLOAT(OFS_PARM0), sv.protocol);
+	sv.protocol->WriteCoord(VM_M_WriteDest(prog), PRVM_G_FLOAT(OFS_PARM0));
 }
 
 static void VM_M_WriteString (prvm_prog_t *prog)

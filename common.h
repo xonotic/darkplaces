@@ -121,28 +121,6 @@ void StoreLittleShort (unsigned char *buffer, unsigned short i);
 
 //============================================================================
 
-// these versions are purely for internal use, never sent in network protocol
-// (use Protocol_EnumForNumber and Protocol_NumberToEnum to convert)
-typedef enum protocolversion_e
-{
-	PROTOCOL_UNKNOWN,
-	PROTOCOL_DARKPLACES7, ///< added QuakeWorld-style movement protocol to allow more consistent prediction
-	PROTOCOL_DARKPLACES6, ///< various changes
-	PROTOCOL_DARKPLACES5, ///< uses EntityFrame5 entity snapshot encoder/decoder which is based on a Tribes networking article at http://www.garagegames.com/articles/networking1/
-	PROTOCOL_DARKPLACES4, ///< various changes
-	PROTOCOL_DARKPLACES3, ///< uses EntityFrame4 entity snapshot encoder/decoder which is broken, this attempted to do partial snapshot updates on a QuakeWorld-like protocol, but it is broken and impossible to fix
-	PROTOCOL_DARKPLACES2, ///< various changes
-	PROTOCOL_DARKPLACES1, ///< uses EntityFrame entity snapshot encoder/decoder which is a QuakeWorld-like entity snapshot delta compression method
-	PROTOCOL_QUAKEDP, ///< darkplaces extended quake protocol (used by TomazQuake and others), backwards compatible as long as no extended features are used
-	PROTOCOL_NEHAHRAMOVIE, ///< Nehahra movie protocol, a big nasty hack dating back to early days of the Quake Standards Group (but only ever used by neh_gl.exe), this is potentially backwards compatible with quake protocol as long as no extended features are used (but in actuality the neh_gl.exe which wrote this protocol ALWAYS wrote the extended information)
-	PROTOCOL_QUAKE, ///< quake (aka netquake/normalquake/nq) protocol
-	PROTOCOL_QUAKEWORLD, ///< quakeworld protocol
-	PROTOCOL_NEHAHRABJP, ///< same as QUAKEDP but with 16bit modelindex
-	PROTOCOL_NEHAHRABJP2, ///< same as NEHAHRABJP but with 16bit soundindex
-	PROTOCOL_NEHAHRABJP3 ///< same as NEHAHRABJP2 but with some changes
-}
-protocolversion_t;
-
 /*! \name Message IO functions.
  * Handles byte ordering and avoids alignment errors
  * @{
@@ -162,9 +140,9 @@ void MSG_WriteAngle32f (sizebuf_t *sb, vec_t f);
 void MSG_WriteCoord13i (sizebuf_t *sb, vec_t f);
 void MSG_WriteCoord16i (sizebuf_t *sb, vec_t f);
 void MSG_WriteCoord32f (sizebuf_t *sb, vec_t f);
-void MSG_WriteCoord (sizebuf_t *sb, vec_t f, protocolversion_t protocol);
-void MSG_WriteVector (sizebuf_t *sb, const vec3_t v, protocolversion_t protocol);
-void MSG_WriteAngle (sizebuf_t *sb, vec_t f, protocolversion_t protocol);
+void MSG_WriteVector13i (sizebuf_t *sb, const vec3_t v);
+void MSG_WriteVector16i (sizebuf_t *sb, const vec3_t v);
+void MSG_WriteVector32f (sizebuf_t *sb, const vec3_t v);
 
 void MSG_BeginReading (sizebuf_t *sb);
 int MSG_ReadLittleShort (sizebuf_t *sb);
@@ -188,9 +166,9 @@ float MSG_ReadAngle32f (sizebuf_t *sb);
 float MSG_ReadCoord13i (sizebuf_t *sb);
 float MSG_ReadCoord16i (sizebuf_t *sb);
 float MSG_ReadCoord32f (sizebuf_t *sb);
-float MSG_ReadCoord (sizebuf_t *sb, protocolversion_t protocol);
-void MSG_ReadVector (sizebuf_t *sb, vec3_t v, protocolversion_t protocol);
-float MSG_ReadAngle (sizebuf_t *sb, protocolversion_t protocol);
+void MSG_ReadVector13i (sizebuf_t *sb, vec3_t v);
+void MSG_ReadVector16i (sizebuf_t *sb, vec3_t v);
+void MSG_ReadVector32f (sizebuf_t *sb, vec3_t v);
 //@}
 //============================================================================
 

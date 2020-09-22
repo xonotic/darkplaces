@@ -523,7 +523,7 @@ static int SCR_DrawQWDownload(int offset)
 		cls.qw_downloadspeedtime = host.realtime;
 		cls.qw_downloadspeedcount = 0;
 	}
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 		dpsnprintf(temp, sizeof(temp), "Downloading %s %3i%% (%i) at %i bytes/s", cls.qw_downloadname, cls.qw_downloadpercent, cls.qw_downloadmemorycursize, cls.qw_downloadspeedrate);
 	else
 		dpsnprintf(temp, sizeof(temp), "Downloading %s %3i%% (%i/%i) at %i bytes/s", cls.qw_downloadname, cls.qw_downloadpercent, cls.qw_downloadmemorycursize, cls.qw_downloadmemorymaxsize, cls.qw_downloadspeedrate);

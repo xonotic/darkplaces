@@ -401,7 +401,7 @@ qbool CSQC_AddRenderEdict(prvm_edict_t *ed, int edictnum)
 	 &&  (entrender->alpha >= 1)
 	 && !(renderflags & RF_NOSHADOW)
 	 && !(entrender->flags & RENDER_VIEWMODEL)
-	 && (!(entrender->flags & RENDER_EXTERIORMODEL) || (!cl.intermission && cls.protocol != PROTOCOL_NEHAHRAMOVIE && !cl_noplayershadow.integer)))
+	 && (!(entrender->flags & RENDER_EXTERIORMODEL) || (!cl.intermission && cls.protocol != &protocol_nehahramovie && !cl_noplayershadow.integer)))
 		entrender->flags |= RENDER_SHADOW;
 	if (entrender->flags & RENDER_VIEWMODEL)
 		entrender->flags |= RENDER_NOSELFSHADOW;
@@ -1102,7 +1102,7 @@ void CL_VM_Init (void)
 			i = 0;
 
 			CL_CutDemo(&demobuf, &demofilesize);
-			while(MakeDownloadPacket(csqc_progname.string, csprogsdata, (size_t)csprogsdatasize, csprogsdatacrc, i++, &sb, cls.protocol))
+			while(MakeDownloadPacket(csqc_progname.string, csprogsdata, (size_t)csprogsdatasize, csprogsdatacrc, i++, &sb, cls.protocol->num))
 				CL_WriteDemoMessage(&sb);
 			CL_PasteDemo(&demobuf, &demofilesize);
 

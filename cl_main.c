@@ -248,9 +248,9 @@ void CL_SetInfo(const char *key, const char *value, qbool send, qbool allowstark
 	InfoString_SetValue(cls.userinfo, sizeof(cls.userinfo), key, value);
 	if (cls.state == ca_connected && cls.netcon)
 	{
-		if (cls.protocol == PROTOCOL_QUAKEWORLD)
+		if (cls.protocol == &protocol_quakeworld)
 		{
-			MSG_WriteByte(&cls.netcon->message, qw_clc_stringcmd);
+			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
 			MSG_WriteString(&cls.netcon->message, va(vabuf, sizeof(vabuf), "setinfo \"%s\" \"%s\"", key, value));
 		}
 		else if (!strcasecmp(key, "name"))
@@ -394,10 +394,10 @@ void CL_Disconnect(void)
 		memset(&buf, 0, sizeof(buf));
 		buf.data = bufdata;
 		buf.maxsize = sizeof(bufdata);
-		if (cls.protocol == PROTOCOL_QUAKEWORLD)
+		if (cls.protocol == &protocol_quakeworld)
 		{
 			Con_DPrint("Sending drop command\n");
-			MSG_WriteByte(&buf, qw_clc_stringcmd);
+			MSG_WriteByte(&buf, clc_stringcmd);
 			MSG_WriteString(&buf, "drop");
 		}
 		else
@@ -446,7 +446,7 @@ void CL_Reconnect_f(cmd_state_t *cmd)
 		return;
 	}
 	// if connected, do something based on protocol
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 	{
 		// quakeworld can just re-login
 		if (cls.qw_downloadmemory)  // don't change when downloading
@@ -457,7 +457,7 @@ void CL_Reconnect_f(cmd_state_t *cmd)
 		if (cls.state == ca_connected)
 		{
 			Con_Printf("Server is changing level...\n");
-			MSG_WriteChar(&cls.netcon->message, qw_clc_stringcmd);
+			MSG_WriteChar(&cls.netcon->message, clc_stringcmd);
 			MSG_WriteString(&cls.netcon->message, "new");
 		}
 	}
@@ -1268,7 +1268,7 @@ static void CL_UpdateNetworkEntity(entity_t *e, int recursionlimit, qbool interp
 	if (!(e->render.effects & (EF_NOSHADOW | EF_ADDITIVE | EF_NODEPTHTEST))
 	 && (e->render.alpha >= 1)
 	 && !(e->render.flags & RENDER_VIEWMODEL)
-	 && (!(e->render.flags & RENDER_EXTERIORMODEL) || (!cl.intermission && cls.protocol != PROTOCOL_NEHAHRAMOVIE && !cl_noplayershadow.integer)))
+	 && (!(e->render.flags & RENDER_EXTERIORMODEL) || (!cl.intermission && cls.protocol != &protocol_nehahramovie && !cl_noplayershadow.integer)))
 		e->render.flags |= RENDER_SHADOW;
 	if (e->render.flags & RENDER_VIEWMODEL)
 		e->render.flags |= RENDER_NOSELFSHADOW;

@@ -674,7 +674,7 @@ static void SV_Pings_f(cmd_state_t *cmd)
 	if (!host_client->netconnection)
 		return;
 
-	if (sv.protocol != PROTOCOL_QUAKEWORLD)
+	if (sv.protocol != &protocol_quakeworld)
 	{
 		MSG_WriteByte(&host_client->netconnection->message, svc_stufftext);
 		MSG_WriteUnterminatedString(&host_client->netconnection->message, "pingplreport");
@@ -696,7 +696,7 @@ static void SV_Pings_f(cmd_state_t *cmd)
 		movementloss = (movementloss * 100 + NETGRAPH_PACKETS - 1) / NETGRAPH_PACKETS;
 		ping = (int)floor(svs.clients[i].ping*1000+0.5);
 		ping = bound(0, ping, 9999);
-		if (sv.protocol == PROTOCOL_QUAKEWORLD)
+		if (sv.protocol == &protocol_quakeworld)
 		{
 			// send qw_svc_updateping and qw_svc_updatepl messages
 			MSG_WriteByte(&host_client->netconnection->message, qw_svc_updateping);
@@ -714,7 +714,7 @@ static void SV_Pings_f(cmd_state_t *cmd)
 			MSG_WriteUnterminatedString(&host_client->netconnection->message, temp);
 		}
 	}
-	if (sv.protocol != PROTOCOL_QUAKEWORLD)
+	if (sv.protocol != &protocol_quakeworld)
 		MSG_WriteString(&host_client->netconnection->message, "\n");
 }
 
@@ -818,7 +818,7 @@ static void SV_Status_f(cmd_state_t *cmd)
 			players++;
 	print ("host:     %s\n", Cvar_VariableString (&cvars_all, "hostname", CF_SERVER));
 	print ("version:  %s build %s (gamename %s)\n", gamename, buildstring, gamenetworkfiltername);
-	print ("protocol: %i (%s)\n", Protocol_NumberForEnum(sv.protocol), Protocol_NameForEnum(sv.protocol));
+	print ("protocol: %i (%s)\n", sv.protocol->num, sv.protocol->name);
 	print ("map:      %s\n", sv.name);
 	print ("timing:   %s\n", Host_TimingReport(vabuf, sizeof(vabuf)));
 	print ("players:  %i active (%i max)\n\n", players, svs.maxclients);
@@ -885,7 +885,7 @@ static void SV_Status_f(cmd_state_t *cmd)
 		
 		if (in == 0) // default layout
 		{
-			if (sv.protocol == PROTOCOL_QUAKE && svs.maxclients <= 99)
+			if (sv.protocol == &protocol_netquake && svs.maxclients <= 99)
 			{
 				// LadyHavoc: this is very touchy because we must maintain ProQuake compatible status output
 				print ("#%-2u %-16.16s  %3i  %2i:%02i:%02i\n", i+1, client->name, frags, hours, minutes, seconds);

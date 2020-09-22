@@ -67,7 +67,7 @@ void EntityStateQW_ReadPlayerUpdate(void)
 	s->number = enumber;
 	s->colormap = enumber;
 	playerflags = MSG_ReadShort(&cl_message);
-	MSG_ReadVector(&cl_message, s->origin, cls.protocol);
+	cls.protocol->ReadVector(&cl_message, s->origin);
 	s->frame = MSG_ReadByte(&cl_message);
 
 	VectorClear(viewangles);

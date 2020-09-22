@@ -1059,7 +1059,7 @@ static void CL_ClientMovement_Physics_Swim(cl_clientmovement_state_t *s)
 	if (s->waterjumptime <= 0)
 	{
 		// water friction
-		f = 1 - s->cmd.frametime * cl.movevars_waterfriction * (cls.protocol == PROTOCOL_QUAKEWORLD ? s->waterlevel : 1);
+		f = 1 - s->cmd.frametime * cl.movevars_waterfriction * (cls.protocol == &protocol_quakeworld ? s->waterlevel : 1);
 		f = bound(0, f, 1);
 		VectorScale(s->velocity, f, s->velocity);
 
@@ -1359,7 +1359,7 @@ static void CL_ClientMovement_Physics_Walk(cl_clientmovement_state_t *s)
 				// this mimics it for compatibility
 				VectorSet(neworigin2, s->origin[0] + s->velocity[0]*(16/f), s->origin[1] + s->velocity[1]*(16/f), s->origin[2] + s->mins[2]);
 				VectorSet(neworigin3, neworigin2[0], neworigin2[1], neworigin2[2] - 34);
-				if (cls.protocol == PROTOCOL_QUAKEWORLD)
+				if (cls.protocol == &protocol_quakeworld)
 					trace = CL_TraceBox(neworigin2, s->mins, s->maxs, neworigin3, MOVE_NORMAL, s->self, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_PLAYERCLIP, 0, 0, collision_extendmovelength.value, true, true, NULL, true);
 				else
 					trace = CL_TraceLine(neworigin2, neworigin3, MOVE_NORMAL, s->self, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY | SUPERCONTENTS_PLAYERCLIP, 0, 0, collision_extendmovelength.value, true, true, NULL, true, false);
@@ -1385,7 +1385,7 @@ static void CL_ClientMovement_Physics_Walk(cl_clientmovement_state_t *s)
 			else
 				s->velocity[2] -= gravity;
 		}
-		if (cls.protocol == PROTOCOL_QUAKEWORLD)
+		if (cls.protocol == &protocol_quakeworld)
 			s->velocity[2] = 0;
 		if (VectorLength2(s->velocity))
 			CL_ClientMovement_Move(s);
@@ -1473,7 +1473,7 @@ static void CL_ClientMovement_PlayerMove(cl_clientmovement_state_t *s)
 extern cvar_t host_timescale;
 void CL_UpdateMoveVars(void)
 {
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 	{
 		cl.moveflags = 0;
 	}
@@ -1820,7 +1820,7 @@ void CL_SendMove(void)
 		cl.cmd.msec = 100;
 	cl.cmd.frametime = cl.cmd.msec * (1.0 / 1000.0);
 
-	switch(cls.protocol)
+	switch(cls.protocol->num)
 	{
 	case PROTOCOL_QUAKEWORLD:
 		// quakeworld uses a different cvar with opposite meaning, for compatibility
@@ -1842,11 +1842,10 @@ void CL_SendMove(void)
 
 	cl.cmd.jump = (cl.cmd.buttons & 2) != 0;
 	cl.cmd.crouch = 0;
-	switch (cls.protocol)
+	switch (cls.protocol->num)
 	{
 	case PROTOCOL_QUAKEWORLD:
 	case PROTOCOL_QUAKE:
-	case PROTOCOL_QUAKEDP:
 	case PROTOCOL_NEHAHRAMOVIE:
 	case PROTOCOL_NEHAHRABJP:
 	case PROTOCOL_NEHAHRABJP2:
@@ -1886,7 +1885,7 @@ void CL_SendMove(void)
 	}
 
 	// do not send 0ms packets because they mess up physics
-	if(cl.cmd.msec == 0 && cl.time > cl.oldtime && (cls.protocol == PROTOCOL_QUAKEWORLD || cls.signon == SIGNONS))
+	if(cl.cmd.msec == 0 && cl.time > cl.oldtime && (cls.protocol == &protocol_quakeworld || cls.signon == SIGNONS))
 		return;
 	// always send if buttons changed or an impulse is pending
 	// even if it violates the rate limit!
@@ -1928,12 +1927,12 @@ void CL_SendMove(void)
 	// set prydon cursor info
 	CL_UpdatePrydonCursor();
 
-	if (cls.protocol == PROTOCOL_QUAKEWORLD || cls.signon == SIGNONS)
+	if (cls.protocol == &protocol_quakeworld || cls.signon == SIGNONS)
 	{
-		switch (cls.protocol)
+		switch (cls.protocol->num)
 		{
 		case PROTOCOL_QUAKEWORLD:
-			MSG_WriteByte(&buf, qw_clc_move);
+			MSG_WriteByte(&buf, clc_move);
 			// save the position for a checksum byte
 			checksumindex = buf.cursize;
 			MSG_WriteByte(&buf, 0);
@@ -1956,14 +1955,13 @@ void CL_SendMove(void)
 			if (cl.qw_validsequence && !cl_nodelta.integer && cls.state == ca_connected && !cls.demorecording)
 			{
 				cl.qw_deltasequence[cls.netcon->outgoing_unreliable_sequence & QW_UPDATE_MASK] = cl.qw_validsequence;
-				MSG_WriteByte(&buf, qw_clc_delta);
+				MSG_WriteByte(&buf, clc_delta);
 				MSG_WriteByte(&buf, cl.qw_validsequence & 255);
 			}
 			else
 				cl.qw_deltasequence[cls.netcon->outgoing_unreliable_sequence & QW_UPDATE_MASK] = -1;
 			break;
 		case PROTOCOL_QUAKE:
-		case PROTOCOL_QUAKEDP:
 		case PROTOCOL_NEHAHRAMOVIE:
 		case PROTOCOL_NEHAHRABJP:
 		case PROTOCOL_NEHAHRABJP2:
@@ -2042,7 +2040,7 @@ void CL_SendMove(void)
 					continue;
 				// 5/9 bytes
 				MSG_WriteByte (&buf, clc_move);
-				if (cls.protocol != PROTOCOL_DARKPLACES6)
+				if (cls.protocol != &protocol_dpp6)
 					MSG_WriteLong (&buf, cmd->predicted ? cmd->sequence : 0);
 				MSG_WriteFloat (&buf, cmd->time); // last server packet time
 				// 6 bytes
@@ -2073,7 +2071,7 @@ void CL_SendMove(void)
 		}
 	}
 
-	if (cls.protocol != PROTOCOL_QUAKEWORLD && buf.cursize)
+	if (cls.protocol != &protocol_quakeworld && buf.cursize)
 	{
 		// ack entity frame numbers received since the last input was sent
 		// (redundent to improve handling of client->server packet loss)

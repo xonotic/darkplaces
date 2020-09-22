@@ -294,7 +294,7 @@ void EntityFrame5_CL_ReadFrame(void)
 	// read the number of this frame to echo back in next input packet
 	framenum = MSG_ReadLong(&cl_message);
 	CL_NewFrameReceived(framenum);
-	if (cls.protocol != PROTOCOL_QUAKE && cls.protocol != PROTOCOL_QUAKEDP && cls.protocol != PROTOCOL_NEHAHRAMOVIE && cls.protocol != PROTOCOL_DARKPLACES1 && cls.protocol != PROTOCOL_DARKPLACES2 && cls.protocol != PROTOCOL_DARKPLACES3 && cls.protocol != PROTOCOL_DARKPLACES4 && cls.protocol != PROTOCOL_DARKPLACES5 && cls.protocol != PROTOCOL_DARKPLACES6)
+	if (cls.protocol != &protocol_netquake && cls.protocol != &protocol_quakedp && cls.protocol != &protocol_nehahramovie && cls.protocol != &protocol_dpp1 && cls.protocol != &protocol_dpp2 && cls.protocol != &protocol_dpp3 && cls.protocol != &protocol_dpp4 && cls.protocol != &protocol_dpp5 && cls.protocol != &protocol_dpp6)
 		cls.servermovesequence = MSG_ReadLong(&cl_message);
 	// read entity numbers until we find a 0x8000
 	// (which would be remove world entity, but is actually a terminator)

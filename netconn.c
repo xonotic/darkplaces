@@ -21,6 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 #include "quakedef.h"
+#include "protocol.h"
 #include "thread.h"
 #include "lhnet.h"
 
@@ -723,7 +724,7 @@ static int NetConn_AddCryptoFlag(crypto_t *crypto)
 	return flag;
 }
 
-int NetConn_Transmit(netconn_t *conn, sizebuf_t *data, protocolversion_t protocol, int rate, int burstsize, qbool quakesignon_suppressreliables)
+int NetConn_Transmit(netconn_t *conn, sizebuf_t *data, protocol_t *protocol, int rate, int burstsize, qbool quakesignon_suppressreliables)
 {
 	int totallen = 0;
 	unsigned char sendbuffer[NET_HEADERSIZE+NET_MAXMESSAGE];
@@ -737,7 +738,7 @@ int NetConn_Transmit(netconn_t *conn, sizebuf_t *data, protocolversion_t protoco
 
 	conn->outgoing_netgraph[conn->outgoing_packetcounter].cleartime = conn->cleartime;
 
-	if (protocol == PROTOCOL_QUAKEWORLD)
+	if (protocol == &protocol_quakeworld)
 	{
 		int packetLen;
 		qbool sendreliable;
@@ -1195,7 +1196,7 @@ void NetConn_UpdateSockets(void)
 	}
 }
 
-static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, size_t length, protocolversion_t protocol, double newtimeout)
+static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, size_t length, protocol_t *protocol, double newtimeout)
 {
 	int originallength = (int)length;
 	unsigned char sendbuffer[NET_HEADERSIZE+NET_MAXMESSAGE];
@@ -1204,7 +1205,7 @@ static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, s
 	if (length < 8)
 		return 0;
 
-	if (protocol == PROTOCOL_QUAKEWORLD)
+	if (protocol == &protocol_quakeworld)
 	{
 		unsigned int sequence, sequence_ack;
 		qbool reliable_ack, reliable_message;
@@ -1505,7 +1506,7 @@ static int NetConn_ReceivedMessage(netconn_t *conn, const unsigned char *data, s
 	return 0;
 }
 
-static void NetConn_ConnectionEstablished(lhnetsocket_t *mysocket, lhnetaddress_t *peeraddress, protocolversion_t initialprotocol)
+static void NetConn_ConnectionEstablished(lhnetsocket_t *mysocket, lhnetaddress_t *peeraddress, protocol_t *initialprotocol)
 {
 	crypto_t *crypto;
 	cls.connect_trying = false;
@@ -1547,9 +1548,9 @@ static void NetConn_ConnectionEstablished(lhnetsocket_t *mysocket, lhnetaddress_
 	cls.protocol = initialprotocol;
 	// reset move sequence numbering on this new connection
 	cls.servermovesequence = 0;
-	if (cls.protocol == PROTOCOL_QUAKEWORLD)
+	if (cls.protocol == &protocol_quakeworld)
 		CL_ForwardToServer("new");
-	if (cls.protocol == PROTOCOL_QUAKE)
+	if (cls.protocol == &protocol_netquake)
 	{
 		// write a keepalive (clc_nop) as it seems to greatly improve the
 		// chances of connecting to a netquake server
@@ -1769,7 +1770,7 @@ static void NetConn_ClientParsePacket_ServerList_ParseDPList(lhnetaddress_t *sen
 		if (serverlist_consoleoutput && developer_networking.integer)
 			Con_Printf("Requesting info from DarkPlaces server %s\n", ipstring);
 		
-		if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_DARKPLACES7, ipstring, false ) ) {
+		if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( protocol_dpp7.num, ipstring, false ) ) {
 			break;
 		}
 
@@ -1927,7 +1928,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 #ifdef CONFIG_MENU
 			M_Update_Return_Reason("Accepted");
 #endif
-			NetConn_ConnectionEstablished(mysocket, peeraddress, PROTOCOL_DARKPLACES3);
+			NetConn_ConnectionEstablished(mysocket, peeraddress, &protocol_dpp3);
 			return true;
 		}
 		if (length > 7 && !memcmp(string, "reject ", 7) && cls.connect_trying)
@@ -2073,7 +2074,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 					if (serverlist_consoleoutput && developer_networking.integer)
 						Con_Printf("Requesting info from QuakeWorld server %s\n", ipstring);
 					
-					if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_QUAKEWORLD, ipstring, false ) ) {
+					if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( protocol_quakeworld.num, ipstring, false ) ) {
 						break;
 					}
 
@@ -2136,7 +2137,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 #ifdef CONFIG_MENU
 			M_Update_Return_Reason("QuakeWorld Accepted");
 #endif
-			NetConn_ConnectionEstablished(mysocket, peeraddress, PROTOCOL_QUAKEWORLD);
+			NetConn_ConnectionEstablished(mysocket, peeraddress, &protocol_quakeworld);
 			return true;
 		}
 		if (length > 2 && !memcmp(string, "n\\", 2))
@@ -2202,7 +2203,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 		return true;
 	}
 	// quakeworld ingame packet
-	if (fromserver && cls.protocol == PROTOCOL_QUAKEWORLD && length >= 8 && (ret = NetConn_ReceivedMessage(cls.netcon, data, length, cls.protocol, net_messagetimeout.value)) == 2)
+	if (fromserver && cls.protocol == &protocol_quakeworld && length >= 8 && (ret = NetConn_ReceivedMessage(cls.netcon, data, length, cls.protocol, net_messagetimeout.value)) == 2)
 	{
 		ret = 0;
 		CL_ParseServerMessage();
@@ -2256,7 +2257,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 #ifdef CONFIG_MENU
 				M_Update_Return_Reason("Accepted");
 #endif
-				NetConn_ConnectionEstablished(mysocket, &clientportaddress, PROTOCOL_QUAKE);
+				NetConn_ConnectionEstablished(mysocket, &clientportaddress, &protocol_netquake);
 			}
 			break;
 		case CCREP_REJECT:
@@ -3316,7 +3317,7 @@ static int NetConn_ServerParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 	// protocol
 	// (this protects more modern protocols against being used for
 	//  Quake packet flood Denial Of Service attacks)
-	if (length >= 5 && (i = BuffBigLong(data)) && (i & (~NETFLAG_LENGTH_MASK)) == (int)NETFLAG_CTL && (i & NETFLAG_LENGTH_MASK) == length && (sv.protocol == PROTOCOL_QUAKE || sv.protocol == PROTOCOL_QUAKEDP || sv.protocol == PROTOCOL_NEHAHRAMOVIE || sv.protocol == PROTOCOL_NEHAHRABJP || sv.protocol == PROTOCOL_NEHAHRABJP2 || sv.protocol == PROTOCOL_NEHAHRABJP3 || sv.protocol == PROTOCOL_DARKPLACES1 || sv.protocol == PROTOCOL_DARKPLACES2 || sv.protocol == PROTOCOL_DARKPLACES3) && !ENCRYPTION_REQUIRED)
+	if (length >= 5 && (i = BuffBigLong(data)) && (i & (~NETFLAG_LENGTH_MASK)) == (int)NETFLAG_CTL && (i & NETFLAG_LENGTH_MASK) == length && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3) && !ENCRYPTION_REQUIRED)
 	{
 		int c;
 		int protocolnumber;
@@ -3697,7 +3698,7 @@ void NetConn_QueryMasters(qbool querydp, qbool queryqw)
 					if(LHNETADDRESS_GetAddressType(&favorites[j]) == af)
 					{
 						if(LHNETADDRESS_ToString(&favorites[j], request, sizeof(request), true))
-							NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_DARKPLACES7, request, true );
+							NetConn_ClientParsePacket_ServerList_PrepareQuery( protocol_dpp7.num, request, true );
 					}
 				}
 			}
@@ -3747,7 +3748,7 @@ void NetConn_QueryMasters(qbool querydp, qbool queryqw)
 						if(LHNETADDRESS_ToString(&favorites[j], request, sizeof(request), true))
 						{
 							NetConn_WriteString(cl_sockets[i], "\377\377\377\377status\n", &favorites[j]);
-							NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_QUAKEWORLD, request, true );
+							NetConn_ClientParsePacket_ServerList_PrepareQuery( protocol_quakeworld.num, request, true );
 						}
 					}
 				}
@@ -3803,7 +3804,7 @@ static void Net_Heartbeat_f(cmd_state_t *cmd)
 
 static void PrintStats(netconn_t *conn)
 {
-	if ((cls.state == ca_connected && cls.protocol == PROTOCOL_QUAKEWORLD) || (sv.active && sv.protocol == PROTOCOL_QUAKEWORLD))
+	if ((cls.state == ca_connected && cls.protocol == &protocol_quakeworld) || (sv.active && sv.protocol == &protocol_quakeworld))
 		Con_Printf("address=%21s canSend=%u sendSeq=%6u recvSeq=%6u\n", conn->address, !conn->sendMessageLength, conn->outgoing_unreliable_sequence, conn->qw.incoming_sequence);
 	else
 		Con_Printf("address=%21s canSend=%u sendSeq=%6u recvSeq=%6u\n", conn->address, !conn->sendMessageLength, conn->nq.sendSequence, conn->nq.receiveSequence);
