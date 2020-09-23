@@ -49,6 +49,8 @@ struct protocol_s
 	const char *name;
 	const int num;
 
+	const int max_edicts;
+
 	void (*WriteCoord)(sizebuf_t *, float);
 	void (*WriteAngle)(sizebuf_t *, float);
 	void (*WriteVector)(sizebuf_t *, const vec3_t);

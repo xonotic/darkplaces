@@ -43,6 +43,7 @@ protocol_t protocol_netquake =
 {
 	.name = "QUAKE",
 	.num = 15,
+	.max_edicts = 640,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -59,6 +60,7 @@ protocol_t protocol_quakedp =
 {
 	.name = "QUAKEDP",
 	.num = 15,
+	.max_edicts = 2048,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -91,6 +93,7 @@ protocol_t protocol_dpp1 =
 {
 	.name = "DP1",
 	.num = 96,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord32f,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector32f,
@@ -107,6 +110,7 @@ protocol_t protocol_dpp2 =
 {
 	.name = "DP2",
 	.num = 97,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord16i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector16i,
@@ -123,6 +127,7 @@ protocol_t protocol_dpp3 =
 {
 	.name = "DP3",
 	.num = 3500,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord16i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector16i,
@@ -139,6 +144,7 @@ protocol_t protocol_dpp4 =
 {
 	.name = "DP4",
 	.num = 3501,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord16i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector16i,
@@ -155,6 +161,7 @@ protocol_t protocol_dpp5 =
 {
 	.name = "DP5",
 	.num = 3502,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord32f,
 	.WriteAngle = MSG_WriteAngle16i,
 	.WriteVector = MSG_WriteVector32f,
@@ -171,6 +178,7 @@ protocol_t protocol_dpp6 =
 {
 	.name = "DP6",
 	.num = 3503,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord32f,
 	.WriteAngle = MSG_WriteAngle16i,
 	.WriteVector = MSG_WriteVector32f,
@@ -187,6 +195,7 @@ protocol_t protocol_dpp7 =
 {
 	.name = "DP7",
 	.num = 3504,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord32f,
 	.WriteAngle = MSG_WriteAngle16i,
 	.WriteVector = MSG_WriteVector32f,
@@ -204,6 +213,7 @@ protocol_t protocol_nehahramovie =
 {
 	.name = "NEHAHRAMOVIE",
 	.num = 250,
+	.max_edicts = 2048,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -220,6 +230,7 @@ protocol_t protocol_nehahrabjp =
 {
 	.name = "NEHAHRABJP",
 	.num = 10000,
+	.max_edicts = 4096,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -236,6 +247,7 @@ protocol_t protocol_nehahrabjp2 =
 {
 	.name = "NEHAHRABJP2",
 	.num = 10001,
+	.max_edicts = 4096,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -252,6 +264,7 @@ protocol_t protocol_nehahrabjp3 =
 {
 	.name = "NEHAHRABJP3",
 	.num = 10002,
+	.max_edicts = 4096,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
