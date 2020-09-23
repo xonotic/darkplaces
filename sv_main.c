@@ -3511,6 +3511,15 @@ void SV_SpawnServer (const char *map)
 		Con_Printf(CON_WARN "NOTE: random seed is %d; use for debugging/benchmarking only!\nUnset sv_random_seed to get real random numbers again.\n", sv_random_seed.integer);
 	}
 
+	sv.protocol = Protocol_ForName(sv_protocolname.string);
+	if (!sv.protocol)
+	{
+		char buffer[1024];
+		Protocol_Names(buffer, sizeof(buffer));
+		Con_Printf(CON_ERROR "Unknown sv_protocolname \"%s\", valid values are:\n%s\n", sv_protocolname.string, buffer);
+		sv.protocol = &protocol_netquake;
+	}
+
 	SV_VM_Setup();
 
 	sv.active = true;
@@ -3524,15 +3533,6 @@ void SV_SpawnServer (const char *map)
 	Cvar_SetQuick(&sv_worldname, sv.worldname);
 	Cvar_SetQuick(&sv_worldnamenoextension, sv.worldnamenoextension);
 	Cvar_SetQuick(&sv_worldbasename, sv.worldbasename);
-
-	sv.protocol = Protocol_ForName(sv_protocolname.string);
-	if (!sv.protocol)
-	{
-		char buffer[1024];
-		Protocol_Names(buffer, sizeof(buffer));
-		Con_Printf(CON_ERROR "Unknown sv_protocolname \"%s\", valid values are:\n%s\n", sv_protocolname.string, buffer);
-		sv.protocol = &protocol_netquake;
-	}
 
 // load progs to get entity field count
 	//PR_LoadProgs ( sv_progs.string );
