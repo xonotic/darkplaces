@@ -1038,7 +1038,7 @@ void SV_ReadClientMessage(void)
 			SV_ExecuteClientMoves();
 			break;
 		}
-		if(!netcmd || netcmd >= protocol->max_clcmsg || !protocol->clcmsg[netcmd].func)
+		if(!netcmd || netcmd >= protocol->clc->size || !protocol->clc->msg[netcmd].func)
 		{
 			Con_Printf("SV_ReadClientMessage: unknown command char %i (at offset 0x%x)\n", netcmd, sv_message.readcount);
 			if (developer_networking.integer)
@@ -1047,7 +1047,7 @@ void SV_ReadClientMessage(void)
 			return;
 		}
 		else
-			protocol->clcmsg[netcmd].func(protocol);
+			protocol->clc->msg[netcmd].func(protocol);
 	}
 }
 

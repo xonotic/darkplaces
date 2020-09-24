@@ -59,16 +59,18 @@ struct protocol_s
 	void (*ReadVector)(sizebuf_t *, vec3_t);
 
 	// TODO: Other info?
-	const int max_svcmsg;
-	struct protocol_netmsg_s *svcmsg;
-	const int max_clcmsg;
-	struct protocol_netmsg_s *clcmsg;
+	struct protocol_netmsg_s *svc;
+	struct protocol_netmsg_s *clc;
 };
 
 struct protocol_netmsg_s
 {
-	const char *name;
-	void (*func)(struct protocol_s *);
+	const int size;
+	struct
+	{
+		const char *name;
+		void (*func)(struct protocol_s *);
+	} msg[256];
 };
 
 typedef struct protocol_s protocol_t;
@@ -89,10 +91,10 @@ extern protocol_t protocol_nehahrabjp;
 extern protocol_t protocol_nehahrabjp2;
 extern protocol_t protocol_nehahrabjp3;
 
-extern protocol_netmsg_t netmsg_nq_svc[];
-extern protocol_netmsg_t netmsg_qw_svc[];
-extern protocol_netmsg_t netmsg_dpext_svc[];
-extern protocol_netmsg_t netmsg_base_clc[];
+extern protocol_netmsg_t netmsg_nq_svc;
+extern protocol_netmsg_t netmsg_qw_svc;
+extern protocol_netmsg_t netmsg_dpext_svc;
+extern protocol_netmsg_t netmsg_base_clc;
 
 #define PF_PREDICTION (1<<0)
 #define PF_MOVE_CROUCH (1<<1)

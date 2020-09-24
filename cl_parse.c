@@ -3339,17 +3339,17 @@ void CL_ParseServerMessage(void)
 			}
 		}
 
-		if(cmd <= protocol->max_svcmsg && protocol->svcmsg[cmd].func)
+		if(cmd <= protocol->svc->size && protocol->svc->msg[cmd].func)
 		{
-			SHOWNET(protocol->svcmsg[cmd].name);
-			cmdlogname[cmdindex] = protocol->svcmsg[cmd].name;
+			SHOWNET(protocol->svc->msg[cmd].name);
+			cmdlogname[cmdindex] = protocol->svc->msg[cmd].name;
 			if (!cmdlogname[cmdindex])
 			{
 				// LadyHavoc: fix for bizarre problem in MSVC that I do not understand (if I assign the string pointer directly it ends up storing a NULL pointer)
 				const char *d = "<unknown>";
 				cmdlogname[cmdindex] = d;
 			}
-			protocol->svcmsg[cmd].func(protocol);
+			protocol->svc->msg[cmd].func(protocol);
 		}
 		else
 		{

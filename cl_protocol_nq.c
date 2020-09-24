@@ -2,7 +2,8 @@
 #include "protocol.h"
 #include "cl_protocol_basenq.h"
 
-protocol_netmsg_t netmsg_nq_svc[] =
+protocol_netmsg_t netmsg_nq_svc =
 {
-	NETMSG_BASENQ_SVC
+	.size = 34,
+	.msg = {NETMSG_BASENQ_SVC}
 };

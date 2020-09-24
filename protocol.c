@@ -50,10 +50,8 @@ protocol_t protocol_netquake =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 34,
-	.svcmsg = netmsg_nq_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_nq_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_quakedp =
@@ -67,10 +65,8 @@ protocol_t protocol_quakedp =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_quakeworld =
@@ -83,10 +79,8 @@ protocol_t protocol_quakeworld =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 53,
-	.svcmsg = netmsg_qw_svc,
-	.max_clcmsg = 59,
-	.clcmsg = NULL
+	.svc = &netmsg_qw_svc,
+	.clc = NULL
 };
 
 protocol_t protocol_dpp1 =
@@ -100,10 +94,8 @@ protocol_t protocol_dpp1 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector32f,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp2 =
@@ -117,10 +109,8 @@ protocol_t protocol_dpp2 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp3 =
@@ -134,10 +124,8 @@ protocol_t protocol_dpp3 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp4 =
@@ -151,10 +139,8 @@ protocol_t protocol_dpp4 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp5 =
@@ -168,10 +154,8 @@ protocol_t protocol_dpp5 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp6 =
@@ -185,10 +169,8 @@ protocol_t protocol_dpp6 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_dpp7 =
@@ -202,10 +184,8 @@ protocol_t protocol_dpp7 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 
 };
 
@@ -220,10 +200,8 @@ protocol_t protocol_nehahramovie =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_nehahrabjp =
@@ -237,10 +215,8 @@ protocol_t protocol_nehahrabjp =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_nehahrabjp2 =
@@ -254,10 +230,8 @@ protocol_t protocol_nehahrabjp2 =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t protocol_nehahrabjp3 =
@@ -271,10 +245,8 @@ protocol_t protocol_nehahrabjp3 =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
-	.max_svcmsg = 62,
-	.svcmsg = netmsg_dpext_svc,
-	.max_clcmsg = 59,
-	.clcmsg = netmsg_base_clc
+	.svc = &netmsg_dpext_svc,
+	.clc = &netmsg_base_clc
 };
 
 protocol_t *protocols[] =
