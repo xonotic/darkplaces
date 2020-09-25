@@ -65,6 +65,7 @@ protocol_t protocol_quakedp =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -94,6 +95,7 @@ protocol_t protocol_dpp1 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector32f,
+	.ReadFrame = EntityFrame_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -109,6 +111,7 @@ protocol_t protocol_dpp2 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
+	.ReadFrame = EntityFrame_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -124,6 +127,7 @@ protocol_t protocol_dpp3 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
+	.ReadFrame = EntityFrame_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -139,6 +143,7 @@ protocol_t protocol_dpp4 =
 	.ReadCoord = MSG_ReadCoord16i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector16i,
+	.ReadFrame = EntityFrame4_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -154,6 +159,7 @@ protocol_t protocol_dpp5 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -169,6 +175,7 @@ protocol_t protocol_dpp6 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -184,6 +191,7 @@ protocol_t protocol_dpp7 =
 	.ReadCoord = MSG_ReadCoord32f,
 	.ReadAngle = MSG_ReadAngle16i,
 	.ReadVector = MSG_ReadVector32f,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 
@@ -200,6 +208,7 @@ protocol_t protocol_nehahramovie =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -215,6 +224,7 @@ protocol_t protocol_nehahrabjp =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -230,6 +240,7 @@ protocol_t protocol_nehahrabjp2 =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };
@@ -245,6 +256,7 @@ protocol_t protocol_nehahrabjp3 =
 	.ReadCoord = MSG_ReadCoord13i,
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
+	.ReadFrame = EntityFrame5_CL_ReadFrame,
 	.svc = &netmsg_dpext_svc,
 	.clc = &netmsg_base_clc
 };

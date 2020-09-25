@@ -127,12 +127,8 @@ static void Netmsg_svc_entities (protocol_t *protocol) //			57		// [int] deltafr
 		cls.signon = SIGNONS;
 		CL_SignonReply ();
 	}
-	if (protocol == &protocol_dpp1 || protocol == &protocol_dpp2 || protocol == &protocol_dpp3)
-		EntityFrame_CL_ReadFrame();
-	else if (protocol == &protocol_dpp4)
-		EntityFrame4_CL_ReadFrame();
-	else
-		EntityFrame5_CL_ReadFrame();
+
+	protocol->ReadFrame();
 }
 
 static void Netmsg_svc_csqcentities (protocol_t *protocol) //		58		// [short] entnum [variable length] entitydata ... [short] 0x0000

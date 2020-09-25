@@ -58,6 +58,8 @@ struct protocol_s
 	float (*ReadAngle)(sizebuf_t *);
 	void (*ReadVector)(sizebuf_t *, vec3_t);
 
+	void (*ReadFrame)(void);
+
 	// TODO: Other info?
 	struct protocol_netmsg_s *svc;
 	struct protocol_netmsg_s *clc;
