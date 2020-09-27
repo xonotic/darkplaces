@@ -45,12 +45,12 @@ cvar_t cl_bobfall = {CF_CLIENT | CF_ARCHIVE, "cl_bobfall","0", "how much the vie
 cvar_t cl_bobfallcycle = {CF_CLIENT | CF_ARCHIVE, "cl_bobfallcycle","3", "speed of the bobfall swing"};
 cvar_t cl_bobfallminspeed = {CF_CLIENT | CF_ARCHIVE, "cl_bobfallminspeed","200", "necessary amount of speed for bob-falling to occur"};
 cvar_t cl_bobmodel = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel", "1", "enables gun bobbing"};
-cvar_t cl_bobmodel_side = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_side", "0", "gun bobbing sideways sway amount"};
-cvar_t cl_bobmodel_up = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_up", "0", "gun bobbing upward movement amount"};
-cvar_t cl_bobmodel_forward = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_forward", "0.25", "gun bobbing forward movement amount"};
+cvar_t cl_bobmodel_side = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_side", "0.15", "gun bobbing sideways sway amount"};
+cvar_t cl_bobmodel_up = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_up", "0.06", "gun bobbing upward movement amount"};
+cvar_t cl_bobmodel_forward = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_forward", "0", "gun bobbing forward movement amount"};
 cvar_t cl_bobmodel_classic = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_classic", "1", "classic Quake-style forward gun bobbing"};
-cvar_t cl_bobmodel_speed = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_speed", "6", "gun bobbing speed"};
-cvar_t cl_bob_limit = {CF_CLIENT | CF_ARCHIVE, "cl_bob_limit", "4", "limits bobbing to this much distance from view_ofs"};
+cvar_t cl_bobmodel_speed = {CF_CLIENT | CF_ARCHIVE, "cl_bobmodel_speed", "7", "gun bobbing speed"};
+cvar_t cl_bob_limit = {CF_CLIENT | CF_ARCHIVE, "cl_bob_limit", "7", "limits bobbing to this much distance from view_ofs"};
 cvar_t cl_bob_limit_heightcheck = {CF_CLIENT | CF_ARCHIVE, "cl_bob_limit_heightcheck", "0", "check ceiling and floor height against cl_bob_limit and scale down all view bobbing if could result in camera being in solid"};
 cvar_t cl_bob_limit_heightcheck_dontcrosswatersurface = {CF_CLIENT | CF_ARCHIVE, "cl_bob_limit_heightcheck_dontcrosswatersurface", "1", "limit cl_bob_limit to not crossing liquid surfaces also"};
 cvar_t cl_bob_velocity_limit = {CF_CLIENT | CF_ARCHIVE, "cl_bob_velocity_limit", "400", "limits the xyspeed value in the bobbing code"};
@@ -141,6 +141,8 @@ cvar_t v_deathtiltangle = {CF_CLIENT, "v_deathtiltangle", "80", "what roll angle
 cvar_t chase_pitchangle = {CF_CLIENT | CF_ARCHIVE, "chase_pitchangle", "55", "chase cam pitch angle"};
 
 cvar_t v_yshearing = {CF_CLIENT, "v_yshearing", "0", "be all out of gum (set this to the maximum angle to allow Y shearing for - try values like 75)"};
+
+cvar_t r_viewmodel_quake = {CF_CLIENT | CF_ARCHIVE, "r_viewmodel_quake", "0", "Quake-style weapon viewmodel angle adjustment"};
 
 float	v_dmg_time, v_dmg_roll, v_dmg_pitch;
 
@@ -475,20 +477,45 @@ static void highpass3_limited(vec3_t value, vec_t fracx, vec_t limitx, vec_t fra
  *   viewmodelmatrix_nobob
  *   viewmodelmatrix_withbob
  */
-void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qbool teleported, qbool clonground, qbool clcmdjump, float clstatsviewheight, qbool cldead, qbool clintermission, const vec3_t clvelocity)
+
+/*
+==================
+V_CalcIntermissionRefdef
+
+==================
+*/
+static void V_CalcIntermissionRefdef (vec3_t vieworg, vec3_t viewangles, const matrix4x4_t *entrendermatrix, float clstatsviewheight)
+{
+	matrix4x4_t tmpmatrix;
+
+	// entity is a fixed camera, just copy the matrix
+	if (cls.protocol == &protocol_quakeworld)
+		Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.qw_intermission_origin[0], cl.qw_intermission_origin[1], cl.qw_intermission_origin[2], cl.qw_intermission_angles[0], cl.qw_intermission_angles[1], cl.qw_intermission_angles[2], 1);
+	else
+	{
+		r_refdef.view.matrix = *entrendermatrix;
+		Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, clstatsviewheight);
+	}
+	if (v_yshearing.value > 0)
+		Matrix4x4_QuakeToDuke3D(&r_refdef.view.matrix, &r_refdef.view.matrix, v_yshearing.value);
+	Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
+	Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
+	Matrix4x4_Copy(&viewmodelmatrix_withbob, &viewmodelmatrix_nobob);
+
+	VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
+	VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
+
+	Matrix4x4_Invert_Simple(&tmpmatrix, &r_refdef.view.matrix);
+	Matrix4x4_CreateScale(&cl.csqc_viewmodelmatrixfromengine, cl_viewmodel_scale.value);
+}
+
+void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qbool teleported, qbool clonground, qbool clcmdjump, float clstatsviewheight, qbool cldead, const vec3_t clvelocity)
 {
 	float vieworg[3], viewangles[3], smoothtime;
 	float gunorg[3], gunangles[3];
 	matrix4x4_t tmpmatrix;
-	
 	static float viewheightavg;
-	float viewheight;	
-#if 0
-// begin of chase camera bounding box size for proper collisions by Alexander Zubov
-	vec3_t camboxmins = {-3, -3, -3};
-	vec3_t camboxmaxs = {3, 3, 3};
-// end of chase camera bounding box size for proper collisions by Alexander Zubov
-#endif
+	float viewheight;
 	trace_t trace;
 
 	// react to clonground state changes (for gun bob)
@@ -520,28 +547,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	if (v_dmg_time > 0)
 		v_dmg_time -= bound(0, smoothtime, 0.1);
 
-	if (clintermission)
-	{
-		// entity is a fixed camera, just copy the matrix
-		if (cls.protocol == &protocol_quakeworld)
-			Matrix4x4_CreateFromQuakeEntity(&r_refdef.view.matrix, cl.qw_intermission_origin[0], cl.qw_intermission_origin[1], cl.qw_intermission_origin[2], cl.qw_intermission_angles[0], cl.qw_intermission_angles[1], cl.qw_intermission_angles[2], 1);
-		else
-		{
-			r_refdef.view.matrix = *entrendermatrix;
-			Matrix4x4_AdjustOrigin(&r_refdef.view.matrix, 0, 0, clstatsviewheight);
-		}
-		if (v_yshearing.value > 0)
-			Matrix4x4_QuakeToDuke3D(&r_refdef.view.matrix, &r_refdef.view.matrix, v_yshearing.value);
-		Matrix4x4_Copy(&viewmodelmatrix_nobob, &r_refdef.view.matrix);
-		Matrix4x4_ConcatScale(&viewmodelmatrix_nobob, cl_viewmodel_scale.value);
-		Matrix4x4_Copy(&viewmodelmatrix_withbob, &viewmodelmatrix_nobob);
-
-		VectorCopy(vieworg, cl.csqc_vieworiginfromengine);
-		VectorCopy(viewangles, cl.csqc_viewanglesfromengine);
-
-		Matrix4x4_Invert_Simple(&tmpmatrix, &r_refdef.view.matrix);
-		Matrix4x4_CreateScale(&cl.csqc_viewmodelmatrixfromengine, cl_viewmodel_scale.value);
-	}
+	if (cl.intermission)
+		V_CalcIntermissionRefdef(vieworg, viewangles, entrendermatrix, clstatsviewheight);
 	else
 	{
 		// smooth stair stepping, but only if clonground and enabled
@@ -578,10 +585,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 
 			if (chase_overhead.integer)
 			{
-#if 1
 				vec3_t offset;
 				vec3_t bestvieworg;
-#endif
 				vec3_t up;
 				viewangles[PITCH] = 0;
 				AngleVectors(viewangles, forward, NULL, up);
@@ -589,23 +594,8 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				chase_dest[0] = vieworg[0] - forward[0] * camback + up[0] * camup;
 				chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup;
 				chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup;
-#if 0
-#if 1
-				//trace = CL_TraceLine(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-				trace = CL_TraceLine(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-#else
-				//trace = CL_TraceBox(vieworg, eyeboxmins, eyeboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, true, false, NULL, false);
-#endif
-				VectorCopy(trace.endpos, vieworg);
-				vieworg[2] -= 8;
-#else
 				// trace from first person view location to our chosen third person view location
-#if 1
 				trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
-#else
-				trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false);
-#endif
 				VectorCopy(trace.endpos, bestvieworg);
 				offset[2] = 0;
 				for (offset[0] = -16;offset[0] <= 16;offset[0] += 8)
@@ -616,18 +606,13 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						chase_dest[0] = vieworg[0] - forward[0] * camback + up[0] * camup + offset[0];
 						chase_dest[1] = vieworg[1] - forward[1] * camback + up[1] * camup + offset[1];
 						chase_dest[2] = vieworg[2] - forward[2] * camback + up[2] * camup + offset[2];
-#if 1
 						trace = CL_TraceLine(vieworg, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false, true);
-#else
-						trace = CL_TraceBox(vieworg, camboxmins, camboxmaxs, chase_dest, MOVE_NOMONSTERS, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_SKY, 0, MATERIALFLAGMASK_TRANSLUCENT, collision_extendmovelength.value, true, false, NULL, false);
-#endif
 						if (bestvieworg[2] > trace.endpos[2])
 							bestvieworg[2] = trace.endpos[2];
 					}
 				}
 				bestvieworg[2] -= 8;
 				VectorCopy(bestvieworg, vieworg);
-#endif
 				viewangles[PITCH] = campitch;
 			}
 			else
@@ -656,25 +641,12 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 			if (cldead && v_deathtilt.integer)
 				viewangles[ROLL] = v_deathtiltangle.value;
 
-			// Hanicef: don't apply punchangle twice if the scene is rendered more than once.
-			if (!cl_punchangle_applied)
-			{
-				VectorAdd(viewangles, cl.punchangle, viewangles);
-				cl_punchangle_applied = 1;
-			}
-			viewangles[ROLL] += Com_CalcRoll(clviewangles, clvelocity, cl_rollangle.value, cl_rollspeed.value);
-
-			if (v_dmg_time > 0)
-			{
-				viewangles[ROLL] += v_dmg_time/v_kicktime.value*v_dmg_roll;
-				viewangles[PITCH] += v_dmg_time/v_kicktime.value*v_dmg_pitch;
-			}
 			// origin
 			VectorAdd(vieworg, cl.punchvector, vieworg);
 			if (!cldead)
 			{
-				double xyspeed, bob, bobfall;
-				double bobcycle = 0, cycle; // double-precision because cl.time can be a very large number, where float would get stuttery at high time values
+				double xyspeed = 0, bob = 0, bobfall = 0;
+				double cycle = 0; // double-precision because cl.time can be a very large number, where float would get stuttery at high time values
 				vec_t frametime;
 
 				frametime = (cl.time - cl.calcrefdef_prevtime) * cl.movevars_timescale;
@@ -739,7 +711,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 				// vertical view bobbing code
 				if (cl_bob.value && cl_bobcycle.value)
 				{
-					float bob_limit = cl_bob_limit.value;
+					float bob_limit = cl_bobmodel_classic.integer ? 4 : cl_bob_limit.value;
 
 					if (cl_bob_limit_heightcheck.integer)
 					{
@@ -771,20 +743,23 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 					cycle = cl.time / cl_bobcycle.value;
 					cycle -= (int) cycle;
 					if (cycle < cl_bobup.value)
-						bobcycle = cycle = sin(M_PI * cycle / cl_bobup.value);
+						cycle = M_PI * cycle / cl_bobup.value;
 					else
-						bobcycle = cycle = sin(M_PI + M_PI * (cycle-cl_bobup.value)/(1.0 - cl_bobup.value));
+						cycle = M_PI + M_PI * (cycle-cl_bobup.value)/(1.0 - cl_bobup.value);
 					// bob is proportional to velocity in the xy plane
 					// (don't count Z, or jumping messes it up)
 					bob = xyspeed * cl_bob.value;
-					bob = bob*0.3 + bob*0.7*cycle;
+					bob = bob*0.3 + bob*0.7*sin(cycle);
 					bob = bound(-7, bob, bob_limit);
+
 					vieworg[2] += bob;
+
 					// we also need to adjust gunorg, or this appears like pushing the gun!
 					// In the old code, this was applied to vieworg BEFORE copying to gunorg,
 					// but this is not viable with the new followmodel code as that would mean
 					// that followmodel would work on the munged-by-bob vieworg and do feedback
-					gunorg[2] += bob;
+					if(!cl_bobmodel_classic.integer)
+						gunorg[2] += bob;
 				}
 
 				// horizontal view bobbing code
@@ -855,50 +830,85 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 						gunorg[2] += bobfall;
 					}
 				}
+				VectorCopy(clviewangles, viewangles);
+
+				// Hanicef: don't apply punchangle twice if the scene is rendered more than once.
+				if (!cl_punchangle_applied)
+				{
+					VectorAdd(viewangles, cl.punchangle, viewangles);
+					cl_punchangle_applied = 1;
+				}
+				viewangles[ROLL] += Com_CalcRoll(clviewangles, clvelocity, cl_rollangle.value, cl_rollspeed.value);
+
+				if (v_dmg_time > 0)
+				{
+					viewangles[ROLL] += v_dmg_time/v_kicktime.value*v_dmg_roll;
+					viewangles[PITCH] += v_dmg_time/v_kicktime.value*v_dmg_pitch;
+				}
 
 				// gun model bobbing code
 				if (cl_bobmodel.value)
 				{
-					// calculate for swinging gun model
-					// the gun bobs when running on the ground, but doesn't bob when you're in the air.
-					// Sajt: I tried to smooth out the transitions between bob and no bob, which works
-					// for the most part, but for some reason when you go through a message trigger or
-					// pick up an item or anything like that it will momentarily jolt the gun.
 					vec3_t forward, right, up;
-					float bspeed;
-					float s;
-					float t;
+					AngleVectors (gunangles, forward, right, up);
 
-					s = cl.time * cl_bobmodel_speed.value;
-					if (clonground)
+					if(!cl_bobmodel_classic.integer)
 					{
-						if (cl.time - cl.hitgroundtime < 0.2)
+						// calculate for swinging gun model
+						// the gun bobs when running on the ground, but doesn't bob when you're in the air.
+						// Sajt: I tried to smooth out the transitions between bob and no bob, which works
+						// for the most part, but for some reason when you go through a message trigger or
+						// pick up an item or anything like that it will momentarily jolt the gun.
+						float bspeed;
+						float s;
+						float t;
+
+						s = cl.time * cl_bobmodel_speed.value;
+						if (clonground)
 						{
-							// just hit the ground, speed the bob back up over the next 0.2 seconds
-							t = cl.time - cl.hitgroundtime;
-							t = bound(0, t, 0.2);
-							t *= 5;
+							if (cl.time - cl.hitgroundtime < 0.2)
+							{
+								// just hit the ground, speed the bob back up over the next 0.2 seconds
+								t = cl.time - cl.hitgroundtime;
+								t = bound(0, t, 0.2);
+								t *= 5;
+							}
+							else
+								t = 1;
 						}
 						else
-							t = 1;
+						{
+							// recently left the ground, slow the bob down over the next 0.2 seconds
+							t = cl.time - cl.lastongroundtime;
+							t = 0.2 - bound(0, t, 0.2);
+							t *= 5;
+						}
+
+						bspeed = xyspeed * 0.01f;
+						bob = bspeed * cl_bobmodel_side.value * cl_viewmodel_scale.value * sin (s) * t;
+						VectorMA (gunorg, bob, right, gunorg);
+						bob = bspeed * cl_bobmodel_up.value * cl_viewmodel_scale.value * cos (s * 2) * t;
+						VectorMA (gunorg, bob, up, gunorg);
 					}
 					else
 					{
-						// recently left the ground, slow the bob down over the next 0.2 seconds
-						t = cl.time - cl.lastongroundtime;
-						t = 0.2 - bound(0, t, 0.2);
-						t *= 5;
-					}
+						// Classic Quake bobbing
+						for (int i = 0; i < 3; i++)
+							gunorg[i] += forward[i]*bob*0.4;
+						gunorg[2] += bob;
 
-					bspeed = xyspeed * 0.01f;
-					AngleVectors (gunangles, forward, right, up);
-					bob = bspeed * cl_bobmodel_side.value * cl_viewmodel_scale.value * sin (s) * t;
-					VectorMA (gunorg, bob, right, gunorg);
-					bob = bspeed * cl_bobmodel_up.value * cl_viewmodel_scale.value * cos (s * 2) * t;
-					VectorMA (gunorg, bob, up, gunorg);
-					// Classic Quake bobbing
-					bob = (cl_bobmodel_classic.integer ? xyspeed * cl_bob.value * 0.25 * bobcycle : bspeed * cl_bobmodel_forward.value * cos(s * 2) * t) * cl_viewmodel_scale.value;
-					VectorMA (gunorg, (cl_bobmodel_classic.integer ? (bob > 1 ? 1 : bob) : bob), forward, gunorg);
+						if (r_viewmodel_quake.value)
+						{
+							if (scr_viewsize.value == 110)
+								gunorg[2] += 1;
+							else if (scr_viewsize.value == 100)
+								gunorg[2] += 2;
+							else if (scr_viewsize.value == 90)
+								gunorg[2] += 1;
+							else if (scr_viewsize.value == 80)
+								gunorg[2] += 0.5;
+						}
+					}
 				}
 			}
 		}
@@ -942,7 +952,7 @@ void V_CalcRefdef (void)
 		ent = &cl.entities[cl.viewentity];
 
 		cldead = (cl.stats[STAT_HEALTH] <= 0 && cl.stats[STAT_HEALTH] != -666 && cl.stats[STAT_HEALTH] != -2342);
-		V_CalcRefdefUsing(&ent->render.matrix, cl.viewangles, !ent->persistent.trail_allowed, cl.onground, cl.cmd.jump, cl.stats[STAT_VIEWHEIGHT], cldead, cl.intermission != 0, cl.velocity); // FIXME use a better way to detect teleport/warp than trail_allowed
+		V_CalcRefdefUsing(&ent->render.matrix, cl.viewangles, !ent->persistent.trail_allowed, cl.onground, cl.cmd.jump, cl.stats[STAT_VIEWHEIGHT], cldead, cl.velocity); // FIXME use a better way to detect teleport/warp than trail_allowed
 	}
 	else
 	{
@@ -1291,5 +1301,6 @@ void V_Init (void)
 	Cvar_RegisterVariable (&v_deathtiltangle);
 
 	Cvar_RegisterVariable (&v_yshearing);
+	Cvar_RegisterVariable (&r_viewmodel_quake);
 }
 
