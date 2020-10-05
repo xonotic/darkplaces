@@ -24,171 +24,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "matrixlib.h"
 #include "snd_main.h"
-
-// NOTE: r_stat_name[] must match this indexing
-typedef enum r_stat_e
-{
-	r_stat_timedelta,
-	r_stat_quality,
-	r_stat_renders,
-	r_stat_entities,
-	r_stat_entities_surfaces,
-	r_stat_entities_triangles,
-	r_stat_world_leafs,
-	r_stat_world_portals,
-	r_stat_world_surfaces,
-	r_stat_world_triangles,
-	r_stat_lightmapupdates,
-	r_stat_lightmapupdatepixels,
-	r_stat_particles,
-	r_stat_drawndecals,
-	r_stat_totaldecals,
-	r_stat_draws,
-	r_stat_draws_vertices,
-	r_stat_draws_elements,
-	r_stat_lights,
-	r_stat_lights_clears,
-	r_stat_lights_scissored,
-	r_stat_lights_lighttriangles,
-	r_stat_lights_shadowtriangles,
-	r_stat_lights_dynamicshadowtriangles,
-	r_stat_bouncegrid_lights,
-	r_stat_bouncegrid_particles,
-	r_stat_bouncegrid_traces,
-	r_stat_bouncegrid_hits,
-	r_stat_bouncegrid_splats,
-	r_stat_bouncegrid_bounces,
-	r_stat_photoncache_animated,
-	r_stat_photoncache_cached,
-	r_stat_photoncache_traced,
-	r_stat_bloom,
-	r_stat_bloom_copypixels,
-	r_stat_bloom_drawpixels,
-	r_stat_rendertargets_used,
-	r_stat_rendertargets_pixels,
-	r_stat_indexbufferuploadcount,
-	r_stat_indexbufferuploadsize,
-	r_stat_vertexbufferuploadcount,
-	r_stat_vertexbufferuploadsize,
-	r_stat_framedatacurrent,
-	r_stat_framedatasize,
-	r_stat_bufferdatacurrent_vertex, // R_BUFFERDATA_ types are added to this index
-	r_stat_bufferdatacurrent_index16,
-	r_stat_bufferdatacurrent_index32,
-	r_stat_bufferdatacurrent_uniform,
-	r_stat_bufferdatasize_vertex, // R_BUFFERDATA_ types are added to this index
-	r_stat_bufferdatasize_index16,
-	r_stat_bufferdatasize_index32,
-	r_stat_bufferdatasize_uniform,
-	r_stat_animcache_skeletal_count,
-	r_stat_animcache_skeletal_bones,
-	r_stat_animcache_skeletal_maxbones,
-	r_stat_animcache_shade_count,
-	r_stat_animcache_shade_vertices,
-	r_stat_animcache_shade_maxvertices,
-	r_stat_animcache_shape_count,
-	r_stat_animcache_shape_vertices,
-	r_stat_animcache_shape_maxvertices,
-	r_stat_batch_batches,
-	r_stat_batch_withgaps,
-	r_stat_batch_surfaces,
-	r_stat_batch_vertices,
-	r_stat_batch_triangles,
-	r_stat_batch_fast_batches,
-	r_stat_batch_fast_surfaces,
-	r_stat_batch_fast_vertices,
-	r_stat_batch_fast_triangles,
-	r_stat_batch_copytriangles_batches,
-	r_stat_batch_copytriangles_surfaces,
-	r_stat_batch_copytriangles_vertices,
-	r_stat_batch_copytriangles_triangles,
-	r_stat_batch_dynamic_batches,
-	r_stat_batch_dynamic_surfaces,
-	r_stat_batch_dynamic_vertices,
-	r_stat_batch_dynamic_triangles,
-	r_stat_batch_dynamicskeletal_batches,
-	r_stat_batch_dynamicskeletal_surfaces,
-	r_stat_batch_dynamicskeletal_vertices,
-	r_stat_batch_dynamicskeletal_triangles,
-	r_stat_batch_dynamic_batches_because_cvar,
-	r_stat_batch_dynamic_surfaces_because_cvar,
-	r_stat_batch_dynamic_vertices_because_cvar,
-	r_stat_batch_dynamic_triangles_because_cvar,
-	r_stat_batch_dynamic_batches_because_lightmapvertex,
-	r_stat_batch_dynamic_surfaces_because_lightmapvertex,
-	r_stat_batch_dynamic_vertices_because_lightmapvertex,
-	r_stat_batch_dynamic_triangles_because_lightmapvertex,
-	r_stat_batch_dynamic_batches_because_deformvertexes_autosprite,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_autosprite,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_autosprite,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_autosprite,
-	r_stat_batch_dynamic_batches_because_deformvertexes_autosprite2,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_autosprite2,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_autosprite2,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_autosprite2,
-	r_stat_batch_dynamic_batches_because_deformvertexes_normal,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_normal,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_normal,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_normal,
-	r_stat_batch_dynamic_batches_because_deformvertexes_wave,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_wave,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_wave,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_wave,
-	r_stat_batch_dynamic_batches_because_deformvertexes_bulge,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_bulge,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_bulge,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_bulge,
-	r_stat_batch_dynamic_batches_because_deformvertexes_move,
-	r_stat_batch_dynamic_surfaces_because_deformvertexes_move,
-	r_stat_batch_dynamic_vertices_because_deformvertexes_move,
-	r_stat_batch_dynamic_triangles_because_deformvertexes_move,
-	r_stat_batch_dynamic_batches_because_tcgen_lightmap,
-	r_stat_batch_dynamic_surfaces_because_tcgen_lightmap,
-	r_stat_batch_dynamic_vertices_because_tcgen_lightmap,
-	r_stat_batch_dynamic_triangles_because_tcgen_lightmap,
-	r_stat_batch_dynamic_batches_because_tcgen_vector,
-	r_stat_batch_dynamic_surfaces_because_tcgen_vector,
-	r_stat_batch_dynamic_vertices_because_tcgen_vector,
-	r_stat_batch_dynamic_triangles_because_tcgen_vector,
-	r_stat_batch_dynamic_batches_because_tcgen_environment,
-	r_stat_batch_dynamic_surfaces_because_tcgen_environment,
-	r_stat_batch_dynamic_vertices_because_tcgen_environment,
-	r_stat_batch_dynamic_triangles_because_tcgen_environment,
-	r_stat_batch_dynamic_batches_because_tcmod_turbulent,
-	r_stat_batch_dynamic_surfaces_because_tcmod_turbulent,
-	r_stat_batch_dynamic_vertices_because_tcmod_turbulent,
-	r_stat_batch_dynamic_triangles_because_tcmod_turbulent,
-	r_stat_batch_dynamic_batches_because_nogaps,
-	r_stat_batch_dynamic_surfaces_because_nogaps,
-	r_stat_batch_dynamic_vertices_because_nogaps,
-	r_stat_batch_dynamic_triangles_because_nogaps,
-	r_stat_batch_dynamic_batches_because_derived,
-	r_stat_batch_dynamic_surfaces_because_derived,
-	r_stat_batch_dynamic_vertices_because_derived,
-	r_stat_batch_dynamic_triangles_because_derived,
-	r_stat_batch_entitycache_count,
-	r_stat_batch_entitycache_surfaces,
-	r_stat_batch_entitycache_vertices,
-	r_stat_batch_entitycache_triangles,
-	r_stat_batch_entityanimate_count,
-	r_stat_batch_entityanimate_surfaces,
-	r_stat_batch_entityanimate_vertices,
-	r_stat_batch_entityanimate_triangles,
-	r_stat_batch_entityskeletal_count,
-	r_stat_batch_entityskeletal_surfaces,
-	r_stat_batch_entityskeletal_vertices,
-	r_stat_batch_entityskeletal_triangles,
-	r_stat_batch_entitystatic_count,
-	r_stat_batch_entitystatic_surfaces,
-	r_stat_batch_entitystatic_vertices,
-	r_stat_batch_entitystatic_triangles,
-	r_stat_batch_entitycustom_count,
-	r_stat_batch_entitycustom_surfaces,
-	r_stat_batch_entitycustom_vertices,
-	r_stat_batch_entitycustom_triangles,
-	r_stat_count // size of array
-}
-r_stat_t;
+#include "view.h"
+#include "cap.h"
+#include "cl_parse.h"
+#include "cl_particles.h"
+#include "r_stats.h"
 
 // flags for rtlight rendering
 #define LIGHTFLAG_NORMALMODE 1
@@ -214,7 +54,7 @@ tridecal_t;
 
 typedef struct decalsystem_s
 {
-	dp_model_t *model;
+	model_t *model;
 	double lastupdatetime;
 	int maxdecals;
 	int freedecal;
@@ -234,7 +74,7 @@ typedef struct effect_s
 	vec3_t origin;
 	double starttime;
 	float framerate;
-	dp_model_t *model;
+	model_t *model;
 	int startframe;
 	int endframe;
 	// these are for interpolation
@@ -501,7 +341,7 @@ typedef struct entity_render_s
 	float transparent_offset;
 
 	// NULL = no model
-	dp_model_t *model;
+	model_t *model;
 	// number of the entity represents, or 0 for non-network entities
 	int entitynumber;
 	// literal colormap colors for renderer, if both are 0 0 0 it is not colormapped
@@ -639,40 +479,6 @@ typedef struct entity_s
 }
 entity_t;
 
-typedef struct usercmd_s
-{
-	vec3_t	viewangles;
-
-// intended velocities
-	float	forwardmove;
-	float	sidemove;
-	float	upmove;
-
-	vec3_t	cursor_screen;
-	vec3_t	cursor_start;
-	vec3_t	cursor_end;
-	vec3_t	cursor_impact;
-	vec3_t	cursor_normal;
-	vec_t	cursor_fraction;
-	int		cursor_entitynumber;
-
-	double time; // time the move is executed for (cl_movement: clienttime, non-cl_movement: receivetime)
-	double receivetime; // time the move was received at
-	double clienttime; // time to which server state the move corresponds to
-	int msec; // for predicted moves
-	int buttons;
-	int impulse;
-	unsigned int sequence;
-	qbool applied; // if false we're still accumulating a move
-	qbool predicted; // if true the sequence should be sent as 0
-
-	// derived properties
-	double frametime;
-	qbool canjump;
-	qbool jump;
-	qbool crouch;
-} usercmd_t;
-
 typedef struct lightstyle_s
 {
 	int		length;
@@ -737,60 +543,6 @@ typedef enum qw_downloadtype_e
 	dl_sound
 }
 qw_downloadtype_t;
-
-#ifdef CONFIG_VIDEO_CAPTURE
-typedef enum capturevideoformat_e
-{
-	CAPTUREVIDEOFORMAT_AVI_I420,
-	CAPTUREVIDEOFORMAT_OGG_VORBIS_THEORA
-}
-capturevideoformat_t;
-
-typedef struct capturevideostate_s
-{
-	double startrealtime;
-	double framerate;
-	int framestep;
-	int framestepframe;
-	qbool active;
-	qbool realtime;
-	qbool error;
-	int soundrate;
-	int soundchannels;
-	int frame;
-	double starttime;
-	double lastfpstime;
-	int lastfpsframe;
-	int soundsampleframe;
-	unsigned char *screenbuffer;
-	unsigned char *outbuffer;
-	char basename[MAX_QPATH];
-	int width, height;
-
-	// precomputed RGB to YUV tables
-	// converts the RGB values to YUV (see cap_avi.c for how to use them)
-	short rgbtoyuvscaletable[3][3][256];
-	unsigned char yuvnormalizetable[3][256];
-
-	// precomputed gamma ramp (only needed if the capturevideo module uses RGB output)
-	// note: to map from these values to RGB24, you have to multiply by 255.0/65535.0, then add 0.5, then cast to integer
-	unsigned short vidramp[256 * 3];
-
-	// stuff to be filled in by the video format module
-	capturevideoformat_t format;
-	const char *formatextension;
-	qfile_t *videofile;
-		// always use this:
-		//   cls.capturevideo.videofile = FS_OpenRealFile(va(vabuf, sizeof(vabuf), "%s.%s", cls.capturevideo.basename, cls.capturevideo.formatextension), "wb", false);
-	void (*endvideo) (void);
-	void (*videoframes) (int num);
-	void (*soundframe) (const portable_sampleframe_t *paintbuffer, size_t length);
-
-	// format specific data
-	void *formatspecific;
-}
-capturevideostate_t;
-#endif
 
 #define CL_MAX_DOWNLOADACKS 4
 
@@ -956,82 +708,6 @@ typedef struct
 	qbool drawenginesbar;
 	qbool drawcrosshair;
 }csqc_vidvars_t;
-
-typedef enum
-{
-	PARTICLE_BILLBOARD = 0,
-	PARTICLE_SPARK = 1,
-	PARTICLE_ORIENTED_DOUBLESIDED = 2,
-	PARTICLE_VBEAM = 3,
-	PARTICLE_HBEAM = 4,
-	PARTICLE_INVALID = -1
-}
-porientation_t;
-
-typedef enum
-{
-	PBLEND_ALPHA = 0,
-	PBLEND_ADD = 1,
-	PBLEND_INVMOD = 2,
-	PBLEND_INVALID = -1
-}
-pblend_t;
-
-typedef struct particletype_s
-{
-	pblend_t blendmode;
-	porientation_t orientation;
-	qbool lighting;
-}
-particletype_t;
-
-typedef enum ptype_e
-{
-	pt_dead, pt_alphastatic, pt_static, pt_spark, pt_beam, pt_rain, pt_raindecal, pt_snow, pt_bubble, pt_blood, pt_smoke, pt_decal, pt_entityparticle, pt_total
-}
-ptype_t;
-
-typedef struct particle_s
-{
-	// for faster batch rendering, particles are rendered in groups by effect (resulting in less perfect sorting but far less state changes)
-
-	// fields used by rendering: (48 bytes)
-	vec3_t          sortorigin; // sort by this group origin, not particle org
-	vec3_t          org;
-	vec3_t          vel; // velocity of particle, or orientation of decal, or end point of beam
-	float           size;
-	float           alpha; // 0-255
-	float           stretch; // only for sparks
-
-	// fields not used by rendering:  (44 bytes)
-	float           stainsize;
-	float           stainalpha;
-	float           sizeincrease; // rate of size change per second
-	float           alphafade; // how much alpha reduces per second
-	float           time2; // used for snow fluttering and decal fade
-	float           bounce; // how much bounce-back from a surface the particle hits (0 = no physics, 1 = stop and slide, 2 = keep bouncing forever, 1.5 is typical)
-	float           gravity; // how much gravity affects this particle (1.0 = normal gravity, 0.0 = none)
-	float           airfriction; // how much air friction affects this object (objects with a low mass/size ratio tend to get more air friction)
-	float           liquidfriction; // how much liquid friction affects this object (objects with a low mass/size ratio tend to get more liquid friction)
-//	float           delayedcollisions; // time that p->bounce becomes active
-	float           delayedspawn; // time that particle appears and begins moving
-	float           die; // time when this particle should be removed, regardless of alpha
-
-	// short variables grouped to save memory (4 bytes)
-	short			angle; // base rotation of particle
-	short			spin; // geometry rotation speed around the particle center normal
-
-	// byte variables grouped to save memory (12 bytes)
-	unsigned char   color[3];
-	unsigned char   qualityreduction; // enables skipping of this particle according to r_refdef.view.qualityreduction
-	unsigned char   typeindex;
-	unsigned char   blendmode;
-	unsigned char   orientation;
-	unsigned char   texnum;
-	unsigned char   staincolor[3];
-	signed char     staintexnum;
-}
-particle_t;
 
 typedef enum cl_parsingtextmode_e
 {
@@ -1234,10 +910,10 @@ typedef struct client_state_s
 	int gametype;
 
 	// models and sounds used by engine code (particularly cl_parse.c)
-	dp_model_t *model_bolt;
-	dp_model_t *model_bolt2;
-	dp_model_t *model_bolt3;
-	dp_model_t *model_beam;
+	model_t *model_bolt;
+	model_t *model_bolt2;
+	model_t *model_bolt3;
+	model_t *model_beam;
 	sfx_t *sfx_wizhit;
 	sfx_t *sfx_knighthit;
 	sfx_t *sfx_tink1;
@@ -1570,7 +1246,7 @@ void CL_ValidateState(entity_state_t *s);
 void CL_MoveLerpEntityStates(entity_t *ent);
 void CL_LerpUpdate(entity_t *e);
 void CL_ParseTEnt (void);
-void CL_NewBeam (int ent, vec3_t start, vec3_t end, dp_model_t *m, int lightning);
+void CL_NewBeam (int ent, vec3_t start, vec3_t end, model_t *m, int lightning);
 void CL_RelinkBeams (void);
 void CL_Beam_CalculatePositions (const beam_t *b, vec3_t start, vec3_t end);
 void CL_ClientMovement_Replay(void);
@@ -1578,7 +1254,7 @@ void CL_ClientMovement_Replay(void);
 void CL_ClearTempEntities (void);
 entity_render_t *CL_NewTempEntity (double shadertime);
 
-void CL_Effect(vec3_t org, dp_model_t *model, int startframe, int framecount, float framerate);
+void CL_Effect(vec3_t org, model_t *model, int startframe, int framecount, float framerate);
 
 void CL_ClearState (void);
 void CL_ExpandEntities(int num);
@@ -1593,8 +1269,6 @@ extern int cl_ignoremousemoves;
 
 
 float CL_KeyState (kbutton_t *key);
-const char *Key_KeynumToString (int keynum, char *buf, size_t buflength);
-int Key_StringToKeynum (const char *str);
 
 //
 // cl_cmd.c
@@ -1628,371 +1302,10 @@ void CL_TimeDemo_f(cmd_state_t *cmd);
 
 void CL_Demo_Init(void);
 
-//
-// cl_parse.c
-//
-void CL_Parse_Init(void);
-void CL_Parse_Shutdown(void);
-void CL_ParseServerMessage(void);
-void CL_Parse_DumpPacket(void);
-void CL_Parse_ErrorCleanUp(void);
-void QW_CL_StartUpload(unsigned char *data, int size);
-extern cvar_t qport;
-void CL_KeepaliveMessage(qbool readmessages); // call this during loading of large content
-
-//
-// view
-//
-void V_StartPitchDrift_f(cmd_state_t *cmd);
-void V_StopPitchDrift (void);
-
-void V_Init (void);
-void V_UpdateBlends (void);
-void V_ParseDamage (void);
-
-//
-// cl_part
-//
-
-extern cvar_t cl_particles;
-extern cvar_t cl_particles_quality;
-extern cvar_t cl_particles_size;
-extern cvar_t cl_particles_quake;
-extern cvar_t cl_particles_blood;
-extern cvar_t cl_particles_blood_alpha;
-extern cvar_t cl_particles_blood_decal_alpha;
-extern cvar_t cl_particles_blood_decal_scalemin;
-extern cvar_t cl_particles_blood_decal_scalemax;
-extern cvar_t cl_particles_blood_bloodhack;
-extern cvar_t cl_particles_bulletimpacts;
-extern cvar_t cl_particles_explosions_sparks;
-extern cvar_t cl_particles_explosions_shell;
-extern cvar_t cl_particles_rain;
-extern cvar_t cl_particles_snow;
-extern cvar_t cl_particles_smoke;
-extern cvar_t cl_particles_smoke_alpha;
-extern cvar_t cl_particles_smoke_alphafade;
-extern cvar_t cl_particles_sparks;
-extern cvar_t cl_particles_bubbles;
-extern cvar_t cl_decals;
-extern cvar_t cl_decals_time;
-extern cvar_t cl_decals_fadetime;
-
-void CL_Particles_Clear(void);
-void CL_Particles_Init(void);
-void CL_Particles_Shutdown(void);
-particle_t *CL_NewParticle(const vec3_t sortorigin, unsigned short ptypeindex, int pcolor1, int pcolor2, int ptex, float psize, float psizeincrease, float palpha, float palphafade, float pgravity, float pbounce, float px, float py, float pz, float pvx, float pvy, float pvz, float pairfriction, float pliquidfriction, float originjitter, float velocityjitter, qbool pqualityreduction, float lifetime, float stretch, pblend_t blendmode, porientation_t orientation, int staincolor1, int staincolor2, int staintex, float stainalpha, float stainsize, float angle, float spin, float tint[4]);
-
-typedef enum effectnameindex_s
-{
-	EFFECT_NONE,
-	EFFECT_TE_GUNSHOT,
-	EFFECT_TE_GUNSHOTQUAD,
-	EFFECT_TE_SPIKE,
-	EFFECT_TE_SPIKEQUAD,
-	EFFECT_TE_SUPERSPIKE,
-	EFFECT_TE_SUPERSPIKEQUAD,
-	EFFECT_TE_WIZSPIKE,
-	EFFECT_TE_KNIGHTSPIKE,
-	EFFECT_TE_EXPLOSION,
-	EFFECT_TE_EXPLOSIONQUAD,
-	EFFECT_TE_TAREXPLOSION,
-	EFFECT_TE_TELEPORT,
-	EFFECT_TE_LAVASPLASH,
-	EFFECT_TE_SMALLFLASH,
-	EFFECT_TE_FLAMEJET,
-	EFFECT_EF_FLAME,
-	EFFECT_TE_BLOOD,
-	EFFECT_TE_SPARK,
-	EFFECT_TE_PLASMABURN,
-	EFFECT_TE_TEI_G3,
-	EFFECT_TE_TEI_SMOKE,
-	EFFECT_TE_TEI_BIGEXPLOSION,
-	EFFECT_TE_TEI_PLASMAHIT,
-	EFFECT_EF_STARDUST,
-	EFFECT_TR_ROCKET,
-	EFFECT_TR_GRENADE,
-	EFFECT_TR_BLOOD,
-	EFFECT_TR_WIZSPIKE,
-	EFFECT_TR_SLIGHTBLOOD,
-	EFFECT_TR_KNIGHTSPIKE,
-	EFFECT_TR_VORESPIKE,
-	EFFECT_TR_NEHAHRASMOKE,
-	EFFECT_TR_NEXUIZPLASMA,
-	EFFECT_TR_GLOWTRAIL,
-	EFFECT_SVC_PARTICLE,
-	EFFECT_TOTAL
-}
-effectnameindex_t;
-
-int CL_ParticleEffectIndexForName(const char *name);
-const char *CL_ParticleEffectNameForIndex(int i);
-void CL_ParticleEffect(int effectindex, float pcount, const vec3_t originmins, const vec3_t originmaxs, const vec3_t velocitymins, const vec3_t velocitymaxs, entity_t *ent, int palettecolor);
-void CL_ParticleTrail(int effectindex, float pcount, const vec3_t originmins, const vec3_t originmaxs, const vec3_t velocitymins, const vec3_t velocitymaxs, entity_t *ent, int palettecolor, qbool spawndlight, qbool spawnparticles, float tintmins[4], float tintmaxs[4], float fade);
-void CL_ParticleBox(int effectindex, float pcount, const vec3_t originmins, const vec3_t originmaxs, const vec3_t velocitymins, const vec3_t velocitymaxs, entity_t *ent, int palettecolor, qbool spawndlight, qbool spawnparticles, float tintmins[4], float tintmaxs[4], float fade);
-void CL_ParseParticleEffect (void);
-void CL_ParticleCube (const vec3_t mins, const vec3_t maxs, const vec3_t dir, int count, int colorbase, vec_t gravity, vec_t randomvel);
-void CL_ParticleRain (const vec3_t mins, const vec3_t maxs, const vec3_t dir, int count, int colorbase, int type);
-void CL_EntityParticles (const entity_t *ent);
-void CL_ParticleExplosion (const vec3_t org);
-void CL_ParticleExplosion2 (const vec3_t org, int colorStart, int colorLength);
-void R_NewExplosion(const vec3_t org);
 
 #include "cl_screen.h"
 
 extern qbool sb_showscores;
-
-float RSurf_FogVertex(const vec3_t p);
-float RSurf_FogPoint(const vec3_t p);
-
-typedef enum r_viewport_type_e
-{
-	R_VIEWPORTTYPE_ORTHO,
-	R_VIEWPORTTYPE_PERSPECTIVE,
-	R_VIEWPORTTYPE_PERSPECTIVE_INFINITEFARCLIP,
-	R_VIEWPORTTYPE_PERSPECTIVECUBESIDE,
-	R_VIEWPORTTYPE_TOTAL
-}
-r_viewport_type_t;
-
-typedef struct r_viewport_s
-{
-	matrix4x4_t cameramatrix; // from entity (transforms from camera entity to world)
-	matrix4x4_t viewmatrix; // actual matrix for rendering (transforms to viewspace)
-	matrix4x4_t projectmatrix; // actual projection matrix (transforms from viewspace to screen)
-	int x;
-	int y;
-	int z;
-	int width;
-	int height;
-	int depth;
-	r_viewport_type_t type;
-	float screentodepth[2]; // used by deferred renderer to calculate linear depth from device depth coordinates
-}
-r_viewport_t;
-
-typedef struct r_refdef_view_s
-{
-	// view information (changes multiple times per frame)
-	// if any of these variables change then r_refdef.viewcache must be regenerated
-	// by calling R_View_Update
-	// (which also updates viewport, scissor, colormask)
-
-	// it is safe and expected to copy this into a structure on the stack and
-	// call the renderer recursively, then restore from the stack afterward
-	// (as long as R_View_Update is called)
-
-	// eye position information
-	matrix4x4_t matrix, inverse_matrix;
-	vec3_t origin;
-	vec3_t forward;
-	vec3_t left;
-	vec3_t right;
-	vec3_t up;
-	int numfrustumplanes;
-	mplane_t frustum[6];
-	qbool useclipplane;
-	qbool usecustompvs; // uses r_refdef.viewcache.pvsbits as-is rather than computing it
-	mplane_t clipplane;
-	float frustum_x, frustum_y;
-	vec3_t frustumcorner[4];
-	// if turned off it renders an ortho view
-	int useperspective;
-	// allows visibility culling based on the view origin (e.g. pvs and R_CanSeeBox)
-	// this is turned off by:
-	// r_trippy
-	// !r_refdef.view.useperspective
-	// (sometimes) r_refdef.view.useclipplane
-	int usevieworiginculling;
-	float ortho_x, ortho_y;
-
-	// screen area to render in
-	int x;
-	int y;
-	int z;
-	int width;
-	int height;
-	int depth;
-	r_viewport_t viewport; // note: if r_viewscale is used, the viewport.width and viewport.height may be less than width and height
-
-	// which color components to allow (for anaglyph glasses)
-	int colormask[4];
-
-	// global RGB color multiplier for rendering
-	float colorscale;
-
-	// whether to call R_ClearScreen before rendering stuff
-	qbool clear;
-	// if true, don't clear or do any post process effects (bloom, etc)
-	qbool isoverlay;
-	// if true, this is the MAIN view (which is, after CSQC, copied into the scene for use e.g. by r_speeds 1, showtex, prydon cursor)
-	qbool ismain;
-
-	// whether to draw r_showtris and such, this is only true for the main
-	// view render, all secondary renders (mirrors, portals, cameras,
-	// distortion effects, etc) omit such debugging information
-	qbool showdebug;
-
-	// these define which values to use in GL_CullFace calls to request frontface or backface culling
-	int cullface_front;
-	int cullface_back;
-
-	// render quality (0 to 1) - affects r_drawparticles_drawdistance and others
-	float quality;
-}
-r_refdef_view_t;
-
-typedef struct r_refdef_viewcache_s
-{
-	// updated by gl_main_newmap()
-	int maxentities;
-	int world_numclusters;
-	int world_numclusterbytes;
-	int world_numleafs;
-	int world_numsurfaces;
-
-	// these properties are generated by R_View_Update()
-
-	// which entities are currently visible for this viewpoint
-	// (the used range is 0...r_refdef.scene.numentities)
-	unsigned char *entityvisible;
-
-	// flag arrays used for visibility checking on world model
-	// (all other entities have no per-surface/per-leaf visibility checks)
-	unsigned char *world_pvsbits;
-	unsigned char *world_leafvisible;
-	unsigned char *world_surfacevisible;
-	// if true, the view is currently in a leaf without pvs data
-	qbool world_novis;
-}
-r_refdef_viewcache_t;
-
-// TODO: really think about which fields should go into scene and which one should stay in refdef [1/7/2008 Black]
-// maybe also refactor some of the functions to support different setting sources (ie. fogenabled, etc.) for different scenes
-typedef struct r_refdef_scene_s {
-	// whether to call S_ExtraUpdate during render to reduce sound chop
-	qbool extraupdate;
-
-	// (client gameworld) time for rendering time based effects
-	double time;
-
-	// the world
-	entity_render_t *worldentity;
-
-	// same as worldentity->model
-	dp_model_t *worldmodel;
-
-	// renderable entities (excluding world)
-	entity_render_t **entities;
-	int numentities;
-	int maxentities;
-
-	// field of temporary entities that is reset each (client) frame
-	entity_render_t *tempentities;
-	int numtempentities;
-	int maxtempentities;
-	qbool expandtempentities;
-
-	// renderable dynamic lights
-	rtlight_t *lights[MAX_DLIGHTS];
-	rtlight_t templights[MAX_DLIGHTS];
-	int numlights;
-
-	// intensities for light styles right now, controls rtlights
-	float rtlightstylevalue[MAX_LIGHTSTYLES];	// float fraction of base light value
-	// 8.8bit fixed point intensities for light styles
-	// controls intensity lightmap layers
-	unsigned short lightstylevalue[MAX_LIGHTSTYLES];	// 8.8 fraction of base light value
-
-	// adds brightness to the whole scene, separate from lightmapintensity
-	// see CL_UpdateEntityShading
-	float ambientintensity;
-	// brightness of lightmap and modellight lighting on materials
-	// see CL_UpdateEntityShading
-	float lightmapintensity;
-
-	qbool rtworld;
-	qbool rtworldshadows;
-	qbool rtdlight;
-	qbool rtdlightshadows;
-} r_refdef_scene_t;
-
-typedef struct r_refdef_s
-{
-	// these fields define the basic rendering information for the world
-	// but not the view, which could change multiple times in one rendered
-	// frame (for example when rendering textures for certain effects)
-
-	// these are set for water warping before
-	// frustum_x/frustum_y are calculated
-	float frustumscale_x, frustumscale_y;
-
-	// current view settings (these get reset a few times during rendering because of water rendering, reflections, etc)
-	r_refdef_view_t view;
-	r_refdef_viewcache_t viewcache;
-
-	// minimum visible distance (pixels closer than this disappear)
-	double nearclip;
-	// maximum visible distance (pixels further than this disappear in 16bpp modes,
-	// in 32bpp an infinite-farclip matrix is used instead)
-	double farclip;
-
-	// fullscreen color blend
-	float viewblend[4];
-
-	r_refdef_scene_t scene;
-
-	float fogplane[4];
-	float fogplaneviewdist;
-	qbool fogplaneviewabove;
-	float fogheightfade;
-	float fogcolor[3];
-	float fogrange;
-	float fograngerecip;
-	float fogmasktabledistmultiplier;
-#define FOGMASKTABLEWIDTH 1024
-	float fogmasktable[FOGMASKTABLEWIDTH];
-	float fogmasktable_start, fogmasktable_alpha, fogmasktable_range, fogmasktable_density;
-	float fog_density;
-	float fog_red;
-	float fog_green;
-	float fog_blue;
-	float fog_alpha;
-	float fog_start;
-	float fog_end;
-	float fog_height;
-	float fog_fadedepth;
-	qbool fogenabled;
-	qbool oldgl_fogenable;
-
-	// new flexible texture height fog (overrides normal fog)
-	char fog_height_texturename[64]; // note: must be 64 for the sscanf code
-	unsigned char *fog_height_table1d;
-	unsigned char *fog_height_table2d;
-	int fog_height_tablesize; // enable
-	float fog_height_tablescale;
-	float fog_height_texcoordscale;
-	char fogheighttexturename[64]; // detects changes to active fog height texture
-
-	int draw2dstage; // 0 = no, 1 = yes, other value = needs setting up again
-
-	// true during envmap command capture
-	qbool envmap;
-
-	// whether to draw world lights realtime, dlights realtime, and their shadows
-	float polygonfactor;
-	float polygonoffset;
-
-	// how long R_RenderView took on the previous frame
-	double lastdrawscreentime;
-
-	// rendering stats for r_speeds display
-	// (these are incremented in many places)
-	int stats[r_stat_count];
-}
-r_refdef_t;
-
-extern r_refdef_t r_refdef;
 
 typedef enum waterlevel_e
 {
@@ -2040,7 +1353,7 @@ typedef enum meshname_e {
 	NUM_MESHENTITIES,
 } meshname_t;
 extern entity_t cl_meshentities[NUM_MESHENTITIES];
-extern dp_model_t cl_meshentitymodels[NUM_MESHENTITIES];
+extern model_t cl_meshentitymodels[NUM_MESHENTITIES];
 extern const char *cl_meshentitynames[NUM_MESHENTITIES];
 #define CL_Mesh_Scene() (&cl_meshentitymodels[MESH_SCENE])
 #define CL_Mesh_UI() (&cl_meshentitymodels[MESH_UI])
@@ -2054,20 +1367,7 @@ void CL_ParseEntityLump(char *entitystring);
 void CL_FindNonSolidLocation(const vec3_t in, vec3_t out, vec_t radius);
 void CL_RelinkLightFlashes(void);
 void CL_Beam_AddPolygons(const beam_t *b);
-void Sbar_ShowFPS(void);
-void Sbar_ShowFPS_Update(void);
-void Host_SaveConfig(void);
-void Host_LoadConfig_f(cmd_state_t *cmd);
 void CL_UpdateMoveVars(void);
-void SCR_CaptureVideo_SoundFrame(const portable_sampleframe_t *paintbuffer, size_t length);
-void V_DriftPitch(void);
-void V_FadeViewFlashs(void);
-void V_CalcViewBlend(void);
-void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewangles, qbool teleported, qbool clonground, qbool clcmdjump, float clstatsviewheight, qbool cldead, const vec3_t clvelocity);
-void V_CalcRefdef(void);
-void V_MakeViewIsometric(void);
-void V_MakeViewIsometric(void);
-void V_StartPitchDrift(void);
 void CL_Locs_Reload_f(cmd_state_t *cmd);
 
 #endif

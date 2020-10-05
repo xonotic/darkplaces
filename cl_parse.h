@@ -1,6 +1,20 @@
-#include "quakedef.h"
+#ifndef CL_PARSE_H
+#define CL_PARSE_H
 
-void CL_ParseBaseline (entity_t *ent, int large);
+#include "qtypes.h"
+#include "cvar.h"
+struct entity_s;
+
+extern struct cvar_s qport;
+
+void CL_Parse_Init(void);
+void CL_Parse_Shutdown(void);
+void CL_ParseServerMessage(void);
+void CL_Parse_DumpPacket(void);
+void CL_Parse_ErrorCleanUp(void);
+void QW_CL_StartUpload(unsigned char *data, int size);
+void CL_KeepaliveMessage(qbool readmessages); // call this during loading of large content
+void CL_ParseBaseline (struct entity_s *ent, int large);
 void CL_ParseClientdata (void);
 void CL_ParseStatic (int large);
 void CL_ParseStaticSound (int large);
@@ -24,3 +38,5 @@ void CL_ParseDownload(void);
 void CL_ParseTrailParticles(void);
 void CL_ParsePointParticles(void);
 void CL_ParsePointParticles1(void);
+
+#endif

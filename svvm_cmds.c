@@ -327,7 +327,7 @@ static vec3_t quakemins = {-16, -16, -16}, quakemaxs = {16, 16, 16};
 static void VM_SV_setmodel(prvm_prog_t *prog)
 {
 	prvm_edict_t	*e;
-	dp_model_t	*mod;
+	model_t	*mod;
 	int		i;
 
 	VM_SAFEPARMCOUNT(2, VM_SV_setmodel);
@@ -2369,7 +2369,7 @@ static void VM_SV_setattachment(prvm_prog_t *prog)
 	prvm_edict_t *e = PRVM_G_EDICT(OFS_PARM0);
 	prvm_edict_t *tagentity = PRVM_G_EDICT(OFS_PARM1);
 	const char *tagname = PRVM_G_STRING(OFS_PARM2);
-	dp_model_t *model;
+	model_t *model;
 	int tagindex;
 	VM_SAFEPARMCOUNT(3, VM_SV_setattachment);
 
@@ -2423,7 +2423,7 @@ static int SV_GetTagIndex (prvm_prog_t *prog, prvm_edict_t *e, const char *tagna
 static int SV_GetExtendedTagInfo (prvm_prog_t *prog, prvm_edict_t *e, int tagindex, int *parentindex, const char **tagname, matrix4x4_t *tag_localmatrix)
 {
 	int r;
-	dp_model_t *model;
+	model_t *model;
 
 	*tagname = NULL;
 	*parentindex = 0;
@@ -2462,7 +2462,7 @@ void SV_GetEntityMatrix (prvm_prog_t *prog, prvm_edict_t *ent, matrix4x4_t *out,
 
 static int SV_GetEntityLocalTagMatrix(prvm_prog_t *prog, prvm_edict_t *ent, int tagindex, matrix4x4_t *out)
 {
-	dp_model_t *model;
+	model_t *model;
 	if (tagindex >= 0 && (model = SV_GetModelFromEdict(ent)) && model->animscenes)
 	{
 		VM_GenerateFrameGroupBlend(prog, ent->priv.server->framegroupblend, ent);
@@ -2481,15 +2481,12 @@ static int SV_GetEntityLocalTagMatrix(prvm_prog_t *prog, prvm_edict_t *ent, int 
 // 3 - null or non-precached model
 // 4 - no tags with requested index
 // 5 - runaway loop at attachment chain
-extern cvar_t cl_bob;
-extern cvar_t cl_bobcycle;
-extern cvar_t cl_bobup;
 static int SV_GetTagMatrix (prvm_prog_t *prog, matrix4x4_t *out, prvm_edict_t *ent, int tagindex)
 {
 	int ret;
 	int modelindex, attachloop;
 	matrix4x4_t entitymatrix, tagmatrix, attachmatrix;
-	dp_model_t *model;
+	model_t *model;
 
 	*out = identitymatrix; // warnings and errors return identical matrix
 
@@ -2542,29 +2539,6 @@ static int SV_GetTagMatrix (prvm_prog_t *prog, matrix4x4_t *out, prvm_edict_t *e
 
 		SV_GetEntityMatrix(prog, ent, &entitymatrix, true);
 		Matrix4x4_Concat(out, &entitymatrix, &tagmatrix);
-
-		/*
-		// Cl_bob, ported from rendering code
-		if (PRVM_serveredictfloat(ent, health) > 0 && cl_bob.value && cl_bobcycle.value)
-		{
-			double bob, cycle;
-			// LadyHavoc: this code is *weird*, but not replacable (I think it
-			// should be done in QC on the server, but oh well, quake is quake)
-			// LadyHavoc: figured out bobup: the time at which the sin is at 180
-			// degrees (which allows lengthening or squishing the peak or valley)
-			cycle = sv.time/cl_bobcycle.value;
-			cycle -= (int)cycle;
-			if (cycle < cl_bobup.value)
-				cycle = sin(M_PI * cycle / cl_bobup.value);
-			else
-				cycle = sin(M_PI + M_PI * (cycle-cl_bobup.value)/(1.0 - cl_bobup.value));
-			// bob is proportional to velocity in the xy plane
-			// (don't count Z, or jumping messes it up)
-			bob = sqrt(PRVM_serveredictvector(ent, velocity)[0]*PRVM_serveredictvector(ent, velocity)[0] + PRVM_serveredictvector(ent, velocity)[1]*PRVM_serveredictvector(ent, velocity)[1])*cl_bob.value;
-			bob = bob*0.3 + bob*0.7*cycle;
-			Matrix4x4_AdjustOrigin(out, 0, 0, bound(-7, bob, 4));
-		}
-		*/
 	}
 	return 0;
 }
@@ -2617,7 +2591,7 @@ static void VM_SV_gettaginfo(prvm_prog_t *prog)
 	const char *tagname;
 	int returncode;
 	vec3_t forward, left, up, origin;
-	const dp_model_t *model;
+	const model_t *model;
 
 	VM_SAFEPARMCOUNT(2, VM_SV_gettaginfo);
 
@@ -2746,7 +2720,7 @@ static void VM_SV_serverkey(prvm_prog_t *prog)
 static void VM_SV_setmodelindex(prvm_prog_t *prog)
 {
 	prvm_edict_t	*e;
-	dp_model_t	*mod;
+	model_t	*mod;
 	int		i;
 	VM_SAFEPARMCOUNT(2, VM_SV_setmodelindex);
 
@@ -2898,7 +2872,7 @@ static void VM_SV_setpause(prvm_prog_t *prog) {
 static void VM_SV_skel_create(prvm_prog_t *prog)
 {
 	int modelindex = (int)PRVM_G_FLOAT(OFS_PARM0);
-	dp_model_t *model = SV_GetModelByIndex(modelindex);
+	model_t *model = SV_GetModelByIndex(modelindex);
 	skeleton_t *skeleton;
 	int i;
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
@@ -2928,7 +2902,7 @@ static void VM_SV_skel_build(prvm_prog_t *prog)
 	float retainfrac = PRVM_G_FLOAT(OFS_PARM3);
 	int firstbone = PRVM_G_FLOAT(OFS_PARM4) - 1;
 	int lastbone = PRVM_G_FLOAT(OFS_PARM5) - 1;
-	dp_model_t *model = SV_GetModelByIndex(modelindex);
+	model_t *model = SV_GetModelByIndex(modelindex);
 	int numblends;
 	int bonenum;
 	int blendindex;
@@ -3171,7 +3145,7 @@ static void VM_SV_skel_delete(prvm_prog_t *prog)
 static void VM_SV_frameforname(prvm_prog_t *prog)
 {
 	int modelindex = (int)PRVM_G_FLOAT(OFS_PARM0);
-	dp_model_t *model = SV_GetModelByIndex(modelindex);
+	model_t *model = SV_GetModelByIndex(modelindex);
 	const char *name = PRVM_G_STRING(OFS_PARM1);
 	int i;
 	PRVM_G_FLOAT(OFS_RETURN) = -1;
@@ -3191,7 +3165,7 @@ static void VM_SV_frameforname(prvm_prog_t *prog)
 static void VM_SV_frameduration(prvm_prog_t *prog)
 {
 	int modelindex = (int)PRVM_G_FLOAT(OFS_PARM0);
-	dp_model_t *model = SV_GetModelByIndex(modelindex);
+	model_t *model = SV_GetModelByIndex(modelindex);
 	int framenum = (int)PRVM_G_FLOAT(OFS_PARM1);
 	PRVM_G_FLOAT(OFS_RETURN) = 0;
 	if (!model || !model->animscenes || framenum < 0 || framenum >= model->numframes)

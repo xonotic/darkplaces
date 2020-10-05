@@ -22,6 +22,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef WORLD_H
 #define WORLD_H
 
+#include "qtypes.h"
+#include "com_list.h"
 #include "collision.h"
 
 #define MOVE_NORMAL     0

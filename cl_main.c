@@ -340,6 +340,16 @@ void CL_ExpandCSQCRenderEntities(int num)
 	}
 }
 
+static void CL_ToggleMenu_Hook(void)
+{
+#ifdef CONFIG_MENU
+	// remove menu
+	if (key_dest == key_menu || key_dest == key_menu_grabbed)
+		MR_ToggleMenu(0);
+#endif
+	key_dest = key_game;
+}
+
 extern cvar_t rcon_secure;
 
 /*
@@ -430,7 +440,7 @@ This command causes the client to wait for the signon messages again.
 This is sent just before a server changes levels
 ==================
 */
-void CL_Reconnect_f(cmd_state_t *cmd)
+static void CL_Reconnect_f(cmd_state_t *cmd)
 {
 	char temp[128];
 	// if not connected, reconnect to the most recent server
@@ -574,6 +584,11 @@ static void CL_EstablishConnection_Local(void)
 		CL_EstablishConnection("local:1", -2);
 }
 
+static qbool CL_Intermission(void)
+{
+	return cl.intermission;
+}
+
 /*
 ==============
 CL_PrintEntities_f
@@ -609,7 +624,7 @@ List information on all models in the client modelindex
 static void CL_ModelIndexList_f(cmd_state_t *cmd)
 {
 	int i;
-	dp_model_t *model;
+	model_t *model;
 
 	// Print Header
 	Con_Printf("%3s: %-30s %-8s %-8s\n", "ID", "Name", "Type", "Triangles");
@@ -656,7 +671,7 @@ void CL_UpdateRenderEntity(entity_render_t *ent)
 {
 	vec3_t org;
 	vec_t scale;
-	dp_model_t *model = ent->model;
+	model_t *model = ent->model;
 	// update the inverse matrix for the renderer
 	Matrix4x4_Invert_Simple(&ent->inversematrix, &ent->matrix);
 	// update the animation blend state
@@ -766,7 +781,7 @@ entity_render_t *CL_NewTempEntity(double shadertime)
 	return render;
 }
 
-void CL_Effect(vec3_t org, dp_model_t *model, int startframe, int framecount, float framerate)
+void CL_Effect(vec3_t org, model_t *model, int startframe, int framecount, float framerate)
 {
 	int i;
 	cl_effect_t *e;
@@ -2463,7 +2478,7 @@ void CL_Locs_Reload_f(cmd_state_t *cmd)
 }
 
 entity_t cl_meshentities[NUM_MESHENTITIES];
-dp_model_t cl_meshentitymodels[NUM_MESHENTITIES];
+model_t cl_meshentitymodels[NUM_MESHENTITIES];
 const char *cl_meshentitynames[NUM_MESHENTITIES] =
 {
 	"MESH_SCENE",
@@ -3057,5 +3072,8 @@ void CL_Init (void)
 		CL_Video_Init();
 
 		host.hook.ConnectLocal = CL_EstablishConnection_Local;
+		host.hook.Disconnect = CL_Disconnect;
+		host.hook.CL_Intermission = CL_Intermission;
+		host.hook.ToggleMenu = CL_ToggleMenu_Hook;
 	}
 }

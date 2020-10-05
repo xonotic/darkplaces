@@ -25,19 +25,16 @@
 #ifndef FS_H
 #define FS_H
 
+#include <stddef.h>
+#include <stdarg.h>
+#include "qtypes.h"
+#include "qdefs.h"
+#include "zone.h"
 
 // ------ Types ------ //
 
 typedef struct qfile_s qfile_t;
-
-#ifdef WIN32
-//typedef long fs_offset_t; // 32bit
-typedef __int64 fs_offset_t; ///< 64bit (lots of warnings, and read/write still don't take 64bit on win64)
-#else
-typedef long long fs_offset_t;
-#endif
-
-
+typedef int64_t fs_offset_t;
 
 // ------ Variables ------ //
 
@@ -50,6 +47,14 @@ extern char fs_userdir [MAX_OSPATH];
 extern int fs_numgamedirs;
 extern char fs_gamedirs[MAX_GAMEDIRS][MAX_QPATH];
 
+typedef struct vfs_s
+{
+	char gamedir[MAX_OSPATH];
+	char basedir[MAX_OSPATH];
+	char userdir[MAX_OSPATH];
+	int numgamedirs;
+	char gamedirs[MAX_GAMEDIRS][MAX_QPATH];
+} vfs_t;
 
 // ------ Main functions ------ //
 

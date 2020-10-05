@@ -27,7 +27,11 @@
 #ifndef __KEYS_H
 #define __KEYS_H
 
+#include <stddef.h>
 #include "qtypes.h"
+#include "qdefs.h"
+#include "fs.h"
+#include "cmd.h"
 
 //
 // these are the key numbers that should be passed to Key_Event
@@ -389,6 +393,8 @@ const char *Key_GetBind (int key, int bindmap);
 void Key_FindKeysForCommand (const char *command, int *keys, int numkeys, int bindmap);
 qbool Key_SetBindMap(int fg, int bg);
 void Key_GetBindMap(int *fg, int *bg);
+const char *Key_KeynumToString (int keynum, char *buf, size_t buflength);
+int Key_StringToKeynum (const char *str);
 
 #endif // __KEYS_H
 

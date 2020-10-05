@@ -276,6 +276,7 @@
     <ClCompile Include="r_lightning.c" />
     <ClCompile Include="r_modules.c" />
     <ClCompile Include="r_shadow.c" />
+    <ClInclude Include="r_stats.c" />
     <ClCompile Include="r_sky.c" />
     <ClCompile Include="r_sprites.c" />
     <ClCompile Include="sbar.c" />
@@ -316,11 +317,14 @@
   <ItemGroup>
     <ClInclude Include="bih.h" />
     <ClInclude Include="bspfile.h" />
+    <ClInclude Include="cap.h" />
     <ClInclude Include="cap_avi.h" />
     <ClInclude Include="cap_ogg.h" />
     <ClInclude Include="cdaudio.h" />
     <ClInclude Include="cl_collision.h" />
     <ClInclude Include="cl_gecko.h" />
+	<ClInclude Include="cl_parse.h" />
+	<ClInclude Include="cl_particles.h" />
     <ClInclude Include="cl_screen.h" />
     <ClInclude Include="cl_video.h" />
     <ClInclude Include="cl_video_libavw.h" />
@@ -336,6 +340,7 @@
     <ClInclude Include="csprogs.h" />
     <ClInclude Include="curves.h" />
     <ClInclude Include="cvar.h" />
+    <ClInclude Include="darkplaces.h" />
     <ClInclude Include="dpvsimpledecode.h" />
     <ClInclude Include="draw.h" />
     <ClInclude Include="fs.h" />
@@ -345,6 +350,7 @@
     <ClInclude Include="gl_backend.h" />
     <ClInclude Include="glquake.h" />
     <ClInclude Include="hmac.h" />
+    <ClInclude Include="host.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="image_png.h" />
     <ClInclude Include="input.h" />
@@ -366,6 +372,9 @@
     <ClInclude Include="model_dpmodel.h" />
     <ClInclude Include="model_iqm.h" />
     <ClInclude Include="model_psk.h" />
+    <ClInclude Include="model_q1bsp.h" />
+    <ClInclude Include="model_q2bsp.h" />
+    <ClInclude Include="model_q3bsp.h" />
     <ClInclude Include="model_shared.h" />
     <ClInclude Include="model_sprite.h" />
     <ClInclude Include="model_zymotic.h" />
@@ -383,11 +392,15 @@
     <ClInclude Include="protocol.h" />
     <ClInclude Include="prvm_cmds.h" />
     <ClInclude Include="prvm_execprogram.h" />
+    <ClInclude Include="qdefs.h" />
+    <ClInclude Include="qstats.h" />
     <ClInclude Include="qtypes.h" />
     <ClInclude Include="quakedef.h" />
     <ClInclude Include="r_lerpanim.h" />
     <ClInclude Include="r_modules.h" />
+    <ClInclude Include="r_qshader.h" />
     <ClInclude Include="r_shadow.h" />
+    <ClInclude Include="r_stats.h" />
     <ClInclude Include="r_textures.h" />
     <ClInclude Include="render.h" />
     <ClInclude Include="resource.h" />
@@ -410,6 +423,7 @@
     <ClInclude Include="timing.h" />
     <ClInclude Include="utf8lib.h" />
     <ClInclude Include="vid.h" />
+    <ClInclude Include="view.h" />
     <ClInclude Include="wad.h" />
     <ClInclude Include="world.h" />
     <ClInclude Include="zone.h" />

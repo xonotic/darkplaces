@@ -154,6 +154,7 @@ OBJ_COMMON= \
 	r_shadow.o \
 	r_sky.o \
 	r_sprites.o \
+	r_stats.o \
 	sbar.o \
 	sv_ccmds.o \
 	sv_demo.o \
@@ -525,6 +526,7 @@ clean:
 	-$(CMD_RM) $(EXE_SDLNEXUIZ)
 	-$(CMD_RM) *.o
 	-$(CMD_RM) *.d
+	-$(CMD_RM) *.gch
 	-$(CMD_RM) build-obj/
 
 clean-profile: clean

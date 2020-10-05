@@ -432,6 +432,30 @@ static void SV_AreaStats_f(cmd_state_t *cmd)
 	World_PrintAreaStats(&sv.world, "server");
 }
 
+static qbool SV_CanSave(void)
+{
+	prvm_prog_t *prog = SVVM_prog;
+	if(SV_IsLocalGame() == 1)
+	{
+		// singleplayer checks
+		if ((svs.clients[0].active && PRVM_serveredictfloat(svs.clients[0].edict, deadflag)))
+		{
+			Con_Print("Can't savegame with a dead player\n");
+			return false;
+		}
+
+		if(host.hook.CL_Intermission && host.hook.CL_Intermission())
+		{
+			Con_Print("Can't save in intermission.\n");
+			return false;
+		}
+	}
+	else
+		Con_Print(CON_WARN "Warning: saving a multiplayer game may have strange results when restored (to properly resume, all players must join in the same player slots and then the game can be reloaded).\n");
+	return true;
+	
+}
+
 /*
 ===============
 SV_Init
@@ -632,6 +656,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_mapformat_is_quake3);
 
 	SV_InitOperatorCommands();
+	host.hook.SV_CanSave = SV_CanSave;
 
 	sv_mempool = Mem_AllocPool("server", 0, NULL);
 }
@@ -1494,12 +1519,12 @@ int SV_ParticleEffectIndex(const char *name)
 	return 0;
 }
 
-dp_model_t *SV_GetModelByIndex(int modelindex)
+model_t *SV_GetModelByIndex(int modelindex)
 {
 	return (modelindex > 0 && modelindex < MAX_MODELS) ? sv.models[modelindex] : NULL;
 }
 
-dp_model_t *SV_GetModelFromEdict(prvm_edict_t *ed)
+model_t *SV_GetModelFromEdict(prvm_edict_t *ed)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	int modelindex;
@@ -1690,7 +1715,7 @@ void SV_SpawnServer (const char *map)
 	prvm_edict_t *ent;
 	int i;
 	char *entities;
-	dp_model_t *worldmodel;
+	model_t *worldmodel;
 	char modelname[sizeof(sv.worldname)];
 	char vabuf[1024];
 
@@ -1987,6 +2012,17 @@ void SV_SpawnServer (const char *map)
 		Sys_MakeProcessMean();
 
 //	SV_UnlockThreadMutex();
+}
+
+/*
+ * Returns number of slots if we're a listen server.
+ * Returns 0 if we're a dedicated server.
+ */
+int SV_IsLocalGame(void)
+{
+	if (sv.active && &svs.clients[0] && LHNETADDRESS_GetAddressType(&svs.clients[0].netconnection->peeraddress) == LHNETADDRESSTYPE_LOOP)
+		return svs.maxclients;
+	return 0;
 }
 
 /*

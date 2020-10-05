@@ -61,9 +61,9 @@ static void SV_Map_f(cmd_state_t *cmd)
 	if (gamemode == GAME_DELUXEQUAKE)
 		Cvar_Set(&cvars_all, "warpmark", "");
 
-	cls.demonum = -1;		// stop demo loop in case this fails
+	if(host.hook.Disconnect)
+		host.hook.Disconnect();
 
-	CL_Disconnect ();
 	SV_Shutdown();
 
 	if(svs.maxclients != svs.maxclients_next)
@@ -74,12 +74,8 @@ static void SV_Map_f(cmd_state_t *cmd)
 		svs.clients = (client_t *)Mem_Alloc(sv_mempool, sizeof(client_t) * svs.maxclients);
 	}
 
-#ifdef CONFIG_MENU
-	// remove menu
-	if (key_dest == key_menu || key_dest == key_menu_grabbed)
-		MR_ToggleMenu(0);
-#endif
-	key_dest = key_game;
+	if(host.hook.ToggleMenu)
+		host.hook.ToggleMenu();
 
 	svs.serverflags = 0;			// haven't completed an episode yet
 	strlcpy(level, Cmd_Argv(cmd, 1), sizeof(level));
@@ -112,12 +108,8 @@ static void SV_Changelevel_f(cmd_state_t *cmd)
 		return;
 	}
 
-#ifdef CONFIG_MENU
-	// remove menu
-	if (key_dest == key_menu || key_dest == key_menu_grabbed)
-		MR_ToggleMenu(0);
-#endif
-	key_dest = key_game;
+	if(host.hook.ToggleMenu)
+		host.hook.ToggleMenu();
 
 	SV_SaveSpawnparms ();
 	strlcpy(level, Cmd_Argv(cmd, 1), sizeof(level));
@@ -149,12 +141,8 @@ static void SV_Restart_f(cmd_state_t *cmd)
 		return;
 	}
 
-#ifdef CONFIG_MENU
-	// remove menu
-	if (key_dest == key_menu || key_dest == key_menu_grabbed)
-		MR_ToggleMenu(0);
-#endif
-	key_dest = key_game;
+	if(host.hook.ToggleMenu)
+		host.hook.ToggleMenu();
 
 	strlcpy(mapname, sv.name, sizeof(mapname));
 	SV_SpawnServer(mapname);
@@ -710,68 +698,6 @@ static void SV_Pings_f(cmd_state_t *cmd)
 	}
 	if (sv.protocol != &protocol_quakeworld)
 		MSG_WriteString(&host_client->netconnection->message, "\n");
-}
-
-/*
-====================
-SV_User_f
-
-user <name or userid>
-
-Dump userdata / masterdata for a user
-====================
-*/
-static void SV_User_f(cmd_state_t *cmd) // credit: taken from QuakeWorld
-{
-	int		uid;
-	int		i;
-
-	if (Cmd_Argc(cmd) != 2)
-	{
-		Con_Printf ("Usage: user <username / userid>\n");
-		return;
-	}
-
-	uid = atoi(Cmd_Argv(cmd, 1));
-
-	for (i = 0;i < cl.maxclients;i++)
-	{
-		if (!cl.scores[i].name[0])
-			continue;
-		if (cl.scores[i].qw_userid == uid || !strcasecmp(cl.scores[i].name, Cmd_Argv(cmd, 1)))
-		{
-			InfoString_Print(cl.scores[i].qw_userinfo);
-			return;
-		}
-	}
-	Con_Printf ("User not in server.\n");
-}
-
-/*
-====================
-SV_Users_f
-
-Dump userids for all current players
-====================
-*/
-static void SV_Users_f(cmd_state_t *cmd) // credit: taken from QuakeWorld
-{
-	int		i;
-	int		c;
-
-	c = 0;
-	Con_Printf ("userid frags name\n");
-	Con_Printf ("------ ----- ----\n");
-	for (i = 0;i < cl.maxclients;i++)
-	{
-		if (cl.scores[i].name[0])
-		{
-			Con_Printf ("%6i %4i %s\n", cl.scores[i].qw_userid, cl.scores[i].frags, cl.scores[i].name);
-			c++;
-		}
-	}
-
-	Con_Printf ("%i total users\n", c);
 }
 
 /*
@@ -1340,7 +1266,7 @@ static void SV_Viewmodel_f(cmd_state_t *cmd)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	prvm_edict_t	*e;
-	dp_model_t	*m;
+	model_t	*m;
 
 	if (!sv.active)
 		return;
@@ -1369,7 +1295,7 @@ static void SV_Viewframe_f(cmd_state_t *cmd)
 	prvm_prog_t *prog = SVVM_prog;
 	prvm_edict_t	*e;
 	int		f;
-	dp_model_t	*m;
+	model_t	*m;
 
 	if (!sv.active)
 		return;
@@ -1387,7 +1313,7 @@ static void SV_Viewframe_f(cmd_state_t *cmd)
 	}
 }
 
-static void PrintFrameName (dp_model_t *m, int frame)
+static void PrintFrameName (model_t *m, int frame)
 {
 	if (m->animscenes)
 		Con_Printf("frame %i: %s\n", frame, m->animscenes[frame].name);
@@ -1404,7 +1330,7 @@ static void SV_Viewnext_f(cmd_state_t *cmd)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	prvm_edict_t	*e;
-	dp_model_t	*m;
+	model_t	*m;
 
 	if (!sv.active)
 		return;
@@ -1431,7 +1357,7 @@ static void SV_Viewprev_f(cmd_state_t *cmd)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	prvm_edict_t	*e;
-	dp_model_t	*m;
+	model_t	*m;
 
 	if (!sv.active)
 		return;
@@ -1707,8 +1633,6 @@ void SV_InitOperatorCommands(void)
 	Cmd_AddCommand(CF_SHARED, "viewnext", SV_Viewnext_f, "change to next animation frame of viewthing entity in current level");
 	Cmd_AddCommand(CF_SHARED, "viewprev", SV_Viewprev_f, "change to previous animation frame of viewthing entity in current level");
 	Cmd_AddCommand(CF_SHARED, "maxplayers", SV_MaxPlayers_f, "sets limit on how many players (or bots) may be connected to the server at once");
-	Cmd_AddCommand(CF_SHARED, "user", SV_User_f, "prints additional information about a player number or name on the scoreboard");
-	Cmd_AddCommand(CF_SHARED, "users", SV_Users_f, "prints additional information about all players on the scoreboard");
 	Cmd_AddCommand(CF_SERVER, "sendcvar", SV_SendCvar_f, "sends the value of a cvar to the server as a sentcvar command, for use by QuakeC");
 
 	// commands that do not have automatic forwarding from cmd_client, these are internal details of the network protocol and not of interest to users (if they know what they are doing they can still use a generic "cmd prespawn" or similar)

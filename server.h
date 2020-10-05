@@ -512,6 +512,10 @@ extern client_t *host_client;
 //===========================================================
 
 void SV_Init (void);
+double SV_Frame(double time);
+void SV_Shutdown(void);
+
+int SV_IsLocalGame(void);
 
 void SV_StartParticle (vec3_t org, vec3_t dir, int color, int count);
 void SV_StartEffect (vec3_t org, int modelindex, int startframe, int framecount, int framerate);
@@ -520,6 +524,8 @@ void SV_StartPointSound (vec3_t origin, const char *sample, int volume, float at
 
 void SV_ConnectClient (int clientnum, netconn_t *netconnection);
 void SV_DropClient (qbool crash);
+
+void SV_ClientCommands(const char *fmt, ...) DP_FUNC_PRINTF(1);
 
 void SV_SendClientMessages(void);
 
@@ -534,14 +540,14 @@ int SV_SoundIndex(const char *s, int precachemode);
 
 int SV_ParticleEffectIndex(const char *name);
 
-dp_model_t *SV_GetModelByIndex(int modelindex);
-dp_model_t *SV_GetModelFromEdict(prvm_edict_t *ed);
+model_t *SV_GetModelByIndex(int modelindex);
+model_t *SV_GetModelFromEdict(prvm_edict_t *ed);
 
 void SV_SetIdealPitch (void);
 
 void SV_AddUpdates (void);
 
-void SV_ClientThink (void);
+void SV_PlayerPhysics (void);
 
 void SV_ClientPrint(const char *msg);
 void SV_ClientPrintf(const char *fmt, ...) DP_FUNC_PRINTF(1);

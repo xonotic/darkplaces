@@ -80,7 +80,7 @@ static void Netmsg_svc_precache (protocol_t *protocol) //			54		// short soundin
 		{
 			if (i >= 1 && i < MAX_MODELS)
 			{
-				dp_model_t *model = Mod_ForName(s, false, false, s[0] == '*' ? cl.model_name[1] : NULL);
+				model_t *model = Mod_ForName(s, false, false, s[0] == '*' ? cl.model_name[1] : NULL);
 				if (!model)
 					Con_DPrintf("svc_precache: Mod_ForName(\"%s\") failed\n", s);
 				cl.model_precache[i] = model;

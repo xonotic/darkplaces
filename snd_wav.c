@@ -22,10 +22,10 @@
 */
 
 
-#include "quakedef.h"
+#include "darkplaces.h"
 #include "snd_main.h"
 #include "snd_wav.h"
-
+#include "sound.h"
 
 typedef struct wavinfo_s
 {

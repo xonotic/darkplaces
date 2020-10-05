@@ -1823,7 +1823,7 @@ void CL_ParseServerInfo (void)
 
 void CL_ValidateState(entity_state_t *s)
 {
-	dp_model_t *model;
+	model_t *model;
 
 	if (!s->active)
 		return;
@@ -2215,7 +2215,7 @@ void CL_ParseEffect2 (void)
 	CL_Effect(org, CL_GetModelByIndex(modelindex), startframe, framecount, framerate);
 }
 
-void CL_NewBeam (int ent, vec3_t start, vec3_t end, dp_model_t *m, int lightning)
+void CL_NewBeam (int ent, vec3_t start, vec3_t end, model_t *m, int lightning)
 {
 	int i;
 	beam_t *b = NULL;
@@ -2254,7 +2254,7 @@ void CL_NewBeam (int ent, vec3_t start, vec3_t end, dp_model_t *m, int lightning
 		Con_DPrint("beam list overflow!\n");
 }
 
-static void CL_ParseBeam (dp_model_t *m, int lightning)
+static void CL_ParseBeam (model_t *m, int lightning)
 {
 	int ent;
 	vec3_t start, end;

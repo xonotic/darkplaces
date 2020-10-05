@@ -205,7 +205,7 @@ static void Host_ServerOptions (void)
 Host_Quit_f
 ==================
 */
-void Host_Quit_f(cmd_state_t *cmd)
+static void Host_Quit_f(cmd_state_t *cmd)
 {
 	if(host.state == host_shutdown)
 		Con_Printf("shutting down already!\n");
@@ -615,6 +615,12 @@ static void Host_Init (void)
 	const char* os;
 	char vabuf[1024];
 	cmd_state_t *cmd = &cmd_client;
+
+	host.hook.ConnectLocal = NULL;
+	host.hook.Disconnect = NULL;
+	host.hook.ToggleMenu = NULL;
+	host.hook.CL_Intermission = NULL;
+	host.hook.SV_CanSave = NULL;
 
 	host.state = host_init;
 
