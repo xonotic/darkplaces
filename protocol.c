@@ -217,7 +217,7 @@ protocol_t protocol_nehahrabjp =
 {
 	.name = "NEHAHRABJP",
 	.num = 10000,
-	.max_edicts = 4096,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -233,7 +233,7 @@ protocol_t protocol_nehahrabjp2 =
 {
 	.name = "NEHAHRABJP2",
 	.num = 10001,
-	.max_edicts = 4096,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
@@ -249,7 +249,7 @@ protocol_t protocol_nehahrabjp3 =
 {
 	.name = "NEHAHRABJP3",
 	.num = 10002,
-	.max_edicts = 4096,
+	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord13i,
 	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
