@@ -261,6 +261,22 @@ protocol_t protocol_nehahrabjp3 =
 	.clc = &netmsg_base_clc
 };
 
+protocol_t protocol_fitzquake = 
+{
+	.name = "FITZQUAKE",
+	.num = 666,
+	.max_edicts = MAX_EDICTS,
+	.WriteCoord = MSG_WriteCoord13i,
+	.WriteAngle = MSG_WriteAngle16i,
+	.WriteVector = MSG_WriteVector13i,
+	.ReadCoord = MSG_ReadCoord13i,
+	.ReadAngle = MSG_ReadAngle16i,
+	.ReadVector = MSG_ReadVector13i
+	//.ReadFrame = EntityFrameFQ_CL_ReadFrame,
+	//.svc = &netmsg_fitzquake_svc,
+	//.clc = &netmsg_base_clc
+};
+
 protocol_t *protocols[] =
 {
 	&protocol_netquake,
@@ -277,6 +293,7 @@ protocol_t *protocols[] =
 	&protocol_nehahrabjp,
 	&protocol_nehahrabjp2,
 	&protocol_nehahrabjp3,
+	&protocol_fitzquake,
 	NULL
 };
 
