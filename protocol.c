@@ -267,13 +267,12 @@ protocol_t protocol_fitzquake =
 	.num = 666,
 	.max_edicts = MAX_EDICTS,
 	.WriteCoord = MSG_WriteCoord13i,
-	.WriteAngle = MSG_WriteAngle16i,
+	.WriteAngle = MSG_WriteAngle8i,
 	.WriteVector = MSG_WriteVector13i,
 	.ReadCoord = MSG_ReadCoord13i,
-	.ReadAngle = MSG_ReadAngle16i,
-	.ReadVector = MSG_ReadVector13i
-	//.ReadFrame = EntityFrameFQ_CL_ReadFrame,
-	//.svc = &netmsg_fitzquake_svc,
+	.ReadAngle = MSG_ReadAngle8i,
+	.ReadVector = MSG_ReadVector13i,
+	.svc = &netmsg_fq_svc,
 	//.clc = &netmsg_base_clc
 };
 

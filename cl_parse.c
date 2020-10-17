@@ -1966,11 +1966,15 @@ CL_ParseBaseline
 void CL_ParseBaseline (entity_t *ent, int large)
 {
 	int i;
+	int bits;
 
 	ent->state_baseline = defaultstate;
 	// FIXME: set ent->state_baseline.number?
 	ent->state_baseline.active = true;
-	if (large)
+
+	bits = (cls.protocol == &protocol_fitzquake && large) ? MSG_ReadByte(&cl_message) : 0;
+
+	if (cls.protocol != &protocol_fitzquake && large)
 	{
 		ent->state_baseline.modelindex = (unsigned short) MSG_ReadShort(&cl_message);
 		ent->state_baseline.frame = (unsigned short) MSG_ReadShort(&cl_message);
@@ -1982,8 +1986,8 @@ void CL_ParseBaseline (entity_t *ent, int large)
 	}
 	else
 	{
-		ent->state_baseline.modelindex = MSG_ReadByte(&cl_message);
-		ent->state_baseline.frame = MSG_ReadByte(&cl_message);
+		ent->state_baseline.modelindex = (bits & B_LARGEMODEL) ? (unsigned short) MSG_ReadShort(&cl_message) : MSG_ReadByte(&cl_message);
+		ent->state_baseline.frame = (bits & B_LARGEFRAME) ? (unsigned short) MSG_ReadShort(&cl_message) : MSG_ReadByte(&cl_message);
 	}
 	ent->state_baseline.colormap = MSG_ReadByte(&cl_message);
 	ent->state_baseline.skin = MSG_ReadByte(&cl_message);
@@ -1992,6 +1996,9 @@ void CL_ParseBaseline (entity_t *ent, int large)
 		ent->state_baseline.origin[i] = cls.protocol->ReadCoord(&cl_message);
 		ent->state_baseline.angles[i] = cls.protocol->ReadAngle(&cl_message);
 	}
+
+	ent->state_baseline.alpha = (bits & B_ALPHA) ? MSG_ReadByte(&cl_message) : ent->state_baseline.alpha; //johnfitz -- PROTOCOL_FITZQUAKE
+
 	ent->state_previous = ent->state_current = ent->state_baseline;
 }
 
@@ -2012,7 +2019,7 @@ void CL_ParseClientdata (void)
 	VectorCopy (cl.mvelocity[0], cl.mvelocity[1]);
 	cl.mviewzoom[1] = cl.mviewzoom[0];
 
-	if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5)
+	if (cls.protocol == &protocol_fitzquake || cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5)
 	{
 		cl.stats[STAT_VIEWHEIGHT] = DEFAULT_VIEWHEIGHT;
 		cl.stats[STAT_ITEMS] = 0;
@@ -2046,12 +2053,12 @@ void CL_ParseClientdata (void)
 	{
 		if (bits & (SU_PUNCH1<<i) )
 		{
-			if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3)
+			if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_fitzquake)
 				cl.mpunchangle[0][i] = MSG_ReadChar(&cl_message);
 			else
 				cl.mpunchangle[0][i] = MSG_ReadAngle16i(&cl_message);
 		}
-		if (bits & (SU_PUNCHVEC1<<i))
+		if (bits & (SU_PUNCHVEC1<<i) && cls.protocol != &protocol_fitzquake)
 		{
 			if (cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4)
 				cl.mpunchvector[0][i] = MSG_ReadCoord16i(&cl_message);
@@ -2060,7 +2067,7 @@ void CL_ParseClientdata (void)
 		}
 		if (bits & (SU_VELOCITY1<<i) )
 		{
-			if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4)
+			if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_fitzquake)
 				cl.mvelocity[0][i] = MSG_ReadChar(&cl_message)*16;
 			else
 				cl.mvelocity[0][i] = MSG_ReadCoord32f(&cl_message);
@@ -2068,7 +2075,7 @@ void CL_ParseClientdata (void)
 	}
 
 	// LadyHavoc: hipnotic demos don't have this bit set but should
-	if (bits & SU_ITEMS || cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5)
+	if (bits & SU_ITEMS || cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5 || cls.protocol == &protocol_fitzquake)
 		cl.stats[STAT_ITEMS] = MSG_ReadLong(&cl_message);
 
 	cl.onground = (bits & SU_ONGROUND) != 0;
@@ -2087,7 +2094,7 @@ void CL_ParseClientdata (void)
 		cl.stats[STAT_CELLS] = MSG_ReadShort(&cl_message);
 		cl.stats[STAT_ACTIVEWEAPON] = (unsigned short) MSG_ReadShort(&cl_message);
 	}
-	else if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4)
+	else if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_fitzquake)
 	{
 		cl.stats[STAT_WEAPONFRAME] = (bits & SU_WEAPONFRAME) ? MSG_ReadByte(&cl_message) : 0;
 		cl.stats[STAT_ARMOR] = (bits & SU_ARMOR) ? MSG_ReadByte(&cl_message) : 0;
@@ -2107,7 +2114,7 @@ void CL_ParseClientdata (void)
 			cl.stats[STAT_ACTIVEWEAPON] = MSG_ReadByte(&cl_message);
 	}
 
-	if (bits & SU_VIEWZOOM)
+	if (cls.protocol != &protocol_fitzquake && (bits & SU_VIEWZOOM))
 	{
 		if (cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4)
 			cl.stats[STAT_VIEWZOOM] = MSG_ReadByte(&cl_message);
@@ -2115,6 +2122,32 @@ void CL_ParseClientdata (void)
 			cl.stats[STAT_VIEWZOOM] = (unsigned short) MSG_ReadShort(&cl_message);
 	}
 
+	if(cls.protocol == &protocol_fitzquake)
+	{
+		//johnfitz -- PROTOCOL_FITZQUAKE
+		if (bits & SU_WEAPON2)
+			cl.stats[STAT_WEAPON] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_ARMOR2)
+			cl.stats[STAT_ARMOR] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_AMMO2)
+			cl.stats[STAT_AMMO] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_SHELLS2)
+			cl.stats[STAT_SHELLS] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_NAILS2)
+			cl.stats[STAT_NAILS] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_ROCKETS2)
+			cl.stats[STAT_ROCKETS] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_CELLS2)
+			cl.stats[STAT_CELLS] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_WEAPONFRAME2)
+			cl.stats[STAT_WEAPONFRAME] |= (MSG_ReadByte(&cl_message) << 8);
+		if (bits & SU_WEAPONALPHA)
+			cl.viewent.render.alpha = MSG_ReadByte(&cl_message);
+		else
+			cl.viewent.render.alpha = ENTALPHA_DEFAULT;
+	}
+
+	//johnfitz
 	// viewzoom interpolation
 	cl.mviewzoom[0] = (float) max(cl.stats[STAT_VIEWZOOM], 2) * (1.0f / 255.0f);
 }
@@ -2149,7 +2182,7 @@ void CL_ParseStatic (int large)
 	ent->render.framegroupblend[0].start = lhrandom(-10, -1);
 	ent->render.skinnum = ent->state_baseline.skin;
 	ent->render.effects = ent->state_baseline.effects;
-	ent->render.alpha = 1;
+	ent->render.alpha = ent->state_baseline.alpha;
 
 	//VectorCopy (ent->state_baseline.origin, ent->render.origin);
 	//VectorCopy (ent->state_baseline.angles, ent->render.angles);
@@ -2164,13 +2197,13 @@ void CL_ParseStatic (int large)
 CL_ParseStaticSound
 ===================
 */
-void CL_ParseStaticSound (int large)
+void CL_ParseStaticSound (int large, int version)
 {
 	vec3_t		org;
 	int			sound_num, vol, atten;
 
 	cls.protocol->ReadVector(&cl_message, org);
-	if (large)
+	if (large || version == 2)
 		sound_num = (unsigned short) MSG_ReadShort(&cl_message);
 	else
 		sound_num = MSG_ReadByte(&cl_message);
@@ -3322,7 +3355,7 @@ void CL_ParseServerMessage(void)
 		if(protocol != &protocol_quakeworld)
 		{
 			// if the high bit of the command byte is set, it is a fast update
-			if (cmd & 128)
+			if (cmd & U_SIGNAL)
 			{
 				// LadyHavoc: fix for bizarre problem in MSVC that I do not understand (if I assign the string pointer directly it ends up storing a NULL pointer)
 				temp = "entity";

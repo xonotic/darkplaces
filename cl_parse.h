@@ -17,7 +17,7 @@ void CL_KeepaliveMessage(qbool readmessages); // call this during loading of lar
 void CL_ParseBaseline (struct entity_s *ent, int large);
 void CL_ParseClientdata (void);
 void CL_ParseStatic (int large);
-void CL_ParseStaticSound (int large);
+void CL_ParseStaticSound (int large, int version);
 void CL_ParseEffect (void);
 void CL_ParseEffect2 (void);
 void CL_ParseServerInfo (void);

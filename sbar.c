@@ -1879,7 +1879,7 @@ void Sbar_DeathmatchOverlay (void)
 			MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
 			MSG_WriteString(&cls.netcon->message, "pings");
 		}
-		else if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5 || cls.protocol == &protocol_dpp6/* || cls.protocol == &protocol_dpp7*/)
+		else if (cls.protocol == &protocol_netquake || cls.protocol == &protocol_fitzquake || cls.protocol == &protocol_quakedp || cls.protocol == &protocol_nehahramovie || cls.protocol == &protocol_nehahrabjp || cls.protocol == &protocol_nehahrabjp2 || cls.protocol == &protocol_nehahrabjp3 || cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4 || cls.protocol == &protocol_dpp5 || cls.protocol == &protocol_dpp6/* || cls.protocol == &protocol_dpp7*/)
 		{
 			// these servers usually lack the pings command and so a less efficient "ping" command must be sent, which on modern DP servers will also reply with a pingplreport command after the ping listing
 			static int ping_anyway_counter = 0;

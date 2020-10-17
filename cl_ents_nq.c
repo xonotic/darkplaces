@@ -35,16 +35,8 @@ void EntityFrameQuake_ReadEntity(int bits)
 
 	ent = cl.entities + num;
 
-	// note: this inherits the 'active' state of the baseline chosen
-	// (state_baseline is always active, state_current may not be active if
-	// the entity was missing in the last frame)
-	if (bits & U_DELTA)
-		s = ent->state_current;
-	else
-	{
-		s = ent->state_baseline;
-		s.active = ACTIVE_NETWORK;
-	}
+	s = ent->state_baseline;
+	s.active = ACTIVE_NETWORK;
 
 	cl.isquakeentity[num] = true;
 	if (cl.lastquakeentity < num)
@@ -70,18 +62,29 @@ void EntityFrameQuake_ReadEntity(int bits)
 	if (bits & U_ORIGIN3)	s.origin[2] = cls.protocol->ReadCoord(&cl_message);
 	if (bits & U_ANGLE3)	s.angles[2] = cls.protocol->ReadAngle(&cl_message);
 	if (bits & U_STEP)		s.flags |= RENDER_STEP;
-	if (bits & U_ALPHA)		s.alpha = MSG_ReadByte(&cl_message);
-	if (bits & U_SCALE)		s.scale = MSG_ReadByte(&cl_message);
-	if (bits & U_EFFECTS2)	s.effects = (s.effects & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
-	if (bits & U_GLOWSIZE)	s.glowsize = MSG_ReadByte(&cl_message);
-	if (bits & U_GLOWCOLOR)	s.glowcolor = MSG_ReadByte(&cl_message);
-	if (bits & U_COLORMOD)	{int c = MSG_ReadByte(&cl_message);s.colormod[0] = (unsigned char)(((c >> 5) & 7) * (32.0f / 7.0f));s.colormod[1] = (unsigned char)(((c >> 2) & 7) * (32.0f / 7.0f));s.colormod[2] = (unsigned char)((c & 3) * (32.0f / 3.0f));}
-	if (bits & U_GLOWTRAIL) s.flags |= RENDER_GLOWTRAIL;
-	if (bits & U_FRAME2)	s.frame = (s.frame & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
-	if (bits & U_MODEL2)	s.modelindex = (s.modelindex & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
-	if (bits & U_VIEWMODEL)	s.flags |= RENDER_VIEWMODEL;
-	if (bits & U_EXTERIORMODEL)	s.flags |= RENDER_EXTERIORMODEL;
-
+	if (cls.protocol != &protocol_fitzquake)
+	{
+		if (bits & U_ALPHA)		s.alpha = MSG_ReadByte(&cl_message);
+		if (bits & U_SCALE)		s.scale = MSG_ReadByte(&cl_message);
+		if (bits & U_EFFECTS2)	s.effects = (s.effects & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
+		if (bits & U_GLOWSIZE)	s.glowsize = MSG_ReadByte(&cl_message);
+		if (bits & U_GLOWCOLOR)	s.glowcolor = MSG_ReadByte(&cl_message);
+		if (bits & U_COLORMOD)	{int c = MSG_ReadByte(&cl_message);s.colormod[0] = (unsigned char)(((c >> 5) & 7) * (32.0f / 7.0f));s.colormod[1] = (unsigned char)(((c >> 2) & 7) * (32.0f / 7.0f));s.colormod[2] = (unsigned char)((c & 3) * (32.0f / 3.0f));}
+		if (bits & U_GLOWTRAIL) s.flags |= RENDER_GLOWTRAIL;
+		if (bits & U_FRAME2)	s.frame = (s.frame & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
+		if (bits & U_MODEL2)	s.modelindex = (s.modelindex & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
+		if (bits & U_VIEWMODEL)	s.flags |= RENDER_VIEWMODEL;
+		if (bits & U_EXTERIORMODEL)	s.flags |= RENDER_EXTERIORMODEL;
+	}
+	else
+	{
+		if (bits & U_ALPHA_FQ) s.alpha = MSG_ReadByte(&cl_message);
+		if (bits & U_SCALE_FQ) MSG_ReadByte(&cl_message); // ignored
+		if (bits & U_FRAME2_FQ) s.frame = (s.frame & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
+		if (bits & U_MODEL2_FQ)	s.modelindex = (s.modelindex & 0x00FF) | (MSG_ReadByte(&cl_message) << 8);
+		// Cloudwalk: idk???
+		if (bits & U_LERPFINISH_FQ) ent->persistent.lerpdeltatime = s.time + ((float)(MSG_ReadByte(&cl_message)) / 255);
+	}
 	// LadyHavoc: to allow playback of the Nehahra movie
 	if (cls.protocol == &protocol_nehahramovie && (bits & U_EXTEND1))
 	{

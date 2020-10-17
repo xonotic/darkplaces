@@ -174,7 +174,7 @@ static void Netmsg_svc_updatestatlong(protocol_t *protocol)
 
 static void Netmsg_svc_spawnstaticsound(protocol_t *protocol)
 {
-	CL_ParseStaticSound (false);
+	CL_ParseStaticSound (false, 1);
 }
 
 static void Netmsg_svc_cdtrack(protocol_t *protocol)

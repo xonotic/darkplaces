@@ -138,7 +138,7 @@ static void Netmsg_svc_csqcentities (protocol_t *protocol) //		58		// [short] en
 
 static void Netmsg_svc_spawnstaticsound2 (protocol_t *protocol) //	59		// [coord3] [short] samp [byte] vol [byte] aten
 {
-	CL_ParseStaticSound (true);
+	CL_ParseStaticSound (true, 2);
 }
 
 static void Netmsg_svc_trailparticles (protocol_t *protocol) //	60		// [short] entnum [short] effectnum [vector] start [vector] end
@@ -155,6 +155,22 @@ static void Netmsg_svc_pointparticles1 (protocol_t *protocol) //	62		// [short] 
 {
 	CL_ParsePointParticles1();
 }
+
+static void Netmsg_svc_bf (protocol_t *protocol)
+{
+	Cbuf_InsertText (&cmd_client, "bf");
+}
+
+static void Netmsg_svc_fog (protocol_t *protocol)
+{
+	// STUB
+	MSG_ReadByte(&cl_message);
+	MSG_ReadByte(&cl_message);
+	MSG_ReadByte(&cl_message);
+	MSG_ReadByte(&cl_message);
+	MSG_ReadShort(&cl_message);
+}
+
 #define NETMSG_DPEXT_SVC \
 	NETMSG_BASENQ_SVC, \
 	{"svc_showlmp", Netmsg_svc_showlmp}, \
@@ -185,3 +201,22 @@ static void Netmsg_svc_pointparticles1 (protocol_t *protocol) //	62		// [short] 
 	{"svc_trailparticles", Netmsg_svc_trailparticles}, \
 	{"svc_pointparticles", Netmsg_svc_pointparticles}, \
 	{"svc_pointparticles1", Netmsg_svc_pointparticles1}
+
+#define NETMSG_FQ_SVC \
+	NETMSG_BASENQ_SVC, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{"svc_skybox", Netmsg_svc_skybox}, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{"svc_bf", Netmsg_svc_bf}, \
+	{"svc_fog", Netmsg_svc_fog}, \
+	{"svc_spawnbaseline2", Netmsg_svc_spawnbaseline2}, \
+	{"svc_spawnstatic2", Netmsg_svc_spawnstatic2}, \
+	{"svc_spawnstaticsound2", Netmsg_svc_spawnstaticsound2}, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{NULL, NULL}, \
+	{NULL, NULL}

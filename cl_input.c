@@ -1779,31 +1779,35 @@ void CL_SendMove(void)
 	bits = 0;
 	if (in_attack.state   & 3) bits |=   1;
 	if (in_jump.state     & 3) bits |=   2;
-	if (in_button3.state  & 3) bits |=   4;
-	if (in_button4.state  & 3) bits |=   8;
-	if (in_button5.state  & 3) bits |=  16;
-	if (in_button6.state  & 3) bits |=  32;
-	if (in_button7.state  & 3) bits |=  64;
-	if (in_button8.state  & 3) bits |= 128;
-	if (in_use.state      & 3) bits |= 256;
-	if (key_dest != key_game || key_consoleactive) bits |= 512;
-	if (cl_prydoncursor.integer > 0) bits |= 1024;
-	if (in_button9.state  & 3)  bits |=   2048;
-	if (in_button10.state  & 3) bits |=   4096;
-	if (in_button11.state  & 3) bits |=   8192;
-	if (in_button12.state  & 3) bits |=  16384;
-	if (in_button13.state  & 3) bits |=  32768;
-	if (in_button14.state  & 3) bits |=  65536;
-	if (in_button15.state  & 3) bits |= 131072;
-	if (in_button16.state  & 3) bits |= 262144;
-	// button bits 19-31 unused currently
-	// rotate/zoom view serverside if PRYDON_CLIENTCURSOR cursor is at edge of screen
-	if(cl_prydoncursor.integer > 0)
+
+	if (cls.protocol != &protocol_fitzquake)
 	{
-		if (cl.cmd.cursor_screen[0] <= -1) bits |= 8;
-		if (cl.cmd.cursor_screen[0] >=  1) bits |= 16;
-		if (cl.cmd.cursor_screen[1] <= -1) bits |= 32;
-		if (cl.cmd.cursor_screen[1] >=  1) bits |= 64;
+		if (in_button3.state  & 3) bits |=   4;
+		if (in_button4.state  & 3) bits |=   8;
+		if (in_button5.state  & 3) bits |=  16;
+		if (in_button6.state  & 3) bits |=  32;
+		if (in_button7.state  & 3) bits |=  64;
+		if (in_button8.state  & 3) bits |= 128;
+		if (in_use.state      & 3) bits |= 256;
+		if (key_dest != key_game || key_consoleactive) bits |= 512;
+		if (cl_prydoncursor.integer > 0) bits |= 1024;
+		if (in_button9.state  & 3)  bits |=   2048;
+		if (in_button10.state  & 3) bits |=   4096;
+		if (in_button11.state  & 3) bits |=   8192;
+		if (in_button12.state  & 3) bits |=  16384;
+		if (in_button13.state  & 3) bits |=  32768;
+		if (in_button14.state  & 3) bits |=  65536;
+		if (in_button15.state  & 3) bits |= 131072;
+		if (in_button16.state  & 3) bits |= 262144;
+		// button bits 19-31 unused currently
+		// rotate/zoom view serverside if PRYDON_CLIENTCURSOR cursor is at edge of screen
+		if(cl_prydoncursor.integer > 0)
+		{
+			if (cl.cmd.cursor_screen[0] <= -1) bits |= 8;
+			if (cl.cmd.cursor_screen[0] >=  1) bits |= 16;
+			if (cl.cmd.cursor_screen[1] <= -1) bits |= 32;
+			if (cl.cmd.cursor_screen[1] >=  1) bits |= 64;
+		}
 	}
 
 	// set buttons and impulse
@@ -1962,6 +1966,7 @@ void CL_SendMove(void)
 				cl.qw_deltasequence[cls.netcon->outgoing_unreliable_sequence & QW_UPDATE_MASK] = -1;
 			break;
 		case PROTOCOL_QUAKE:
+		case PROTOCOL_FITZQUAKE:
 		case PROTOCOL_NEHAHRAMOVIE:
 		case PROTOCOL_NEHAHRABJP:
 		case PROTOCOL_NEHAHRABJP2:
@@ -1970,7 +1975,7 @@ void CL_SendMove(void)
 			MSG_WriteByte (&buf, clc_move);
 			MSG_WriteFloat (&buf, cl.cmd.time); // last server packet time
 			// 3 bytes (6 bytes in proquake)
-			if (cls.proquake_servermod == 1) // MOD_PROQUAKE
+			if (cls.proquake_servermod == 1 || cls.protocol->num == PROTOCOL_FITZQUAKE) // MOD_PROQUAKE
 			{
 				for (i = 0;i < 3;i++)
 					MSG_WriteAngle16i (&buf, cl.cmd.viewangles[i]);

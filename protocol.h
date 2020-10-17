@@ -100,8 +100,10 @@ extern protocol_t protocol_nehahramovie;
 extern protocol_t protocol_nehahrabjp;
 extern protocol_t protocol_nehahrabjp2;
 extern protocol_t protocol_nehahrabjp3;
+extern protocol_t protocol_fitzquake;
 
 extern protocol_netmsg_t netmsg_nq_svc;
+extern protocol_netmsg_t netmsg_fq_svc;
 extern protocol_netmsg_t netmsg_qw_svc;
 extern protocol_netmsg_t netmsg_dpext_svc;
 extern protocol_netmsg_t netmsg_base_clc;
@@ -215,6 +217,14 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define U_GLOWCOLOR		(1<<21) // 1 byte, palette index, default is 254 (white), this IS used for darklight (allowing colored darklight), however the particles from a darklight are always black, not sent if default value (even if glowsize or glowtrail is set)
 #define U_COLORMOD		(1<<22) // 1 byte, 3 bit red, 3 bit green, 2 bit blue, this lets you tint an object artifically, so you could make a red rocket, or a blue fiend...
 #define U_EXTEND2		(1<<23) // another byte to follow
+
+// PROTOCOL_FITZQUAKE
+#define U_ALPHA_FQ		(1<<16)
+#define U_FRAME2_FQ		(1<<17)
+#define U_MODEL2_FQ		(1<<18)
+#define U_LERPFINISH_FQ	(1<<19)
+#define U_SCALE_FQ		(1<<20)
+
 // LadyHavoc: second extend byte
 #define U_GLOWTRAIL		(1<<24) // leaves a trail of particles (of color .glowcolor, or black if it is a negative glowsize)
 #define U_VIEWMODEL		(1<<25) // attachs the model to the view (origin and angles become relative to it), only shown to owner, a more powerful alternative to .weaponmodel and such
@@ -246,19 +256,25 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define SU_PUNCHVEC2	(1<<17)
 #define SU_PUNCHVEC3	(1<<18)
 #define SU_VIEWZOOM		(1<<19) // byte factor (0 = 0.0 (not valid), 255 = 1.0)
-#define SU_UNUSED20		(1<<20)
-#define SU_UNUSED21		(1<<21)
-#define SU_UNUSED22		(1<<22)
+#define SU_NAILS2		(1<<20) // 1 byte, this is .ammo_nails & 0xFF00 (second byte)
+#define SU_ROCKETS2		(1<<21) // 1 byte, this is .ammo_rockets & 0xFF00 (second byte)
+#define SU_CELLS2		(1<<22) // 1 byte, this is .ammo_cells & 0xFF00 (second byte)
 #define SU_EXTEND2		(1<<23) // another byte to follow, future expansion
 // second extend byte
-#define SU_UNUSED24		(1<<24)
-#define SU_UNUSED25		(1<<25)
+#define SU_WEAPONFRAME2	(1<<24) // 1 byte, this is .weaponframe & 0xFF00 (second byte)
+#define SU_WEAPONALPHA	(1<<25) // 1 byte, this is alpha for weaponmodel, uses ENTALPHA_ENCODE, not sent if ENTALPHA_DEFAULT
 #define SU_UNUSED26		(1<<26)
 #define SU_UNUSED27		(1<<27)
 #define SU_UNUSED28		(1<<28)
 #define SU_UNUSED29		(1<<29)
 #define SU_UNUSED30		(1<<30)
 #define SU_EXTEND3		(1<<31) // another byte to follow, future expansion
+
+// PROTOCOL_FITZQUAKE
+#define SU_WEAPON2		(1<<16) // 1 byte, this is .weaponmodel & 0xFF00 (second byte)
+#define SU_ARMOR2		(1<<17) // 1 byte, this is .armorvalue & 0xFF00 (second byte)
+#define SU_AMMO2		(1<<18) // 1 byte, this is .currentammo & 0xFF00 (second byte)
+#define SU_SHELLS2		(1<<19) // 1 byte, this is .ammo_shells & 0xFF00 (second byte)
 
 // a sound with no channel is a local only sound
 #define	SND_VOLUME		(1<<0)		// a byte
@@ -268,10 +284,21 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define	SND_LARGESOUND	(1<<4)		// a short (instead of a byte)
 #define	SND_SPEEDUSHORT4000	(1<<5)		// ushort speed*4000 (speed is usually 1.0, a value of 0.0 is the same as 1.0)
 
+// PROTOCOL_FITZQUAKE: flags for entity baseline messages
+#define B_LARGEMODEL	(1<<0)	// modelindex is short instead of byte
+#define B_LARGEFRAME	(1<<1)	// frame is short instead of byte
+#define B_ALPHA			(1<<2)	// 1 byte, uses ENTALPHA_ENCODE, not sent if ENTALPHA_DEFAULT
+
+// PROTOCOL_FITZQUAKE: alpha encoding
+#define ENTALPHA_DEFAULT	0	//entity's alpha is "default" (i.e. water obeys r_wateralpha) -- must be zero so zeroed out memory works
+#define ENTALPHA_ZERO		1	//entity is invisible (lowest possible alpha)
+#define ENTALPHA_ONE		255 //entity is fully opaque (highest possible alpha)
+#define ENTALPHA_ENCODE(a)	(((a)==0)?ENTALPHA_DEFAULT:Q_rint(CLAMP(1,(a)*254.0f+1,255))) //server convert to byte to send to client
+#define ENTALPHA_DECODE(a)	(((a)==ENTALPHA_DEFAULT)?1.0f:((float)(a)-1)/(254)) //client convert to float for rendering
+#define ENTALPHA_TOSAVE(a)	(((a)==ENTALPHA_DEFAULT)?0.0f:(((a)==ENTALPHA_ZERO)?-1.0f:((float)(a)-1)/(254))) //server convert to float for savegame
 
 // defaults for clientinfo messages
 #define	DEFAULT_VIEWHEIGHT	22
-
 
 // game types sent by serverinfo
 // these determine which intermission screen plays
@@ -339,6 +366,13 @@ void Protocol_Names(char *buffer, size_t buffersize);
 #define	svc_showlmp			35		// [string] slotname [string] lmpfilename [short] x [short] y
 #define	svc_hidelmp			36		// [string] slotname
 #define	svc_skybox			37		// [string] skyname
+
+// PROTOCOL_FITZQUAKE
+#define svc_bf					 40
+#define svc_fog_fq				 41	 // [byte] density [byte] red [byte] green [byte] blue [float] time
+#define svc_spawnbaseline2_fq	 42  // support for large modelindex, large framenum, alpha, using flags
+#define svc_spawnstatic2_fq		 43	 // support for large modelindex, large framenum, alpha, using flags
+#define	svc_spawnstaticsound2_fq 44	 // [coord3] [short] samp [byte] vol [byte] aten
 
 // LadyHavoc: my svc_ range, 50-69
 #define svc_downloaddata	50		// [int] start [short] size
@@ -493,6 +527,7 @@ typedef struct framegroupblend_s
 	float lerp;
 	// time frame began playing (for framegroup animations)
 	double start;
+	double finish; // Server sent us a more accurate interval. Use it instead of 0.1
 }
 framegroupblend_t;
 

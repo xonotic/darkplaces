@@ -92,6 +92,7 @@ OBJ_COMMON= \
 	cl_parse.o \
 	cl_particles.o \
 	cl_protocol_dpp7.o \
+	cl_protocol_fq.o \
 	cl_protocol_nq.o \
 	cl_protocol_qw.o \
 	cl_screen.o \

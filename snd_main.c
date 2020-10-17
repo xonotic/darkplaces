@@ -1566,7 +1566,7 @@ static void S_PlaySfxOnChannel (sfx_t *sfx, channel_t *target_chan, unsigned int
 	// If it's a static sound
 	if (isstatic)
 	{
-		if (sfx->loopstart >= sfx->total_length && (cls.protocol == &protocol_netquake || cls.protocol == &protocol_quakeworld))
+		if (sfx->loopstart >= sfx->total_length && (cls.protocol == &protocol_netquake || cls.protocol == &protocol_fitzquake || cls.protocol == &protocol_quakeworld))
 			Con_DPrintf("Quake compatibility warning: Static sound \"%s\" is not looped\n", sfx->name);
 		target_chan->distfade = attenuation / (64.0f * snd_soundradius.value);
 	}

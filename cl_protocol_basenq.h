@@ -255,7 +255,7 @@ static void Netmsg_svc_foundsecret (protocol_t *protocol)
 
 static void Netmsg_svc_spawnstaticsound (protocol_t *protocol)
 {
-	CL_ParseStaticSound (protocol == &protocol_nehahrabjp2 || protocol == &protocol_nehahrabjp3 ? true : false);
+	CL_ParseStaticSound (protocol == &protocol_nehahrabjp2 || protocol == &protocol_nehahrabjp3 ? true : false, 1);
 }
 
 static void Netmsg_svc_intermission (protocol_t *protocol)
