@@ -392,7 +392,7 @@ static void Cvar_SetQuick_Internal (cvar_t *var, const char *value)
 	memcpy ((char *)var->string, value, valuelen + 1);
 	var->value = atof (var->string);
 	var->integer = (int) var->value;
-	if ((var->flags & CF_NOTIFY) && changed && sv.active && !sv_disablenotify.integer)
+	if ((var->flags & CF_NOTIFY) && sv.active && !sv_disablenotify.integer)
 		SV_BroadcastPrintf("\003^3Server cvar \"%s\" changed to \"%s\"\n", var->name, var->string);
 #if 0
 	// TODO: add infostring support to the server?
@@ -441,14 +441,6 @@ void Cvar_Set(cvar_state_t *cvars, const char *var_name, const char *value)
 		return;
 	}
 	Cvar_SetQuick(var, value);
-}
-
-void Cvar_Set_NoCallback(cvar_t *var, const char *value)
-{
-	void (*callback_save)(cvar_t *) = var->callback;
-	var->callback = NULL;
-	Cvar_SetQuick_Internal(var, value);
-	var->callback = callback_save;
 }
 
 /*
@@ -505,6 +497,38 @@ void Cvar_RegisterAlias(cvar_t *variable, const char *alias )
 
 /*
 ============
+Cvar_Link
+
+Links a variable to the variable list and hashtable
+============
+*/
+static void Cvar_Link(cvar_t *variable, cvar_state_t *cvars)
+{
+	cvar_t *current, *next;
+	cvar_hash_t *hash;
+	int hashindex;
+	/*
+	 * Link the variable in
+	 * alphanumerical order
+	 */
+	for( current = NULL, next = cvars->vars ; next && strcmp( next->name, variable->name ) < 0 ; current = next, next = next->next )
+		;
+	if(current)
+		current->next = variable;
+	else
+		cvars->vars = variable;
+	variable->next = next;
+
+	// link to head of list in this hash table index
+	hash = (cvar_hash_t *)Z_Malloc(sizeof(cvar_hash_t));
+	hashindex = CRC_Block((const unsigned char *)variable->name, strlen(variable->name)) % CVAR_HASHSIZE;
+	hash->next = cvars->hashtable[hashindex];
+	hash->cvar = variable;
+	cvars->hashtable[hashindex] = hash;
+}
+
+/*
+============
 Cvar_RegisterVariable
 
 Adds a freestanding variable to the variable list.
@@ -513,11 +537,7 @@ Adds a freestanding variable to the variable list.
 void Cvar_RegisterVariable (cvar_t *variable)
 {
 	cvar_state_t *cvars = NULL;
-	int hashindex;
-	cvar_hash_t *hash;
-	cvar_t *current, *next, *cvar;
-	char *oldstr;
-	size_t alloclen;
+	cvar_t *current, *cvar;
 	int i;
 
 	switch (variable->flags & (CF_CLIENT | CF_SERVER))
@@ -538,7 +558,7 @@ void Cvar_RegisterVariable (cvar_t *variable)
 	if (developer_extra.integer)
 		Con_DPrintf("Cvar_RegisterVariable({\"%s\", \"%s\", %i});\n", variable->name, variable->string, variable->flags);
 
-// first check to see if it has already been defined
+	// first check to see if it has already been defined
 	cvar = Cvar_FindVar(cvars, variable->name, ~0);
 	if (cvar)
 	{
@@ -584,20 +604,17 @@ void Cvar_RegisterVariable (cvar_t *variable)
 		return;
 	}
 
-// check for overlap with a command
+	// check for overlap with a command
 	if (Cmd_Exists(&cmd_client, variable->name) || Cmd_Exists(&cmd_server, variable->name))
 	{
 		Con_Printf("Cvar_RegisterVariable: %s is a command\n", variable->name);
 		return;
 	}
 
-// copy the value off, because future sets will Z_Free it
-	oldstr = (char *)variable->string;
-	alloclen = strlen(variable->string) + 1;
-	variable->string = (char *)Z_Malloc (alloclen);
-	memcpy ((char *)variable->string, oldstr, alloclen);
-	variable->defstring = (char *)Z_Malloc (alloclen);
-	memcpy ((char *)variable->defstring, oldstr, alloclen);
+	// copy the value off, because future sets will Z_Free it
+	variable->name = (char *)Mem_strdup(zonemempool, variable->name);
+	variable->string = (char *)Mem_strdup(zonemempool, variable->string);
+	variable->defstring = (char *)Mem_strdup(zonemempool, variable->string);
 	variable->value = atof (variable->string);
 	variable->integer = (int) variable->value;
 	variable->aliasindex = 0;
@@ -606,23 +623,7 @@ void Cvar_RegisterVariable (cvar_t *variable)
 	for (i = 0;i < PRVM_PROG_MAX;i++)
 		variable->globaldefindex[i] = -1;
 
-// link the variable in
-// alphanumerical order
-	for( current = NULL, next = cvars->vars ; next && strcmp( next->name, variable->name ) < 0 ; current = next, next = next->next )
-		;
-	if( current ) {
-		current->next = variable;
-	} else {
-		cvars->vars = variable;
-	}
-	variable->next = next;
-
-	// link to head of list in this hash table index
-	hash = (cvar_hash_t *)Z_Malloc(sizeof(cvar_hash_t));
-	hashindex = CRC_Block((const unsigned char *)variable->name, strlen(variable->name)) % CVAR_HASHSIZE;
-	hash->next = cvars->hashtable[hashindex];
-	hash->cvar = variable;
-	cvars->hashtable[hashindex] = hash;
+	Cvar_Link(variable, cvars);
 }
 
 /*
@@ -634,15 +635,13 @@ Adds a newly allocated variable to the variable list or sets its value.
 */
 cvar_t *Cvar_Get(cvar_state_t *cvars, const char *name, const char *value, int flags, const char *newdescription)
 {
-	int hashindex;
-	cvar_hash_t *hash;
-	cvar_t *current, *next, *cvar;
+	cvar_t *cvar;
 	int i;
 
 	if (developer_extra.integer)
 		Con_DPrintf("Cvar_Get(\"%s\", \"%s\", %i);\n", name, value, flags);
 
-// first check to see if it has already been defined
+	// first check to see if it has already been defined
 	cvar = Cvar_FindVar(cvars, name, ~0);
 	if (cvar)
 	{
@@ -661,23 +660,23 @@ cvar_t *Cvar_Get(cvar_state_t *cvars, const char *name, const char *value, int f
 		return cvar;
 	}
 
-// check for pure evil
+	// check for pure evil
 	if (!*name)
 	{
 		Con_Printf("Cvar_Get: invalid variable name\n");
 		return NULL;
 	}
 
-// check for overlap with a command
+	// check for overlap with a command
 	if (Cmd_Exists(&cmd_client, name) || Cmd_Exists(&cmd_server, name))
 	{
 		Con_Printf("Cvar_Get: %s is a command\n", name);
 		return NULL;
 	}
 
-// allocate a new cvar, cvar name, and cvar string
-// TODO: factorize the following code with the one at the end of Cvar_RegisterVariable()
-// FIXME: these never get Z_Free'd
+	// allocate a new cvar, cvar name, and cvar string
+	// TODO: factorize the following code with the one at the end of Cvar_RegisterVariable()
+	// FIXME: these never get Z_Free'd
 	cvar = (cvar_t *)Z_Malloc(sizeof(cvar_t));
 	cvar->flags = flags | CF_ALLOCATED;
 	cvar->name = (char *)Mem_strdup(zonemempool, name);
@@ -697,22 +696,7 @@ cvar_t *Cvar_Get(cvar_state_t *cvars, const char *name, const char *value, int f
 	for (i = 0;i < PRVM_PROG_MAX;i++)
 		cvar->globaldefindex[i] = -1;
 
-// link the variable in
-// alphanumerical order
-	for( current = NULL, next = cvars->vars ; next && strcmp( next->name, cvar->name ) < 0 ; current = next, next = next->next )
-		;
-	if( current )
-		current->next = cvar;
-	else
-		cvars->vars = cvar;
-	cvar->next = next;
-
-	// link to head of list in this hash table index
-	hash = (cvar_hash_t *)Z_Malloc(sizeof(cvar_hash_t));
-	hashindex = CRC_Block((const unsigned char *)cvar->name, strlen(cvar->name)) % CVAR_HASHSIZE;
-	hash->next = cvars->hashtable[hashindex];
-	cvars->hashtable[hashindex] = hash;
-	hash->cvar = cvar;
+	Cvar_Link(cvar, cvars);
 
 	return cvar;
 }
@@ -742,12 +726,12 @@ qbool	Cvar_Command (cmd_state_t *cmd)
 	cvar_state_t	*cvars = cmd->cvars;
 	cvar_t			*v;
 
-// check variables
+	// check variables
 	v = Cvar_FindVar(cvars, Cmd_Argv(cmd, 0), (cmd->cvars_flagsmask));
 	if (!v)
 		return false;
 
-// perform a variable print or set
+	// perform a variable print or set
 	if (Cmd_Argc(cmd) == 1)
 	{
 		Cvar_PrintHelp(v, Cmd_Argv(cmd, 0), true);
@@ -756,16 +740,15 @@ qbool	Cvar_Command (cmd_state_t *cmd)
 
 	if (developer_extra.integer)
 		Con_DPrint("Cvar_Command: ");
-	
+
 	if(Cvar_Readonly(v, NULL))
 		return true;
-	
+
 	Cvar_SetQuick(v, Cmd_Argv(cmd, 1));
 	if (developer_extra.integer)
 		Con_DPrint("\n");
 	return true;
 }
-
 
 void Cvar_UnlockDefaults(cmd_state_t *cmd)
 {
@@ -775,7 +758,6 @@ void Cvar_UnlockDefaults(cmd_state_t *cmd)
 	for (var = cvars->vars ; var ; var = var->next)
 		var->flags &= ~CF_DEFAULTSET;
 }
-
 
 void Cvar_LockDefaults_f(cmd_state_t *cmd)
 {
@@ -902,7 +884,6 @@ void Cvar_ResetToDefaults_All_f(cmd_state_t *cmd)
 	}
 }
 
-
 void Cvar_ResetToDefaults_NoSaveOnly_f(cmd_state_t *cmd)
 {
 	cvar_state_t *cvars = cmd->cvars;
@@ -928,7 +909,6 @@ void Cvar_ResetToDefaults_SaveOnly_f(cmd_state_t *cmd)
 	}
 }
 
-
 /*
 ============
 Cvar_WriteVariables
@@ -952,7 +932,6 @@ void Cvar_WriteVariables (cvar_state_t *cvars, qfile_t *f)
 		}
 	}
 }
-
 
 // Added by EvilTypeGuy eviltypeguy@qeradiant.com
 // 2000-01-09 CvarList command By Matthias "Maddes" Buecher, http://www.inside3d.com/qip/

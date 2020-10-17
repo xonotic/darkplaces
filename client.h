@@ -1216,6 +1216,8 @@ double CL_Frame(double time);
 void CL_Shutdown (void);
 void CL_Init (void);
 
+void CL_StartVideo(void);
+
 void CL_EstablishConnection(const char *host, int firstarg);
 
 void CL_Disconnect (void);

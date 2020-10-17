@@ -23,12 +23,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include <time.h>
 #include "libcurl.h"
-#include "cdaudio.h"
-#include "cl_video.h"
-#include "progsvm.h"
-#include "csprogs.h"
-#include "sv_demo.h"
-#include "snd_main.h"
 #include "taskqueue.h"
 #include "utf8lib.h"
 
@@ -131,7 +125,6 @@ void Host_Error (const char *error, ...)
 	PRVM_Crash(MVM_prog);
 #endif
 
-	cl.csqc_loaded = false;
 	Cvar_SetValueQuick(&csqc_progcrc, -1);
 	Cvar_SetValueQuick(&csqc_progsize, -1);
 
@@ -148,56 +141,6 @@ void Host_Error (const char *error, ...)
 	hosterror = false;
 
 	Host_AbortCurrentFrame();
-}
-
-static void Host_ServerOptions (void)
-{
-	int i;
-
-	// general default
-	svs.maxclients = 8;
-
-// COMMANDLINEOPTION: Server: -dedicated [playerlimit] starts a dedicated server (with a command console), default playerlimit is 8
-// COMMANDLINEOPTION: Server: -listen [playerlimit] starts a multiplayer server with graphical client, like singleplayer but other players can connect, default playerlimit is 8
-	// if no client is in the executable or -dedicated is specified on
-	// commandline, start a dedicated server
-	i = Sys_CheckParm ("-dedicated");
-	if (i || !cl_available)
-	{
-		cls.state = ca_dedicated;
-		// check for -dedicated specifying how many players
-		if (i && i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
-			svs.maxclients = atoi (sys.argv[i+1]);
-		if (Sys_CheckParm ("-listen"))
-			Con_Printf ("Only one of -dedicated or -listen can be specified\n");
-		// default sv_public on for dedicated servers (often hosted by serious administrators), off for listen servers (often hosted by clueless users)
-		Cvar_SetValue(&cvars_all, "sv_public", 1);
-	}
-	else if (cl_available)
-	{
-		// client exists and not dedicated, check if -listen is specified
-		cls.state = ca_disconnected;
-		i = Sys_CheckParm ("-listen");
-		if (i)
-		{
-			// default players unless specified
-			if (i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
-				svs.maxclients = atoi (sys.argv[i+1]);
-		}
-		else
-		{
-			// default players in some games, singleplayer in most
-			if (gamemode != GAME_GOODVSBAD2 && !IS_NEXUIZ_DERIVED(gamemode) && gamemode != GAME_BATTLEMECH)
-				svs.maxclients = 1;
-		}
-	}
-
-	svs.maxclients = svs.maxclients_next = bound(1, svs.maxclients, MAX_SCOREBOARD);
-
-	svs.clients = (client_t *)Mem_Alloc(sv_mempool, sizeof(client_t) * svs.maxclients);
-
-	if (svs.maxclients > 1 && !deathmatch.integer && !coop.integer)
-		Cvar_SetValueQuick(&deathmatch, 1);
 }
 
 /*
@@ -420,12 +363,10 @@ double Host_Frame(double time)
 	Mem_CheckSentinelsGlobal();
 
 	// if the accumulators haven't become positive yet, wait a while
-	if (cls.state == ca_dedicated)
-		wait = sv_timer * -1000000.0; // dedicated
-	else if (!sv.active || svs.threaded)
-		wait = cl_timer * -1000000.0; // connected to server, main menu, or server is on different thread
+	if(!sv_timer || !cl_timer)
+		wait = min(cl_timer, sv_timer) * -1000000.0;
 	else
-		wait = max(cl_timer, sv_timer) * -1000000.0; // listen server or singleplayer
+		wait = max(cl_timer, sv_timer) * -1000000.0;
 
 	if (!host.restless && wait >= 1)
 		return wait;
@@ -446,7 +387,8 @@ static inline void Host_Sleep(double time)
 		time = 1; // because we cast to int
 
 	time0 = Sys_DirtyTime();
-	if (sv_checkforpacketsduringsleep.integer && !sys_usenoclockbutbenchmark.integer && !svs.threaded) {
+	if (sv_checkforpacketsduringsleep.integer && !sys_usenoclockbutbenchmark.integer && !svs.threaded)
+	{
 		NetConn_SleepMicroseconds((int)time);
 		if (cls.state != ca_dedicated)
 			NetConn_ClientFrame(); // helps server browser get good ping values
@@ -521,21 +463,6 @@ void Host_Main(void)
 }
 
 //============================================================================
-
-qbool vid_opened = false;
-void Host_StartVideo(void)
-{
-	if (!vid_opened && cls.state != ca_dedicated)
-	{
-		vid_opened = true;
-#ifdef WIN32
-		// make sure we open sockets before opening video because the Windows Firewall "unblock?" dialog can screw up the graphics context on some graphics drivers
-		NetConn_UpdateSockets();
-#endif
-		VID_Start();
-		CDAudio_Startup();
-	}
-}
 
 char engineversion[128];
 
@@ -713,7 +640,6 @@ static void Host_Init (void)
 	World_Init();
 	SV_Init();
 	Host_InitLocal();
-	Host_ServerOptions();
 
 	Thread_Init();
 	TaskQueue_Init();
@@ -740,7 +666,7 @@ static void Host_Init (void)
 
 	host.state = host_active;
 
-	Host_StartVideo();
+	CL_StartVideo();
 
 	Log_Start();
 

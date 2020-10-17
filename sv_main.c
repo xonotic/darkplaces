@@ -456,6 +456,56 @@ static qbool SV_CanSave(void)
 	
 }
 
+static void SV_ServerOptions (void)
+{
+	int i;
+
+	// general default
+	svs.maxclients = 8;
+
+// COMMANDLINEOPTION: Server: -dedicated [playerlimit] starts a dedicated server (with a command console), default playerlimit is 8
+// COMMANDLINEOPTION: Server: -listen [playerlimit] starts a multiplayer server with graphical client, like singleplayer but other players can connect, default playerlimit is 8
+	// if no client is in the executable or -dedicated is specified on
+	// commandline, start a dedicated server
+	i = Sys_CheckParm ("-dedicated");
+	if (i || !cl_available)
+	{
+		cls.state = ca_dedicated;
+		// check for -dedicated specifying how many players
+		if (i && i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
+			svs.maxclients = atoi (sys.argv[i+1]);
+		if (Sys_CheckParm ("-listen"))
+			Con_Printf ("Only one of -dedicated or -listen can be specified\n");
+		// default sv_public on for dedicated servers (often hosted by serious administrators), off for listen servers (often hosted by clueless users)
+		Cvar_SetValue(&cvars_all, "sv_public", 1);
+	}
+	else if (cl_available)
+	{
+		// client exists and not dedicated, check if -listen is specified
+		cls.state = ca_disconnected;
+		i = Sys_CheckParm ("-listen");
+		if (i)
+		{
+			// default players unless specified
+			if (i + 1 < sys.argc && atoi (sys.argv[i+1]) >= 1)
+				svs.maxclients = atoi (sys.argv[i+1]);
+		}
+		else
+		{
+			// default players in some games, singleplayer in most
+			if (gamemode != GAME_GOODVSBAD2 && !IS_NEXUIZ_DERIVED(gamemode) && gamemode != GAME_BATTLEMECH)
+				svs.maxclients = 1;
+		}
+	}
+
+	svs.maxclients = svs.maxclients_next = bound(1, svs.maxclients, MAX_SCOREBOARD);
+
+	svs.clients = (client_t *)Mem_Alloc(sv_mempool, sizeof(client_t) * svs.maxclients);
+
+	if (svs.maxclients > 1 && !deathmatch.integer && !coop.integer)
+		Cvar_SetValueQuick(&deathmatch, 1);
+}
+
 /*
 ===============
 SV_Init
@@ -659,6 +709,8 @@ void SV_Init (void)
 	host.hook.SV_CanSave = SV_CanSave;
 
 	sv_mempool = Mem_AllocPool("server", 0, NULL);
+
+	SV_ServerOptions();
 }
 
 static void SV_SaveEntFile_f(cmd_state_t *cmd)
@@ -2419,6 +2471,9 @@ double SV_Frame(double time)
 	char vabuf[1024];
 	qbool playing = false;
 
+	if(!sv.active)
+		return 0;
+
 	if (!svs.threaded)
 	{
 		svs.perf_acc_sleeptime = host.sleeptime;
@@ -2461,11 +2516,8 @@ double SV_Frame(double time)
 		 * Receive packets on each main loop iteration, as the main loop may
 		 * be undersleeping due to select() detecting a new packet
 		 */
-		if (sv.active)
-		{
-			NetConn_ServerFrame();
-			SV_CheckTimeouts();
-		}
+		NetConn_ServerFrame();
+		SV_CheckTimeouts();
 	}
 
 	/*
@@ -2484,7 +2536,7 @@ double SV_Frame(double time)
 		sv_timer = 0.1;
 	}
 
-	if (sv.active && sv_timer > 0 && !svs.threaded)
+	if (sv_timer > 0 && !svs.threaded)
 	{
 		/*
 		 * Execute one or more server frames, with an upper limit on how much

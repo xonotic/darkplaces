@@ -2730,6 +2730,21 @@ void CL_UpdateEntityShading(void)
 		CL_UpdateEntityShading_Entity(r_refdef.scene.entities[i]);
 }
 
+qbool vid_opened = false;
+void CL_StartVideo(void)
+{
+	if (!vid_opened && cls.state != ca_dedicated)
+	{
+		vid_opened = true;
+#ifdef WIN32
+		// make sure we open sockets before opening video because the Windows Firewall "unblock?" dialog can screw up the graphics context on some graphics drivers
+		NetConn_UpdateSockets();
+#endif
+		VID_Start();
+		CDAudio_Startup();
+	}
+}
+
 extern cvar_t host_framerate;
 extern cvar_t host_speeds;
 
@@ -2740,6 +2755,9 @@ double CL_Frame (double time)
 	static double time1 = 0, time2 = 0, time3 = 0;
 	static double wait;
 	int pass1, pass2, pass3;
+
+	if(!host_isclient.integer)
+		return 0;
 
 	CL_VM_PreventInformationLeaks();
 
