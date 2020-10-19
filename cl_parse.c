@@ -2058,7 +2058,7 @@ void CL_ParseClientdata (void)
 			else
 				cl.mpunchangle[0][i] = MSG_ReadAngle16i(&cl_message);
 		}
-		if (bits & (SU_PUNCHVEC1<<i) && cls.protocol != &protocol_fitzquake)
+		if (cls.protocol != &protocol_fitzquake && bits & (SU_PUNCHVEC1<<i))
 		{
 			if (cls.protocol == &protocol_dpp1 || cls.protocol == &protocol_dpp2 || cls.protocol == &protocol_dpp3 || cls.protocol == &protocol_dpp4)
 				cl.mpunchvector[0][i] = MSG_ReadCoord16i(&cl_message);

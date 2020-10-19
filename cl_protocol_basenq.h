@@ -87,6 +87,7 @@ static void Netmsg_svc_stufftext (protocol_t *protocol)		// [string] stuffed int
 	else */ switch(cls.protocol->num)
 	{
 		case PROTOCOL_QUAKE:
+		case PROTOCOL_FITZQUAKE:
 			// maybe add other protocols if
 			// so desired, but not DP7
 			strip_pqc = true;
