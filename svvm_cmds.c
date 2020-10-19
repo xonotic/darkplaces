@@ -485,7 +485,7 @@ static void VM_SV_ambientsound(prvm_prog_t *prog)
 		return;
 
 	large = false;
-	if (soundnum >= 256)
+	if (soundnum > 255)
 		large = true;
 
 	if(sv.protocol == &protocol_nehahrabjp)
@@ -494,7 +494,12 @@ static void VM_SV_ambientsound(prvm_prog_t *prog)
 	// add an svc_spawnambient command to the level signon packet
 
 	if (large)
-		MSG_WriteByte (&sv.signon, svc_spawnstaticsound2);
+	{
+		if(sv.protocol == &protocol_fitzquake)
+			MSG_WriteByte (&sv.signon, svc_spawnstaticsound2_fq);
+		else
+			MSG_WriteByte (&sv.signon, svc_spawnstaticsound2);
+	}
 	else
 		MSG_WriteByte (&sv.signon, svc_spawnstaticsound);
 
@@ -505,8 +510,8 @@ static void VM_SV_ambientsound(prvm_prog_t *prog)
 	else
 		MSG_WriteByte (&sv.signon, soundnum);
 
-	MSG_WriteByte (&sv.signon, (int)(vol*255));
-	MSG_WriteByte (&sv.signon, (int)(attenuation*64));
+	MSG_WriteByte (&sv.signon, (vol*255));
+	MSG_WriteByte (&sv.signon, (attenuation*64));
 
 }
 
@@ -1520,7 +1525,7 @@ static void VM_SV_WritePicture(prvm_prog_t *prog)
 static void VM_SV_makestatic(prvm_prog_t *prog)
 {
 	prvm_edict_t *ent;
-	int i, large;
+	int i, bits;
 
 	// allow 0 parameters due to an id1 qc bug in which this function is used
 	// with no parameters (but directly after setmodel with self in OFS_PARM0)
@@ -1541,17 +1546,34 @@ static void VM_SV_makestatic(prvm_prog_t *prog)
 		return;
 	}
 
-	large = false;
-	if (PRVM_serveredictfloat(ent, modelindex) >= 256 || PRVM_serveredictfloat(ent, frame) >= 256)
-		large = true;
-
+	bits = 0;
+	if (PRVM_serveredictfloat(ent, modelindex) >= 256)
+		bits |= B_LARGEMODEL;
+	if (PRVM_serveredictfloat(ent, frame) >= 256)
+		bits |= B_LARGEFRAME;
+	if (sv.protocol == &protocol_fitzquake && PRVM_serveredictfloat(ent, alpha) != ENTALPHA_DEFAULT)
+		bits |= B_ALPHA;
 	if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 	{
 		MSG_WriteByte (&sv.signon,svc_spawnstatic);
 		MSG_WriteShort (&sv.signon, (int)PRVM_serveredictfloat(ent, modelindex));
 		MSG_WriteByte (&sv.signon, (int)PRVM_serveredictfloat(ent, frame));
 	}
-	else if (large)
+	else if (bits && sv.protocol == &protocol_fitzquake)
+	{
+		MSG_WriteByte (&sv.signon, svc_spawnstatic2_fq);
+		MSG_WriteByte (&sv.signon, bits);
+		if (bits & B_LARGEMODEL)
+			MSG_WriteShort (&sv.signon, (int)PRVM_serveredictfloat(ent, modelindex));
+		else
+			MSG_WriteByte (&sv.signon, (int)PRVM_serveredictfloat(ent, modelindex));
+		
+		if (bits & B_LARGEFRAME)
+			MSG_WriteShort (&sv.signon, (int)PRVM_serveredictfloat(ent, frame));
+		else
+			MSG_WriteByte (&sv.signon, (int)PRVM_serveredictfloat(ent, frame));
+	}
+	else if (bits)
 	{
 		MSG_WriteByte (&sv.signon,svc_spawnstatic2);
 		MSG_WriteShort (&sv.signon, (int)PRVM_serveredictfloat(ent, modelindex));
@@ -1571,6 +1593,9 @@ static void VM_SV_makestatic(prvm_prog_t *prog)
 		sv.protocol->WriteCoord(&sv.signon, PRVM_serveredictvector(ent, origin)[i]);
 		sv.protocol->WriteAngle(&sv.signon, PRVM_serveredictvector(ent, angles)[i]);
 	}
+
+	if(sv.protocol == &protocol_fitzquake && bits & B_ALPHA)
+		MSG_WriteByte(&sv.signon, (int)PRVM_serveredictfloat(ent, alpha));
 
 // throw the entity away now
 	PRVM_ED_Free(prog, ent);

@@ -913,7 +913,7 @@ void SV_MarkWriteEntityStateToClient(entity_state_t *s)
 		// always send world submodels in newer protocols because they don't
 		// generate much traffic (in old protocols they hog bandwidth)
 		// but only if sv_cullentities_nevercullbmodels is off
-		else if (!(s->effects & EF_NODEPTHTEST) && (!isbmodel || !sv_cullentities_nevercullbmodels.integer || sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie))
+		else if (!(s->effects & EF_NODEPTHTEST) && (!isbmodel || !sv_cullentities_nevercullbmodels.integer || sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_fitzquake))
 		{
 			// entity has survived every check so far, check if visible
 			ed = PRVM_EDICT_NUM(s->number);
@@ -1173,7 +1173,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	{
 		if (PRVM_serveredictvector(ent, punchangle)[i])
 			bits |= (SU_PUNCH1<<i);
-		if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
+		if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_fitzquake)
 			if (punchvector[i])
 				bits |= (SU_PUNCHVEC1<<i);
 		if (PRVM_serveredictvector(ent, velocity)[i])
@@ -1248,7 +1248,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		statsf[STAT_MOVEVARS_AIRACCEL_SIDEWAYS_FRICTION] = sv_airaccel_sideways_friction.value;
 	}
 
-	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5)
+	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5 || sv.protocol == &protocol_fitzquake)
 	{
 		if (stats[STAT_VIEWHEIGHT] != DEFAULT_VIEWHEIGHT) bits |= SU_VIEWHEIGHT;
 		bits |= SU_ITEMS;
@@ -1259,6 +1259,19 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		if (sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5)
 			if (viewzoom != 255)
 				bits |= SU_VIEWZOOM;
+	}
+
+	if(sv.protocol == &protocol_fitzquake)
+	{
+		if (bits & SU_WEAPON && SV_ModelIndex(PRVM_GetString(prog, PRVM_serveredictstring(ent, weaponmodel)), 0) & 0xFF00) bits |= SU_WEAPON2;
+		if ((int)PRVM_serveredictfloat(ent, armorvalue) & 0xFF00) bits |= SU_ARMOR2;
+		if ((int)PRVM_serveredictfloat(ent, currentammo) & 0xFF00) bits |= SU_AMMO2;
+		if ((int)PRVM_serveredictfloat(ent, ammo_shells) & 0xFF00) bits |= SU_SHELLS2;
+		if ((int)PRVM_serveredictfloat(ent, ammo_nails) & 0xFF00) bits |= SU_NAILS2;
+		if ((int)PRVM_serveredictfloat(ent, ammo_rockets) & 0xFF00) bits |= SU_ROCKETS2;
+		if ((int)PRVM_serveredictfloat(ent, ammo_cells) & 0xFF00) bits |= SU_CELLS2;
+		if (bits & SU_WEAPONFRAME && (int)PRVM_serveredictfloat(ent, weaponframe) & 0xFF00) bits |= SU_WEAPONFRAME2;
+		if (bits & SU_WEAPON && PRVM_serveredictfloat(ent, alpha) != ENTALPHA_DEFAULT) bits |= SU_WEAPONALPHA; //for now, weaponalpha = client entity alpha
 	}
 
 	if (bits >= 65536)
@@ -1284,12 +1297,12 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 	{
 		if (bits & (SU_PUNCH1<<i))
 		{
-			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
+			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_fitzquake)
 				MSG_WriteChar(msg, (int)PRVM_serveredictvector(ent, punchangle)[i]);
 			else
 				MSG_WriteAngle16i(msg, PRVM_serveredictvector(ent, punchangle)[i]);
 		}
-		if (bits & (SU_PUNCHVEC1<<i))
+		if (sv.protocol != &protocol_fitzquake && bits & (SU_PUNCHVEC1<<i))
 		{
 			if (sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 				MSG_WriteCoord16i(msg, punchvector[i]);
@@ -1298,7 +1311,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		}
 		if (bits & (SU_VELOCITY1<<i))
 		{
-			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_netquake || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
+			if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_fitzquake)
 				MSG_WriteChar(msg, (int)(PRVM_serveredictvector(ent, velocity)[i] * (1.0f / 16.0f)));
 			else
 				MSG_WriteCoord32f(msg, PRVM_serveredictvector(ent, velocity)[i]);
@@ -1326,7 +1339,7 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		if (bits & SU_VIEWZOOM)
 			MSG_WriteShort (msg, bound(0, stats[STAT_VIEWZOOM], 65535));
 	}
-	else if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
+	else if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_fitzquake)
 	{
 		if (bits & SU_WEAPONFRAME)
 			MSG_WriteByte (msg, stats[STAT_WEAPONFRAME]);
@@ -1354,12 +1367,37 @@ void SV_WriteClientdataToMessage (client_t *client, prvm_edict_t *ent, sizebuf_t
 		}
 		else
 			MSG_WriteByte (msg, stats[STAT_ACTIVEWEAPON]);
-		if (bits & SU_VIEWZOOM)
+
+		if (sv.protocol != &protocol_fitzquake && bits & SU_VIEWZOOM)
 		{
 			if (sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4)
 				MSG_WriteByte (msg, bound(0, stats[STAT_VIEWZOOM], 255));
 			else
 				MSG_WriteShort (msg, bound(0, stats[STAT_VIEWZOOM], 65535));
+		}
+
+		if (sv.protocol == &protocol_fitzquake)
+		{
+			//johnfitz -- PROTOCOL_FITZQUAKE
+			if (bits & SU_WEAPON2)
+				MSG_WriteByte (msg, SV_ModelIndex(PRVM_GetString(prog, PRVM_serveredictstring(ent, weaponmodel)), 0) >> 8);
+			if (bits & SU_ARMOR2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, armorvalue) >> 8);
+			if (bits & SU_AMMO2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, currentammo) >> 8);
+			if (bits & SU_SHELLS2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, ammo_shells) >> 8);
+			if (bits & SU_NAILS2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, ammo_nails) >> 8);
+			if (bits & SU_ROCKETS2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, ammo_rockets) >> 8);
+			if (bits & SU_CELLS2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, ammo_cells) >> 8);
+			if (bits & SU_WEAPONFRAME2)
+				MSG_WriteByte (msg, (int)PRVM_serveredictfloat(ent, weaponframe) >> 8);
+			if (bits & SU_WEAPONALPHA)
+				MSG_WriteByte (msg, PRVM_serveredictfloat(ent, alpha)); //for now, weaponalpha = client entity alpha
+			//johnfitz
 		}
 	}
 }
@@ -1459,6 +1497,7 @@ static void SV_SendClientDatagram (client_t *client)
 	case PROTOCOL_DARKPLACES2:
 	case PROTOCOL_DARKPLACES3:
 	case PROTOCOL_DARKPLACES4:
+	case PROTOCOL_FITZQUAKE:
 		// no packet size limit support on DP1-4 protocols because they kick
 		// the client off if they overflow, and miss effects
 		// packets are simply sent less often to obey the rate limit

@@ -1082,16 +1082,24 @@ Returns false if the entity removed itself.
 static qbool SV_RunThink (prvm_edict_t *ent)
 {
 	prvm_prog_t *prog = SVVM_prog;
+	float thinktime;
+	float oldframe;
 	int iterations;
 
 	// don't let things stay in the past.
 	// it is possible to start that way by a trigger with a local time.
-	if (PRVM_serveredictfloat(ent, nextthink) <= 0 || PRVM_serveredictfloat(ent, nextthink) > sv.time + sv.frametime)
+	thinktime = PRVM_serveredictfloat(ent, nextthink);
+	if (thinktime <= 0 || thinktime > sv.time + sv.frametime)
 		return true;
+
+	if (thinktime < sv.time)
+		thinktime = sv.time;
+
+	oldframe = PRVM_serveredictfloat(ent, frame);
 
 	for (iterations = 0;iterations < 128  && !ent->priv.server->free;iterations++)
 	{
-		PRVM_serverglobalfloat(time) = max(sv.time, PRVM_serveredictfloat(ent, nextthink));
+		PRVM_serverglobalfloat(time) = thinktime;
 		PRVM_serveredictfloat(ent, nextthink) = 0;
 		PRVM_serverglobaledict(self) = PRVM_EDICT_TO_PROG(ent);
 		PRVM_serverglobaledict(other) = PRVM_EDICT_TO_PROG(prog->edicts);
@@ -1102,6 +1110,15 @@ static qbool SV_RunThink (prvm_edict_t *ent)
 		// frame
 		if (PRVM_serveredictfloat(ent, nextthink) <= PRVM_serverglobalfloat(time) || PRVM_serveredictfloat(ent, nextthink) > sv.time + sv.frametime || !sv_gameplayfix_multiplethinksperframe.integer)
 			break;
+	}
+	//capture interval to nextthink here and send it to client for better
+	//lerp timing, but only if interval is not 0.1 (which client assumes)
+	ent->priv.server->sendinterval = false;
+	if (!ent->priv.server->free && PRVM_serveredictfloat(ent, nextthink) && (PRVM_serveredictfloat(ent, movetype) == MOVETYPE_STEP || PRVM_serveredictfloat(ent, frame) != oldframe))
+	{
+		int i = Q_rint((PRVM_serveredictfloat(ent, nextthink)-thinktime)*255);
+		if (i >= 0 && i < 256 && i != 25 && i != 26) //25 and 26 are close enough to 0.1 to not send
+			ent->priv.server->sendinterval = true;
 	}
 	return !ent->priv.server->free;
 }

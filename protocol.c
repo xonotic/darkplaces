@@ -273,7 +273,7 @@ protocol_t protocol_fitzquake =
 	.ReadAngle = MSG_ReadAngle8i,
 	.ReadVector = MSG_ReadVector13i,
 	.svc = &netmsg_fq_svc,
-	//.clc = &netmsg_base_clc
+	.clc = &netmsg_base_clc
 };
 
 protocol_t *protocols[] =

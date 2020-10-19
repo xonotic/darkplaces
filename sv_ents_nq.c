@@ -60,30 +60,32 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 		{
 			bits |= U_FRAME;
 			if (s->frame & 0xFF00)
-				bits |= U_FRAME2;
+				bits |= (sv.protocol != &protocol_fitzquake) ? U_FRAME2 : U_FRAME2_FQ;
 		}
 		if (baseline.effects != s->effects)
 		{
 			bits |= U_EFFECTS;
-			if (s->effects & 0xFF00)
+			if (sv.protocol != &protocol_fitzquake && s->effects & 0xFF00)
 				bits |= U_EFFECTS2;
 		}
 		if (baseline.modelindex != s->modelindex)
 		{
 			bits |= U_MODEL;
 			if ((s->modelindex & 0xFF00) && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
-				bits |= U_MODEL2;
+				bits |= (sv.protocol != &protocol_fitzquake) ? U_MODEL2 : U_MODEL2_FQ;
 		}
 		if (baseline.alpha != s->alpha)
-			bits |= U_ALPHA;
-		if (baseline.scale != s->scale)
+			bits |= (sv.protocol != &protocol_fitzquake) ? U_ALPHA : U_ALPHA_FQ;
+		if (sv.protocol != &protocol_fitzquake && baseline.scale != s->scale)
 			bits |= U_SCALE;
-		if (baseline.glowsize != s->glowsize)
+		if (sv.protocol != &protocol_fitzquake && baseline.glowsize != s->glowsize)
 			bits |= U_GLOWSIZE;
-		if (baseline.glowcolor != s->glowcolor)
+		if (sv.protocol != &protocol_fitzquake && baseline.glowcolor != s->glowcolor)
 			bits |= U_GLOWCOLOR;
-		if (!VectorCompare(baseline.colormod, s->colormod))
+		if (sv.protocol != &protocol_fitzquake && !VectorCompare(baseline.colormod, s->colormod))
 			bits |= U_COLORMOD;
+		if (sv.protocol == &protocol_fitzquake && PRVM_EDICT_NUM(s->number)->priv.server->sendinterval)
+			bits |= U_LERPFINISH_FQ;
 
 		// if extensions are disabled, clear the relevant update flags
 		if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_nehahramovie)
@@ -131,14 +133,25 @@ qbool EntityFrameQuake_WriteFrame(sizebuf_t *msg, int maxsize, int numstates, co
 			if (bits & U_ANGLE2)		sv.protocol->WriteAngle(&buf, s->angles[1]);
 			if (bits & U_ORIGIN3)		sv.protocol->WriteCoord(&buf, s->origin[2]);
 			if (bits & U_ANGLE3)		sv.protocol->WriteAngle(&buf, s->angles[2]);
-			if (bits & U_ALPHA)			MSG_WriteByte(&buf, s->alpha);
-			if (bits & U_SCALE)			MSG_WriteByte(&buf, s->scale);
-			if (bits & U_EFFECTS2)		MSG_WriteByte(&buf, s->effects >> 8);
-			if (bits & U_GLOWSIZE)		MSG_WriteByte(&buf, s->glowsize);
-			if (bits & U_GLOWCOLOR)		MSG_WriteByte(&buf, s->glowcolor);
-			if (bits & U_COLORMOD)		{int c = ((int)bound(0, s->colormod[0] * (7.0f / 32.0f), 7) << 5) | ((int)bound(0, s->colormod[1] * (7.0f / 32.0f), 7) << 2) | ((int)bound(0, s->colormod[2] * (3.0f / 32.0f), 3) << 0);MSG_WriteByte(&buf, c);}
-			if (bits & U_FRAME2)		MSG_WriteByte(&buf, s->frame >> 8);
-			if (bits & U_MODEL2)		MSG_WriteByte(&buf, s->modelindex >> 8);
+
+			if(sv.protocol != &protocol_fitzquake)
+			{
+				if (bits & U_ALPHA)			MSG_WriteByte(&buf, s->alpha);
+				if (bits & U_SCALE)			MSG_WriteByte(&buf, s->scale);
+				if (bits & U_EFFECTS2)		MSG_WriteByte(&buf, s->effects >> 8);
+				if (bits & U_GLOWSIZE)		MSG_WriteByte(&buf, s->glowsize);
+				if (bits & U_GLOWCOLOR)		MSG_WriteByte(&buf, s->glowcolor);
+				if (bits & U_COLORMOD)		{int c = ((int)bound(0, s->colormod[0] * (7.0f / 32.0f), 7) << 5) | ((int)bound(0, s->colormod[1] * (7.0f / 32.0f), 7) << 2) | ((int)bound(0, s->colormod[2] * (3.0f / 32.0f), 3) << 0);MSG_WriteByte(&buf, c);}
+				if (bits & U_FRAME2)		MSG_WriteByte(&buf, s->frame >> 8);
+				if (bits & U_MODEL2)		MSG_WriteByte(&buf, s->modelindex >> 8);
+			}
+			else
+			{
+				if (bits & U_ALPHA_FQ)		MSG_WriteByte(&buf, s->alpha);
+				if (bits & U_FRAME2_FQ)		MSG_WriteByte(&buf, (int)s->frame >> 8);
+				if (bits & U_MODEL2_FQ)		MSG_WriteByte(&buf, (int)s->modelindex >> 8);
+				if (bits & U_LERPFINISH_FQ) MSG_WriteByte(&buf, (uint8_t) (Q_rint((PRVM_serveredictfloat(PRVM_EDICT_NUM(s->number), nextthink) - sv.time) * 255)));
+			}
 
 			// the nasty protocol
 			if ((bits & U_EXTEND1) && sv.protocol == &protocol_nehahramovie)

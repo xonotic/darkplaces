@@ -772,7 +772,7 @@ void SV_SendServerinfo (client_t *client)
 	memset(client->stats, 0, sizeof(client->stats));
 	memset(client->statsdeltabits, 0, sizeof(client->statsdeltabits));
 
-	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_fitzquake)
 	{
 		if (sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3)
 			client->entitydatabase = EntityFrame_AllocDatabase(sv_mempool);
@@ -1391,7 +1391,7 @@ int SV_ModelIndex(const char *s, int precachemode)
 		{
 			if (precachemode)
 			{
-				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5))
+				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5 || sv.protocol == &protocol_fitzquake))
 				{
 					Con_Printf("SV_ModelIndex(\"%s\"): precache_model can only be done in spawn functions\n", filename);
 					return 0;
@@ -1454,7 +1454,7 @@ int SV_SoundIndex(const char *s, int precachemode)
 		{
 			if (precachemode)
 			{
-				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5))
+				if (sv.state != ss_loading && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5 || sv.protocol == &protocol_fitzquake))
 				{
 					Con_Printf("SV_SoundIndex(\"%s\"): precache_sound can only be done in spawn functions\n", filename);
 					return 0;
@@ -1595,7 +1595,7 @@ SV_CreateBaseline
 static void SV_CreateBaseline (void)
 {
 	prvm_prog_t *prog = SVVM_prog;
-	int i, entnum, large;
+	int i, entnum, bits;
 	prvm_edict_t *svent;
 
 	// LadyHavoc: clear *all* baselines (not just active ones)
@@ -1621,32 +1621,53 @@ static void SV_CreateBaseline (void)
 		{
 			svent->priv.server->baseline.colormap = entnum;
 			svent->priv.server->baseline.modelindex = SV_ModelIndex("progs/player.mdl", 1);
+			if(sv.protocol == &protocol_fitzquake)
+				svent->priv.server->baseline.alpha = ENTALPHA_DEFAULT;
 		}
 		else
 		{
 			svent->priv.server->baseline.colormap = 0;
 			svent->priv.server->baseline.modelindex = (int)PRVM_serveredictfloat(svent, modelindex);
+			if(sv.protocol == &protocol_fitzquake)
+				svent->priv.server->baseline.alpha = PRVM_serveredictfloat(svent, alpha);
 		}
-
-		large = false;
-		if (svent->priv.server->baseline.modelindex & 0xFF00 || svent->priv.server->baseline.frame & 0xFF00)
-		{
-			large = true;
-			if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
-				large = false;
-		}
+		bits = 0;
+		if (svent->priv.server->baseline.modelindex & 0xFF00)
+			bits |= B_LARGEMODEL;
+		if (svent->priv.server->baseline.frame & 0xFF00)
+			bits |= B_LARGEFRAME;
+		if (sv.protocol == &protocol_fitzquake && svent->priv.server->baseline.alpha != ENTALPHA_DEFAULT)
+			bits |= B_ALPHA;
+		if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
+			bits = 0;
 
 		// add to the message
-		if (large)
-			MSG_WriteByte (&sv.signon, svc_spawnbaseline2);
+		if (bits)
+		{
+			if(sv.protocol == &protocol_fitzquake)
+				MSG_WriteByte (&sv.signon, svc_spawnbaseline2_fq);
+			else
+				MSG_WriteByte (&sv.signon, svc_spawnbaseline2);
+		}
 		else
 			MSG_WriteByte (&sv.signon, svc_spawnbaseline);
+		
 		MSG_WriteShort (&sv.signon, entnum);
 
-		if (large)
+		if (bits)
 		{
-			MSG_WriteShort (&sv.signon, svent->priv.server->baseline.modelindex);
-			MSG_WriteShort (&sv.signon, svent->priv.server->baseline.frame);
+			if(sv.protocol == &protocol_fitzquake)
+				MSG_WriteByte (&sv.signon, bits);
+
+			if(sv.protocol != &protocol_fitzquake || bits & B_LARGEMODEL)
+				MSG_WriteShort (&sv.signon, svent->priv.server->baseline.modelindex);
+			else
+				MSG_WriteByte (&sv.signon, svent->priv.server->baseline.modelindex);
+
+			if(sv.protocol != &protocol_fitzquake || bits & B_LARGEFRAME)
+				MSG_WriteShort (&sv.signon, svent->priv.server->baseline.frame);
+			else
+				MSG_WriteByte (&sv.signon, svent->priv.server->baseline.frame);
 		}
 		else if (sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
 		{
@@ -1665,6 +1686,9 @@ static void SV_CreateBaseline (void)
 			sv.protocol->WriteCoord(&sv.signon, svent->priv.server->baseline.origin[i]);
 			sv.protocol->WriteAngle(&sv.signon, svent->priv.server->baseline.angles[i]);
 		}
+
+		if (sv.protocol == &protocol_fitzquake && bits & B_ALPHA)
+			MSG_WriteByte (&sv.signon, svent->priv.server->baseline.alpha);
 	}
 }
 
@@ -1886,6 +1910,8 @@ void SV_SpawnServer (const char *map)
 		Con_Printf(CON_ERROR "Unknown sv_protocolname \"%s\", valid values are:\n%s\n", sv_protocolname.string, buffer);
 		sv.protocol = &protocol_netquake;
 	}
+	else if (sv.protocol == &protocol_fitzquake)
+		Cvar_SetValueQuick(&pr_checkextension, 0);
 
 	SV_VM_Setup();
 
@@ -2019,7 +2045,7 @@ void SV_SpawnServer (const char *map)
 		Mod_PurgeUnused();
 
 // create a baseline for more efficient communications
-	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3)
+	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_fitzquake)
 		SV_CreateBaseline ();
 
 	sv.state = ss_active; // LadyHavoc: workaround for svc_precache bug

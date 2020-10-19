@@ -113,6 +113,8 @@ typedef struct edict_engineprivate_s
 	frameblend_t frameblend[MAX_FRAMEBLENDS];
 	skeleton_t skeleton;
 
+	qbool sendinterval; // PROTOCOL_FITZQUAKE
+
 	// physics parameters
 	qbool ode_physics;
 	void *ode_body;

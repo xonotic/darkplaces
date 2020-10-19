@@ -653,7 +653,7 @@ void SV_ReadClientMove (void)
 	if (sv_message.badread) Con_Printf("SV_ReadClientMessage: badread at %s:%i\n", __FILE__, __LINE__);
 
 	// read ping time
-	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5 && sv.protocol != &protocol_dpp6)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5 && sv.protocol != &protocol_dpp6 && sv.protocol != &protocol_fitzquake)
 		move->sequence = MSG_ReadLong(&sv_message);
 	move->time = move->clienttime = MSG_ReadFloat(&sv_message);
 	if (sv_message.badread) Con_Printf("SV_ReadClientMessage: badread at %s:%i\n", __FILE__, __LINE__);
@@ -689,7 +689,7 @@ void SV_ReadClientMove (void)
 	// read buttons
 	// be sure to bitwise OR them into the move->buttons because we want to
 	// accumulate button presses from multiple packets per actual move
-	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5)
+	if (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_dpp4 || sv.protocol == &protocol_dpp5 || sv.protocol == &protocol_fitzquake)
 		move->buttons = MSG_ReadByte(&sv_message);
 	else
 		move->buttons = MSG_ReadLong(&sv_message);
@@ -700,7 +700,7 @@ void SV_ReadClientMove (void)
 	if (sv_message.badread) Con_Printf("SV_ReadClientMessage: badread at %s:%i\n", __FILE__, __LINE__);
 
 	// PRYDON_CLIENTCURSOR
-	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5)
+	if (sv.protocol != &protocol_netquake && sv.protocol != &protocol_quakedp && sv.protocol != &protocol_nehahramovie && sv.protocol != &protocol_nehahrabjp && sv.protocol != &protocol_nehahrabjp2 && sv.protocol != &protocol_nehahrabjp3 && sv.protocol != &protocol_dpp1 && sv.protocol != &protocol_dpp2 && sv.protocol != &protocol_dpp3 && sv.protocol != &protocol_dpp4 && sv.protocol != &protocol_dpp5 && sv.protocol != &protocol_fitzquake)
 	{
 		// 30 bytes
 		move->cursor_screen[0] = MSG_ReadShort(&sv_message) * (1.0f / 32767.0f);

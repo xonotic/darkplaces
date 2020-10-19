@@ -3319,7 +3319,7 @@ static int NetConn_ServerParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 	// protocol
 	// (this protects more modern protocols against being used for
 	//  Quake packet flood Denial Of Service attacks)
-	if (length >= 5 && (i = BuffBigLong(data)) && (i & (~NETFLAG_LENGTH_MASK)) == (int)NETFLAG_CTL && (i & NETFLAG_LENGTH_MASK) == length && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3) && !ENCRYPTION_REQUIRED)
+	if (length >= 5 && (i = BuffBigLong(data)) && (i & (~NETFLAG_LENGTH_MASK)) == (int)NETFLAG_CTL && (i & NETFLAG_LENGTH_MASK) == length && (sv.protocol == &protocol_netquake || sv.protocol == &protocol_quakedp || sv.protocol == &protocol_nehahramovie || sv.protocol == &protocol_nehahrabjp || sv.protocol == &protocol_nehahrabjp2 || sv.protocol == &protocol_nehahrabjp3 || sv.protocol == &protocol_dpp1 || sv.protocol == &protocol_dpp2 || sv.protocol == &protocol_dpp3 || sv.protocol == &protocol_fitzquake) && !ENCRYPTION_REQUIRED)
 	{
 		int c;
 		int protocolnumber;
