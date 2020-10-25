@@ -12,7 +12,7 @@
 
 #include <signal.h>
 
-#include "quakedef.h"
+#include "darkplaces.h"
 
 sys_t sys;
 
@@ -154,10 +154,10 @@ int main (int argc, char **argv)
 	Sys_ProvideSelfFD();
 
 	// COMMANDLINEOPTION: sdl: -noterminal disables console output on stdout
-	if(COM_CheckParm("-noterminal"))
+	if(Sys_CheckParm("-noterminal"))
 		sys.outfd = -1;
 	// COMMANDLINEOPTION: sdl: -stderr moves console output to stderr
-	else if(COM_CheckParm("-stderr"))
+	else if(Sys_CheckParm("-stderr"))
 		sys.outfd = 2;
 	else
 		sys.outfd = 1;
@@ -175,7 +175,7 @@ int main (int argc, char **argv)
 	return 0;
 }
 
-qboolean sys_supportsdlgetticks = false;
+qbool sys_supportsdlgetticks = false;
 unsigned int Sys_SDL_GetTicks (void)
 {
 	Sys_Error("Called Sys_SDL_GetTicks on non-SDL target");
