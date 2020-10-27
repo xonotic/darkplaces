@@ -61,6 +61,50 @@ interface from being ambiguous.
 struct cmd_state_s;
 struct qfile_s;
 
+// TODO
+typedef enum ival_type_e
+{
+	_bool,
+	_int,
+	_float,
+	//_vector,
+	_string
+} ival_type_t;
+
+typedef struct ivar_s
+{
+	union
+	{
+		qbool boolean;
+		int integer;
+		float value;
+		//float *vector;
+		const char *string;
+	};
+
+	ival_type_t type;
+
+} ivar_t;
+
+// Not used, just what the new cvar_t *might* look like.
+typedef struct ncvar_s
+{
+	ivar_t var;
+	ivar_t init;
+	int flags;
+	const char *name;
+	const char *description;
+	const char *string;
+	const char *defstring;
+	void (*callback)(struct ncvar_s *var);
+
+	int globaldefindex[3];
+	int globaldefindex_stringno[3];
+
+	struct ncvar_s *next;
+
+} ncvar_t;
+
 typedef struct cvar_s
 {
 	int flags;
@@ -94,6 +138,8 @@ typedef struct cvar_s
 	int globaldefindex[3];
 	int globaldefindex_stringno[3];
 
+	ivar_t *internal;
+
 	struct cvar_s *next;
 } cvar_t;
 
@@ -116,6 +162,8 @@ extern cvar_state_t cvars_null; // used by cmd_serverfromclient which intentiona
 void Cvar_RegisterAlias(cvar_t *variable, const char *alias );
 
 void Cvar_RegisterCallback(cvar_t *variable, void (*callback)(cvar_t *));
+
+void Cvar_RegisterInternal(ivar_t *variable, const char *name, const char *description, int flags);
 
 /// registers a cvar that already has the name, string, and optionally the
 /// archive elements set.

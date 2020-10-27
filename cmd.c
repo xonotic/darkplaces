@@ -2146,7 +2146,7 @@ void Cmd_ClearCSQCCommands (cmd_state_t *cmd)
 	}
 }
 
-extern cvar_t sv_cheats;
+extern ivar_t sv_cheats;
 
 /*
 ============

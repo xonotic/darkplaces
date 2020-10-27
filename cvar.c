@@ -392,6 +392,22 @@ static void Cvar_SetQuick_Internal (cvar_t *var, const char *value)
 	memcpy ((char *)var->string, value, valuelen + 1);
 	var->value = atof (var->string);
 	var->integer = (int) var->value;
+
+	if(var->internal)
+	{
+		switch (var->internal->type)
+		{
+		case _bool:
+		case _int:
+		case _float:
+			var->internal->integer = var->integer;
+			break;
+		case _string:
+			var->internal->string = (char *)var->string;
+			break;
+		}
+	}
+
 	if ((var->flags & CF_NOTIFY) && sv.active && !sv_disablenotify.integer)
 		SV_BroadcastPrintf("\003^3Server cvar \"%s\" changed to \"%s\"\n", var->name, var->string);
 #if 0
@@ -527,6 +543,51 @@ static void Cvar_Link(cvar_t *variable, cvar_state_t *cvars)
 	cvars->hashtable[hashindex] = hash;
 }
 
+void Cvar_RegisterInternal(ivar_t *variable, const char *name, const char *description, int flags)
+{
+	cvar_t *cvar = NULL;
+	char buf[256];
+	int i;
+
+	cvar = Cvar_FindVar(&cvars_all, name, ~0);
+	if(cvar)
+		return;
+	
+	cvar = (cvar_t *)Z_Malloc(sizeof(cvar_t));
+	cvar->flags = flags;
+	cvar->name = (char *)Mem_strdup(zonemempool, name);
+	switch (variable->type)
+	{
+	case _bool:
+	case _int:
+		dpsnprintf(buf, sizeof(buf), "%i", variable->integer);
+		break;
+	case _float:
+		dpsnprintf(buf, sizeof(buf), "%.9g", variable->value);
+		break;
+	case _string:
+		dpsnprintf(buf, sizeof(buf), "%s", variable->string);
+		break;
+	}
+
+	cvar->name = (char *)Mem_strdup(zonemempool, name);
+	cvar->string = (char *)Mem_strdup(zonemempool, buf);
+	cvar->defstring = (char *)Mem_strdup(zonemempool, buf);
+	cvar->description = (char *)Mem_strdup(zonemempool, description);
+	cvar->value = variable->value;
+	cvar->integer = variable->integer;
+	cvar->aliases = (char **)Z_Malloc(sizeof(char **));
+	cvar->internal = variable;
+	memset(cvar->aliases, 0, sizeof(char *));
+
+
+	// Mark it as not an autocvar.
+	for (i = 0;i < PRVM_PROG_MAX;i++)
+		cvar->globaldefindex[i] = -1;
+
+	Cvar_Link(cvar, &cvars_all);
+}
+
 /*
 ============
 Cvar_RegisterVariable
@@ -617,6 +678,7 @@ void Cvar_RegisterVariable (cvar_t *variable)
 	variable->defstring = (char *)Mem_strdup(zonemempool, variable->string);
 	variable->value = atof (variable->string);
 	variable->integer = (int) variable->value;
+	variable->internal = NULL;
 	variable->aliasindex = 0;
 
 	// Mark it as not an autocvar.
@@ -685,6 +747,7 @@ cvar_t *Cvar_Get(cvar_state_t *cvars, const char *name, const char *value, int f
 	cvar->value = atof (cvar->string);
 	cvar->integer = (int) cvar->value;
 	cvar->aliases = (char **)Z_Malloc(sizeof(char **));
+	cvar->internal = NULL;
 	memset(cvar->aliases, 0, sizeof(char *));
 
 	if(newdescription && *newdescription)

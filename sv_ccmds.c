@@ -24,7 +24,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "sv_demo.h"
 
 int current_skill;
-cvar_t sv_cheats = {CF_SERVER | CF_NOTIFY, "sv_cheats", "0", "enables cheat commands in any game, and cheat impulses in dpmod"};
+// TODO: Convenience macros? Maybe IVAR_BOOL(sv_cheats, 1) or something
+ivar_t sv_cheats = { .boolean = 0, _bool};
+//cvar_t sv_cheats = {CF_SERVER | CF_NOTIFY, "sv_cheats", "0", "enables cheat commands in any game, and cheat impulses in dpmod"};
 cvar_t sv_adminnick = {CF_SERVER | CF_ARCHIVE, "sv_adminnick", "", "nick name to use for admin messages instead of host name"};
 cvar_t sv_status_privacy = {CF_SERVER | CF_ARCHIVE, "sv_status_privacy", "0", "do not show IP addresses in 'status' replies to clients"};
 cvar_t sv_status_show_qcstatus = {CF_SERVER | CF_ARCHIVE, "sv_status_show_qcstatus", "0", "show the 'qcstatus' field in status replies, not the 'frags' field. Turn this on if your mod uses this field, and the 'frags' field on the other hand has no meaningful value."};
@@ -1609,8 +1611,12 @@ static void SV_Ent_Remove_All_f(cmd_state_t *cmd)
 
 void SV_InitOperatorCommands(void)
 {
-	Cvar_RegisterVariable(&sv_cheats);
-	Cvar_RegisterCallback(&sv_cheats, SV_DisableCheats_c);
+	// TODO: By making cvar_t a superset of ivar_t, we can just cast sv_cheats
+	// to cvar_t and not have to do what ever this shit is.
+	cvar_t *cheats;
+	Cvar_RegisterInternal(&sv_cheats, "sv_cheats", "enables cheat commands in any game, and cheat impulses in dpmod", CF_SERVER | CF_NOTIFY);
+	cheats = Cvar_FindVar(&cvars_all, "sv_cheats", ~0);
+	Cvar_RegisterCallback(cheats, SV_DisableCheats_c);
 	Cvar_RegisterVariable(&sv_adminnick);
 	Cvar_RegisterVariable(&sv_status_privacy);
 	Cvar_RegisterVariable(&sv_status_show_qcstatus);
