@@ -1008,9 +1008,21 @@ void IN_Move( void )
 			}
 		}
 
-		SDL_GetMouseState(&x, &y);
-		in_windowmouse_x = x;
-		in_windowmouse_y = y;
+		if (in_setmouse > 0)
+		{
+			if (vid_activewindow)
+			{
+				SDL_WarpMouseInWindow(window, in_windowmouse_x, in_windowmouse_y);
+			}
+			--in_setmouse;
+		}
+		else
+		{
+			SDL_GetMouseState(&x, &y);
+			in_windowmouse_x = x;
+			in_windowmouse_y = y;
+		}
+
 	}
 
 	VID_BuildJoyState(&joystate);

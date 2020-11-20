@@ -66,6 +66,8 @@ viddef_t vid;
 // AK FIXME -> input_dest
 qbool in_client_mouse = true;
 
+int in_setmouse = 0;
+
 // AK where should it be placed ?
 float in_mouse_x, in_mouse_y;
 float in_windowmouse_x, in_windowmouse_y;
