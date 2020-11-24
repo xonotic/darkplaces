@@ -1008,9 +1008,9 @@ void IN_Move( void )
 			}
 		}
 
-		if (in_setmouse > 0)
+		if (in_setmouse > 0 && vid_activewindow)
 		{
-			if (vid_activewindow)
+			if (in_setmouse == 1)
 			{
 				SDL_WarpMouseInWindow(window, in_windowmouse_x, in_windowmouse_y);
 			}
