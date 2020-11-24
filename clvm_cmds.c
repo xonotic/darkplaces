@@ -2219,11 +2219,12 @@ static void VM_CL_getmousepos(prvm_prog_t *prog)
 		VectorSet(PRVM_G_VECTOR(OFS_RETURN), in_mouse_x * vid_conwidth.integer / vid.width, in_mouse_y * vid_conheight.integer / vid.height, 0);
 }
 
+//#644 void(vector) setmousepos
 static void VM_CL_setmousepos(prvm_prog_t *prog)
 {
 	VM_SAFEPARMCOUNT(1, VM_CL_setmousepos);
 
-	if (!key_consoleactive && key_dest == key_game)
+	if (!key_consoleactive && key_dest == key_game && cl.csqc_wantsmousemove)
 	{
 		vec3_t pos;
 		VectorCopy(PRVM_G_VECTOR(OFS_PARM0), pos);
@@ -5599,8 +5600,10 @@ NULL,							// #637
 VM_CL_RotateMoves,					// #638
 VM_digest_hex,						// #639
 VM_CL_V_CalcRefdef,					// #640 void(entity e) V_CalcRefdef (DP_CSQC_V_CALCREFDEF)
-VM_CL_setmousepos,					// #641 void(vecor pos) setmousepos
+NULL,								// #641
 VM_coverage,						// #642
+NULL,								// #643
+VM_CL_setmousepos,					// #644 void(vecor pos) setmousepos
 NULL
 };
 

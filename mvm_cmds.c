@@ -800,6 +800,23 @@ static void VM_M_getmousepos(prvm_prog_t *prog)
 		VectorSet(PRVM_G_VECTOR(OFS_RETURN), in_mouse_x * vid_conwidth.integer / vid.width, in_mouse_y * vid_conheight.integer / vid.height, 0);
 }
 
+//#644 void(vector) setmousepos
+static void VM_M_setmousepos(prvm_prog_t *prog)
+{
+	VM_SAFEPARMCOUNT(1, VM_M_setmousepos);
+
+	if (!key_consoleactive && key_dest == key_game && key_dest == key_menu_grabbed && in_client_mouse)
+	{
+		vec3_t pos;
+		VectorCopy(PRVM_G_VECTOR(OFS_PARM0), pos);
+		// Turn it back from console space as returned by getmousepos,
+		// into window space.
+		in_windowmouse_x = pos[0] * vid.width / vid_conwidth.integer;
+		in_windowmouse_y = pos[1] * vid.height / vid_conheight.integer;
+		in_setmouse = 2;
+	}
+}
+
 static void VM_M_crypto_getkeyfp(prvm_prog_t *prog)
 {
 	lhnetaddress_t addr;
@@ -1721,6 +1738,7 @@ NULL,							// #640
 VM_M_crypto_getmyidstatus,				// #641 float(float i) crypto_getmyidstatus
 VM_coverage,						// #642
 VM_M_crypto_getidstatus,				// #643 float(string addr) crypto_getidstatus
+VM_M_setmousepos,					// #644 void(vecor pos) setmousepos
 NULL
 };
 
