@@ -5600,7 +5600,7 @@ NULL,							// #637
 VM_CL_RotateMoves,					// #638
 VM_digest_hex,						// #639
 VM_CL_V_CalcRefdef,					// #640 void(entity e) V_CalcRefdef (DP_CSQC_V_CALCREFDEF)
-NULL,								// #641
+NULL,									// #641
 VM_coverage,						// #642
 NULL,								// #643
 VM_CL_setmousepos,					// #644 void(vecor pos) setmousepos
