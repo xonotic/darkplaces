@@ -2204,6 +2204,12 @@ static void VM_CL_setcursormode (prvm_prog_t *prog)
 	VM_SAFEPARMCOUNT(1, VM_CL_setcursormode);
 	cl.csqc_wantsmousemove = PRVM_G_FLOAT(OFS_PARM0) != 0;
 	cl_ignoremousemoves = 2;
+	
+	if (!cl.csqc_wantsmousemove)
+	{
+		// Cancel setting cursor pos if we change the cursor back to aiming mode.
+		in_setmouse = 0;
+	}
 }
 
 //#344 vector() getmousepos (DP_CSQC)
