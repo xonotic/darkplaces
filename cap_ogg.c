@@ -955,14 +955,14 @@ void SCR_CaptureVideo_Ogg_BeginVideo(void)
 		theora_info ti;
 		int vp3compat;
 
-		format->serial1 = rand();
+		format->serial1 = xor_rand();
 		qogg_stream_init(&format->to, format->serial1);
 
 		if(cls.capturevideo.soundrate)
 		{
 			do
 			{
-				format->serial2 = rand();
+				format->serial2 = xor_rand();
 			}
 			while(format->serial1 == format->serial2);
 			qogg_stream_init(&format->vo, format->serial2);

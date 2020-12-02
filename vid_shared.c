@@ -1519,7 +1519,7 @@ void VID_BuildGammaTables(unsigned short *ramps, int rampsize)
 			for (x = 0;x < 3;x++)
 			{
 				n[x] = lhrandom(0, 1);
-				nd[x] = (rand()&1)?-0.25:0.25;
+				nd[x] = (xor_rand()&1)?-0.25:0.25;
 				nt[x] = lhrandom(1, 8.2);
 			}
 		}

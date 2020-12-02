@@ -621,7 +621,7 @@ int NetConn_Read(lhnetsocket_t *mysocket, void *data, int maxlength, lhnetaddres
 		return 0;
 	if (cl_netpacketloss_receive.integer)
 		for (i = 0;i < cl_numsockets;i++)
-			if (cl_sockets[i] == mysocket && (rand() % 100) < cl_netpacketloss_receive.integer)
+			if (cl_sockets[i] == mysocket && (xor_rand() % 100) < cl_netpacketloss_receive.integer)
 				return 0;
 	if (developer_networking.integer)
 	{
@@ -645,7 +645,7 @@ int NetConn_Write(lhnetsocket_t *mysocket, const void *data, int length, const l
 	int i;
 	if (cl_netpacketloss_send.integer)
 		for (i = 0;i < cl_numsockets;i++)
-			if (cl_sockets[i] == mysocket && (rand() % 100) < cl_netpacketloss_send.integer)
+			if (cl_sockets[i] == mysocket && (xor_rand() % 100) < cl_netpacketloss_send.integer)
 				return length;
 	if (mysocket->address.addresstype == LHNETADDRESSTYPE_LOOP && netconn_mutex)
 		Thread_LockMutex(netconn_mutex);
@@ -713,7 +713,7 @@ static int NetConn_AddCryptoFlag(crypto_t *crypto)
 	if (crypto->authenticated)
 	{
 		// Let's always set at least one of the bits.
-		int r = rand() % 7 + 1;
+		int r = xor_rand() % 7 + 1;
 		if (r & 1)
 			flag |= NETFLAG_CRYPTO0;
 		if (r & 2)

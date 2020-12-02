@@ -270,7 +270,7 @@ void CDAudio_Play_byName (const char *trackname, qboolean looping, qboolean tryr
 		
 		if(cdValid && maxTrack > 0)
 		{
-			track = 1 + (rand() % maxTrack);
+			track = 1 + (xor_rand() % maxTrack);
 			if(CDAudio_Play_real(track, looping, true))
 				goto success;
 		}

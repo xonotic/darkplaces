@@ -2448,11 +2448,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SPIKE, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2466,11 +2466,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SUPERSPIKE, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2532,11 +2532,11 @@ static void CL_ParseTempEntity(void)
 			CL_ParticleEffect(EFFECT_TE_GUNSHOT, radius, pos, pos2, vec3_origin, vec3_origin, NULL, 0);
 			if(cl_sound_ric_gunshot.integer & RIC_GUNSHOT)
 			{
-				if (rand() % 5)
+				if (xor_rand() % 5)
 					S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 				else
 				{
-					rnd = rand() & 3;
+					rnd = xor_rand() & 3;
 					if (rnd == 1)
 						S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 					else if (rnd == 2)
@@ -2590,11 +2590,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SPIKE, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2608,11 +2608,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SPIKEQUAD, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2626,11 +2626,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SUPERSPIKE, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2644,11 +2644,11 @@ static void CL_ParseTempEntity(void)
 			MSG_ReadVector(&cl_message, pos, cls.protocol);
 			CL_FindNonSolidLocation(pos, pos, 4);
 			CL_ParticleEffect(EFFECT_TE_SUPERSPIKEQUAD, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
-			if (rand() % 5)
+			if (xor_rand() % 5)
 				S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 			else
 			{
-				rnd = rand() & 3;
+				rnd = xor_rand() & 3;
 				if (rnd == 1)
 					S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 				else if (rnd == 2)
@@ -2738,11 +2738,11 @@ static void CL_ParseTempEntity(void)
 			CL_ParticleEffect(EFFECT_TE_GUNSHOT, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
 			if(cl_sound_ric_gunshot.integer & RIC_GUNSHOT)
 			{
-				if (rand() % 5)
+				if (xor_rand() % 5)
 					S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 				else
 				{
-					rnd = rand() & 3;
+					rnd = xor_rand() & 3;
 					if (rnd == 1)
 						S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 					else if (rnd == 2)
@@ -2760,11 +2760,11 @@ static void CL_ParseTempEntity(void)
 			CL_ParticleEffect(EFFECT_TE_GUNSHOTQUAD, 1, pos, pos, vec3_origin, vec3_origin, NULL, 0);
 			if(cl_sound_ric_gunshot.integer & RIC_GUNSHOTQUAD)
 			{
-				if (rand() % 5)
+				if (xor_rand() % 5)
 					S_StartSound(-1, 0, cl.sfx_tink1, pos, 1, 1);
 				else
 				{
-					rnd = rand() & 3;
+					rnd = xor_rand() & 3;
 					if (rnd == 1)
 						S_StartSound(-1, 0, cl.sfx_ric1, pos, 1, 1);
 					else if (rnd == 2)
@@ -2896,7 +2896,7 @@ static void CL_ParseTempEntity(void)
 			if (colorLength == 0)
 				colorLength = 1;
 			CL_ParticleExplosion2(pos, colorStart, colorLength);
-			tempcolor = palette_rgb[(rand()%colorLength) + colorStart];
+			tempcolor = palette_rgb[(xor_rand()%colorLength) + colorStart];
 			color[0] = tempcolor[0] * (2.0f / 255.0f);
 			color[1] = tempcolor[1] * (2.0f / 255.0f);
 			color[2] = tempcolor[2] * (2.0f / 255.0f);

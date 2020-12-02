@@ -3388,7 +3388,7 @@ void SV_SpawnServer (const char *server)
 
 	if(*sv_random_seed.string)
 	{
-		srand(sv_random_seed.integer);
+		xor_srand(sv_random_seed.integer);
 		Con_Printf("NOTE: random seed is %d; use for debugging/benchmarking only!\nUnset sv_random_seed to get real random numbers again.\n", sv_random_seed.integer);
 	}
 

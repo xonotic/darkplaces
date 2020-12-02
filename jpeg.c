@@ -959,7 +959,7 @@ size_t JPEG_SaveImage_to_Buffer (char *jpegbuf, size_t jpegsize, int width, int 
 
 		img = Mem_Alloc(tempmempool, width * height * 3);
 		for(i = 0; i < width * height * 3; ++i)
-			img[i] = rand() & 0xFF;
+			img[i] = xor_rand() & 0xFF;
 
 		for(i = 0; i <= 100; ++i)
 		{

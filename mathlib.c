@@ -1080,3 +1080,54 @@ int Math_randomrangei(randomseed_t *r, int mini, int maxi)
 	unsigned long long n = Math_rand64(r);
 	return (int)(((n >> 33) * (maxi - mini) + mini) >> 31);
 }
+
+
+// Fast xorshift+128 random number generator function (original: https://codingforspeed.com/using-faster-psudo-random-generator-xorshift/)
+
+unsigned int xor_rand_x = 123456789;
+unsigned int xor_rand_y = 362436069;
+unsigned int xor_rand_z = 521288629;
+unsigned int xor_rand_w = 88675123;
+
+
+unsigned int xor_rand(void)
+{
+	const unsigned int t = xor_rand_x ^ (xor_rand_x << 11);
+
+	// Rotate the static values (w rotation in return statement):
+	xor_rand_x = xor_rand_y;
+	xor_rand_y = xor_rand_z;
+	xor_rand_z = xor_rand_w;
+
+	return xor_rand_w = xor_rand_w ^ (xor_rand_w >> 19) ^ (t ^ (t >> 8));
+}
+
+
+void xor_srand(const unsigned int srand_num)
+{
+	xor_rand_x = srand_num + 123456789;
+	xor_rand_y = srand_num + 362436069;
+	xor_rand_z = srand_num + 521288629;
+	xor_rand_w = srand_num + 88675123;
+
+	if (xor_rand_x == 0)
+	{
+		xor_rand_x = 123456789;
+	}
+
+	if (xor_rand_y == 0)
+	{
+		xor_rand_y = 362436069;
+	}
+
+	if (xor_rand_z == 0)
+	{
+		xor_rand_z = 521288629;
+	}
+
+	if (xor_rand_w == 0)
+	{
+		xor_rand_w = 88675123;
+	}
+}
+

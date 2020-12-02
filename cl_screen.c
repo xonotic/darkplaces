@@ -2615,11 +2615,11 @@ void SCR_UpdateLoadingScreen (qboolean clear, qboolean startup)
 			loadingscreenpic_number = 0;
 		else if(scr_loadingscreen_firstforstartup.integer)
 			if(scr_loadingscreen_count.integer > 1)
-				loadingscreenpic_number = rand() % (scr_loadingscreen_count.integer - 1) + 1;
+				loadingscreenpic_number = xor_rand() % (scr_loadingscreen_count.integer - 1) + 1;
 			else
 				loadingscreenpic_number = 0;
 		else
-			loadingscreenpic_number = rand() % (scr_loadingscreen_count.integer > 1 ? scr_loadingscreen_count.integer : 1);
+			loadingscreenpic_number = xor_rand() % (scr_loadingscreen_count.integer > 1 ? scr_loadingscreen_count.integer : 1);
 	}
 
 	if(clear)

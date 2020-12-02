@@ -33,7 +33,7 @@ void fractalnoise(unsigned char *noise, int size, int startgrid)
 		amplitude >>= 1;
 		for (y = 0;y < size;y += g2)
 			for (x = 0;x < size;x += g2)
-				n(x,y) += (rand()&amplitude);
+				n(x,y) += (xor_rand()&amplitude);
 
 		g = g2 >> 1;
 		if (g)
@@ -101,7 +101,7 @@ void fractalnoisequick(unsigned char *noise, int size, int startgrid)
 		amplitude >>= 1;
 		for (y = 0;y < size;y += g2)
 			for (x = 0;x < size;x += g2)
-				n(x,y) += (rand()&amplitude);
+				n(x,y) += (xor_rand()&amplitude);
 
 		g = g2 >> 1;
 		if (g)
@@ -151,10 +151,10 @@ float noise4f(float x, float y, float z, float w)
 	{
 		// noisetable is a random-ish series of float values in +/- 1 range
 		for (i = 0;i < NOISE_SIZE;i++)
-			noisetable[i] = (rand() / (double)RAND_MAX) * 2 - 1;
+			noisetable[i] = (xor_rand() / (double)RAND_MAX) * 2 - 1;
 		// r is a remapping table to make each dimension of the index have different indexing behavior
 		for (i = 0;i < NOISE_SIZE;i++)
-			r[i] = (int)(rand() * (double)NOISE_SIZE / ((double)RAND_MAX + 1)) & NOISE_MASK;
+			r[i] = (int)(xor_rand() * (double)NOISE_SIZE / ((double)RAND_MAX + 1)) & NOISE_MASK;
 			// that & is only needed if RAND_MAX is > the range of double, which isn't the case on most platforms
 	}
 	frac[0][1] = x - floor(x);index[0][0] = ((int)floor(x)) & NOISE_MASK;
