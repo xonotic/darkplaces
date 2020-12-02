@@ -594,5 +594,12 @@ void Sys_Shared_Init(void);
 #define INT_LOSSLESS_FORMAT_CONVERT_U(x) ((uintmax_t)(x))
 #endif
 
+
+// Alternative (faster) xor_rand() with lower statistical gaussian adherence:
+
+extern unsigned int xor_srand;
+
+unsigned int xor_rand(void);
+
 #endif
 

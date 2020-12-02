@@ -1080,3 +1080,25 @@ int Math_randomrangei(randomseed_t *r, int mini, int maxi)
 	unsigned long long n = Math_rand64(r);
 	return (int)(((n >> 33) * (maxi - mini) + mini) >> 31);
 }
+
+
+// Fast xorshift+128 random number generator function (original: https://codingforspeed.com/using-faster-psudo-random-generator-xorshift/)
+// xor_srand defined in quakedef.h
+
+unsigned int xor_srand = 123456789;
+
+unsigned int xor_rand(void)
+{
+	static unsigned int y = 362436069;
+	static unsigned int z = 521288629;
+	static unsigned int w = 88675123;
+
+	const unsigned int t = xor_srand ^ (xor_srand << 11);
+
+	// Rotate the static values (w rotation in return statement):
+	xor_srand = y;
+	y = z;
+	z = w;
+
+	return w = w ^ (w >> 19) ^ (t ^ (t >> 8));
+}

@@ -3769,9 +3769,9 @@ skinframe_t *R_SkinFrame_LoadMissing(void)
 	skinframe->reflect = NULL;
 	skinframe->hasalpha = false;
 
-	skinframe->avgcolor[0] = rand() / RAND_MAX;
-	skinframe->avgcolor[1] = rand() / RAND_MAX;
-	skinframe->avgcolor[2] = rand() / RAND_MAX;
+	skinframe->avgcolor[0] = xor_rand() / RAND_MAX;
+	skinframe->avgcolor[1] = xor_rand() / RAND_MAX;
+	skinframe->avgcolor[2] = xor_rand() / RAND_MAX;
 	skinframe->avgcolor[3] = 1;
 
 	return skinframe;

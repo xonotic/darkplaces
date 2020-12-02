@@ -62,7 +62,7 @@ extern vec3_t vec3_origin;
 /// with), causing "stone monsters" that never spawned properly, also MAX is
 /// avoided because some people use random() as an index into arrays or for
 /// loop conditions, where hitting exactly MAX may be a fatal error
-#define lhrandom(MIN,MAX) (((double)(rand() + 0.5) / ((double)RAND_MAX + 1)) * ((MAX)-(MIN)) + (MIN))
+#define lhrandom(MIN,MAX) (((double)(xor_rand() + 0.5) / ((double)RAND_MAX + 1)) * ((MAX)-(MIN)) + (MIN))
 
 #define invpow(base,number) (log(number) / log(base))
 

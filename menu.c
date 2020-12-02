@@ -3272,7 +3272,7 @@ void M_Menu_Quit_f (void)
 	// count how many there are
 	for (n = 1;M_ChooseQuitMessage(n);n++);
 	// choose one
-	M_ChooseQuitMessage(rand() % n);
+	M_ChooseQuitMessage(xor_rand() % n);
 }
 
 

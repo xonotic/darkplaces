@@ -749,7 +749,7 @@ void Host_Main(void)
 
 		// keep the random time dependent, but not when playing demos/benchmarking
 		if(!*sv_random_seed.string && !cls.demoplayback)
-			rand();
+			xor_rand();
 
 		// get new key events
 		Key_EventQueue_Unblock();
@@ -1174,9 +1174,9 @@ static void Host_Init (void)
 
 	// LordHavoc: quake never seeded the random number generator before... heh
 	if (COM_CheckParm("-benchmark"))
-		srand(0); // predictable random sequence for -benchmark
+		xor_srand = 912345678; // predictable random sequence for -benchmark
 	else
-		srand((unsigned int)time(NULL));
+		xor_srand = (unsigned int)time(NULL);
 
 	// FIXME: this is evil, but possibly temporary
 	// LordHavoc: doesn't seem very temporary...

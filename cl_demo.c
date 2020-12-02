@@ -602,7 +602,7 @@ void CL_TimeDemo_f (void)
 		return;
 	}
 
-	srand(0); // predictable random sequence for benchmarking
+	xor_srand = 912345678; // predictable random sequence for benchmarking
 
 	CL_PlayDemo_f ();
 
