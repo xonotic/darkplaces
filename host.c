@@ -1174,9 +1174,9 @@ static void Host_Init (void)
 
 	// LordHavoc: quake never seeded the random number generator before... heh
 	if (COM_CheckParm("-benchmark"))
-		xor_srand = 912345678; // predictable random sequence for -benchmark
+		xor_srand(912345678); // predictable random sequence for -benchmark
 	else
-		xor_srand = (unsigned int)time(NULL);
+		xor_srand((unsigned int)time(NULL));
 
 	// FIXME: this is evil, but possibly temporary
 	// LordHavoc: doesn't seem very temporary...

@@ -597,9 +597,13 @@ void Sys_Shared_Init(void);
 
 // Alternative (faster) xor_rand() with lower statistical gaussian adherence:
 
-extern unsigned int xor_srand;
+extern unsigned int xor_rand_x;
+extern unsigned int xor_rand_y;
+extern unsigned int xor_rand_z;
+extern unsigned int xor_rand_w;
 
 unsigned int xor_rand(void);
+void xor_srand(unsigned int);
 
 #endif
 
