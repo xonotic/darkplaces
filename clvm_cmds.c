@@ -2242,8 +2242,6 @@ static void VM_CL_setmousepos(prvm_prog_t *prog)
 	}
 }
 
-
-
 //#345 float(float framenum) getinputstate (EXT_CSQC)
 static void VM_CL_getinputstate (prvm_prog_t *prog)
 {
