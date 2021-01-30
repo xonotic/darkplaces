@@ -1,4 +1,3 @@
-
 #include "quakedef.h"
 #include "cdaudio.h"
 #include "image.h"
@@ -1379,6 +1378,7 @@ static int VID_Mode(int fullscreen, int width, int height, int bpp, float refres
 	mode.refreshrate = vid_userefreshrate.integer ? max(1, refreshrate) : 0;
 	mode.userefreshrate = vid_userefreshrate.integer != 0;
 	mode.stereobuffer = stereobuffer != 0;
+	mode.samples = vid_samples.integer;
 	cl_ignoremousemoves = 2;
 	VID_ClearExtensions();
 
@@ -1393,6 +1393,7 @@ static int VID_Mode(int fullscreen, int width, int height, int bpp, float refres
 		vid.refreshrate    = vid.mode.refreshrate;
 		vid.userefreshrate = vid.mode.userefreshrate;
 		vid.stereobuffer   = vid.mode.stereobuffer;
+		vid.samples        = vid.mode.samples;
 		vid.stencil        = vid.mode.bitsperpixel > 16;
 		vid.sRGB2D         = vid_sRGB.integer >= 1 && vid.sRGBcapable2D;
 		vid.sRGB3D         = vid_sRGB.integer >= 1 && vid.sRGBcapable3D;
