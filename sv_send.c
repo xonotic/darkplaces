@@ -1429,8 +1429,8 @@ static void SV_SendClientDatagram (client_t *client)
 	// obey rate limit by limiting packet frequency if the packet size
 	// limiting fails
 	// (usually this is caused by reliable messages)
-	if (!NetConn_CanSend(client->netconnection))
-		return;
+//	if (!NetConn_CanSend(client->netconnection))
+//		return;
 
 	// PROTOCOL_DARKPLACES5 and later support packet size limiting of updates
 	maxrate = max(NET_MINRATE, sv_maxrate.integer);

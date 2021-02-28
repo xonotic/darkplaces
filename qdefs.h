@@ -177,7 +177,7 @@
 
 #define	ON_EPSILON		0.1			///< point on plane side epsilon
 
-#define	NET_MINRATE		1000 ///< limits "rate" and "sv_maxrate" cvars
+#define	NET_MINRATE		1000000 ///< limits "rate" and "sv_maxrate" cvars
 
 // In Quake, any char in 0..32 counts as whitespace
 //#define ISWHITESPACE(ch) ((unsigned char) ch <= (unsigned char) ' ')
