@@ -2,6 +2,8 @@
 
 107 ICON "darkplaces.ico"
 
+1 RT_MANIFEST "darkplaces.exe.manifest"
+
 1 VERSIONINFO
 FILEVERSION 1,0,0,0
 PRODUCTVERSION 1,0,0,0
