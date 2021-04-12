@@ -1189,6 +1189,9 @@ void Sys_SendKeyEvents( void )
 				break;
 		}
 
+	if (!vid_activewindow)
+		VID_SetMouse(false, false, false);
+
 	// enable/disable sound on focus gain/loss
 	if ((!vid_hidden && vid_activewindow) || !snd_mutewhenidle.integer)
 	{
@@ -1445,6 +1448,9 @@ void Sys_SendKeyEvents( void )
 #endif
 				break;
 		}
+
+	if (!vid_activewindow)
+		VID_SetMouse(false, false, false);
 
 	// enable/disable sound on focus gain/loss
 	if ((!vid_hidden && vid_activewindow) || !snd_mutewhenidle.integer)
@@ -2893,6 +2899,9 @@ void VID_Finish (void)
 	vid_hasfocus = (appstate & SDL_APPINPUTFOCUS) != 0;
 #endif
 	vid_activewindow = !vid_hidden && vid_hasfocus;
+
+	if (!vid_activewindow)
+		VID_SetMouse(false, false, false);
 
 	VID_UpdateGamma();
 
