@@ -209,7 +209,12 @@ ifeq ($(DP_MAKE_TARGET), bsd)
 ifeq ($(DP_ARCH),FreeBSD)
 	DEFAULT_SNDAPI=OSS
 else
+ifeq ($(DP_ARCH),OpenBSD)
+	DEFAULT_SNDAPI=NULL
+	UNIX_X11LIBPATH:=/usr/X11R6/lib
+else
 	DEFAULT_SNDAPI=BSD
+endif
 endif
 	OBJ_CD=$(OBJ_BSDCD)
 
