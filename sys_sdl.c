@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
+#include <execinfo.h>
 #endif
 
 #ifdef __ANDROID__
@@ -14,6 +15,7 @@
 #endif
 
 #include <signal.h>
+#include <time.h>
 
 #include <SDL.h>
 
@@ -64,6 +66,60 @@ void Sys_Error (const char *error, ...)
 
 	//Host_Shutdown ();
 	exit (1);
+}
+
+static const char *segfault_witty_comments[] =
+{
+	"Oh no!",
+	"It's gonna be okay.",
+	"Oops...",
+	"I'm sorry :(",
+	"Ooh that's gotta hurt.",
+	"I wish there was more I could do.",
+	"I blame Cloudwalk.",
+	"I blame LadyHavoc.",
+	"I blame divVerent.",
+	"Hi, I'm Null Pointer. Welcome to Jackass!",
+	"I meant to do that!",
+	"Ow.",
+	"Totally not copying that one voxel game with these witty comments.",
+	NULL
+};
+
+static const int segfault_witty_max = 12;
+static qbool segfaulted = false;
+
+static void Sys_HandleSegfault(int signal)
+{
+	void *bt[20];
+	char **btstrings;
+	char crash_report[32768];
+	int numptrs, i, j;
+	time_t t;
+	struct tm t2;
+
+	if(signal != SIGSEGV)
+		Sys_Error("Sys_HandleSegfault: Called without SIGSEGV?!");
+	
+	if(segfaulted)
+		exit(1);
+	
+	segfaulted = true;
+	
+	srand(time(0));
+
+	t = time(NULL);
+	t2 = *localtime(&t);
+
+	numptrs = backtrace(bt, 20);
+	btstrings = backtrace_symbols(bt, numptrs);
+	
+	j = dpsnprintf(crash_report, sizeof(crash_report), "DarkPlaces Crash Report -- %d-%02d-%02d %02d:%02d:%02d\n\n// %s\n\nBacktrace:\n", t2.tm_year + 1900, t2.tm_mon + 1, t2.tm_mday, t2.tm_hour, t2.tm_min, t2.tm_sec, segfault_witty_comments[rand() % (segfault_witty_max + 1)]);
+	
+	for(i = 0; i < numptrs && j != -1; i++)
+		j += dpsnprintf(&crash_report[j], sizeof(crash_report) - j, "%s\n", btstrings[i]);
+
+	Sys_Error("DarkPlaces has crashed. Please report this to a developer.\n\n--CUT HERE--\n%s\n--CUT HERE--", crash_report);
 }
 
 void Sys_PrintToTerminal(const char *text)
@@ -181,6 +237,8 @@ void Sys_InitConsole (void)
 
 int main (int argc, char *argv[])
 {
+	struct sigaction sa;
+
 	signal(SIGFPE, SIG_IGN);
 
 #ifdef __ANDROID__
@@ -190,6 +248,11 @@ int main (int argc, char *argv[])
 	sys.selffd = -1;
 	sys.argc = argc;
 	sys.argv = (const char **)argv;
+
+	sa.sa_flags = SA_NODEFER;
+	sa.sa_handler = Sys_HandleSegfault;
+
+	sigaction(SIGSEGV, &sa, NULL);
 
 	// Sys_Error this early in startup might screw with automated
 	// workflows or something if we show the dialog by default.
