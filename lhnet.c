@@ -193,7 +193,7 @@ static int LHNETADDRESS_Resolve(lhnetaddressnative_t *address, const char *name,
 		memcpy(&address->addr.in, addrinf->ai_addr, sizeof(address->addr.in));
 	}
 	address->port = port;
-	
+
 	freeaddrinfo (addrinf);
 	return 1;
 }
@@ -212,6 +212,8 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 	const char* addr_end = NULL;
 	const char* port_name = NULL;
 	int addr_family = AF_UNSPEC;
+	const char *colon;
+	const char *dot;
 
 	if (!address || !string || !*string)
 		return 0;
@@ -267,7 +269,10 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 
 	if (namelen >= sizeof(name))
 		namelen = sizeof(name) - 1;
+	if (namelen < 3) // can't be shorter than "x.y" (<local hostname>.<domain name>)
+		return 0;
 	memcpy (name, addr_start, namelen);
+	// cut port from name
 	name[namelen] = 0;
 
 	if (port_name)
@@ -283,6 +288,12 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 		address->port = port;
 		return 1;
 	}
+	dot = strrchr(name, '.');
+	if (dot && name[0] == '.' || name[namelen - 1] == '.') // can't start or end with a dot
+		return 0;
+	colon = strrchr(name, ':');
+	if ((dot && colon) || (!dot && !colon)) // either it must contain a dot (name or ipv4) or a colon (ipv6)
+		return 0;
 	// try to parse as dotted decimal ipv4 address first
 	// note this supports partial ip addresses
 	d1 = d2 = d3 = d4 = 0;
@@ -370,7 +381,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 #endif
 		namecache[namecacheposition].address.addresstype = LHNETADDRESSTYPE_NONE;
 	}
-	
+
 	namecacheposition = (namecacheposition + 1) % MAX_NAMECACHE;
 	return resolved;
 }
@@ -382,6 +393,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 	struct hostent *hostentry;
 	unsigned char *a;
 	const char *colon;
+	const char *dot;
 	char name[128];
 #ifdef STANDALONETEST
 	char string2[128];
@@ -403,6 +415,8 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 	if (port == 0)
 		port = defaultport;
 	namelen = colon - string;
+	if (namelen < 3) // can't be shorter than "x.y" (<domain name>.<domain extension>)
+		return 0;
 	if (namelen > 127)
 		namelen = 127;
 	if (string[0] == '[' && namelen > 0 && string[namelen-1] == ']') // ipv6
@@ -411,6 +425,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 		namelen -= 2;
 	}
 	memcpy(name, string, namelen);
+	// cut port from name
 	name[namelen] = 0;
 	// handle loopback
 	if (!strcmp(name, "local"))
@@ -419,6 +434,12 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 		address->port = port;
 		return 1;
 	}
+	dot = strrchr(name, '.');
+	if (dot && name[0] == '.' || name[namelen - 1] == '.') // can't start or end with a dot
+		return 0;
+	colon = strrchr(name, ':');
+	if ((dot && colon) || (!dot && !colon)) // either it must contain a dot (name or ipv4) or a colon (ipv6)
+		return 0;
 	// try to parse as dotted decimal ipv4 address first
 	// note this supports partial ip addresses
 	d1 = d2 = d3 = d4 = 0;
