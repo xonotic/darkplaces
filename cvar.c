@@ -22,6 +22,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+#ifdef CONFIG_MENU
+    #include "progsvm.h"
+#endif
+
 const char *cvar_dummy_description = "custom cvar";
 static const char *cvar_null_string = "";
 
@@ -393,6 +397,21 @@ static void Cvar_SetQuick_Internal (cvar_t *var, const char *value)
 	// LadyHavoc: don't reallocate when there is no change
 	if (!changed)
 		return;
+    
+    //Con_Printf("----> Changing \"%s\" value from \"%s\" to \"%s\"\n", var->name, var->string, value);
+
+#ifdef CONFIG_MENU
+    // prepare values to send into QC
+	prvm_prog_t *prog = MVM_prog;
+    bool qcSubscribed = PRVM_menufunction(m_cvar_changed);
+
+    if (qcSubscribed && prog->loaded)
+    {
+        prog->globals.ip[OFS_PARM0] = PRVM_SetTempString(prog, var->name);
+        prog->globals.ip[OFS_PARM1] = PRVM_SetTempString(prog, var->string);
+        prog->globals.ip[OFS_PARM2] = PRVM_SetTempString(prog, value);
+    }
+#endif
 
 	// LadyHavoc: don't reallocate when the buffer is the same size
 	valuelen = strlen(value);
@@ -427,6 +446,14 @@ static void Cvar_SetQuick_Internal (cvar_t *var, const char *value)
 
 	// Call the function stored in the cvar for bounds checking, cleanup, etc
 	Cvar_Callback(var);
+
+#ifdef CONFIG_MENU
+    // call "onCvarChanged" like event
+    if (qcSubscribed && prog->loaded)
+    {
+        prog->ExecuteProgram(prog, PRVM_menufunction(m_cvar_changed), "QC function m_cvar_changed is missing");
+    }
+#endif
 }
 
 void Cvar_SetQuick (cvar_t *var, const char *value)
