@@ -6703,7 +6703,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 	}
 	else
 	{
-		// lightmap - 2x diffuse and specular brightness because bsp files have 0-2 colors as 0-1
+		// lightmap - 2x diffuse brightness because bsp files have 0-2 colors as 0-1
 		for (q = 0; q < 3; q++)
 		{
 			t->render_glowmod[q] = rsurface.entity->render_glowmod[q] * r_refdef.view.colorscale;
@@ -6714,7 +6714,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 			t->render_modellight_specular[q] = 0;
 			t->render_lightmap_ambient[q] = rsurface.entity->render_lightmap_ambient[q] * r_refdef.view.colorscale;
 			t->render_lightmap_diffuse[q] = rsurface.entity->render_lightmap_diffuse[q] * 2 * r_refdef.view.colorscale;
-			t->render_lightmap_specular[q] = rsurface.entity->render_lightmap_specular[q] * 2 * r_refdef.view.colorscale;
+			t->render_lightmap_specular[q] = rsurface.entity->render_lightmap_specular[q] * r_refdef.view.colorscale;
 			t->render_rtlight_diffuse[q] = rsurface.entity->render_rtlight_diffuse[q] * r_refdef.view.colorscale;
 			t->render_rtlight_specular[q] = rsurface.entity->render_rtlight_specular[q] * r_refdef.view.colorscale;
 		}
