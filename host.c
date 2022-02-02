@@ -333,11 +333,12 @@ void Host_LockSession(void)
 		{
 			if(locksession.integer == 2)
 			{
-				Con_Printf(CON_WARN "WARNING: session lock %s could not be acquired. Please run with -sessionid and an unique session name. Continuing anyway.\n", p);
+				Con_Printf(CON_WARN "WARNING: Session lock %s could not be acquired. Please run with -sessionid and a unique session name. Continuing anyway.\n", p);
 			}
 			else
 			{
-				Sys_Error("session lock %s could not be acquired. Please run with -sessionid and an unique session name.\n", p);
+				Sys_Error("Session lock could not be acquired. Is there already a running instance? If not, remove the file '%s' and try again.\n"
+						"Note: Please run with -sessionid and a unique session name if you intend to run multiple copies.\n", p);
 			}
 		}
 	}
