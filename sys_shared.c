@@ -24,6 +24,9 @@
 # ifdef SUPPORTDLL
 #  include <dlfcn.h>
 # endif
+# ifdef __FreeBSD__
+#  include <sys/sysctl.h>
+# endif
 #endif
 
 static char sys_timestring[128];
@@ -493,7 +496,10 @@ static const char *Sys_FindExecutableName(void)
 	static char exenamebuf[MAX_OSPATH+1];
 	ssize_t n = -1;
 #if defined(__FreeBSD__)
-	n = readlink("/proc/curproc/file", exenamebuf, sizeof(exenamebuf)-1);
+	size_t l = sizeof(exenamebuf);
+	int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+	if (sysctl(mib, 4, exenamebuf, &l, NULL, 0) == 0)
+		n = (ssize_t)l;
 #elif defined(__linux__)
 	n = readlink("/proc/self/exe", exenamebuf, sizeof(exenamebuf)-1);
 #endif
