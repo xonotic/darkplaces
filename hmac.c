@@ -1,7 +1,7 @@
 #include "darkplaces.h"
 #include "hmac.h"
 
-qbool hmac(
+qbool d_hmac(
 	hashfunc_t hfunc, int hlen, int hblock,
 	unsigned char *out,
 	const unsigned char *in, int n,
