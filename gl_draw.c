@@ -1046,18 +1046,16 @@ float DrawQ_TextWidth_UntilWidth_TrackColors_Scale(const char *text, size_t *max
 			}
 			x += width_of[ch] * dw;
 		} else {
-			if (!map || map == ft2_oldstyle_map || ch < map->start || ch >= map->start + FONT_CHARS_PER_MAP)
+			if (!map || map == ft2_oldstyle_map)
 			{
 				map = FontMap_FindForChar(fontmap, ch);
 				if (!map)
 				{
-					if (!Font_LoadMapForIndex(ft2, map_index, ch, &map))
-						break;
 					if (!map)
 						break;
 				}
 			}
-			mapch = ch - map->start;
+			mapch = Font_LoadMapForIndex(ft2, map_index, ch, &map);
 			if (prevch && Font_GetKerningForMap(ft2, map_index, w, h, prevch, ch, &kx, NULL))
 				x += kx * dw;
 			x += map->glyphs[mapch].advance_x * dw;
@@ -1223,12 +1221,10 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 				x += 1.0/pix_x * r_textshadow.value;
 				y += 1.0/pix_y * r_textshadow.value;
 			}
-			if (!fontmap || (ch <= 0xFF && fontmap->glyphs[ch].image) || (ch >= 0xE000 && ch <= 0xE0FF))
+
+			/* ascii characters use bulti font map */
+			if (!fontmap && ch <= 128)
 			{
-				if (ch >= 0xE000)
-					ch -= 0xE000;
-				if (ch > 0xFF)
-					goto out;
 				if (fontmap)
 					map = ft2_oldstyle_map;
 				prevch = 0;
@@ -1259,27 +1255,20 @@ float DrawQ_String_Scale(float startx, float starty, const char *text, size_t ma
 				Mod_Mesh_AddTriangle(mod, surf, e0, e2, e3);
 				x += width_of[ch] * dw;
 			} else {
-				if (!map || map == ft2_oldstyle_map || ch < map->start || ch >= map->start + FONT_CHARS_PER_MAP)
+				if (!map || map == ft2_oldstyle_map)
 				{
 					// find the new map
 					map = FontMap_FindForChar(fontmap, ch);
-					if (!map)
-					{
-						if (!Font_LoadMapForIndex(ft2, map_index, ch, &map))
-						{
-							shadow = -1;
-							break;
-						}
-						if (!map)
-						{
-							// this shouldn't happen
-							shadow = -1;
-							break;
-						}
-					}
+					
+					// if (!Font_LoadMapForIndex(ft2, map_index, ch, &map))
+					// {
+					// 	shadow = -1;
+					// 	break;
+					// }
 				}
 
-				mapch = ch - map->start;
+
+				mapch = Font_LoadMapForIndex(ft2, map_index, ch, &map);
 				thisw = map->glyphs[mapch].advance_x;
 
 				//x += ftbase_x;

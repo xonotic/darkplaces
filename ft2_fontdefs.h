@@ -26,7 +26,6 @@ typedef struct glyph_slot_s
 
 struct ft2_font_map_s
 {
-	Uchar                  start;
 	struct ft2_font_map_s *next;
 	float                  size;
 	// the actual size used in the freetype code
@@ -35,8 +34,19 @@ struct ft2_font_map_s
 	int                    glyphSize;
 
 	cachepic_t            *pic;
-	qbool               static_tex;
+	qbool                  static_tex;
 	glyph_slot_t           glyphs[FONT_CHARS_PER_MAP];
+
+	// glyph description contains the characters for each glyph_slot_t
+	Uchar                  glyph_desc[FONT_CHARS_PER_MAP];
+
+	// store the count of fonts existing in the map
+	int                    glyph_count;
+	unsigned char         *glyph_data;
+
+	// goes to map_identifier
+	unsigned long          idx;
+
 
 	// contains the kerning information for the first 256 characters
 	// for the other characters, we will lookup the kerning information
@@ -55,7 +65,7 @@ struct ft2_attachment_s
 };
 
 //qbool Font_LoadMapForIndex(ft2_font_t *font, Uchar _ch, ft2_font_map_t **outmap);
-qbool Font_LoadMapForIndex(ft2_font_t *font, int map_index, Uchar _ch, ft2_font_map_t **outmap);
+int Font_LoadMapForIndex(ft2_font_t *font, int map_index, Uchar _ch, ft2_font_map_t **outmap);
 
 void font_start(void);
 void font_shutdown(void);
