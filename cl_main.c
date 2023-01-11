@@ -392,6 +392,7 @@ void CL_DisconnectEx(qbool kicked, const char *fmt, ... )
 	CL_VM_ShutDown();
 // stop sounds (especially looping!)
 	S_StopAllSounds ();
+	FS_Rescan();
 
 	cl.parsingtextexpectingpingforscores = 0; // just in case no reply has come yet
 
