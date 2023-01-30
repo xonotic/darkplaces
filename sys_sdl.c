@@ -1,6 +1,7 @@
 
 #ifdef WIN32
 #include <io.h>
+#include <locale.h>
 #include "conio.h"
 #else
 #include <unistd.h>
@@ -220,6 +221,10 @@ void Sys_InitConsole (void)
 
 int main (int argc, char *argv[])
 {
+#ifdef WIN32
+	setlocale(LC_ALL, "");
+#endif
+
 	signal(SIGFPE, SIG_IGN);
 
 #ifdef __ANDROID__
