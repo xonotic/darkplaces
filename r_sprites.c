@@ -24,11 +24,11 @@ extern cvar_t r_overheadsprites_scaley;
 #endif
 
 /* R_Track_Sprite
-   If the sprite is out of view, track it.
-   `origin`, `left` and `up` are changed by this function to achive a rotation around
-   the hotspot.
-
-   --blub
+ * If the sprite is out of view, track it.
+ * `origin`, `left` and `up` are changed by this function to achive a rotation around
+ * the hotspot.
+ *
+ * --blub
  */
 #define SIDE_TOP 1
 #define SIDE_LEFT 2
