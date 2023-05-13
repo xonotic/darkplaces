@@ -110,8 +110,8 @@ static void R_TrackSprite(const entity_render_t *ent, vec3_t origin, vec3_t left
 		// d*d = r*r / (1 + fxa*fxa + gyb*gyb)
 		// d = sqrt(r*r / (1 + fxa*fxa + gyb*gyb))
 		// thus:
-		distance = sqrt((distance*distance) / (1.0
-					r_refdef.view.frustum_x*r_refdef.view.frustum_x * x*x * ax*ax
+		distance = sqrt((distance*distance) / (1.0 +
+					r_refdef.view.frustum_x*r_refdef.view.frustum_x * x*x * ax*ax +
 					r_refdef.view.frustum_y*r_refdef.view.frustum_y * y*y * ay*ay));
 		// ^ the one we want        ^ the one we have       ^ our factors
 

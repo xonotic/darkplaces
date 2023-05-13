@@ -1020,7 +1020,7 @@ string(string format, ...) sprintf = #627;
 //supported stuff:
 //  %
 //  optional: <argpos>$ for the argument to format (the arg counter then is not increased)
-//  flags: #0-
+//  flags: #0- +
 //  optional: <width>, *, or *<argpos>$ for the field width (width is read before value and precision)
 //  optional: .<precision>, .*, or .*<argpos>$ for the precision (precision is read before value)
 //  length modifiers: h for forcing a float, l for forcing an entity (by default, %d etc. cast a float to int), ll for forcing an int

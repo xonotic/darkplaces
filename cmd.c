@@ -544,7 +544,7 @@ void Cbuf_Frame(cmd_buf_t *cbuf)
 Cmd_StuffCmds_f
 
 Adds command line parameters as script statements
-Commands lead with a +, and continue until a - or another
+Commands lead with a +, and continue until a - or another +
 quake +prog jctest.qp +cmd amlev1
 quake -nosound +cmd amlev1
 ===============

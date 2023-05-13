@@ -5283,7 +5283,7 @@ static void R_BlendView(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *v
 		cl.motionbluralpha = 1 - exp(-
 				(
 					(r_motionblur.value * blur_factor / 80)
-
+					+
 					(r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
 				)
 				/
