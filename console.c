@@ -439,7 +439,7 @@ static void Log_DestBuffer_Flush_NoLock(void)
 		log_dest_buffer[log_dest_buffer_pos++] = 0;
 
 		if(!NetConn_HaveServerPorts() && !NetConn_HaveClientPorts()) // then temporarily open one
- 		{
+		{
 			have_opened_temp_sockets = true;
 			NetConn_OpenServerPorts(true);
 		}

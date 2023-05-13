@@ -1720,7 +1720,7 @@ const float GEOMTYPE_CAPSULE = 3;     // with leading axis automatically determi
 const float GEOMTYPE_TRIMESH = 4;     // triangle mesh
 const float GEOMTYPE_CYLINDER = 5;    // like capsule but not capped
                                       // note that ODE's builtin cylinder support is experimental, somewhat bugged and unfinished (no cylinder-cylinder collision)
-									  // to use properly working cylinder should build ODE with LIBCCD extension
+                                      // to use properly working cylinder should build ODE with LIBCCD extension
 const float GEOMTYPE_CAPSULE_X = 6;   // capsule with fixed leading axis
 const float GEOMTYPE_CAPSULE_Y = 7;
 const float GEOMTYPE_CAPSULE_Z = 8;
@@ -1767,8 +1767,8 @@ const float FORCETYPE_TORQUE = 3;
 .float  forcetype;    // type of force
 .float  erp;          // error restitution parameter, makes ODE solver attempt to fix errors in contacts,
                       // bringing together 2 joints or fixing object being stuch in other object,
-			          // a value of 0.1 will fix slightly, a value of 1.0 attempts to fix whole error in one frame
-			          // use with care as high values makes system unstable and likely to explode
+                      // a value of 0.1 will fix slightly, a value of 1.0 attempts to fix whole error in one frame
+                      // use with care as high values makes system unstable and likely to explode
 //builtin definitions:
 void(entity e, float physics_enabled) physics_enable = #540; // enable or disable physics on object
 void(entity e, vector force, vector force_pos) physics_addforce = #541; // deprecated, apply a force from certain origin, length of force vector is power of force

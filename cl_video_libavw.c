@@ -289,7 +289,7 @@ void *LibAvW_OpenVideo(clvideo_t *video, char *filename, const char **errorstrin
 			*errorstring = "unable to open videofile";
 			libavw_close(s);
 			Z_Free(s);
-			 return NULL;
+			return NULL;
 		}
 	}
 
@@ -299,7 +299,7 @@ void *LibAvW_OpenVideo(clvideo_t *video, char *filename, const char **errorstrin
 		*errorstring = qLibAvW_ErrorString(errorcode);
 		libavw_close(s);
 		Z_Free(s);
-        return NULL;
+		return NULL;
 	}
 
 	// open video for playing
@@ -308,7 +308,7 @@ void *LibAvW_OpenVideo(clvideo_t *video, char *filename, const char **errorstrin
 		*errorstring = qLibAvW_ErrorString(qLibAvW_StreamGetError(s->stream));
 		libavw_close(s);
 		Z_Free(s);
-        return NULL;
+		return NULL;
 	}
 
 	// all right, start codec

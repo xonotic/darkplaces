@@ -501,8 +501,8 @@ qbool PNG_SaveImage_preflipped (const char *filename, int width, int height, qbo
 	pnginfo = (void *)qpng_create_info_struct(png);
 	if(!pnginfo)
 	{
-		 qpng_destroy_write_struct(&png, NULL);
-		 return false;
+		qpng_destroy_write_struct(&png, NULL);
+		return false;
 	}
 
 	// this must be memset before the setjmp error handler, because it relies

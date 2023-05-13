@@ -289,7 +289,7 @@ int i;
 	NULL,
 	NULL,
 	&&handle_OP_GLOAD_V
-	    };
+		};
 #define DISPATCH_OPCODE() \
     goto *dispatchtable[(++st)->op]
 #define HANDLE_OPCODE(opcode) handle_##opcode

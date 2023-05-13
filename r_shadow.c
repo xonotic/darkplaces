@@ -4442,7 +4442,7 @@ static void R_BeginCoronaQuery(rtlight_t *rtlight, float scale, qbool usequery)
 		return;
 	zdist = (DotProduct(rtlight->shadoworigin, r_refdef.view.forward) - DotProduct(r_refdef.view.origin, r_refdef.view.forward));
 	if (zdist < 32)
- 		return;
+		return;
 	if (usequery && r_numqueries + 2 <= r_maxqueries)
 	{
 		rtlight->corona_queryindex_allpixels = r_queries[r_numqueries++];

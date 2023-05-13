@@ -5922,12 +5922,12 @@ static void Mod_Q3BSP_LoadFaces(lump_t *l)
 			cytess = bound(0, cytess, 1024);
 
 			// store it for the LOD grouping step
-	 		patchtess[patchtesscount].info.xsize = patchsize[0];
-	 		patchtess[patchtesscount].info.ysize = patchsize[1];
-	 		patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].xtess = xtess;
-	 		patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].ytess = ytess;
-	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].xtess = cxtess;
-	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].ytess = cytess;
+			patchtess[patchtesscount].info.xsize = patchsize[0];
+			patchtess[patchtesscount].info.ysize = patchsize[1];
+			patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].xtess = xtess;
+			patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].ytess = ytess;
+			patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].xtess = cxtess;
+			patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].ytess = cytess;
 
 			patchtess[patchtesscount].surface_id = i;
 			patchtess[patchtesscount].lodgroup[0] = LittleFloat(in->specific.patch.mins[0]);

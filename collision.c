@@ -1772,7 +1772,7 @@ static void Collision_ClipExtendFinish(extendtraceinfo_t *extendtraceinfo)
 		if (trace->fraction > 1.0f)
 		{
 			// note that ent may refer to either startsolid or fraction<1, we can't restore the startsolid ent unfortunately
- 			trace->ent = NULL;
+			trace->ent = NULL;
 			trace->hitq3surfaceflags = 0;
 			trace->hitsupercontents = 0;
 			trace->hittexture = NULL;

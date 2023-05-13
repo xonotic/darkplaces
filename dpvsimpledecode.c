@@ -428,7 +428,7 @@ void *dpvsimpledecode_open(clvideo_t *video, char *filename, const char **errors
 				}
 				else if (errorstring != NULL)
 					*errorstring = "not a dpvideo file";
- 				hz_bitstream_read_blocks_free(s->framedatablocks);
+				hz_bitstream_read_blocks_free(s->framedatablocks);
 			}
 			else if (errorstring != NULL)
 				*errorstring = "unable to allocate memory for reading buffer";
