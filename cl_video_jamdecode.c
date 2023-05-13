@@ -125,11 +125,11 @@ void *jam_open(clvideo_t *video, char *filename, const char **errorstring)
 	s->frame_output = AvCodec_AllocFrame();
 	s->frame_output_scale = AvCodec_AllocFrame();
 	if (!s->frame_output_buffer || !s->frame_output || !s->frame_output_scale)
-    {
+	{
 		*errorstring = "JamDecoder: failed to allocate LibAvcodec frame";
 		jam_close(s);
 		Z_Free(s);
-        return NULL;
+		return NULL;
 	}
 #endif
 

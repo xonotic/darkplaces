@@ -110,9 +110,9 @@ iqmvertexarray_t;
 
 typedef struct iqmextension_s
 {
-    unsigned int name;
-    unsigned int num_data, ofs_data;
-    unsigned int ofs_extensions; // pointer to next extension
+	unsigned int name;
+	unsigned int num_data, ofs_data;
+	unsigned int ofs_extensions; // pointer to next extension
 }
 iqmextension_t;
 

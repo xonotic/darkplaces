@@ -105,20 +105,20 @@ typedef unsigned int JDIMENSION;
 
 struct jpeg_memory_mgr
 {
-  void* (*alloc_small) (j_common_ptr cinfo, int pool_id, size_t sizeofobject);
-  void (*_reserve_space_for_alloc_large) (void *dummy, ...);
-  void (*_reserve_space_for_alloc_sarray) (void *dummy, ...);
-  void (*_reserve_space_for_alloc_barray) (void *dummy, ...);
-  void (*_reserve_space_for_request_virt_sarray) (void *dummy, ...);
-  void (*_reserve_space_for_request_virt_barray) (void *dummy, ...);
-  void (*_reserve_space_for_realize_virt_arrays) (void *dummy, ...);
-  void (*_reserve_space_for_access_virt_sarray) (void *dummy, ...);
-  void (*_reserve_space_for_access_virt_barray) (void *dummy, ...);
-  void (*_reserve_space_for_free_pool) (void *dummy, ...);
-  void (*_reserve_space_for_self_destruct) (void *dummy, ...);
+	void* (*alloc_small) (j_common_ptr cinfo, int pool_id, size_t sizeofobject);
+	void (*_reserve_space_for_alloc_large) (void *dummy, ...);
+	void (*_reserve_space_for_alloc_sarray) (void *dummy, ...);
+	void (*_reserve_space_for_alloc_barray) (void *dummy, ...);
+	void (*_reserve_space_for_request_virt_sarray) (void *dummy, ...);
+	void (*_reserve_space_for_request_virt_barray) (void *dummy, ...);
+	void (*_reserve_space_for_realize_virt_arrays) (void *dummy, ...);
+	void (*_reserve_space_for_access_virt_sarray) (void *dummy, ...);
+	void (*_reserve_space_for_access_virt_barray) (void *dummy, ...);
+	void (*_reserve_space_for_free_pool) (void *dummy, ...);
+	void (*_reserve_space_for_self_destruct) (void *dummy, ...);
 
-  long max_memory_to_use;
-  long max_alloc_chunk;
+	long max_memory_to_use;
+	long max_alloc_chunk;
 };
 
 struct jpeg_error_mgr
@@ -155,68 +155,68 @@ struct jpeg_source_mgr
 };
 
 typedef struct {
-  /* These values are fixed over the whole image. */
-  /* For compression, they must be supplied by parameter setup; */
-  /* for decompression, they are read from the SOF marker. */
-  int component_id;             /* identifier for this component (0..255) */
-  int component_index;          /* its index in SOF or cinfo->comp_info[] */
-  int h_samp_factor;            /* horizontal sampling factor (1..4) */
-  int v_samp_factor;            /* vertical sampling factor (1..4) */
-  int quant_tbl_no;             /* quantization table selector (0..3) */
-  /* These values may vary between scans. */
-  /* For compression, they must be supplied by parameter setup; */
-  /* for decompression, they are read from the SOS marker. */
-  /* The decompressor output side may not use these variables. */
-  int dc_tbl_no;                /* DC entropy table selector (0..3) */
-  int ac_tbl_no;                /* AC entropy table selector (0..3) */
+	/* These values are fixed over the whole image. */
+	/* For compression, they must be supplied by parameter setup; */
+	/* for decompression, they are read from the SOF marker. */
+	int component_id;             /* identifier for this component (0..255) */
+	int component_index;          /* its index in SOF or cinfo->comp_info[] */
+	int h_samp_factor;            /* horizontal sampling factor (1..4) */
+	int v_samp_factor;            /* vertical sampling factor (1..4) */
+	int quant_tbl_no;             /* quantization table selector (0..3) */
+	/* These values may vary between scans. */
+	/* For compression, they must be supplied by parameter setup; */
+	/* for decompression, they are read from the SOS marker. */
+	/* The decompressor output side may not use these variables. */
+	int dc_tbl_no;                /* DC entropy table selector (0..3) */
+	int ac_tbl_no;                /* AC entropy table selector (0..3) */
 
-  /* Remaining fields should be treated as private by applications. */
+	/* Remaining fields should be treated as private by applications. */
 
-  /* These values are computed during compression or decompression startup: */
-  /* Component's size in DCT blocks.
-   * Any dummy blocks added to complete an MCU are not counted; therefore
-   * these values do not depend on whether a scan is interleaved or not.
-   */
-  JDIMENSION width_in_blocks;
-  JDIMENSION height_in_blocks;
-  /* Size of a DCT block in samples.  Always DCTSIZE for compression.
-   * For decompression this is the size of the output from one DCT block,
-   * reflecting any scaling we choose to apply during the IDCT step.
-   * Values of 1,2,4,8 are likely to be supported.  Note that different
-   * components may receive different IDCT scalings.
-   */
-  int DCT_scaled_size;
-  /* The downsampled dimensions are the component's actual, unpadded number
-   * of samples at the main buffer (preprocessing/compression interface), thus
-   * downsampled_width = ceil(image_width * Hi/Hmax)
-   * and similarly for height.  For decompression, IDCT scaling is included, so
-   * downsampled_width = ceil(image_width * Hi/Hmax * DCT_scaled_size/DCTSIZE)
-   */
-  JDIMENSION downsampled_width;  /* actual width in samples */
-  JDIMENSION downsampled_height; /* actual height in samples */
-  /* This flag is used only for decompression.  In cases where some of the
-   * components will be ignored (eg grayscale output from YCbCr image),
-   * we can skip most computations for the unused components.
-   */
-  jboolean component_needed;     /* do we need the value of this component? */
+	/* These values are computed during compression or decompression startup: */
+	/* Component's size in DCT blocks.
+	 * Any dummy blocks added to complete an MCU are not counted; therefore
+	 * these values do not depend on whether a scan is interleaved or not.
+	 */
+	JDIMENSION width_in_blocks;
+	JDIMENSION height_in_blocks;
+	/* Size of a DCT block in samples.  Always DCTSIZE for compression.
+	 * For decompression this is the size of the output from one DCT block,
+	 * reflecting any scaling we choose to apply during the IDCT step.
+	 * Values of 1,2,4,8 are likely to be supported.  Note that different
+	 * components may receive different IDCT scalings.
+	 */
+	int DCT_scaled_size;
+	/* The downsampled dimensions are the component's actual, unpadded number
+	 * of samples at the main buffer (preprocessing/compression interface), thus
+	 * downsampled_width = ceil(image_width * Hi/Hmax)
+	 * and similarly for height.  For decompression, IDCT scaling is included, so
+	 * downsampled_width = ceil(image_width * Hi/Hmax * DCT_scaled_size/DCTSIZE)
+	 */
+	JDIMENSION downsampled_width;  /* actual width in samples */
+	JDIMENSION downsampled_height; /* actual height in samples */
+	/* This flag is used only for decompression.  In cases where some of the
+	 * components will be ignored (eg grayscale output from YCbCr image),
+	 * we can skip most computations for the unused components.
+	 */
+	jboolean component_needed;     /* do we need the value of this component? */
 
-  /* These values are computed before starting a scan of the component. */
-  /* The decompressor output side may not use these variables. */
-  int MCU_width;                /* number of blocks per MCU, horizontally */
-  int MCU_height;               /* number of blocks per MCU, vertically */
-  int MCU_blocks;               /* MCU_width * MCU_height */
-  int MCU_sample_width;         /* MCU width in samples, MCU_width*DCT_scaled_size */
-  int last_col_width;           /* # of non-dummy blocks across in last MCU */
-  int last_row_height;          /* # of non-dummy blocks down in last MCU */
+	/* These values are computed before starting a scan of the component. */
+	/* The decompressor output side may not use these variables. */
+	int MCU_width;                /* number of blocks per MCU, horizontally */
+	int MCU_height;               /* number of blocks per MCU, vertically */
+	int MCU_blocks;               /* MCU_width * MCU_height */
+	int MCU_sample_width;         /* MCU width in samples, MCU_width*DCT_scaled_size */
+	int last_col_width;           /* # of non-dummy blocks across in last MCU */
+	int last_row_height;          /* # of non-dummy blocks down in last MCU */
 
-  /* Saved quantization table for component; NULL if none yet saved.
-   * See jdinput.c comments about the need for this information.
-   * This field is currently used only for decompression.
-   */
-  void *quant_table;
+	/* Saved quantization table for component; NULL if none yet saved.
+	 * See jdinput.c comments about the need for this information.
+	 * This field is currently used only for decompression.
+	 */
+	void *quant_table;
 
-  /* Private per-component storage for DCT or IDCT subsystem. */
-  void * dct_table;
+	/* Private per-component storage for DCT or IDCT subsystem. */
+	void * dct_table;
 } jpeg_component_info;
 
 struct jpeg_decompress_struct
@@ -556,23 +556,23 @@ static void JPEG_Noop (j_decompress_ptr cinfo) {}
 
 static jboolean JPEG_FillInputBuffer (j_decompress_ptr cinfo)
 {
-    // Insert a fake EOI marker
-    cinfo->src->next_input_byte = jpeg_eoi_marker;
-    cinfo->src->bytes_in_buffer = 2;
+	// Insert a fake EOI marker
+	cinfo->src->next_input_byte = jpeg_eoi_marker;
+	cinfo->src->bytes_in_buffer = 2;
 
 	return true;
 }
 
 static void JPEG_SkipInputData (j_decompress_ptr cinfo, long num_bytes)
 {
-    if (cinfo->src->bytes_in_buffer <= (unsigned long)num_bytes)
+	if (cinfo->src->bytes_in_buffer <= (unsigned long)num_bytes)
 	{
 		cinfo->src->bytes_in_buffer = 0;
 		return;
 	}
 
-    cinfo->src->next_input_byte += num_bytes;
-    cinfo->src->bytes_in_buffer -= num_bytes;
+	cinfo->src->next_input_byte += num_bytes;
+	cinfo->src->bytes_in_buffer -= num_bytes;
 }
 
 static void JPEG_MemSrc (j_decompress_ptr cinfo, const unsigned char *buffer, size_t filesize)
@@ -1066,7 +1066,7 @@ qbool Image_Compress(const char *imagename, size_t maxsize, void **buf, size_t *
 	{
 		*size = i->compressed_size;
 		*buf = i->compressed;
-        return (*buf != NULL);
+		return (*buf != NULL);
 	}
 
 	// load the image

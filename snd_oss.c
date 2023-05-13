@@ -70,10 +70,10 @@ qbool SndSys_Init (const snd_format_t* requested, snd_format_t* suggested)
 		}
 
 		return false;
-    }
+	}
 
 	// Open /dev/dsp
-    audio_fd = open("/dev/dsp", O_WRONLY);
+	audio_fd = open("/dev/dsp", O_WRONLY);
 	if (audio_fd < 0)
 	{
 		perror("/dev/dsp");

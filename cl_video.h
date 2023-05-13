@@ -68,7 +68,7 @@ typedef struct clvideo_s
 
 	// if a video is suspended, it is automatically paused (else we'd still have to process the frames)
 	// used to determine whether the video's resources should be freed or not
-    double  lasttime;
+	double  lasttime;
 	// when lasttime - realtime > THRESHOLD, all but the stream is freed
 	qbool suspended;
 

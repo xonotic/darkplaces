@@ -2140,7 +2140,7 @@ void VM_getentityfieldstring(prvm_prog_t *prog)
 
 	if (i < 0 || i >= prog->numfielddefs)
 	{
-        VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog->name);
+		VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog->name);
 		PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(prog, "");
 		return;
 	}
@@ -2187,7 +2187,7 @@ void VM_putentityfieldstring(prvm_prog_t *prog)
 
 	if (i < 0 || i >= prog->numfielddefs)
 	{
-        VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog->name);
+		VM_Warning(prog, "VM_entityfielddata: %s: field index out of bounds\n", prog->name);
 		PRVM_G_FLOAT(OFS_RETURN) = 0.0f;
 		return;
 	}
@@ -3663,7 +3663,7 @@ string altstr_set(string altstr, float num, string set)
 */
 void VM_altstr_set(prvm_prog_t *prog)
 {
-    int num;
+	int num;
 	const char *altstr, *str;
 	const char *in;
 	char *out;
@@ -4794,7 +4794,6 @@ void VM_uncolorstring (prvm_prog_t *prog)
 	szString = PRVM_G_STRING(OFS_PARM0);
 	COM_StringDecolorize(szString, 0, szNewString, sizeof(szNewString), true);
 	PRVM_G_INT(OFS_RETURN) = PRVM_SetTempString(prog, szNewString);
-
 }
 
 // #221 float(string str, string sub[, float startpos]) strstrofs (FTE_STRINGS)
@@ -4946,6 +4945,7 @@ static int chrchar_alpha(int i, int basec, int baset, int convc, int convt, int 
 	}
 	return i + basec + baset;
 }
+
 // #224 string(float ccase, float calpha, float cnum, string s, ...) strconv (FTE_STRINGS)
 //bulk convert a string. change case or colouring.
 void VM_strconv (prvm_prog_t *prog)
@@ -6383,36 +6383,36 @@ void VM_getsurfaceclippedpoint(prvm_prog_t *prog)
 //PF_getsurfacenumtriangles, // #??? float(entity e, float s) getsurfacenumtriangles = #???;
 void VM_getsurfacenumtriangles(prvm_prog_t *prog)
 {
-       model_t *model;
-       msurface_t *surface;
-       VM_SAFEPARMCOUNT(2, VM_getsurfacenumtriangles);
-       // return 0 if no such surface
-       if (!(model = getmodel(prog, PRVM_G_EDICT(OFS_PARM0))) || !(surface = getsurface(model, (int)PRVM_G_FLOAT(OFS_PARM1))))
-       {
-               PRVM_G_FLOAT(OFS_RETURN) = 0;
-               return;
-       }
+	model_t *model;
+	msurface_t *surface;
+	VM_SAFEPARMCOUNT(2, VM_getsurfacenumtriangles);
+	// return 0 if no such surface
+	if (!(model = getmodel(prog, PRVM_G_EDICT(OFS_PARM0))) || !(surface = getsurface(model, (int)PRVM_G_FLOAT(OFS_PARM1))))
+	{
+		PRVM_G_FLOAT(OFS_RETURN) = 0;
+		return;
+	}
 
-       PRVM_G_FLOAT(OFS_RETURN) = surface->num_triangles;
+	PRVM_G_FLOAT(OFS_RETURN) = surface->num_triangles;
 }
 //PF_getsurfacetriangle,     // #??? vector(entity e, float s, float n) getsurfacetriangle = #???;
 void VM_getsurfacetriangle(prvm_prog_t *prog)
 {
-       const vec3_t d = {-1, -1, -1};
-       prvm_edict_t *ed;
-       model_t *model;
-       msurface_t *surface;
-       int trinum;
-       VM_SAFEPARMCOUNT(3, VM_getsurfacetriangle);
-       VectorClear(PRVM_G_VECTOR(OFS_RETURN));
-       ed = PRVM_G_EDICT(OFS_PARM0);
-       if (!(model = getmodel(prog, ed)) || !(surface = getsurface(model, (int)PRVM_G_FLOAT(OFS_PARM1))))
-               return;
-       trinum = (int)PRVM_G_FLOAT(OFS_PARM2);
-       if (trinum < 0 || trinum >= surface->num_triangles)
-               return;
-       // FIXME: implement rotation/scaling
-       VectorMA(&(model->surfmesh.data_element3i + 3 * surface->num_firsttriangle)[trinum * 3], surface->num_firstvertex, d, PRVM_G_VECTOR(OFS_RETURN));
+	const vec3_t d = {-1, -1, -1};
+	prvm_edict_t *ed;
+	model_t *model;
+	msurface_t *surface;
+	int trinum;
+	VM_SAFEPARMCOUNT(3, VM_getsurfacetriangle);
+	VectorClear(PRVM_G_VECTOR(OFS_RETURN));
+	ed = PRVM_G_EDICT(OFS_PARM0);
+	if (!(model = getmodel(prog, ed)) || !(surface = getsurface(model, (int)PRVM_G_FLOAT(OFS_PARM1))))
+		return;
+	trinum = (int)PRVM_G_FLOAT(OFS_PARM2);
+	if (trinum < 0 || trinum >= surface->num_triangles)
+		return;
+	// FIXME: implement rotation/scaling
+	VectorMA(&(model->surfmesh.data_element3i + 3 * surface->num_firsttriangle)[trinum * 3], surface->num_firstvertex, d, PRVM_G_VECTOR(OFS_RETURN));
 }
 
 //

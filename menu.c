@@ -106,7 +106,7 @@ static void M_GameOptions_Key(cmd_state_t *cmd, int key, int ascii);
 static void M_ServerList_Key(cmd_state_t *cmd, int key, int ascii);
 static void M_ModList_Key(cmd_state_t *cmd, int key, int ascii);
 
-static qbool	m_entersound;		///< play after drawing a frame, so caching won't disrupt the sound
+static qbool m_entersound;  ///< play after drawing a frame, so caching won't disrupt the sound
 
 void M_Update_Return_Reason(const char *s)
 {
@@ -115,8 +115,8 @@ void M_Update_Return_Reason(const char *s)
 		Con_DPrintf("%s\n", s);
 }
 
-#define StartingGame	(m_multiplayer_cursor == 1)
-#define JoiningGame		(m_multiplayer_cursor == 0)
+#define StartingGame (m_multiplayer_cursor == 1)
+#define JoiningGame  (m_multiplayer_cursor == 0)
 
 // Nehahra
 #define NumberOfNehahraDemos 34
@@ -354,7 +354,7 @@ static void M_Demo_Key (cmd_state_t *cmd, int k, int ascii)
 //=============================================================================
 /* MAIN MENU */
 
-static int	m_main_cursor;
+static int   m_main_cursor;
 static qbool m_missingdata = false;
 
 static int MAIN_ITEMS = 4; // Nehahra: Menu Disable
@@ -431,8 +431,8 @@ void M_Menu_Main_f(cmd_state_t *cmd)
 
 static void M_Main_Draw (void)
 {
-	int		f;
-	cachepic_t	*p;
+	int  f;
+	cachepic_t *p;
 	char vabuf[1024];
 
 	if (m_missingdata)
@@ -506,7 +506,7 @@ static void M_Main_Key(cmd_state_t *cmd, int key, int ascii)
 		m_state = m_none;
 		//cls.demonum = m_save_demonum;
 		//if (cls.demonum != -1 && !cls.demoplayback && cls.state != ca_connected)
-		//	CL_NextDemo ();
+		//  CL_NextDemo ();
 		break;
 
 	case K_DOWNARROW:
@@ -731,8 +731,8 @@ static void M_Main_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* SINGLE PLAYER MENU */
 
-static int	m_singleplayer_cursor;
-#define	SINGLEPLAYER_ITEMS	3
+static int m_singleplayer_cursor;
+#define SINGLEPLAYER_ITEMS 3
 
 
 void M_Menu_SinglePlayer_f(cmd_state_t *cmd)
@@ -745,7 +745,7 @@ void M_Menu_SinglePlayer_f(cmd_state_t *cmd)
 
 static void M_SinglePlayer_Draw (void)
 {
-	cachepic_t	*p;
+	cachepic_t *p;
 	char vabuf[1024];
 
 	M_Background(320, 200);
@@ -767,7 +767,7 @@ static void M_SinglePlayer_Draw (void)
 	}
 	else
 	{
-		int		f;
+		int f;
 
 		M_DrawPic ( (320-Draw_GetPicWidth(p))/2, 4, "gfx/ttl_sgl");
 		M_DrawPic (72, 32, "gfx/sp_menu");
@@ -841,20 +841,20 @@ static void M_SinglePlayer_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* LOAD/SAVE MENU */
 
-static int		load_cursor;		///< 0 < load_cursor < MAX_SAVEGAMES
+static int  load_cursor;  ///< 0 < load_cursor < MAX_SAVEGAMES
 
-static char	m_filenames[MAX_SAVEGAMES][SAVEGAME_COMMENT_LENGTH+1];
-static int		loadable[MAX_SAVEGAMES];
+static char m_filenames[MAX_SAVEGAMES][SAVEGAME_COMMENT_LENGTH+1];
+static int  loadable[MAX_SAVEGAMES];
 
 static void M_ScanSaves (void)
 {
-	int		i, j;
-	size_t	len;
-	char	name[MAX_OSPATH];
-	char	buf[SAVEGAME_COMMENT_LENGTH + 256];
+	int     i, j;
+	size_t  len;
+	char    name[MAX_OSPATH];
+	char    buf[SAVEGAME_COMMENT_LENGTH + 256];
 	const char *t;
-	qfile_t	*f;
-//	int		version;
+	qfile_t *f;
+//	int     version;
 
 	for (i=0 ; i<MAX_SAVEGAMES ; i++)
 	{
@@ -917,8 +917,8 @@ void M_Menu_Save_f(cmd_state_t *cmd)
 
 static void M_Load_Draw (void)
 {
-	int		i;
-	cachepic_t	*p;
+	int i;
+	cachepic_t *p;
 
 	M_Background(320, 200);
 
@@ -935,8 +935,8 @@ static void M_Load_Draw (void)
 
 static void M_Save_Draw (void)
 {
-	int		i;
-	cachepic_t	*p;
+	int i;
+	cachepic_t *p;
 
 	M_Background(320, 200);
 
@@ -1032,8 +1032,8 @@ static void M_Save_Key(cmd_state_t *cmd, int k, int ascii)
 //=============================================================================
 /* Transfusion Single Player Episode Menu */
 
-static int	m_episode_cursor;
-#define	EPISODE_ITEMS	6
+static int m_episode_cursor;
+#define EPISODE_ITEMS 6
 
 void M_Menu_Transfusion_Episode_f(cmd_state_t *cmd)
 {
@@ -1090,8 +1090,8 @@ static void M_Transfusion_Episode_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* Transfusion Single Player Skill Menu */
 
-static int	m_skill_cursor = 2;
-#define	SKILL_ITEMS	5
+static int m_skill_cursor = 2;
+#define SKILL_ITEMS 5
 
 void M_Menu_Transfusion_Skill_f(cmd_state_t *cmd)
 {
@@ -1103,7 +1103,7 @@ void M_Menu_Transfusion_Skill_f(cmd_state_t *cmd)
 static void M_Transfusion_Skill_Draw (void)
 {
 	int y;
-	cachepic_t	*p;
+	cachepic_t *p;
 	char vabuf[1024];
 	M_Background(640, 480);
 
@@ -1191,8 +1191,8 @@ static void M_Transfusion_Skill_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* MULTIPLAYER MENU */
 
-static int	m_multiplayer_cursor;
-#define	MULTIPLAYER_ITEMS	3
+static int m_multiplayer_cursor;
+#define MULTIPLAYER_ITEMS 3
 
 
 void M_Menu_MultiPlayer_f(cmd_state_t *cmd)
@@ -1205,8 +1205,8 @@ void M_Menu_MultiPlayer_f(cmd_state_t *cmd)
 
 static void M_MultiPlayer_Draw (void)
 {
-	int		f;
-	cachepic_t	*p;
+	int  f;
+	cachepic_t *p;
 	char vabuf[1024];
 
 	if (gamemode == GAME_TRANSFUSION)
@@ -1271,18 +1271,18 @@ static void M_MultiPlayer_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* SETUP MENU */
 
-static int		setup_cursor = 4;
-static int		setup_cursor_table[] = {40, 64, 88, 124, 140};
+static int  setup_cursor = 4;
+static int  setup_cursor_table[] = {40, 64, 88, 124, 140};
 
-static char	setup_myname[MAX_SCOREBOARDNAME];
-static int		setup_oldtop;
-static int		setup_oldbottom;
-static int		setup_top;
-static int		setup_bottom;
-static int		setup_rate;
-static int		setup_oldrate;
+static char setup_myname[MAX_SCOREBOARDNAME];
+static int  setup_oldtop;
+static int  setup_oldbottom;
+static int  setup_top;
+static int  setup_bottom;
+static int  setup_rate;
+static int  setup_oldrate;
 
-#define	NUM_SETUP_CMDS	5
+#define NUM_SETUP_CMDS 5
 
 extern cvar_t cl_topcolor;
 extern cvar_t cl_bottomcolor;
@@ -1338,7 +1338,7 @@ static int setup_rateindex(int rate)
 static void M_Setup_Draw (void)
 {
 	int i, j;
-	cachepic_t	*p;
+	cachepic_t *p;
 	char vabuf[1024];
 
 	M_Background(320, 200);
@@ -1431,7 +1431,7 @@ static void M_Setup_Draw (void)
 
 static void M_Setup_Key(cmd_state_t *cmd, int k, int ascii)
 {
-	int			l;
+	int  l;
 	char vabuf[1024];
 
 	switch (k)
@@ -1542,7 +1542,7 @@ forward:
 //=============================================================================
 /* OPTIONS MENU */
 
-#define	SLIDER_RANGE	10
+#define SLIDER_RANGE 10
 
 static void M_DrawSlider (int x, int y, float num, float rangemin, float rangemax)
 {
@@ -1673,7 +1673,7 @@ static void M_Options_PrintSlider(const char *s, int enabled, float value, float
 static void M_Options_Draw (void)
 {
 	int visible;
-	cachepic_t	*p;
+	cachepic_t *p;
 
 	M_Background(320, bound(200, 32 + OPTIONS_ITEMS * 8, vid_conheight.integer));
 
@@ -1805,7 +1805,7 @@ static void M_Options_Key(cmd_state_t *cmd, int k, int ascii)
 	}
 }
 
-#define	OPTIONS_EFFECTS_ITEMS	35
+#define OPTIONS_EFFECTS_ITEMS 35
 
 static int options_effects_cursor;
 
@@ -1880,7 +1880,7 @@ static void M_Menu_Options_Effects_AdjustSliders (int dir)
 static void M_Options_Effects_Draw (void)
 {
 	int visible;
-	cachepic_t	*p;
+	cachepic_t *p;
 
 	M_Background(320, bound(200, 32 + OPTIONS_EFFECTS_ITEMS * 8, vid_conheight.integer));
 
@@ -1968,7 +1968,7 @@ static void M_Options_Effects_Key(cmd_state_t *cmd, int k, int ascii)
 }
 
 
-#define	OPTIONS_GRAPHICS_ITEMS	20
+#define OPTIONS_GRAPHICS_ITEMS 20
 
 static int options_graphics_cursor;
 
@@ -2003,23 +2003,23 @@ static void M_Menu_Options_Graphics_AdjustSliders (cmd_state_t *cmd, int dir)
 
 	optnum = 0;
 
-	     if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_coronas, bound(0, r_coronas.value + dir * 0.125, 4));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&gl_flashblend, !gl_flashblend.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_gloss,							bound(0, r_shadow_gloss.integer + dir, 2));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_dlight,				!r_shadow_realtime_dlight.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_dlight_shadows,		!r_shadow_realtime_dlight_shadows.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world,					!r_shadow_realtime_world.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world_lightmaps,		bound(0, r_shadow_realtime_world_lightmaps.value + dir * 0.1, 1));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world_shadows,			!r_shadow_realtime_world_shadows.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom,                                 !r_bloom.integer);
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_hdr_scenebrightness,                   bound(0.25, r_hdr_scenebrightness.value + dir * 0.125, 4));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_hdr_glowintensity,                     bound(0, r_hdr_glowintensity.value + dir * 0.25, 4));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorscale,                      bound(0.0625, r_bloom_colorscale.value + dir * 0.0625, 1));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorsubtract,                   bound(0, r_bloom_colorsubtract.value + dir * 0.0625, 1-0.0625));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorexponent,                   bound(1, r_bloom_colorexponent.value * (dir > 0 ? 2.0 : 0.5), 8));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_brighten,                        bound(1, r_bloom_brighten.value + dir * 0.0625, 4));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_blur,                            bound(1, r_bloom_blur.value + dir * 1, 16));
-	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_resolution,                      bound(64, r_bloom_resolution.value + dir * 64, 2048));
+	     if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_coronas,                            bound(0, r_coronas.value + dir * 0.125, 4));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&gl_flashblend,                        !gl_flashblend.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_gloss,                       bound(0, r_shadow_gloss.integer + dir, 2));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_dlight,             !r_shadow_realtime_dlight.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_dlight_shadows,     !r_shadow_realtime_dlight_shadows.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world,              !r_shadow_realtime_world.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world_lightmaps,    bound(0, r_shadow_realtime_world_lightmaps.value + dir * 0.1, 1));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_shadow_realtime_world_shadows,      !r_shadow_realtime_world_shadows.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom,                              !r_bloom.integer);
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_hdr_scenebrightness,                bound(0.25, r_hdr_scenebrightness.value + dir * 0.125, 4));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_hdr_glowintensity,                  bound(0, r_hdr_glowintensity.value + dir * 0.25, 4));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorscale,                   bound(0.0625, r_bloom_colorscale.value + dir * 0.0625, 1));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorsubtract,                bound(0, r_bloom_colorsubtract.value + dir * 0.0625, 1-0.0625));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_colorexponent,                bound(1, r_bloom_colorexponent.value * (dir > 0 ? 2.0 : 0.5), 8));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_brighten,                     bound(1, r_bloom_brighten.value + dir * 0.0625, 4));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_blur,                         bound(1, r_bloom_blur.value + dir * 1, 16));
+	else if (options_graphics_cursor == optnum++) Cvar_SetValueQuick (&r_bloom_resolution,                   bound(64, r_bloom_resolution.value + dir * 64, 2048));
 	else if (options_graphics_cursor == optnum++) Cbuf_AddText(cmd, "r_restart\n");
 }
 
@@ -2027,7 +2027,7 @@ static void M_Menu_Options_Graphics_AdjustSliders (cmd_state_t *cmd, int dir)
 static void M_Options_Graphics_Draw (void)
 {
 	int visible;
-	cachepic_t	*p;
+	cachepic_t *p;
 
 	M_Background(320, bound(200, 32 + OPTIONS_GRAPHICS_ITEMS * 8, vid_conheight.integer));
 
@@ -2098,9 +2098,9 @@ static void M_Options_Graphics_Key (cmd_state_t *cmd, int k, int ascii)
 }
 
 
-#define	OPTIONS_COLORCONTROL_ITEMS	18
+#define OPTIONS_COLORCONTROL_ITEMS 18
 
-static int		options_colorcontrol_cursor;
+static int options_colorcontrol_cursor;
 
 // intensity value to match up to 50% dither to 'correct' quake
 static cvar_t menu_options_colorcontrol_correctionvalue = {CF_CLIENT, "menu_options_colorcontrol_correctionvalue", "0.5", "intensity value that matches up to white/black dither pattern, should be 0.5 for linear color"};
@@ -2215,7 +2215,7 @@ static void M_Options_ColorControl_Draw (void)
 	int visible;
 	float x, s, t, u, v;
 	float c[3];
-	cachepic_t	*p, *dither;
+	cachepic_t *p, *dither;
 
 	dither = Draw_CachePic_Flags ("gfx/colorcontrol/ditherpattern", CACHEPICFLAG_NOCLAMP);
 
@@ -2352,106 +2352,106 @@ static void M_Options_ColorControl_Key(cmd_state_t *cmd, int k, int ascii)
 
 static const char *quakebindnames[][2] =
 {
-{"+attack", 		"attack"},
-{"impulse 10", 		"next weapon"},
-{"impulse 12", 		"previous weapon"},
-{"+jump", 			"jump / swim up"},
-{"+forward", 		"walk forward"},
-{"+back", 			"backpedal"},
-{"+left", 			"turn left"},
-{"+right", 			"turn right"},
-{"+speed", 			"run"},
-{"+moveleft", 		"step left"},
-{"+moveright", 		"step right"},
-{"+strafe", 		"sidestep"},
-{"+lookup", 		"look up"},
-{"+lookdown", 		"look down"},
-{"centerview", 		"center view"},
-{"+mlook", 			"mouse look"},
-{"+klook", 			"keyboard look"},
-{"+moveup",			"swim up"},
-{"+movedown",		"swim down"}
+{"+attack",     "attack"},
+{"impulse 10",  "next weapon"},
+{"impulse 12",  "previous weapon"},
+{"+jump",       "jump / swim up"},
+{"+forward",    "walk forward"},
+{"+back",       "backpedal"},
+{"+left",       "turn left"},
+{"+right",      "turn right"},
+{"+speed",      "run"},
+{"+moveleft",   "step left"},
+{"+moveright",  "step right"},
+{"+strafe",     "sidestep"},
+{"+lookup",     "look up"},
+{"+lookdown",   "look down"},
+{"centerview",  "center view"},
+{"+mlook",      "mouse look"},
+{"+klook",      "keyboard look"},
+{"+moveup",     "swim up"},
+{"+movedown",   "swim down"}
 };
 
 static const char *transfusionbindnames[][2] =
 {
-{"",				"Movement"},		// Movement commands
-{"+forward", 		"walk forward"},
-{"+back", 			"backpedal"},
-{"+left", 			"turn left"},
-{"+right", 			"turn right"},
-{"+moveleft", 		"step left"},
-{"+moveright", 		"step right"},
-{"+jump", 			"jump / swim up"},
-{"+movedown",		"swim down"},
-{"",				"Combat"},			// Combat commands
-{"impulse 1",		"Pitch Fork"},
-{"impulse 2",		"Flare Gun"},
-{"impulse 3",		"Shotgun"},
-{"impulse 4",		"Machine Gun"},
-{"impulse 5",		"Incinerator"},
-{"impulse 6",		"Bombs (TNT)"},
-{"impulse 35",		"Proximity Bomb"},
-{"impulse 36",		"Remote Detonator"},
-{"impulse 7",		"Aerosol Can"},
-{"impulse 8",		"Tesla Cannon"},
-{"impulse 9",		"Life Leech"},
-{"impulse 10",		"Voodoo Doll"},
-{"impulse 21",		"next weapon"},
-{"impulse 22",		"previous weapon"},
-{"+attack", 		"attack"},
-{"+button3",		"altfire"},
-{"",				"Inventory"},		// Inventory commands
-{"impulse 40",		"Dr.'s Bag"},
-{"impulse 41",		"Crystal Ball"},
-{"impulse 42",		"Beast Vision"},
-{"impulse 43",		"Jump Boots"},
-{"impulse 23",		"next item"},
-{"impulse 24",		"previous item"},
-{"impulse 25",		"use item"},
-{"",				"Misc"},			// Misc commands
-{"+button4",		"use"},
-{"impulse 50",		"add bot (red)"},
-{"impulse 51",		"add bot (blue)"},
-{"impulse 52",		"kick a bot"},
-{"impulse 26",		"next armor type"},
-{"impulse 27",		"identify player"},
-{"impulse 55",		"voting menu"},
-{"impulse 56",		"observer mode"},
-{"",				"Taunts"},            // Taunts
-{"impulse 70",		"taunt 0"},
-{"impulse 71",		"taunt 1"},
-{"impulse 72",		"taunt 2"},
-{"impulse 73",		"taunt 3"},
-{"impulse 74",		"taunt 4"},
-{"impulse 75",		"taunt 5"},
-{"impulse 76",		"taunt 6"},
-{"impulse 77",		"taunt 7"},
-{"impulse 78",		"taunt 8"},
-{"impulse 79",		"taunt 9"}
+{"",            "Movement"},          // Movement commands
+{"+forward",    "walk forward"},
+{"+back",       "backpedal"},
+{"+left",       "turn left"},
+{"+right",      "turn right"},
+{"+moveleft",   "step left"},
+{"+moveright",  "step right"},
+{"+jump",       "jump / swim up"},
+{"+movedown",   "swim down"},
+{"",            "Combat"},            // Combat commands
+{"impulse 1",   "Pitch Fork"},
+{"impulse 2",   "Flare Gun"},
+{"impulse 3",   "Shotgun"},
+{"impulse 4",   "Machine Gun"},
+{"impulse 5",   "Incinerator"},
+{"impulse 6",   "Bombs (TNT)"},
+{"impulse 35",  "Proximity Bomb"},
+{"impulse 36",  "Remote Detonator"},
+{"impulse 7",   "Aerosol Can"},
+{"impulse 8",   "Tesla Cannon"},
+{"impulse 9",   "Life Leech"},
+{"impulse 10",  "Voodoo Doll"},
+{"impulse 21",  "next weapon"},
+{"impulse 22",  "previous weapon"},
+{"+attack",     "attack"},
+{"+button3",    "altfire"},
+{"",            "Inventory"},         // Inventory commands
+{"impulse 40",  "Dr.'s Bag"},
+{"impulse 41",  "Crystal Ball"},
+{"impulse 42",  "Beast Vision"},
+{"impulse 43",  "Jump Boots"},
+{"impulse 23",  "next item"},
+{"impulse 24",  "previous item"},
+{"impulse 25",  "use item"},
+{"",            "Misc"},              // Misc commands
+{"+button4",    "use"},
+{"impulse 50",  "add bot (red)"},
+{"impulse 51",  "add bot (blue)"},
+{"impulse 52",  "kick a bot"},
+{"impulse 26",  "next armor type"},
+{"impulse 27",  "identify player"},
+{"impulse 55",  "voting menu"},
+{"impulse 56",  "observer mode"},
+{"",            "Taunts"},            // Taunts
+{"impulse 70",  "taunt 0"},
+{"impulse 71",  "taunt 1"},
+{"impulse 72",  "taunt 2"},
+{"impulse 73",  "taunt 3"},
+{"impulse 74",  "taunt 4"},
+{"impulse 75",  "taunt 5"},
+{"impulse 76",  "taunt 6"},
+{"impulse 77",  "taunt 7"},
+{"impulse 78",  "taunt 8"},
+{"impulse 79",  "taunt 9"}
 };
 
 static const char *goodvsbad2bindnames[][2] =
 {
-{"impulse 69",		"Power 1"},
-{"impulse 70",		"Power 2"},
-{"impulse 71",		"Power 3"},
-{"+jump", 			"jump / swim up"},
-{"+forward", 		"walk forward"},
-{"+back", 			"backpedal"},
-{"+left", 			"turn left"},
-{"+right", 			"turn right"},
-{"+speed", 			"run"},
-{"+moveleft", 		"step left"},
-{"+moveright", 		"step right"},
-{"+strafe", 		"sidestep"},
-{"+lookup", 		"look up"},
-{"+lookdown", 		"look down"},
-{"centerview", 		"center view"},
-{"+mlook", 			"mouse look"},
-{"kill", 			"kill yourself"},
-{"+moveup",			"swim up"},
-{"+movedown",		"swim down"}
+{"impulse 69",  "Power 1"},
+{"impulse 70",  "Power 2"},
+{"impulse 71",  "Power 3"},
+{"+jump",       "jump / swim up"},
+{"+forward",    "walk forward"},
+{"+back",       "backpedal"},
+{"+left",       "turn left"},
+{"+right",      "turn right"},
+{"+speed",      "run"},
+{"+moveleft",   "step left"},
+{"+moveright",  "step right"},
+{"+strafe",     "sidestep"},
+{"+lookup",     "look up"},
+{"+lookdown",   "look down"},
+{"centerview",  "center view"},
+{"+mlook",      "mouse look"},
+{"kill",        "kill yourself"},
+{"+moveup",     "swim up"},
+{"+movedown",   "swim down"}
 };
 
 static int numcommands;
@@ -2548,8 +2548,8 @@ static void M_DefaultBinds (void)
 */
 
 
-static int		keys_cursor;
-static int		bind_grab;
+static int keys_cursor;
+static int bind_grab;
 
 void M_Menu_Keys_f(cmd_state_t *cmd)
 {
@@ -2589,8 +2589,8 @@ void M_Menu_Keys_f(cmd_state_t *cmd)
 
 static void M_UnbindCommand (const char *command)
 {
-	int		j;
-	const char	*b;
+	int j;
+	const char *b;
 
 	for (j = 0; j < (int)sizeof (keybindings[0]) / (int)sizeof (keybindings[0][0]); j++)
 	{
@@ -2605,11 +2605,11 @@ static void M_UnbindCommand (const char *command)
 
 static void M_Keys_Draw (void)
 {
-	int		i, j;
-	int		keys[NUMKEYS];
-	int		y;
-	cachepic_t	*p;
-	char	keystring[MAX_INPUTLINE];
+	int  i, j;
+	int  keys[NUMKEYS];
+	int  y;
+	cachepic_t *p;
+	char keystring[MAX_INPUTLINE];
 
 	M_Background(320, 48 + 8 * numcommands);
 
@@ -2667,12 +2667,12 @@ static void M_Keys_Draw (void)
 
 static void M_Keys_Key(cmd_state_t *cmd, int k, int ascii)
 {
-	char	line[80];
-	int		keys[NUMKEYS];
-	char	tinystr[TINYSTR_LEN];
+	char line[80];
+	int  keys[NUMKEYS];
+	char tinystr[TINYSTR_LEN];
 
 	if (bind_grab)
-	{	// defining a key
+	{ // defining a key
 		S_LocalSound ("sound/misc/menu1.wav");
 		if (k == K_ESCAPE)
 		{
@@ -2718,7 +2718,7 @@ static void M_Keys_Key(cmd_state_t *cmd, int k, int ascii)
 		while (bindnames[keys_cursor][0][0] == '\0');  // skip sections
 		break;
 
-	case K_ENTER:		// go into bind mode
+	case K_ENTER:      // go into bind mode
 		Key_FindKeysForCommand (bindnames[keys_cursor][0], keys, NUMKEYS, 0);
 		S_LocalSound ("sound/misc/menu2.wav");
 		if (keys[NUMKEYS - 1] != -1)
@@ -2726,8 +2726,8 @@ static void M_Keys_Key(cmd_state_t *cmd, int k, int ascii)
 		bind_grab = true;
 		break;
 
-	case K_BACKSPACE:		// delete bindings
-	case K_DEL:				// delete bindings
+	case K_BACKSPACE:  // delete bindings
+	case K_DEL:        // delete bindings
 		S_LocalSound ("sound/misc/menu2.wav");
 		M_UnbindCommand (bindnames[keys_cursor][0]);
 		break;
@@ -2911,7 +2911,7 @@ void M_Menu_Video_f(cmd_state_t *cmd)
 static void M_Video_Draw (void)
 {
 	int t;
-	cachepic_t	*p;
+	cachepic_t *p;
 	char vabuf[1024];
 
 	if(!!vid_fullscreen.integer != menu_video_resolutions_forfullscreen)
@@ -2925,7 +2925,7 @@ static void M_Video_Draw (void)
 
 	M_DrawPic(16, 4, "gfx/qplaque");
 	p = Draw_CachePic ("gfx/vidmodes");
-	M_DrawPic((320-Draw_GetPicWidth(p))/2, 4, "gfx/vidmodes");
+	M_DrawPic((320 - Draw_GetPicWidth(p)) / 2, 4, "gfx/vidmodes");
 
 	t = 0;
 
@@ -3089,8 +3089,8 @@ static void M_Video_Key(cmd_state_t *cmd, int key, int ascii)
 //=============================================================================
 /* HELP MENU */
 
-static int		help_page;
-#define	NUM_HELP_PAGES	6
+static int help_page;
+#define NUM_HELP_PAGES 6
 
 
 void M_Menu_Help_f(cmd_state_t *cmd)
@@ -3167,8 +3167,8 @@ static void M_Credits_Key(cmd_state_t *cmd, int key, int ascii)
 /* QUIT MENU */
 
 static const char *m_quit_message[9];
-static int		m_quit_prevstate;
-static qbool	wasInMenus;
+static int         m_quit_prevstate;
+static qbool       wasInMenus;
 
 
 static int M_QuitMessage(const char *line1, const char *line2, const char *line3, const char *line4, const char *line5, const char *line6, const char *line7, const char *line8)
@@ -3321,13 +3321,13 @@ static void M_Quit_Draw (void)
 //=============================================================================
 /* LAN CONFIG MENU */
 
-static int		lanConfig_cursor = -1;
-static int		lanConfig_cursor_table [] = {56, 76, 84, 120};
-#define NUM_LANCONFIG_CMDS	4
+static int  lanConfig_cursor = -1;
+static int  lanConfig_cursor_table [] = {56, 76, 84, 120};
+#define NUM_LANCONFIG_CMDS 4
 
-static int 	lanConfig_port;
-static char	lanConfig_portname[6];
-static char	lanConfig_joinname[40];
+static int  lanConfig_port;
+static char lanConfig_portname[6];
+static char lanConfig_joinname[40];
 
 void M_Menu_LanConfig_f(cmd_state_t *cmd)
 {
@@ -3350,10 +3350,10 @@ void M_Menu_LanConfig_f(cmd_state_t *cmd)
 
 static void M_LanConfig_Draw (void)
 {
-	cachepic_t	*p;
-	int		basex;
-	const char	*startJoin;
-	const char	*protocol;
+	cachepic_t *p;
+	int basex;
+	const char *startJoin;
+	const char *protocol;
 	char vabuf[1024];
 
 	M_Background(320, 200);
@@ -3404,7 +3404,7 @@ static void M_LanConfig_Draw (void)
 
 static void M_LanConfig_Key(cmd_state_t *cmd, int key, int ascii)
 {
-	int		l;
+	int  l;
 	char vabuf[1024];
 
 	switch (key)
@@ -3518,15 +3518,15 @@ static void M_LanConfig_Key(cmd_state_t *cmd, int key, int ascii)
 
 typedef struct level_s
 {
-	const char	*name;
-	const char	*description;
+	const char *name;
+	const char *description;
 } level_t;
 
 typedef struct episode_s
 {
-	const char	*description;
-	int		firstLevel;
-	int		levels;
+	const char *description;
+	int firstLevel;
+	int levels;
 } episode_t;
 
 typedef struct gamelevels_s
@@ -3538,55 +3538,55 @@ typedef struct gamelevels_s
 }
 gamelevels_t;
 
-static level_t quakelevels[] =
+static level_t     quakelevels[] =
 {
-	{"start", "Entrance"},	// 0
+	{"start",      "Entrance"},              // 0
 
-	{"e1m1", "Slipgate Complex"},				// 1
-	{"e1m2", "Castle of the Damned"},
-	{"e1m3", "The Necropolis"},
-	{"e1m4", "The Grisly Grotto"},
-	{"e1m5", "Gloom Keep"},
-	{"e1m6", "The Door To Chthon"},
-	{"e1m7", "The House of Chthon"},
-	{"e1m8", "Ziggurat Vertigo"},
+	{"e1m1",       "Slipgate Complex"},      // 1
+	{"e1m2",       "Castle of the Damned"},
+	{"e1m3",       "The Necropolis"},
+	{"e1m4",       "The Grisly Grotto"},
+	{"e1m5",       "Gloom Keep"},
+	{"e1m6",       "The Door To Chthon"},
+	{"e1m7",       "The House of Chthon"},
+	{"e1m8",       "Ziggurat Vertigo"},
 
-	{"e2m1", "The Installation"},				// 9
-	{"e2m2", "Ogre Citadel"},
-	{"e2m3", "Crypt of Decay"},
-	{"e2m4", "The Ebon Fortress"},
-	{"e2m5", "The Wizard's Manse"},
-	{"e2m6", "The Dismal Oubliette"},
-	{"e2m7", "Underearth"},
+	{"e2m1",       "The Installation"},      // 9
+	{"e2m2",       "Ogre Citadel"},
+	{"e2m3",       "Crypt of Decay"},
+	{"e2m4",       "The Ebon Fortress"},
+	{"e2m5",       "The Wizard's Manse"},
+	{"e2m6",       "The Dismal Oubliette"},
+	{"e2m7",       "Underearth"},
 
-	{"e3m1", "Termination Central"},			// 16
-	{"e3m2", "The Vaults of Zin"},
-	{"e3m3", "The Tomb of Terror"},
-	{"e3m4", "Satan's Dark Delight"},
-	{"e3m5", "Wind Tunnels"},
-	{"e3m6", "Chambers of Torment"},
-	{"e3m7", "The Haunted Halls"},
+	{"e3m1",       "Termination Central"},   // 16
+	{"e3m2",       "The Vaults of Zin"},
+	{"e3m3",       "The Tomb of Terror"},
+	{"e3m4",       "Satan's Dark Delight"},
+	{"e3m5",       "Wind Tunnels"},
+	{"e3m6",       "Chambers of Torment"},
+	{"e3m7",       "The Haunted Halls"},
 
-	{"e4m1", "The Sewage System"},				// 23
-	{"e4m2", "The Tower of Despair"},
-	{"e4m3", "The Elder God Shrine"},
-	{"e4m4", "The Palace of Hate"},
-	{"e4m5", "Hell's Atrium"},
-	{"e4m6", "The Pain Maze"},
-	{"e4m7", "Azure Agony"},
-	{"e4m8", "The Nameless City"},
+	{"e4m1",       "The Sewage System"},     // 23
+	{"e4m2",       "The Tower of Despair"},
+	{"e4m3",       "The Elder God Shrine"},
+	{"e4m4",       "The Palace of Hate"},
+	{"e4m5",       "Hell's Atrium"},
+	{"e4m6",       "The Pain Maze"},
+	{"e4m7",       "Azure Agony"},
+	{"e4m8",       "The Nameless City"},
 
-	{"end", "Shub-Niggurath's Pit"},			// 31
+	{"end",        "Shub-Niggurath's Pit"},  // 31
 
-	{"dm1", "Place of Two Deaths"},				// 32
-	{"dm2", "Claustrophobopolis"},
-	{"dm3", "The Abandoned Base"},
-	{"dm4", "The Bad Place"},
-	{"dm5", "The Cistern"},
-	{"dm6", "The Dark Zone"}
+	{"dm1",        "Place of Two Deaths"},   // 32
+	{"dm2",        "Claustrophobopolis"},
+	{"dm3",        "The Abandoned Base"},
+	{"dm4",        "The Bad Place"},
+	{"dm5",        "The Cistern"},
+	{"dm6",        "The Dark Zone"}
 };
 
-static episode_t quakeepisodes[] =
+static episode_t   quakeepisodes[] =
 {
 	{"Welcome to Quake", 0, 1},
 	{"Doomed Dimension", 1, 8},
@@ -3600,68 +3600,68 @@ static episode_t quakeepisodes[] =
  //MED 01/06/97 added hipnotic levels
 static level_t     hipnoticlevels[] =
 {
-   {"start", "Command HQ"},  // 0
+	{"start",      "Command HQ"},  // 0
 
-   {"hip1m1", "The Pumping Station"},          // 1
-   {"hip1m2", "Storage Facility"},
-   {"hip1m3", "The Lost Mine"},
-   {"hip1m4", "Research Facility"},
-   {"hip1m5", "Military Complex"},
+	{"hip1m1",     "The Pumping Station"},   // 1
+	{"hip1m2",     "Storage Facility"},
+	{"hip1m3",     "The Lost Mine"},
+	{"hip1m4",     "Research Facility"},
+	{"hip1m5",     "Military Complex"},
 
-   {"hip2m1", "Ancient Realms"},          // 6
-   {"hip2m2", "The Black Cathedral"},
-   {"hip2m3", "The Catacombs"},
-   {"hip2m4", "The Crypt"},
-   {"hip2m5", "Mortum's Keep"},
-   {"hip2m6", "The Gremlin's Domain"},
+	{"hip2m1",     "Ancient Realms"},        // 6
+	{"hip2m2",     "The Black Cathedral"},
+	{"hip2m3",     "The Catacombs"},
+	{"hip2m4",     "The Crypt"},
+	{"hip2m5",     "Mortum's Keep"},
+	{"hip2m6",     "The Gremlin's Domain"},
 
-   {"hip3m1", "Tur Torment"},       // 12
-   {"hip3m2", "Pandemonium"},
-   {"hip3m3", "Limbo"},
-   {"hip3m4", "The Gauntlet"},
+	{"hip3m1",     "Tur Torment"},           // 12
+	{"hip3m2",     "Pandemonium"},
+	{"hip3m3",     "Limbo"},
+	{"hip3m4",     "The Gauntlet"},
 
-   {"hipend", "Armagon's Lair"},       // 16
+	{"hipend",     "Armagon's Lair"},        // 16
 
-   {"hipdm1", "The Edge of Oblivion"}           // 17
+	{"hipdm1",     "The Edge of Oblivion"}   // 17
 };
 
 //MED 01/06/97  added hipnotic episodes
-static episode_t   hipnoticepisodes[] =
+static episode_t hipnoticepisodes[] =
 {
-   {"Scourge of Armagon", 0, 1},
-   {"Fortress of the Dead", 1, 5},
-   {"Dominion of Darkness", 6, 6},
-   {"The Rift", 12, 4},
-   {"Final Level", 16, 1},
-   {"Deathmatch Arena", 17, 1}
+	{"Scourge of Armagon", 0, 1},
+	{"Fortress of the Dead", 1, 5},
+	{"Dominion of Darkness", 6, 6},
+	{"The Rift", 12, 4},
+	{"Final Level", 16, 1},
+	{"Deathmatch Arena", 17, 1}
 };
 
 //PGM 01/07/97 added rogue levels
 //PGM 03/02/97 added dmatch level
-static level_t		roguelevels[] =
+static level_t     roguelevels[] =
 {
-	{"start",	"Split Decision"},
-	{"r1m1",	"Deviant's Domain"},
-	{"r1m2",	"Dread Portal"},
-	{"r1m3",	"Judgement Call"},
-	{"r1m4",	"Cave of Death"},
-	{"r1m5",	"Towers of Wrath"},
-	{"r1m6",	"Temple of Pain"},
-	{"r1m7",	"Tomb of the Overlord"},
-	{"r2m1",	"Tempus Fugit"},
-	{"r2m2",	"Elemental Fury I"},
-	{"r2m3",	"Elemental Fury II"},
-	{"r2m4",	"Curse of Osiris"},
-	{"r2m5",	"Wizard's Keep"},
-	{"r2m6",	"Blood Sacrifice"},
-	{"r2m7",	"Last Bastion"},
-	{"r2m8",	"Source of Evil"},
-	{"ctf1",    "Division of Change"}
+	{"start",      "Split Decision"},
+	{"r1m1",       "Deviant's Domain"},
+	{"r1m2",       "Dread Portal"},
+	{"r1m3",       "Judgement Call"},
+	{"r1m4",       "Cave of Death"},
+	{"r1m5",       "Towers of Wrath"},
+	{"r1m6",       "Temple of Pain"},
+	{"r1m7",       "Tomb of the Overlord"},
+	{"r2m1",       "Tempus Fugit"},
+	{"r2m2",       "Elemental Fury I"},
+	{"r2m3",       "Elemental Fury II"},
+	{"r2m4",       "Curse of Osiris"},
+	{"r2m5",       "Wizard's Keep"},
+	{"r2m6",       "Blood Sacrifice"},
+	{"r2m7",       "Last Bastion"},
+	{"r2m8",       "Source of Evil"},
+	{"ctf1",       "Division of Change"}
 };
 
 //PGM 01/07/97 added rogue episodes
 //PGM 03/02/97 added dmatch episode
-static episode_t	rogueepisodes[] =
+static episode_t   rogueepisodes[] =
 {
 	{"Introduction", 0, 1},
 	{"Hell's Fortress", 1, 7},
@@ -3669,30 +3669,30 @@ static episode_t	rogueepisodes[] =
 	{"Deathmatch Arena", 16, 1}
 };
 
-static level_t		nehahralevels[] =
+static level_t     nehahralevels[] =
 {
-	{"nehstart",	"Welcome to Nehahra"},
-	{"neh1m1",	"Forge City1: Slipgates"},
-	{"neh1m2",	"Forge City2: Boiler"},
-	{"neh1m3",	"Forge City3: Escape"},
-	{"neh1m4",	"Grind Core"},
-	{"neh1m5",	"Industrial Silence"},
-	{"neh1m6",	"Locked-Up Anger"},
-	{"neh1m7",	"Wanderer of the Wastes"},
-	{"neh1m8",	"Artemis System Net"},
-	{"neh1m9",	"To the Death"},
-	{"neh2m1",	"The Gates of Ghoro"},
-	{"neh2m2",	"Sacred Trinity"},
-	{"neh2m3",	"Realm of the Ancients"},
-	{"neh2m4",	"Temple of the Ancients"},
-	{"neh2m5",	"Dreams Made Flesh"},
-	{"neh2m6",	"Your Last Cup of Sorrow"},
-	{"nehsec",	"Ogre's Bane"},
-	{"nehahra",	"Nehahra's Den"},
-	{"nehend",	"Quintessence"}
+	{"nehstart",   "Welcome to Nehahra"},
+	{"neh1m1",     "Forge City1: Slipgates"},
+	{"neh1m2",     "Forge City2: Boiler"},
+	{"neh1m3",     "Forge City3: Escape"},
+	{"neh1m4",     "Grind Core"},
+	{"neh1m5",     "Industrial Silence"},
+	{"neh1m6",     "Locked-Up Anger"},
+	{"neh1m7",     "Wanderer of the Wastes"},
+	{"neh1m8",     "Artemis System Net"},
+	{"neh1m9",     "To the Death"},
+	{"neh2m1",     "The Gates of Ghoro"},
+	{"neh2m2",     "Sacred Trinity"},
+	{"neh2m3",     "Realm of the Ancients"},
+	{"neh2m4",     "Temple of the Ancients"},
+	{"neh2m5",     "Dreams Made Flesh"},
+	{"neh2m6",     "Your Last Cup of Sorrow"},
+	{"nehsec",     "Ogre's Bane"},
+	{"nehahra",    "Nehahra's Den"},
+	{"nehend",     "Quintessence"}
 };
 
-static episode_t	nehahraepisodes[] =
+static episode_t nehahraepisodes[] =
 {
 	{"Welcome to Nehahra", 0, 1},
 	{"The Fall of Forge", 1, 9},
@@ -3701,115 +3701,115 @@ static episode_t	nehahraepisodes[] =
 };
 
 // Map list for Transfusion
-static level_t		transfusionlevels[] =
+static level_t transfusionlevels[] =
 {
-	{"e1m1",		"Cradle to Grave"},
-	{"e1m2",		"Wrong Side of the Tracks"},
-	{"e1m3",		"Phantom Express"},
-	{"e1m4",		"Dark Carnival"},
-	{"e1m5",		"Hallowed Grounds"},
-	{"e1m6",		"The Great Temple"},
-	{"e1m7",		"Altar of Stone"},
-	{"e1m8",		"House of Horrors"},
+	{"e1m1",       "Cradle to Grave"},
+	{"e1m2",       "Wrong Side of the Tracks"},
+	{"e1m3",       "Phantom Express"},
+	{"e1m4",       "Dark Carnival"},
+	{"e1m5",       "Hallowed Grounds"},
+	{"e1m6",       "The Great Temple"},
+	{"e1m7",       "Altar of Stone"},
+	{"e1m8",       "House of Horrors"},
 
-	{"e2m1",		"Shipwrecked"},
-	{"e2m2",		"The Lumber Mill"},
-	{"e2m3",		"Rest for the Wicked"},
-	{"e2m4",		"The Overlooked Hotel"},
-	{"e2m5",		"The Haunting"},
-	{"e2m6",		"The Cold Rush"},
-	{"e2m7",		"Bowels of the Earth"},
-	{"e2m8",		"The Lair of Shial"},
-	{"e2m9",		"Thin Ice"},
+	{"e2m1",       "Shipwrecked"},
+	{"e2m2",       "The Lumber Mill"},
+	{"e2m3",       "Rest for the Wicked"},
+	{"e2m4",       "The Overlooked Hotel"},
+	{"e2m5",       "The Haunting"},
+	{"e2m6",       "The Cold Rush"},
+	{"e2m7",       "Bowels of the Earth"},
+	{"e2m8",       "The Lair of Shial"},
+	{"e2m9",       "Thin Ice"},
 
-	{"e3m1",		"Ghost Town"},
-	{"e3m2",		"The Siege"},
-	{"e3m3",		"Raw Sewage"},
-	{"e3m4",		"The Sick Ward"},
-	{"e3m5",		"Spare Parts"},
-	{"e3m6",		"Monster Bait"},
-	{"e3m7",		"The Pit of Cerberus"},
-	{"e3m8",		"Catacombs"},
+	{"e3m1",       "Ghost Town"},
+	{"e3m2",       "The Siege"},
+	{"e3m3",       "Raw Sewage"},
+	{"e3m4",       "The Sick Ward"},
+	{"e3m5",       "Spare Parts"},
+	{"e3m6",       "Monster Bait"},
+	{"e3m7",       "The Pit of Cerberus"},
+	{"e3m8",       "Catacombs"},
 
-	{"e4m1",		"Butchery Loves Company"},
-	{"e4m2",		"Breeding Grounds"},
-	{"e4m3",		"Charnel House"},
-	{"e4m4",		"Crystal Lake"},
-	{"e4m5",		"Fire and Brimstone"},
-	{"e4m6",		"The Ganglion Depths"},
-	{"e4m7",		"In the Flesh"},
-	{"e4m8",		"The Hall of the Epiphany"},
-	{"e4m9",		"Mall of the Dead"},
+	{"e4m1",       "Butchery Loves Company"},
+	{"e4m2",       "Breeding Grounds"},
+	{"e4m3",       "Charnel House"},
+	{"e4m4",       "Crystal Lake"},
+	{"e4m5",       "Fire and Brimstone"},
+	{"e4m6",       "The Ganglion Depths"},
+	{"e4m7",       "In the Flesh"},
+	{"e4m8",       "The Hall of the Epiphany"},
+	{"e4m9",       "Mall of the Dead"},
 
-	{"bb1",			"The Stronghold"},
-	{"bb2",			"Winter Wonderland"},
-	{"bb3",			"Bodies"},
-	{"bb4",			"The Tower"},
-	{"bb5",			"Click!"},
-	{"bb6",			"Twin Fortress"},
-	{"bb7",			"Midgard"},
-	{"bb8",			"Fun With Heads"},
-	{"dm1",			"Monolith Building 11"},
-	{"dm2",			"Power!"},
-	{"dm3",			"Area 15"},
+	{"bb1",        "The Stronghold"},
+	{"bb2",        "Winter Wonderland"},
+	{"bb3",        "Bodies"},
+	{"bb4",        "The Tower"},
+	{"bb5",        "Click!"},
+	{"bb6",        "Twin Fortress"},
+	{"bb7",        "Midgard"},
+	{"bb8",        "Fun With Heads"},
+	{"dm1",        "Monolith Building 11"},
+	{"dm2",        "Power!"},
+	{"dm3",        "Area 15"},
 
-	{"e6m1",		"Welcome to Your Life"},
-	{"e6m2",		"They Are Here"},
-	{"e6m3",		"Public Storage"},
-	{"e6m4",		"Aqueducts"},
-	{"e6m5",		"The Ruined Temple"},
-	{"e6m6",		"Forbidden Rituals"},
-	{"e6m7",		"The Dungeon"},
-	{"e6m8",		"Beauty and the Beast"},
-	{"e6m9",		"Forgotten Catacombs"},
+	{"e6m1",       "Welcome to Your Life"},
+	{"e6m2",       "They Are Here"},
+	{"e6m3",       "Public Storage"},
+	{"e6m4",       "Aqueducts"},
+	{"e6m5",       "The Ruined Temple"},
+	{"e6m6",       "Forbidden Rituals"},
+	{"e6m7",       "The Dungeon"},
+	{"e6m8",       "Beauty and the Beast"},
+	{"e6m9",       "Forgotten Catacombs"},
 
-	{"cp01",		"Boat Docks"},
-	{"cp02",		"Old Opera House"},
-	{"cp03",		"Gothic Library"},
-	{"cp04",		"Lost Monastery"},
-	{"cp05",		"Steamboat"},
-	{"cp06",		"Graveyard"},
-	{"cp07",		"Mountain Pass"},
-	{"cp08",		"Abysmal Mine"},
-	{"cp09",		"Castle"},
-	{"cps1",		"Boggy Creek"},
+	{"cp01",       "Boat Docks"},
+	{"cp02",       "Old Opera House"},
+	{"cp03",       "Gothic Library"},
+	{"cp04",       "Lost Monastery"},
+	{"cp05",       "Steamboat"},
+	{"cp06",       "Graveyard"},
+	{"cp07",       "Mountain Pass"},
+	{"cp08",       "Abysmal Mine"},
+	{"cp09",       "Castle"},
+	{"cps1",       "Boggy Creek"},
 
-	{"cpbb01",		"Crypt of Despair"},
-	{"cpbb02",		"Pits of Blood"},
-	{"cpbb03",		"Unholy Cathedral"},
-	{"cpbb04",		"Deadly Inspirations"},
+	{"cpbb01",     "Crypt of Despair"},
+	{"cpbb02",     "Pits of Blood"},
+	{"cpbb03",     "Unholy Cathedral"},
+	{"cpbb04",     "Deadly Inspirations"},
 
-	{"b2a15",		"Area 15 (B2)"},
-	{"b2bodies",	"BB_Bodies (B2)"},
-	{"b2cabana",	"BB_Cabana"},
-	{"b2power",		"BB_Power"},
-	{"barena",		"Blood Arena"},
-	{"bkeep",		"Blood Keep"},
-	{"bstar",		"Brown Star"},
-	{"crypt",		"The Crypt"},
+	{"b2a15",      "Area 15 (B2)"},
+	{"b2bodies",   "BB_Bodies (B2)"},
+	{"b2cabana",   "BB_Cabana"},
+	{"b2power",    "BB_Power"},
+	{"barena",     "Blood Arena"},
+	{"bkeep",      "Blood Keep"},
+	{"bstar",      "Brown Star"},
+	{"crypt",      "The Crypt"},
 
-	{"bb3_2k1",		"Bodies Infusion"},
-	{"captasao",	"Captasao"},
-	{"curandero",	"Curandero"},
-	{"dcamp",		"DeathCamp"},
-	{"highnoon",	"HighNoon"},
-	{"qbb1",		"The Confluence"},
-	{"qbb2",		"KathartiK"},
-	{"qbb3",		"Caleb's Woodland Retreat"},
-	{"zoo",			"Zoo"},
+	{"bb3_2k1",    "Bodies Infusion"},
+	{"captasao",   "Captasao"},
+	{"curandero",  "Curandero"},
+	{"dcamp",      "DeathCamp"},
+	{"highnoon",   "HighNoon"},
+	{"qbb1",       "The Confluence"},
+	{"qbb2",       "KathartiK"},
+	{"qbb3",       "Caleb's Woodland Retreat"},
+	{"zoo",        "Zoo"},
 
-	{"dranzbb6",	"Black Coffee"},
-	{"fragm",		"Frag'M"},
-	{"maim",		"Maim"},
-	{"qe1m7",		"The House of Chthon"},
-	{"qdm1",		"Place of Two Deaths"},
-	{"qdm4",		"The Bad Place"},
-	{"qdm5",		"The Cistern"},
-	{"qmorbias",	"DM-Morbias"},
-	{"simple",		"Dead Simple"}
+	{"dranzbb6",   "Black Coffee"},
+	{"fragm",      "Frag'M"},
+	{"maim",       "Maim"},
+	{"qe1m7",      "The House of Chthon"},
+	{"qdm1",       "Place of Two Deaths"},
+	{"qdm4",       "The Bad Place"},
+	{"qdm5",       "The Cistern"},
+	{"qmorbias",   "DM-Morbias"},
+	{"simple",     "Dead Simple"}
 };
 
-static episode_t	transfusionepisodes[] =
+static episode_t transfusionepisodes[] =
 {
 	{"The Way of All Flesh", 0, 8},
 	{"Even Death May Die", 8, 9},
@@ -3826,58 +3826,58 @@ static episode_t	transfusionepisodes[] =
 
 static level_t goodvsbad2levels[] =
 {
-	{"rts", "Many Paths"},  // 0
-	{"chess", "Chess, Scott Hess"},                         // 1
-	{"dot", "Big Wall"},
-	{"city2", "The Big City"},
-	{"bwall", "0 G like Psychic TV"},
-	{"snow", "Wireframed"},
-	{"telep", "Infinite Falling"},
-	{"faces", "Facing Bases"},
-	{"island", "Adventure Islands"},
+	{"rts",        "Many Paths"},            // 0
+	{"chess",      "Chess, Scott Hess"},     // 1
+	{"dot",        "Big Wall"},
+	{"city2",      "The Big City"},
+	{"bwall",      "0 G like Psychic TV"},
+	{"snow",       "Wireframed"},
+	{"telep",      "Infinite Falling"},
+	{"faces",      "Facing Bases"},
+	{"island",     "Adventure Islands"},
 };
 
-static episode_t goodvsbad2episodes[] =
+static episode_t   goodvsbad2episodes[] =
 {
 	{"Levels? Bevels!", 0, 8},
 };
 
-static level_t battlemechlevels[] =
+static level_t     battlemechlevels[] =
 {
-	{"start", "Parking Level"},
-	{"dm1", "Hot Dump"},                        // 1
-	{"dm2", "The Pits"},
-	{"dm3", "Dimber Died"},
-	{"dm4", "Fire in the Hole"},
-	{"dm5", "Clubhouses"},
-	{"dm6", "Army go Underground"},
+	{"start",      "Parking Level"},
+	{"dm1",        "Hot Dump"},              // 1
+	{"dm2",        "The Pits"},
+	{"dm3",        "Dimber Died"},
+	{"dm4",        "Fire in the Hole"},
+	{"dm5",        "Clubhouses"},
+	{"dm6",        "Army go Underground"},
 };
 
-static episode_t battlemechepisodes[] =
+static episode_t   battlemechepisodes[] =
 {
 	{"Time for Battle", 0, 7},
 };
 
-static level_t openquartzlevels[] =
+static level_t     openquartzlevels[] =
 {
-	{"start", "Welcome to Openquartz"},
+	{"start",      "Welcome to Openquartz"},
 
-	{"void1", "The center of nowhere"},                        // 1
-	{"void2", "The place with no name"},
-	{"void3", "The lost supply base"},
-	{"void4", "Past the outer limits"},
-	{"void5", "Into the nonexistance"},
-	{"void6", "Void walk"},
+	{"void1",      "The center of nowhere"}, // 1
+	{"void2",      "The place with no name"},
+	{"void3",      "The lost supply base"},
+	{"void4",      "Past the outer limits"},
+	{"void5",      "Into the nonexistance"},
+	{"void6",      "Void walk"},
 
-	{"vtest", "Warp Central"},
-	{"box", "The deathmatch box"},
-	{"bunkers", "Void command"},
-	{"house", "House of chaos"},
-	{"office", "Overnight office kill"},
-	{"am1", "The nameless chambers"},
+	{"vtest",      "Warp Central"},
+	{"box",        "The deathmatch box"},
+	{"bunkers",    "Void command"},
+	{"house",      "House of chaos"},
+	{"office",     "Overnight office kill"},
+	{"am1",        "The nameless chambers"},
 };
 
-static episode_t openquartzepisodes[] =
+static episode_t   openquartzepisodes[] =
 {
 	{"Single Player", 0, 1},
 	{"Void Deathmatch", 1, 6},
@@ -3886,9 +3886,9 @@ static episode_t openquartzepisodes[] =
 
 static level_t defeatindetail2levels[] =
 {
-	{"atac3",	"River Crossing"},
-	{"atac4",	"Canyon Chaos"},
-	{"atac7",	"Desert Stormer"},
+	{"atac3",      "River Crossing"},
+	{"atac4",      "Canyon Chaos"},
+	{"atac7",      "Desert Stormer"},
 };
 
 static episode_t defeatindetail2episodes[] =
@@ -3898,9 +3898,9 @@ static episode_t defeatindetail2episodes[] =
 
 static level_t prydonlevels[] =
 {
-	{"curig2", "Capel Curig"},	// 0
+	{"curig2",     "Capel Curig"},	// 0
 
-	{"tdastart", "Gateway"},				// 1
+	{"tdastart",   "Gateway"},	// 1
 };
 
 static episode_t prydonepisodes[] =
@@ -3946,8 +3946,8 @@ static gameinfo_t gamelist[] =
 
 static gamelevels_t *gameoptions_levels  = NULL;
 
-static int	startepisode;
-static int	startlevel;
+static int startepisode;
+static int startlevel;
 static int maxplayers;
 static qbool m_serverInfoMessage = false;
 static double m_serverInfoMessageTime;
@@ -3971,13 +3971,13 @@ void M_Menu_GameOptions_f(cmd_state_t *cmd)
 
 
 static int gameoptions_cursor_table[] = {40, 56, 64, 72, 80, 88, 96, 104, 112, 140, 160, 168};
-#define	NUM_GAMEOPTIONS	12
-static int		gameoptions_cursor;
+#define NUM_GAMEOPTIONS	12
+static int gameoptions_cursor;
 
 void M_GameOptions_Draw (void)
 {
-	cachepic_t	*p;
-	int		x;
+	cachepic_t *p;
+	int x;
 	char vabuf[1024];
 
 	M_Background(320, 200);
@@ -4501,13 +4501,13 @@ static void M_ServerList_Key(cmd_state_t *cmd, int k, int ascii)
 /* MODLIST MENU */
 // same limit of mod dirs as in fs.c
 #define MODLIST_MAXDIRS 16
-static int modlist_enabled [MODLIST_MAXDIRS];	//array of indexs to modlist
-static int modlist_numenabled;			//number of enabled (or in process to be..) mods
+static int modlist_enabled [MODLIST_MAXDIRS]; //array of indexs to modlist
+static int modlist_numenabled; //number of enabled (or in process to be..) mods
 
 typedef struct modlist_entry_s
 {
-	qbool loaded;	// used to determine whether this entry is loaded and running
-	int enabled;		// index to array of modlist_enabled
+	qbool loaded; // used to determine whether this entry is loaded and running
+	int enabled;  // index to array of modlist_enabled
 
 	// name of the modification, this is (will...be) displayed on the menu entry
 	char name[128];
@@ -4868,7 +4868,7 @@ void M_Draw (void)
 
 	if (gamemode == GAME_TRANSFUSION && !m_missingdata) {
 		if (m_state != m_credits) {
-			cachepic_t	*p, *drop1, *drop2, *drop3;
+			cachepic_t *p, *drop1, *drop2, *drop3;
 			int g, scale_x, scale_y, scale_y_repeat, top_offset;
 			float scale_y_rate;
 			scale_y_repeat = vid_conheight.integer * 2;

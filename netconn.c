@@ -194,7 +194,7 @@ void NetConn_UpdateFavorites_c(cvar_t *var)
 /// spare entries will be removed
 static void _ServerList_ViewList_Helper_InsertBefore( int index, serverlist_entry_t *entry )
 {
-    int i;
+	int i;
 	if( serverlist_viewcount < SERVERLIST_VIEWLISTSIZE ) {
 		i = serverlist_viewcount++;
 	} else {
@@ -3835,7 +3835,7 @@ void Net_Slist_f(cmd_state_t *cmd)
 	ServerList_ResetMasks();
 	serverlist_sortbyfield = SLIF_PING;
 	serverlist_sortflags = 0;
-    if (m_state != m_slist) {
+	if (m_state != m_slist) {
 		Con_Print("Sending requests to master servers\n");
 		ServerList_QueryList(true, true, false, true);
 		Con_Print("Listening for replies...\n");
@@ -3848,7 +3848,7 @@ void Net_SlistQW_f(cmd_state_t *cmd)
 	ServerList_ResetMasks();
 	serverlist_sortbyfield = SLIF_PING;
 	serverlist_sortflags = 0;
-    if (m_state != m_slist) {
+	if (m_state != m_slist) {
 		Con_Print("Sending requests to master servers\n");
 		ServerList_QueryList(true, false, true, true);
 		serverlist_consoleoutput = true;

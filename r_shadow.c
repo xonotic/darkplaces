@@ -4051,7 +4051,7 @@ void R_Shadow_PrepareLights(void)
 
 	if (r_shadow_shadowmode_shadowmapping != r_shadow_shadowmapping.integer ||
 		r_shadow_shadowmode_deferred != r_shadow_deferred.integer ||
-	    r_shadow_shadowmaptexturesize != shadowmaptexturesize ||
+		r_shadow_shadowmaptexturesize != shadowmaptexturesize ||
 		r_shadow_shadowmapvsdct != (r_shadow_shadowmapping_vsdct.integer != 0 && vid.renderpath == RENDERPATH_GL32) ||
 		r_shadow_shadowmapfilterquality != r_shadow_shadowmapping_filterquality.integer ||
 		r_shadow_shadowmapshadowsampler != r_shadow_shadowmapping_useshadowsampler.integer ||

@@ -958,7 +958,7 @@ void VM_cin_open(prvm_prog_t *prog)
 	name = PRVM_G_STRING( OFS_PARM1 );
 
 	VM_CheckEmptyString(prog,  file );
-    VM_CheckEmptyString(prog,  name );
+	VM_CheckEmptyString(prog,  name );
 
 	if( CL_OpenVideo( file, name, MENUOWNER, "" ) )
 		PRVM_G_FLOAT( OFS_RETURN ) = 1;

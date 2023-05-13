@@ -200,7 +200,7 @@ void USAGE(const char *me)
 			"%s -p public.d0pk -I idkey.d0si -d file-to-sign.dat -O signature.dat\n"
 			"%s -p public.d0pk -d file-to-sign.dat -s signature.dat [-O id.d0pi]\n",
 			me, me, me, me, me, me, me, me, me, me, me, me, me, me, me, me, me, me
-		   );
+			);
 }
 
 unsigned int seconds;

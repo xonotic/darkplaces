@@ -1820,7 +1820,7 @@ static void Mod_Q1BSP_LoadTextures(sizebuf_t *sb)
 		// try to load shader or external textures, but first we have to backup the texture_t because shader loading overwrites it even if it fails
 		backuptex = loadmodel->data_textures[i];
 		if (name[0] && /* HACK */ strncmp(name, "sky", 3) /* END HACK */ && (Mod_LoadTextureFromQ3Shader(loadmodel->mempool, loadmodel->name, loadmodel->data_textures + i, va(vabuf, sizeof(vabuf), "%s/%s", mapname, name), false, false, TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS, MATERIALFLAG_WALL) ||
-		                Mod_LoadTextureFromQ3Shader(loadmodel->mempool, loadmodel->name, loadmodel->data_textures + i, va(vabuf, sizeof(vabuf), "%s"   , name), false, false, TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS, MATERIALFLAG_WALL)))
+				Mod_LoadTextureFromQ3Shader(loadmodel->mempool, loadmodel->name, loadmodel->data_textures + i, va(vabuf, sizeof(vabuf), "%s"   , name), false, false, TEXF_ALPHA | TEXF_MIPMAP | TEXF_ISWORLD | TEXF_PICMIP | TEXF_COMPRESS, MATERIALFLAG_WALL)))
 		{
 			// set the width/height fields which are used for parsing texcoords in this bsp format
 			tx->width = mtwidth;

@@ -1811,7 +1811,7 @@ static void SV_PushMove (prvm_edict_t *pusher, float movetime)
 	if (PRVM_serveredictfloat(pusher, movetype) == MOVETYPE_FAKEPUSH) // Tenebrae's MOVETYPE_PUSH variant that doesn't push...
 		numcheckentities = 0;
 	else // MOVETYPE_PUSH
-	        numcheckentities = SV_EntitiesInBox(mins, maxs, MAX_EDICTS, checkentities);
+		numcheckentities = SV_EntitiesInBox(mins, maxs, MAX_EDICTS, checkentities);
 	for (e = 0;e < numcheckentities;e++)
 	{
 		prvm_edict_t *check = checkentities[e];

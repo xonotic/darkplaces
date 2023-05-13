@@ -337,7 +337,7 @@ typedef struct texture_s
 	int mesh_defaulttexflags;
 	int mesh_defaultmaterialflags;
 }
- texture_t;
+texture_t;
 
 typedef struct mtexinfo_s
 {
@@ -517,7 +517,7 @@ typedef struct model_s
 	void(*DrawDebug)(struct entity_render_s *ent);
 	// draw geometry textures for deferred rendering
 	void(*DrawPrepass)(struct entity_render_s *ent);
-    // compile an optimized shadowmap mesh for the model based on light source
+	// compile an optimized shadowmap mesh for the model based on light source
 	void(*CompileShadowMap)(struct entity_render_s *ent, vec3_t relativelightorigin, vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist);
 	// draw depth into a shadowmap
 	void(*DrawShadowMap)(int side, struct entity_render_s *ent, const vec3_t relativelightorigin, const vec3_t relativelightdirection, float lightradius, int numsurfaces, const int *surfacelist, const unsigned char *surfacesides, const vec3_t lightmins, const vec3_t lightmaxs);
@@ -564,7 +564,8 @@ typedef struct modloader_s
 	const char *header;
 	size_t headersize; // The header might not be NULL terminated
 	void (*Load)(model_t *, void *, void *);
-} modloader_t;
+}
+modloader_t;
 
 // sky/water subdivision
 //extern struct cvar_s gl_subdivide_size;
