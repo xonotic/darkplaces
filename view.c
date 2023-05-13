@@ -1160,10 +1160,10 @@ void V_CalcViewBlend(void)
 			r_refdef.viewblend[1] *= (1.0f/256.0f);
 			r_refdef.viewblend[2] *= (1.0f/256.0f);
 		}
-		
+
 		// Samual: Ugly hack, I know. But it's the best we can do since
 		// there is no way to detect client states from the engine.
-		if (cl.stats[STAT_HEALTH] <= 0 && cl.stats[STAT_HEALTH] != -666 && 
+		if (cl.stats[STAT_HEALTH] <= 0 && cl.stats[STAT_HEALTH] != -666 &&
 			cl.stats[STAT_HEALTH] != -2342 && cl_deathfade.value > 0)
 		{
 			cl.deathfade += cl_deathfade.value * max(0.00001, cl.time - cl.oldtime);
@@ -1287,7 +1287,7 @@ void V_Init (void)
 	Cvar_RegisterVariable (&v_kickpitch);
 
 	Cvar_RegisterVariable (&cl_stairsmoothspeed);
-	
+
 	Cvar_RegisterVariable (&cl_smoothviewheight);
 
 	Cvar_RegisterVariable (&chase_back);

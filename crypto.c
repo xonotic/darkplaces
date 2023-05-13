@@ -527,7 +527,7 @@ crypto_data_t;
 
 static crypto_t *Crypto_ServerFindInstance(lhnetaddress_t *peeraddress, qbool allow_create)
 {
-	crypto_t *crypto; 
+	crypto_t *crypto;
 	int i, best;
 
 	if(!d0_blind_id_dll)
@@ -644,7 +644,7 @@ static void Crypto_StoreHostKey(lhnetaddress_t *peeraddress, const char *keystri
 
 	if(!d0_blind_id_dll)
 		return;
-	
+
 	// syntax of keystring:
 	// aeslevel id@key id@key ...
 

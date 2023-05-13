@@ -67,7 +67,7 @@ void Q3PatchTesselateFloat(int numcomponents, int outputstride, float *outputver
 	float px, py, *v, a, b, c, *cp[3][3], temp[3][64];
 	int xmax = max(1, 2*tesselationwidth);
 	int ymax = max(1, 2*tesselationheight);
-	
+
 	// iterate over the individual 3x3 quadratic spline surfaces one at a time
 	// expanding them to fill the output array (with some overlap to ensure
 	// the edges are filled)
@@ -209,7 +209,7 @@ static float Squared3xCurveArea(const float *a, const float *control, const floa
 	// a.b / (|a| |b|)
 	//
 	// so the area is
-	// 
+	//
 	// 0.5 * sqrt(|a|^2 |b|^2 - (a.b)^2)
 	int c;
 	float aa = 0, bb = 0, ab = 0;
@@ -388,7 +388,7 @@ int Q3PatchAdjustTesselation(int numcomponents, patchinfo_t *patch1, float *patc
 	return modified;
 }
 
-#undef SIDE_INVALID 
+#undef SIDE_INVALID
 #undef SIDE_X
 #undef SIDE_Y
 

@@ -157,7 +157,7 @@ void	cin_restart(string name)
 float[bool] gecko_create( string name )
 void gecko_destroy( string name )
 void gecko_navigate( string name, string URI )
-float[bool] gecko_keyevent( string name, float key, float eventtype ) 
+float[bool] gecko_keyevent( string name, float key, float eventtype )
 void gecko_mousemove( string name, float x, float y )
 
 ==============================================================================

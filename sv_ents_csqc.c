@@ -44,7 +44,7 @@ void EntityFrameCSQC_LostFrame(client_t *client, int framenum)
 	ringlast = (ringfirst + NUM_CSQCENTITYDB_FRAMES - 1) % NUM_CSQCENTITYDB_FRAMES; // most recently added entry
 
 	valid = false;
-	
+
 	for(j = 0; j < NUM_CSQCENTITYDB_FRAMES; ++j)
 	{
 		d = &client->csqcentityframehistory[(ringfirst + j) % NUM_CSQCENTITYDB_FRAMES];
@@ -79,7 +79,7 @@ void EntityFrameCSQC_LostFrame(client_t *client, int framenum)
 	ringfirst = (ringfirst + j) % NUM_CSQCENTITYDB_FRAMES;
 	if(ringlast < ringfirst)
 		ringlast += NUM_CSQCENTITYDB_FRAMES;
-	
+
 	memset(recoversendflags, 0, sizeof(recoversendflags));
 
 	for(j = ringfirst; j <= ringlast; ++j)
@@ -345,6 +345,6 @@ qbool EntityFrameCSQC_WriteFrame (sizebuf_t *msg, int maxsize, int numnumbers, c
 		// if no single ent got added, remove the frame from the DB again, to allow
 		// for a larger history
 		EntityFrameCSQC_DeallocFrame(client, framenum);
-	
+
 	return sectionstarted;
 }

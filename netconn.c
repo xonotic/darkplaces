@@ -182,7 +182,7 @@ void NetConn_UpdateFavorites_c(cvar_t *var)
 			strlcpy(favorites_idfp[nFavorites_idfp], com_token, sizeof(favorites_idfp[nFavorites_idfp]));
 			++nFavorites_idfp;
 		}
-		else 
+		else
 		{
 			if(LHNETADDRESS_FromString(&favorites[nFavorites], com_token, 26000))
 				++nFavorites;
@@ -232,7 +232,7 @@ static qbool _ServerList_Entry_Compare( serverlist_entry_t *A, serverlist_entry_
 		if(A->info.isfavorite != B->info.isfavorite)
 			return A->info.isfavorite;
 	}
-	
+
 	switch( serverlist_sortbyfield ) {
 		case SLIF_PING:
 			result = A->info.ping - B->info.ping;
@@ -1630,7 +1630,7 @@ static int NetConn_ClientParsePacket_ServerList_ProcessReply(const char *address
 		entry->info.ping = min((unsigned) entry->info.ping, (unsigned) pingtime);
 		serverreplycount++;
 	}
-	
+
 	// other server info is updated by the caller
 	return n;
 }
@@ -1682,7 +1682,7 @@ static qbool NetConn_ClientParsePacket_ServerList_PrepareQuery( int protocol, co
 			break;
 
 	if( n < serverlist_cachecount ) {
-		// the entry has already been queried once or 
+		// the entry has already been queried once or
 		return true;
 	}
 
@@ -1700,7 +1700,7 @@ static qbool NetConn_ClientParsePacket_ServerList_PrepareQuery( int protocol, co
 	strlcpy (entry->info.cname, ipstring, sizeof(entry->info.cname));
 
 	entry->info.isfavorite = isfavorite;
-	
+
 	// no, then reset the ping right away
 	entry->info.ping = -1;
 	// we also want to increase the serverlist_cachecount then
@@ -1776,7 +1776,7 @@ static void NetConn_ClientParsePacket_ServerList_ParseDPList(lhnetaddress_t *sen
 
 		if (serverlist_consoleoutput && developer_networking.integer)
 			Con_Printf("Requesting info from DarkPlaces server %s\n", ipstring);
-		
+
 		if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_DARKPLACES7, ipstring, false ) ) {
 			break;
 		}
@@ -2080,7 +2080,7 @@ static int NetConn_ClientParsePacket(lhnetsocket_t *mysocket, unsigned char *dat
 					dpsnprintf (ipstring, sizeof (ipstring), "%u.%u.%u.%u:%u", data[0], data[1], data[2], data[3], data[4] * 256 + data[5]);
 					if (serverlist_consoleoutput && developer_networking.integer)
 						Con_Printf("Requesting info from QuakeWorld server %s\n", ipstring);
-					
+
 					if( !NetConn_ClientParsePacket_ServerList_PrepareQuery( PROTOCOL_QUAKEWORLD, ipstring, false ) ) {
 						break;
 					}
@@ -2845,7 +2845,7 @@ static const char *RCon_Authenticate(lhnetaddress_t *peeraddress, const char *pa
 		if(comparator(peeraddress, userpass_start, password, cs, cslen))
 			goto check;
 	}
-	
+
 	return NULL; // DENIED
 
 check:

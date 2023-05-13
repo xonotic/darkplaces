@@ -1925,7 +1925,7 @@ void R_SetupShader_Surface(const float rtlightambient[3], const float rtlightdif
 			if (r_glsl_permutation->loc_Color_Ambient >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Ambient, rtlightambient[0], rtlightambient[1], rtlightambient[2]);
 			if (r_glsl_permutation->loc_Color_Diffuse >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Diffuse, rtlightdiffuse[0], rtlightdiffuse[1], rtlightdiffuse[2]);
 			if (r_glsl_permutation->loc_Color_Specular >= 0) qglUniform3f(r_glsl_permutation->loc_Color_Specular, rtlightspecular[0], rtlightspecular[1], rtlightspecular[2]);
-	
+
 			// additive passes are only darkened by fog, not tinted
 			if (r_glsl_permutation->loc_FogColor >= 0)
 				qglUniform3f(r_glsl_permutation->loc_FogColor, 0, 0, 0);
@@ -3836,7 +3836,7 @@ qbool R_AnimCache_GetEntity(entity_render_t *ent, qbool wantnormals, qbool wantt
 		r_refdef.stats[r_stat_animcache_skeletal_bones] += model->num_bones;
 		r_refdef.stats[r_stat_animcache_skeletal_maxbones] = max(r_refdef.stats[r_stat_animcache_skeletal_maxbones], model->num_bones);
 		ent->animcache_skeletaltransform3x4 = (float *)R_FrameData_Alloc(sizeof(float[3][4]) * model->num_bones);
-		Mod_Skeletal_BuildTransforms(model, ent->frameblend, ent->skeleton, NULL, ent->animcache_skeletaltransform3x4); 
+		Mod_Skeletal_BuildTransforms(model, ent->frameblend, ent->skeleton, NULL, ent->animcache_skeletaltransform3x4);
 		// note: this can fail if the buffer is at the grow limit
 		ent->animcache_skeletaltransform3x4size = sizeof(float[3][4]) * model->num_bones;
 		ent->animcache_skeletaltransform3x4buffer = R_BufferData_Store(ent->animcache_skeletaltransform3x4size, ent->animcache_skeletaltransform3x4, R_BUFFERDATA_UNIFORM, &ent->animcache_skeletaltransform3x4offset);
@@ -4988,7 +4988,7 @@ static void R_Water_ProcessPlanes(int fbo, rtexture_t *depthtexture, rtexture_t 
 				r_refdef.view.usecustompvs = true;
 				r_refdef.scene.worldmodel->brush.FatPVS(r_refdef.scene.worldmodel, visorigin, 2, r_refdef.viewcache.world_pvsbits, (r_refdef.viewcache.world_numclusters+7)>>3, false);
 			}
-			
+
 			// camera needs no clipplane
 			r_refdef.view.useclipplane = false;
 			// TODO: is the camera origin always valid?  if so we don't need to clear this
@@ -5259,22 +5259,22 @@ static void R_BlendView(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *v
 	{
 		// declare variables
 		float blur_factor, blur_mouseaccel, blur_velocity;
-		static float blur_average; 
+		static float blur_average;
 		static vec3_t blur_oldangles; // used to see how quickly the mouse is moving
 
 		// set a goal for the factoring
-		blur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value) 
+		blur_velocity = bound(0, (VectorLength(cl.movement_velocity) - r_motionblur_velocityfactor_minspeed.value)
 			/ max(1, r_motionblur_velocityfactor_maxspeed.value - r_motionblur_velocityfactor_minspeed.value), 1);
-		blur_mouseaccel = bound(0, ((fabs(VectorLength(cl.viewangles) - VectorLength(blur_oldangles)) * 10) - r_motionblur_mousefactor_minspeed.value) 
+		blur_mouseaccel = bound(0, ((fabs(VectorLength(cl.viewangles) - VectorLength(blur_oldangles)) * 10) - r_motionblur_mousefactor_minspeed.value)
 			/ max(1, r_motionblur_mousefactor_maxspeed.value - r_motionblur_mousefactor_minspeed.value), 1);
-		blur_factor = ((blur_velocity * r_motionblur_velocityfactor.value) 
+		blur_factor = ((blur_velocity * r_motionblur_velocityfactor.value)
 			+ (blur_mouseaccel * r_motionblur_mousefactor.value));
 
 		// from the goal, pick an averaged value between goal and last value
 		cl.motionbluralpha = bound(0, (cl.time - cl.oldtime) / max(0.001, r_motionblur_averaging.value), 1);
 		blur_average = blur_average * (1 - cl.motionbluralpha) + blur_factor * cl.motionbluralpha;
 
-		// enforce minimum amount of blur 
+		// enforce minimum amount of blur
 		blur_factor = blur_average * (1 - r_motionblur_minblur.value) + r_motionblur_minblur.value;
 
 		//Con_Printf("motionblur: direct factor: %f, averaged factor: %f, velocity: %f, mouse accel: %f \n", blur_factor, blur_average, blur_velocity, blur_mouseaccel);
@@ -5283,7 +5283,7 @@ static void R_BlendView(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *v
 		cl.motionbluralpha = 1 - exp(-
 				(
 					(r_motionblur.value * blur_factor / 80)
-					+
+
 					(r_damageblur.value * (cl.cshifts[CSHIFT_DAMAGE].percent / 1600))
 				)
 				/
@@ -6011,7 +6011,7 @@ static const unsigned short bboxelements[36] =
 };
 
 #define BBOXEDGES 13
-static const float bboxedges[BBOXEDGES][6] = 
+static const float bboxedges[BBOXEDGES][6] =
 {
 	// whole box
 	{ 0, 0, 0, 1, 1, 1 },
@@ -10048,7 +10048,7 @@ void R_DrawModelSurfaces(entity_render_t *ent, qbool skysurfaces, qbool writedep
 		// Now check if update flags are set on any surfaces that are visible
 		if (r_q1bsp_lightmap_updates_hidden_surfaces.integer)
 		{
-			/* 
+			/*
 			 * We can do less frequent texture uploads (approximately 10hz for animated
 			 * lightstyles) by rebuilding lightmaps on surfaces that are not currently visible.
 			 * For optimal efficiency, this includes the submodels of the worldmodel, so we

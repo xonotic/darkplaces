@@ -555,7 +555,7 @@ static void OGG_DecodeTags(vorbis_comment *vc, unsigned int *start, unsigned int
 	thiscomment = qvorbis_comment_query(vc, "REPLAYGAIN_TRACK_GAIN", 0);
 	if(thiscomment)
 		*gaindb = atof(thiscomment);
-	
+
 	startcomment = qvorbis_comment_query(vc, "LOOP_START", 0); // DarkPlaces, and some Japanese app
 	if(startcomment)
 	{

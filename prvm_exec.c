@@ -852,7 +852,7 @@ static int PRVM_LeaveFunction (prvm_prog_t *prog)
 		f->tprofile_total += prog->stack[prog->depth].tprofile_acc;
 		f->builtinsprofile_total += prog->stack[prog->depth].builtinsprofile_acc;
 	}
-	
+
 	return prog->stack[prog->depth].s;
 }
 

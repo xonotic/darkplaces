@@ -732,7 +732,7 @@ void CL_InitCommands(void)
 	Cvar_RegisterVariable(&r_fixtrans_auto);
 	Cvar_RegisterVariable(&cl_team);
 	Cvar_RegisterVariable(&cl_skin);
-	Cvar_RegisterVariable(&cl_noaim);	
+	Cvar_RegisterVariable(&cl_noaim);
 
 	Cmd_AddCommand(CF_CLIENT | CF_CLIENT_FROM_SERVER, "cmd", CL_ForwardToServer_f, "send a console commandline to the server (used by some mods)");
 	Cmd_AddCommand(CF_CLIENT, "color", CL_Color_f, "change your player shirt and pants colors");

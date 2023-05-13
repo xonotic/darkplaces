@@ -77,7 +77,7 @@ findchar:
 		if (_len) *_len = 0;
 		return false;
 	}
-	
+
 	if (bits == 1) { // ascii
 		if (_start) *_start = i;
 		if (_len) *_len = 1;

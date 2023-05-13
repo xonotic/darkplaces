@@ -1278,7 +1278,7 @@ static int Mod_BSP_LightPoint_RecursiveBSPNode(model_t *model, vec3_t ambientcol
 						dsi = lmwidth-2;
 					if (dti > lmheight-2)
 						dti = lmheight-2;
-					
+
 					// calculate bilinear interpolation factors
 					// and also multiply by fixedpoint conversion factors to
 					// compensate for lightmaps being 0-255 (as 0-2), we use
@@ -1465,7 +1465,7 @@ static int Mod_Q1BSP_TraceLineAgainstSurfacesRecursiveBSPNode(RecursiveHullCheck
 			t1 = DotProduct (plane->normal, t->start) - plane->dist;
 			t2 = DotProduct (plane->normal, t->end) - plane->dist;
 		}
-	
+
 		midf = t1 / (t1 - t2);
 		VectorMA(t->start, midf, t->dist, mid);
 
@@ -2350,7 +2350,7 @@ static void Mod_Q1BSP_LoadEdges(sizebuf_t *sb)
 			Con_Printf("Mod_Q1BSP_LoadEdges: %s has invalid vertex indices in edge %i (vertices %i %i >= numvertices %i)\n", loadmodel->name, i, out->v[0], out->v[1], loadmodel->brushq1.numvertexes);
 			if(!loadmodel->brushq1.numvertexes)
 				Host_Error("Mod_Q1BSP_LoadEdges: %s has edges but no vertexes, cannot fix\n", loadmodel->name);
-				
+
 			out->v[0] = 0;
 			out->v[1] = 0;
 		}
@@ -3021,7 +3021,7 @@ static void Mod_Q1BSP_LoadLeafs(sizebuf_t *sb)
 			out->maxs[0] = MSG_ReadLittleShort(sb);
 			out->maxs[1] = MSG_ReadLittleShort(sb);
 			out->maxs[2] = MSG_ReadLittleShort(sb);
-	
+
 			firstmarksurface = MSG_ReadLittleLong(sb);
 			nummarksurfaces = MSG_ReadLittleLong(sb);
 		}
@@ -3033,7 +3033,7 @@ static void Mod_Q1BSP_LoadLeafs(sizebuf_t *sb)
 			out->maxs[0] = MSG_ReadLittleFloat(sb);
 			out->maxs[1] = MSG_ReadLittleFloat(sb);
 			out->maxs[2] = MSG_ReadLittleFloat(sb);
-	
+
 			firstmarksurface = MSG_ReadLittleLong(sb);
 			nummarksurfaces = MSG_ReadLittleLong(sb);
 		}
@@ -3045,7 +3045,7 @@ static void Mod_Q1BSP_LoadLeafs(sizebuf_t *sb)
 			out->maxs[0] = MSG_ReadLittleShort(sb);
 			out->maxs[1] = MSG_ReadLittleShort(sb);
 			out->maxs[2] = MSG_ReadLittleShort(sb);
-	
+
 			firstmarksurface = (unsigned short)MSG_ReadLittleShort(sb);
 			nummarksurfaces  = (unsigned short)MSG_ReadLittleShort(sb);
 		}
@@ -4503,7 +4503,7 @@ static void Mod_Q2BSP_LoadTexinfo(sizebuf_t *sb)
 	loadmodel->data_textures = (texture_t*)Mem_Realloc(loadmodel->mempool, loadmodel->data_textures, loadmodel->num_texturesperskin * sizeof(texture_t));
 
 	// now assemble the texture chains
-	// if we encounter the textures out of order, the later ones won't mark the earlier ones in a sequence, so the earlier 
+	// if we encounter the textures out of order, the later ones won't mark the earlier ones in a sequence, so the earlier
 	for (i = 0, out = loadmodel->brushq1.texinfo;i < count;i++, out++)
 	{
 		int j, k;
@@ -4581,7 +4581,7 @@ static void Mod_Q2BSP_LoadLeafs(sizebuf_t *sb)
 		out->maxs[0] = MSG_ReadLittleShort(sb);
 		out->maxs[1] = MSG_ReadLittleShort(sb);
 		out->maxs[2] = MSG_ReadLittleShort(sb);
-	
+
 		firstmarksurface = (unsigned short)MSG_ReadLittleShort(sb);
 		nummarksurfaces  = (unsigned short)MSG_ReadLittleShort(sb);
 		firstmarkbrush = (unsigned short)MSG_ReadLittleShort(sb);
@@ -5928,7 +5928,7 @@ static void Mod_Q3BSP_LoadFaces(lump_t *l)
 	 		patchtess[patchtesscount].info.lods[PATCH_LOD_VISUAL].ytess = ytess;
 	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].xtess = cxtess;
 	 		patchtess[patchtesscount].info.lods[PATCH_LOD_COLLISION].ytess = cytess;
-	
+
 			patchtess[patchtesscount].surface_id = i;
 			patchtess[patchtesscount].lodgroup[0] = LittleFloat(in->specific.patch.mins[0]);
 			patchtess[patchtesscount].lodgroup[1] = LittleFloat(in->specific.patch.mins[1]);
@@ -7710,13 +7710,13 @@ static void Mod_VBSP_LoadEdges(sizebuf_t *sb)
 	{
 		out->v[0] = (unsigned short)MSG_ReadLittleShort(sb);
 		out->v[1] = (unsigned short)MSG_ReadLittleShort(sb);
-		
+
 		if ((int)out->v[0] >= loadmodel->brushq1.numvertexes || (int)out->v[1] >= loadmodel->brushq1.numvertexes)
 		{
 			Con_Printf("Mod_VBSP_LoadEdges: %s has invalid vertex indices in edge %i (vertices %i %i >= numvertices %i)\n", loadmodel->name, i, out->v[0], out->v[1], loadmodel->brushq1.numvertexes);
 			if(!loadmodel->brushq1.numvertexes)
 				Host_Error("Mod_VBSP_LoadEdges: %s has edges but no vertexes, cannot fix\n", loadmodel->name);
-				
+
 			out->v[0] = 0;
 			out->v[1] = 0;
 		}

@@ -391,7 +391,7 @@ double Sys_DirtyTime(void)
 		if (QueryPerformanceFrequency (&PerformanceFreq))
 		{
 			QueryPerformanceCounter (&PerformanceCount);
-	
+
 			timescale = 1.0 / ((double) PerformanceFreq.LowPart + (double) PerformanceFreq.HighPart * 65536.0 * 65536.0);
 			return ((double) PerformanceCount.LowPart + (double) PerformanceCount.HighPart * 65536.0 * 65536.0) * timescale;
 		}

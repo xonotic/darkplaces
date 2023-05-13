@@ -207,7 +207,7 @@ static void SCR_CaptureVideo_RIFF_MakeIxChunk(const char *fcc, const char *dwChu
 	int i;
 	fs_offset_t ix = SCR_CaptureVideo_RIFF_GetPosition();
 	fs_offset_t pos, sz;
-	
+
 	if(!format->canseek)
 		Sys_Error("SCR_CaptureVideo_RIFF_MakeIxChunk called on non-seekable AVI");
 
@@ -313,7 +313,7 @@ static void SCR_CaptureVideo_RIFF_OverflowCheck(int framesize)
 	//fs_offset_t curfilesize;
 	if (format->riffstacklevel != 2)
 		Sys_Error("SCR_CaptureVideo_RIFF_OverflowCheck: chunk stack leakage!\n");
-	
+
 	if(!format->canseek)
 		return;
 

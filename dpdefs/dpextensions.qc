@@ -433,7 +433,7 @@ void(entity e, entity tagentity, string tagname) setattachment = #443; // attach
 //darkplaces implementation: Blub\0
 //cvar definitions:
 //   utf8_enable: enable utf8 encoding
-//description: utf8 characters are allowed inside cvars, protocol strings, files, progs strings, etc., 
+//description: utf8 characters are allowed inside cvars, protocol strings, files, progs strings, etc.,
 //and count as 1 char for string functions like strlen, substring, etc.
 // note: utf8_enable is run-time cvar, could be changed during execution
 // note: beware that str2chr() could return value bigger than 255 once utf8 is enabled
@@ -495,7 +495,7 @@ void(entity e, entity tagentity, string tagname) setattachment = #443; // attach
 // description: allows alternative 'static' lightstyle syntax : "=value"
 // examples: "=0.5", "=2.0", "=2.75"
 // could be used to control switchable lights or making styled lights with brightness > 2
-// Warning: this extension is experimental. It safely works in CSQC, but SVQC use is limited by the fact 
+// Warning: this extension is experimental. It safely works in CSQC, but SVQC use is limited by the fact
 // that other engines (which do not support this extension) could connect to a game and misunderstand this kind of lightstyle syntax
 
 //DP_LITSPRITES
@@ -1020,7 +1020,7 @@ string(string format, ...) sprintf = #627;
 //supported stuff:
 //  %
 //  optional: <argpos>$ for the argument to format (the arg counter then is not increased)
-//  flags: #0- +
+//  flags: #0-
 //  optional: <width>, *, or *<argpos>$ for the field width (width is read before value and precision)
 //  optional: .<precision>, .*, or .*<argpos>$ for the precision (precision is read before value)
 //  length modifiers: h for forcing a float, l for forcing an entity (by default, %d etc. cast a float to int), ll for forcing an int
@@ -1357,14 +1357,14 @@ float(string sample) soundlength = #534; // returns length of sound sample in se
 //syntax of .dpsubs files: each line in .dpsubs file defines 1 subtitle, there are three tokens:
 //   <start> <end> "string"
 //   start: subtitle start time in seconds
-//     end: subtitle time-to-show in seconds, if 0 - subtitle will be showed until next subtitle is started, 
+//     end: subtitle time-to-show in seconds, if 0 - subtitle will be showed until next subtitle is started,
 //          if below 0 - show until next subtitles minus this number of seconds
 //    text: subtitle text, color codes (Q3-style and ^xRGB) are allowed
 //example of subtitle file:
 //   3	0	"Vengeance! Vengeance for my eternity of suffering!"
 //   9	0	"Whelp! As if you knew what eternity was!"
 //   13	0	"Grovel before your true master."
-//   17	0	"Never!" 
+//   17	0	"Never!"
 //   18	7	"I'll hack you from crotch to gizzard and feed what's left of you to your brides..."
 
 //DP_SOLIDCORPSE
@@ -1762,11 +1762,11 @@ const float FORCETYPE_TORQUE = 3;
 .vector massofs;      // offsets a mass center out of object center, if not set a center of model bounds is used
 .float  friction;     // a friction of object, get multiplied by second objects's friction on contact
 .float  bouncefactor;
-.float  bouncestop; 
+.float  bouncestop;
 .float  jointtype;    // type of joint
 .float  forcetype;    // type of force
-.float  erp;          // error restitution parameter, makes ODE solver attempt to fix errors in contacts, 
-                      // bringing together 2 joints or fixing object being stuch in other object, 
+.float  erp;          // error restitution parameter, makes ODE solver attempt to fix errors in contacts,
+                      // bringing together 2 joints or fixing object being stuch in other object,
 			          // a value of 0.1 will fix slightly, a value of 1.0 attempts to fix whole error in one frame
 			          // use with care as high values makes system unstable and likely to explode
 //builtin definitions:

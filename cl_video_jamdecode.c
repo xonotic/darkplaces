@@ -352,7 +352,7 @@ readframe:
 		// scale
 		AvCodec_FillPicture((AVPicture *)s->frame_output, (uint8_t *)s->frame_output_buffer, PIX_FMT_BGRA, s->framewidth, s->frameheight);
 		AvCodec_FillPicture((AVPicture *)s->frame_output_scale, (uint8_t *)imagedata, PIX_FMT_BGRA, s->info_imagewidth, s->info_imageheight);
-		SwsContext *scale_context = SwScale_GetCachedContext(NULL, s->framewidth, s->frameheight, PIX_FMT_BGRA, s->info_imagewidth, s->info_imageheight, PIX_FMT_BGRA, libavcodec_scalers[max(0, min(LIBAVCODEC_SCALERS, cl_video_libavcodec_scaler.integer))], NULL, NULL, NULL); 
+		SwsContext *scale_context = SwScale_GetCachedContext(NULL, s->framewidth, s->frameheight, PIX_FMT_BGRA, s->info_imagewidth, s->info_imageheight, PIX_FMT_BGRA, libavcodec_scalers[max(0, min(LIBAVCODEC_SCALERS, cl_video_libavcodec_scaler.integer))], NULL, NULL, NULL);
 		if (!scale_context)
 		{
 			Con_Printf("JamDecoder: LibAvcodec: error creating scale context frame %i\n", s->framenum);
@@ -360,7 +360,7 @@ readframe:
 		}
 		if (!SwScale_Scale(scale_context, s->frame_output->data, s->frame_output->linesize, 0, s->frameheight, s->frame_output_scale->data, s->frame_output_scale->linesize))
 			Con_Printf("JamDecoder: LibAvcodec : error scaling frame\n", s->framenum);
-		SwScale_FreeContext(scale_context); 
+		SwScale_FreeContext(scale_context);
 #else
 		// make BGRA imagepixels from 8bit palettized frame
 		b = (unsigned char *)imagedata;

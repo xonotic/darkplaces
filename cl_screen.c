@@ -1762,7 +1762,7 @@ static void SCR_DrawScreen (void)
 
 	R_TimeReport_EndFrame();
 	R_TimeReport_BeginFrame();
-	
+
 	if(!scr_loading)
 		Sbar_ShowFPS();
 
@@ -1962,7 +1962,7 @@ static void SCR_DrawLoadingStack(void)
 		verts[1] = verts[4] = vid_conheight.integer - scr_loadingscreen_barheight.value;
 		verts[3] = verts[6] = vid_conwidth.integer * loadingscreenstack->absolute_loading_amount_min;
 		verts[7] = verts[10] = vid_conheight.integer;
-		
+
 #if _MSC_VER >= 1400
 #define sscanf sscanf_s
 #endif

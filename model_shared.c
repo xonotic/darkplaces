@@ -414,7 +414,7 @@ model_t *Mod_LoadModel(model_t *mod, qbool crash, qbool checkdisk)
 
 	if (mod->name[0] == '*') // submodel
 		return mod;
-	
+
 	if (!strcmp(mod->name, "null"))
 	{
 		if(mod->loaded)
@@ -479,7 +479,7 @@ model_t *Mod_LoadModel(model_t *mod, qbool crash, qbool checkdisk)
 
 	if (developer_loading.integer)
 		Con_Printf("loading model %s\n", mod->name);
-	
+
 	SCR_PushLoadingScreen(mod->name, 1);
 
 	// LadyHavoc: unload the existing model in this slot (if there is one)
@@ -513,7 +513,7 @@ model_t *Mod_LoadModel(model_t *mod, qbool crash, qbool checkdisk)
 	if (buf)
 	{
 		int i;
-		const char *ext = FS_FileExtension(mod->name);	
+		const char *ext = FS_FileExtension(mod->name);
 		char *bufend = (char *)buf + filesize;
 		// all models use memory, so allocate a memory pool
 		mod->mempool = Mem_AllocPool(mod->name, 0, NULL);
@@ -1368,7 +1368,7 @@ void Mod_Terrain_UpdateSurfacesForViewOrigin(model_t *model)
 {
 	for (y = 0;y < model->terrain.size[1];y += model->terrain.
 	Mod_Terrain_SurfaceRecurseChunk(model, model->terrain.maxstepsize, x, y);
-	Mod_Terrain_BuildChunk(model, 
+	Mod_Terrain_BuildChunk(model,
 }
 #endif
 
@@ -1469,7 +1469,7 @@ void Mod_LoadQ3Shaders(void)
 	int numparameters;
 	char parameter[TEXTURE_MAXFRAMES + 4][Q3PATHLENGTH];
 	char *custsurfaceparmnames[256]; // VorteX: q3map2 has 64 but well, someone will need more
-	unsigned long custsurfaceflags[256]; 
+	unsigned long custsurfaceflags[256];
 	int numcustsurfaceflags;
 	qbool dpshaderkill;
 
@@ -1502,7 +1502,7 @@ void Mod_LoadQ3Shaders(void)
 				while(COM_ParseToken_QuakeC(&text, false))
 				{
 					if (!strcasecmp(com_token, "}"))
-						break;	
+						break;
 					// register surfaceflag
 					if (numcustsurfaceflags >= 256)
 					{
@@ -1837,7 +1837,7 @@ void Mod_LoadQ3Shaders(void)
 						if(layer->blendfunc[0] == GL_ONE && layer->blendfunc[1] == GL_ONE)
 							layer->blendfunc[0] = GL_SRC_ALPHA;
 					}
-					
+
 					layer->dptexflags = 0;
 					if (layer->alphatest)
 						layer->dptexflags |= TEXF_ALPHA;
@@ -2288,7 +2288,7 @@ qbool Mod_LoadTextureFromQ3Shader(mempool_t *mempool, const char *modelname, tex
 	texture->offsetscale = 1;
 	texture->offsetbias = 0;
 	texture->specularscalemod = 1;
-	texture->specularpowermod = 1; 
+	texture->specularpowermod = 1;
 	texture->rtlightambient = 0;
 	texture->transparentsort = TRANSPARENTSORT_DISTANCE;
 	// WHEN ADDING DEFAULTS HERE, REMEMBER TO PUT DEFAULTS IN ALL LOADERS
@@ -3411,7 +3411,7 @@ static void Mod_Decompile_f(cmd_state_t *cmd)
 				// if it's only one frame, use the original frame name
 				if (j == i + 1)
 					strlcpy(animname, mod->animscenes[i].name, sizeof(animname));
-				
+
 			}
 			dpsnprintf(outname, sizeof(outname), "%s_decompiled/%s.smd", basename, animname);
 			Mod_Decompile_SMD(mod, outname, first, count, false);

@@ -489,7 +489,7 @@ qbool PNG_SaveImage_preflipped (const char *filename, int width, int height, qbo
 		return false;
 	}
 
-	png = (void *)qpng_create_write_struct( 
+	png = (void *)qpng_create_write_struct(
 		(qpng_access_version_number() / 100 == 102) ? PNG_LIBPNG_VER_STRING_12 :
 		(qpng_access_version_number() / 100 == 104) ? PNG_LIBPNG_VER_STRING_14 :
 		(qpng_access_version_number() / 100 == 105) ? PNG_LIBPNG_VER_STRING_15 :

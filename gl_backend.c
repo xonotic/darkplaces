@@ -2109,7 +2109,7 @@ void R_Mesh_ResetTextureState(void)
 {
 #if 0
 	unsigned int unitnum;
-	
+
 	BACKENDACTIVECHECK
 
 	for (unitnum = 0;unitnum < MAX_TEXTUREUNITS;unitnum++)

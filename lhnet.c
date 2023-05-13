@@ -193,7 +193,7 @@ static int LHNETADDRESS_Resolve(lhnetaddressnative_t *address, const char *name,
 		memcpy(&address->addr.in, addrinf->ai_addr, sizeof(address->addr.in));
 	}
 	address->port = port;
-	
+
 	freeaddrinfo (addrinf);
 	return 1;
 }
@@ -370,7 +370,7 @@ int LHNETADDRESS_FromString(lhnetaddress_t *vaddress, const char *string, int de
 #endif
 		namecache[namecacheposition].address.addresstype = LHNETADDRESSTYPE_NONE;
 	}
-	
+
 	namecacheposition = (namecacheposition + 1) % MAX_NAMECACHE;
 	return resolved;
 }

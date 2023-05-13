@@ -180,7 +180,7 @@ for(<../*.h>, <../*.c>)
 		}
 		elsif(/getglobal\w*\(\w+, "(\w+)"\)/)
 		{
-			# hack for weird DP source 
+			# hack for weird DP source
 			$vm{csprogs}{globals}{$1} = [0, "DP_CSQC_SPAWNPARTICLE"];
 		}
 	}

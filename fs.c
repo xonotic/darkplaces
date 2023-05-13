@@ -451,7 +451,7 @@ static const char* shfolderdllnames [] =
 };
 static dllhandle_t shfolder_dll = NULL;
 
-const GUID qFOLDERID_SavedGames = {0x4C5C32FF, 0xBB9D, 0x43b0, {0xB5, 0xB4, 0x2D, 0x72, 0xE5, 0x4E, 0xAA, 0xA4}}; 
+const GUID qFOLDERID_SavedGames = {0x4C5C32FF, 0xBB9D, 0x43b0, {0xB5, 0xB4, 0x2D, 0x72, 0xE5, 0x4E, 0xAA, 0xA4}};
 #define qREFKNOWNFOLDERID const GUID *
 #define qKF_FLAG_CREATE 0x8000
 #define qKF_FLAG_NO_ALIAS 0x1000
@@ -1519,7 +1519,7 @@ void FS_Rescan (void)
 		Cvar_SetQuick (&scr_screenshot_name, com_modname);
 	else
 		Cvar_SetQuick (&scr_screenshot_name, gamescreenshotname);
-	
+
 	if((i = Sys_CheckParm("-modname")) && i < sys.argc - 1)
 		strlcpy(com_modname, sys.argv[i+1], sizeof(com_modname));
 
@@ -1740,7 +1740,7 @@ const char *FS_CheckGameDir(const char *gamedir)
 	ret = FS_SysCheckGameDir(va(vabuf, sizeof(vabuf), "%s%s/", fs_basedir, gamedir), buf, sizeof(buf));
 	if(ret)
 		return ret;
-	
+
 	return fs_checkgamedir_missing;
 }
 
@@ -1773,7 +1773,7 @@ static void FS_ListGameDirs(void)
 			continue;
 		if(!*info)
 			continue;
-		stringlistappend(&list2, list.strings[i]); 
+		stringlistappend(&list2, list.strings[i]);
 	}
 	stringlistfreecontents(&list);
 
@@ -2557,7 +2557,7 @@ int FS_CheckNastyPath (const char *path, qbool isgamedir)
 ====================
 FS_SanitizePath
 
-Sanitize path (replace non-portable characters 
+Sanitize path (replace non-portable characters
 with portable ones in-place, etc)
 ====================
 */
@@ -2714,7 +2714,7 @@ static qfile_t *FS_OpenReadFile (const char *filename, qbool quiet, qbool nonblo
 			if(count < 0)
 				return NULL;
 			linkbuf[count] = 0;
-			
+
 			// Now combine the paths...
 			mergeslash = strrchr(filename, '/');
 			mergestart = linkbuf;
@@ -3946,7 +3946,7 @@ void FS_Which_f(cmd_state_t *cmd)
 	{
 		Con_Printf("usage:\n%s <file>\n", Cmd_Argv(cmd, 0));
 		return;
-	}  
+	}
 	filename = Cmd_Argv(cmd, 1);
 	sp = FS_FindFile(filename, &index, true);
 	if (!sp) {
@@ -4099,7 +4099,7 @@ unsigned char *FS_Deflate(const unsigned char *data, size_t size, size_t *deflat
 		Mem_Free(tmp);
 		return NULL;
 	}
-	
+
 	if(qz_deflateEnd(&strm) != Z_OK)
 	{
 		Con_Printf("FS_Deflate: deflateEnd failed\n");
@@ -4126,7 +4126,7 @@ unsigned char *FS_Deflate(const unsigned char *data, size_t size, size_t *deflat
 
 	memcpy(out, tmp, strm.total_out);
 	Mem_Free(tmp);
-	
+
 	return out;
 }
 
@@ -4193,7 +4193,7 @@ unsigned char *FS_Inflate(const unsigned char *data, size_t size, size_t *inflat
 			case Z_STREAM_END:
 			case Z_OK:
 				break;
-				
+
 			case Z_STREAM_ERROR:
 				Con_Print("FS_Inflate: stream error!\n");
 				break;
@@ -4209,7 +4209,7 @@ unsigned char *FS_Inflate(const unsigned char *data, size_t size, size_t *inflat
 			default:
 				Con_Print("FS_Inflate: unknown error!\n");
 				break;
-				
+
 		}
 		if(ret != Z_OK && ret != Z_STREAM_END)
 		{
@@ -4237,6 +4237,6 @@ unsigned char *FS_Inflate(const unsigned char *data, size_t size, size_t *inflat
 	Mem_Free(outbuf.data);
 
 	*inflated_size = (size_t)outbuf.cursize;
-	
+
 	return out;
 }

@@ -890,7 +890,7 @@ static void DrawQ_GetTextColor(float color[4], int colorindex, float r, float g,
 // returns 0 otherwise
 static int RGBstring_to_colorindex(const char *str)
 {
-	Uchar ch; 
+	Uchar ch;
 	int ind = 0x0001 << 4;
 	do {
 		if (*str <= '9' && *str >= '0')

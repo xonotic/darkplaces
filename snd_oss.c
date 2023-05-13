@@ -68,7 +68,7 @@ qbool SndSys_Init (const snd_format_t* requested, snd_format_t* suggested)
 			else
 				suggested->width = 2;
 		}
-		
+
 		return false;
     }
 
@@ -80,7 +80,7 @@ qbool SndSys_Init (const snd_format_t* requested, snd_format_t* suggested)
 		Con_Print("SndSys_Init: could not open /dev/dsp\n");
 		return false;
 	}
-	
+
 	// Use non-blocking IOs if possible
 	flags = fcntl(audio_fd, F_GETFL);
 	if (flags != -1)
@@ -90,7 +90,7 @@ qbool SndSys_Init (const snd_format_t* requested, snd_format_t* suggested)
 	}
 	else
 		Con_Print("SndSys_Init: fcntl(F_GETFL) failed!\n");
-	
+
 	// Set the fragment size (up to "NB_FRAGMENTS" fragments of "fragmentsize" bytes)
 	fragmentsize = requested->speed * requested->channels * requested->width / 10;
 	fragmentsize = (unsigned int)ceilf((float)fragmentsize / (float)NB_FRAGMENTS);
@@ -248,7 +248,7 @@ void SndSys_Submit (void)
 {
 	unsigned int startoffset, factor, limit, nbframes;
 	int written;
-	
+
 	if (audio_fd < 0 ||
 		snd_renderbuffer->startframe == snd_renderbuffer->endframe)
 		return;
@@ -262,7 +262,7 @@ void SndSys_Submit (void)
 		written = SndSys_Write (&snd_renderbuffer->ring[startoffset * factor], limit * factor);
 		if (written < 0 || (unsigned int)written < limit * factor)
 			return;
-		
+
 		nbframes -= limit;
 		startoffset = 0;
 	}

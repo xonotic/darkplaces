@@ -304,7 +304,7 @@ float	drawstring(vector position, string text, vector scale, vector rgb, float a
 float	drawcolorcodedstring(vector position, string text, vector scale, float alpha, float flag) = #467;
 
 vector	drawcolorcodedstring2(vector position, string text, vector scale, vector rgb, float alpha, float flag) = #467;
- 
+
 float	drawpic(vector position, string pic, vector size, vector rgb, float alpha, float flag) = #456;
 
 float	drawfill(vector position, vector size, vector rgb, float alpha, float flag) = #457;

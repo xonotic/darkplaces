@@ -328,7 +328,7 @@ void *LibAvW_OpenVideo(clvideo_t *video, char *filename, const char **errorstrin
 		s->info_imagewidth = max(s->info_imagewidth, (unsigned int)cl_video_libavw_minwidth.integer);
 	if (cl_video_libavw_minheight.integer > 0)
 		s->info_imageheight = max(s->info_imageheight, (unsigned int)cl_video_libavw_minheight.integer);
-	
+
 	// provide sound in separate .wav
 	len = strlen(filename) + 10;
 	wavename = (char *)Z_Malloc(len);

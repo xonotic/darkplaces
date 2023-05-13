@@ -121,7 +121,7 @@ typedef enum opcode_e
 	OP_BITOR,
 
 	// TODO: actually support Hexen 2?
-	
+
 	OP_MULSTORE_F,	//66 redundant, for h2 compat
 	OP_MULSTORE_VF,	//67 redundant, for h2 compat
 	OP_MULSTOREP_F,	//68
@@ -196,7 +196,7 @@ typedef enum opcode_e
 
 	OP_CONV_IF,
 	OP_CONV_FI,
-	
+
 	OP_LOADP_IF,
 	OP_LOADP_FI,
 
@@ -230,7 +230,7 @@ typedef enum opcode_e
 	OP_ADD_PIW,
 
 	OP_LOADA_F,
-	OP_LOADA_V,	
+	OP_LOADA_V,
 	OP_LOADA_S,
 	OP_LOADA_ENT,
 	OP_LOADA_FLD,
@@ -241,7 +241,7 @@ typedef enum opcode_e
 	OP_LOAD_P,
 
 	OP_LOADP_F,
-	OP_LOADP_V,	
+	OP_LOADP_V,
 	OP_LOADP_S,
 	OP_LOADP_ENT,
 	OP_LOADP_FLD,
@@ -252,7 +252,7 @@ typedef enum opcode_e
 	OP_GE_I,
 	OP_LT_I,
 	OP_GT_I,
-	
+
 	OP_LE_IF,
 	OP_GE_IF,
 	OP_LT_IF,
@@ -295,7 +295,7 @@ typedef enum opcode_e
 	OP_GSTOREP_ENT,
 	OP_GSTOREP_FLD,
 	OP_GSTOREP_S,
-	OP_GSTOREP_FNC,		
+	OP_GSTOREP_FNC,
 	OP_GSTOREP_V,
 	OP_GADDRESS,
 	OP_GLOAD_I,

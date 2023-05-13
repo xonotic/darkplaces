@@ -988,7 +988,7 @@ void IN_Move( void )
 			{
 				// have the mouse stuck in the middle, example use: prevent expose effect of beryl during the game when not using
 				// window grabbing. --blub
-	
+
 				// we need 2 frames to initialize the center position
 				if(!stuck)
 				{
@@ -1447,7 +1447,7 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 	workWidth = workArea.right - workArea.left;
 	workHeight = workArea.bottom - workArea.top;
 
-	// SDL forces the window height to be <= screen height - 27px (on Win8.1 - probably intended for the title bar) 
+	// SDL forces the window height to be <= screen height - 27px (on Win8.1 - probably intended for the title bar)
 	// If the task bar is docked to the the left screen border and we move the window to negative y,
 	// there would be some part of the regular desktop visible on the bottom of the screen.
 	screenHeight = GetSystemMetrics(SM_CYSCREEN);
@@ -1464,7 +1464,7 @@ static void AdjustWindowBounds(viddef_mode_t *mode, RECT *rect)
 		rect->top = workArea.top + titleBarPixels;
 		mode->height = workHeight - titleBarPixels;
 	}
-	else 
+	else
 	{
 		rect->left = workArea.left + max(0, (workWidth - width) / 2);
 		rect->top = workArea.top + max(0, (workHeight - height) / 2);
@@ -1635,7 +1635,7 @@ static qbool VID_InitModeGL(viddef_mode_t *mode)
 	vid_hasfocus = true;
 	vid_usingmouse = false;
 	vid_usinghidecursor = false;
-		
+
 	return true;
 }
 

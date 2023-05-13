@@ -139,7 +139,7 @@ void SV_Savegame_to(prvm_prog_t *prog, const char *name)
 				// (like newline, specifically) into escape codes
 				s = stringbuffer->strings[k];
 				for (l = 0;l < (int)sizeof(line) - 2 && *s;)
-				{	
+				{
 					if (*s == '\n')
 					{
 						line[l++] = '\\';
@@ -551,7 +551,7 @@ void SV_Loadgame_f(cmd_state_t *cmd)
 						else
 							Con_Printf(CON_ERROR "failed to create stringbuffer %i \"%s\"\n", i, com_token);
 					}
-				}	
+				}
 				// skip any trailing text or unrecognized commands
 				while (COM_ParseToken_Simple(&t, true, false, true) && strcmp(com_token, "\n"))
 					;

@@ -26,7 +26,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 /*
  * The Half-Life MDL format is Valve's format for models in GoldSrc engine.
- * 
+ *
  * These headers were added based on information found at
  * https://github.com/malortie/assimp/wiki/MDL:-Half-Life-1-file-format
  */
@@ -153,9 +153,9 @@ typedef struct dhlmdl_sequence_description_s
 	int32_t ofs_events;
 
 	int32_t num_frames;
-	
+
 	int64_t unused0;
-	
+
 	int32_t motiontype;
 	int32_t motionbone;
 	vec3_t linearmovement;
@@ -223,11 +223,11 @@ typedef struct dhlmdl_s
 	int32_t num_verts;
 	int32_t ofs_vertinfo;
 	int32_t ofs_verts;
-	
+
 	int32_t num_norms;
 	int32_t ofs_norminfo;
 	int32_t ofs_norms;
-	
+
 	int64_t unused1;
 } dhlmdl_t;
 

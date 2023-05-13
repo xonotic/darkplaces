@@ -492,7 +492,7 @@ prvm_prog_funcoffsets_t;
 // stringbuffer flags
 #define STRINGBUFFER_SAVED     1   // saved in savegames
 #define STRINGBUFFER_QCFLAGS   1   // allowed to be set by QC
-#define STRINGBUFFER_TEMP      128 // internal use ONLY 
+#define STRINGBUFFER_TEMP      128 // internal use ONLY
 typedef struct prvm_stringbuffer_s
 {
 	int max_strings;

@@ -1431,9 +1431,9 @@ qbool PRVM_ED_CallSpawnFunction(prvm_prog_t *prog, prvm_edict_t *ent, const char
 			}
 			else
 			{
-				
+
 				Con_DPrint("No spawn function for:\n");
-				if (developer.integer > 0) // don't confuse non-developers with errors	
+				if (developer.integer > 0) // don't confuse non-developers with errors
 					PRVM_ED_Print(prog, ent, NULL);
 
 				PRVM_ED_Free (prog, ent);
@@ -1540,7 +1540,7 @@ void PRVM_ED_LoadFromFile (prvm_prog_t *prog, const char *data)
 
 		if(!PRVM_ED_CallSpawnFunction(prog, ent, data, start))
 			continue;
-		
+
 		PRVM_ED_CallPostspawnFunction(prog, ent);
 
 		spawned++;

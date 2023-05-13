@@ -14,7 +14,7 @@ Sorted by alphanumeric order by last name, and pseudonym if not available. Activ
 **DarkPlaces Engine**
 -------------------------------------------------------------------------------
 
-* **Project Leader** 
+* **Project Leader**
 	* **Ashley Rose Hale (LadyHavoc)**
 
 * **Core Developers/Maintainers**

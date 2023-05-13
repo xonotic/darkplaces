@@ -1388,19 +1388,19 @@ VM_CL_gettagindex,				// #311 float(entity ent, string tagname) gettagindex (DP_
 VM_CL_gettaginfo,					// #312 vector(entity ent, float tagindex) gettaginfo (DP_QC_GETTAGINFO) (DP_QC_RENDER_SCENE)
 #else
 // CSQC range #300-#399
-NULL,		
-NULL,		
-NULL,		
-NULL,		
-NULL,		
-NULL,		
-NULL,		
-NULL,	
-NULL,	
 NULL,
-NULL,	
-NULL,	
-NULL,	
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
+NULL,
 #endif
 NULL,									// #313
 NULL,									// #314

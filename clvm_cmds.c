@@ -1478,7 +1478,7 @@ void VM_drawcolorcodedstring(prvm_prog_t *prog)
 		pos = PRVM_G_VECTOR(OFS_PARM0);
 		string = PRVM_G_STRING(OFS_PARM1);
 		scale = PRVM_G_VECTOR(OFS_PARM2);
-		VectorCopy(PRVM_G_VECTOR(OFS_PARM3), rgb); 
+		VectorCopy(PRVM_G_VECTOR(OFS_PARM3), rgb);
 		alpha = PRVM_G_FLOAT(OFS_PARM4);
 		flag = (int)PRVM_G_FLOAT(OFS_PARM5);
 	}

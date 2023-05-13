@@ -75,7 +75,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 # elif TARGET_OS_MAC
 #  define DP_OS_NAME "macOS"
 #  define DP_OS_STR "macos"
-# endif 
+# endif
 #elif defined(__MORPHOS__)
 # define DP_OS_NAME		"MorphOS"
 # define DP_OS_STR		"morphos"
@@ -175,7 +175,7 @@ dllfunction_t;
 
 qbool Sys_LoadSelf(dllhandle_t *handle);
 
-/*! Loads a dependency library. 
+/*! Loads a dependency library.
  * \param dllnames a NULL terminated array of possible names for the DLL you want to load.
  * \param handle
  * \param fcts

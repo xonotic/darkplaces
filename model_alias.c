@@ -69,7 +69,7 @@ void Mod_Skeletal_BuildTransforms(const model_t * RESTRICT model, const frameble
 
 	if (!bonepose)
 		bonepose = (float * RESTRICT) Mod_Skeletal_AnimateVertices_AllocBuffers(sizeof(float[12]) * model->num_bones);
-		
+
 	if (skeleton && !skeleton->relativetransforms)
 		skeleton = NULL;
 
@@ -247,15 +247,15 @@ static int Mod_Skeletal_CompressBlend(model_t *model, const int *newindex, const
 		newweights.index[i] = newindex[i];
 		newweights.influence[i] = (unsigned char)(newinfluence[i] * scale);
 		total += newweights.influence[i];
-	}	
+	}
 	while (total > 255)
 	{
 		for (i = 0;i < 4;i++)
 		{
-			if(newweights.influence[i] > 0 && total > 255) 
-			{ 
+			if(newweights.influence[i] > 0 && total > 255)
+			{
 				newweights.influence[i]--;
-				total--; 
+				total--;
 			}
 		}
 	}
@@ -263,10 +263,10 @@ static int Mod_Skeletal_CompressBlend(model_t *model, const int *newindex, const
 	{
 		for (i = 0; i < 4;i++)
 		{
-			if(newweights.influence[i] < 255 && total < 255) 
-			{ 
-				newweights.influence[i]++; 
-				total++; 
+			if(newweights.influence[i] < 255 && total < 255)
+			{
+				newweights.influence[i]++;
+				total++;
 			}
 		}
 	}
@@ -3076,7 +3076,7 @@ void Mod_PSKMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 		if (loadmodel->num_posescale == 0) // don't divide by zero
 			loadmodel->num_posescale = 1.0;
 		loadmodel->num_poseinvscale = 1.0f / loadmodel->num_posescale;
-	
+
 		// load the poses from the animkeys
 		for (index = 0;index < numanimkeys;index++)
 		{
@@ -3117,7 +3117,7 @@ void Mod_PSKMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 		if (loadmodel->num_posescale == 0) // don't divide by zero
 			loadmodel->num_posescale = 1.0;
 		loadmodel->num_poseinvscale = 1.0f / loadmodel->num_posescale;
-	
+
 		// load the basepose as a frame
 		for (index = 0;index < numbones;index++)
 		{
@@ -3301,7 +3301,7 @@ void Mod_INTERQUAKEMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 		va.offset = LittleLong(vas[i].offset);
 		vsize = header.num_vertexes*va.size;
 		switch (va.format)
-		{ 
+		{
 		case IQM_FLOAT: vsize *= sizeof(float); break;
 		case IQM_UBYTE: vsize *= sizeof(unsigned char); break;
 		default: continue;
@@ -3489,7 +3489,7 @@ void Mod_INTERQUAKEMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 				Matrix4x4_FromArray12FloatD3D(&pinvbase, loadmodel->data_baseboneposeinverse + 12*loadmodel->data_bones[i].parent);
 				Matrix4x4_Concat(&invbase, &relinvbase, &pinvbase);
 				Matrix4x4_ToArray12FloatD3D(&invbase, loadmodel->data_baseboneposeinverse + 12*i);
-			}	
+			}
 			else Matrix4x4_ToArray12FloatD3D(&relinvbase, loadmodel->data_baseboneposeinverse + 12*i);
 		}
 	}
@@ -3642,7 +3642,7 @@ void Mod_INTERQUAKEMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 	}
 	else
 	{
-		for (i = 0, k = 0;i < (int)header.num_frames;i++)	
+		for (i = 0, k = 0;i < (int)header.num_frames;i++)
 		{
 			for (j = 0;j < (int)header.num_poses;j++, k++)
 			{
@@ -3694,9 +3694,9 @@ void Mod_INTERQUAKEMODEL_Load(model_t *mod, void *buffer, void *bufferend)
 			bound.mins[0] = LittleFloat(bounds[i].mins[0]);
 			bound.mins[1] = LittleFloat(bounds[i].mins[1]);
 			bound.mins[2] = LittleFloat(bounds[i].mins[2]);
-			bound.maxs[0] = LittleFloat(bounds[i].maxs[0]);			
-			bound.maxs[1] = LittleFloat(bounds[i].maxs[1]);	
-			bound.maxs[2] = LittleFloat(bounds[i].maxs[2]);	
+			bound.maxs[0] = LittleFloat(bounds[i].maxs[0]);
+			bound.maxs[1] = LittleFloat(bounds[i].maxs[1]);
+			bound.maxs[2] = LittleFloat(bounds[i].maxs[2]);
 			bound.xyradius = LittleFloat(bounds[i].xyradius);
 			bound.radius = LittleFloat(bounds[i].radius);
 			if (!i)

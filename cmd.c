@@ -210,11 +210,11 @@ static size_t Cmd_ParseInput (cmd_input_t **output, char **input)
 	 * The Quake command-line is super basic. It can be entered in the console
 	 * or in config files. A semicolon is used to terminate a command and chain
 	 * them together. Otherwise, a newline delineates command input.
-	 * 
+	 *
 	 * In most engines, the Quake command-line is a simple linear text buffer that
 	 * is parsed when it executes. In Darkplaces, we use a linked list of command
 	 * input and parse the input on the spot.
-	 * 
+	 *
 	 * This was done because Darkplaces allows multiple command interpreters on the
 	 * same thread. Previously, each interpreter maintained its own buffer and this
 	 * caused problems related to execution order, and maintaining a single simple
@@ -233,7 +233,7 @@ static size_t Cmd_ParseInput (cmd_input_t **output, char **input)
 			command = false;
 			comment = false;
 			break;
-		default: 
+		default:
 			if(!comment) // Not a newline so far. Still not a valid command yet.
 			{
 				if(!quotes && (*input)[pos] == ';') // Ignore semicolons in quotes.
@@ -298,7 +298,7 @@ static size_t Cmd_ParseInput (cmd_input_t **output, char **input)
 		}
 
 		strlcpy(&(*output)->text[offset], &(*input)[start], cmdsize + 1);
-		
+
 		/*
 		 * If we were still looking ahead by the time we broke from the loop, the command input
 		 * hasn't terminated yet and we're still expecting more, so keep this node open for appending later.
@@ -455,10 +455,10 @@ void Cbuf_Execute (cmd_buf_t *cbuf)
 		 * can insert data at the beginning of the text buffer
 		 */
 		current = List_Entry(cbuf->start.next, cmd_input_t, list);
-		
+
 		// Recycle memory so using WASD doesn't cause a malloc and free
 		List_Move_Tail(&current->list, &cbuf->free);
-		
+
 		/*
 		 * Assume we're rolling with the current command-line and
 		 * always set this false because alias expansion or cbuf insertion
@@ -544,7 +544,7 @@ void Cbuf_Frame(cmd_buf_t *cbuf)
 Cmd_StuffCmds_f
 
 Adds command line parameters as script statements
-Commands lead with a +, and continue until a - or another +
+Commands lead with a +, and continue until a - or another
 quake +prog jctest.qp +cmd amlev1
 quake -nosound +cmd amlev1
 ===============
@@ -1468,7 +1468,7 @@ static qbool Cmd_PreprocessString(cmd_state_t *cmd, const char *intext, char *ou
 				}
 			}
 		}
-		else 
+		else
 			outtext[outlen++] = *in++;
 	}
 	outtext[outlen] = 0;
@@ -1629,7 +1629,7 @@ static void Cmd_Apropos_f(cmd_state_t *cmd)
 static cmd_state_t *Cmd_AddInterpreter(cmd_buf_t *cbuf, cvar_state_t *cvars, int cvars_flagsmask, int cmds_flagsmask, cmd_userdefined_t *userdefined)
 {
 	cmd_state_t *cmd = (cmd_state_t *)Mem_Alloc(tempmempool, sizeof(cmd_state_t));
-	
+
 	cmd->mempool = Mem_AllocPool("commands", 0, NULL);
 	// space for commands and script files
 	cmd->cbuf = cbuf;
@@ -2163,7 +2163,7 @@ void Cmd_ClearCSQCCommands (cmd_state_t *cmd)
 {
 	cmd_function_t *func;
 	cmd_function_t **next = &cmd->userdefined->qc_functions;
-	
+
 	while(*next)
 	{
 		func = *next;
@@ -2178,7 +2178,7 @@ extern cvar_t sv_cheats;
  * Cloudwalk FIXME: This idea sounded great in my head but...
  * How do we handle commands that can be received by the client,
  * but which the server can also execute locally?
- * 
+ *
  * If we create a callback where the engine will forward to server
  * but try to execute the command locally if it's dedicated,
  * we're back to intermixing client and server code which I'm

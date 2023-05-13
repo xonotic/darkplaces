@@ -907,7 +907,7 @@ static void R_Q1BSP_RecursiveGetLightInfo_BSP(r_q1bsp_getlightinfo_t *info, qboo
 					surfaceindex = leafsurfaceindices[leafsurfaceindex];
 					surface = surfaces + surfaceindex;
 					if(!surface->texture)
-						continue;	
+						continue;
 					if (CHECKPVSBIT(info->outsurfacepvs, surfaceindex))
 						continue;
 					SETPVSBIT(info->outsurfacepvs, surfaceindex);

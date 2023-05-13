@@ -1189,7 +1189,7 @@ static channel_t *SND_PickChannel(int entnum, int entchannel)
 
 	if (first_to_die == -1)
 		return NULL;
-	
+
 	S_StopChannel (first_to_die, true, false);
 
 emptychan_found:
@@ -1675,7 +1675,7 @@ void S_StopChannel (unsigned int channel_ind, qbool lockmutex, qbool freesfx)
 	// threaded sound backends
 	if (lockmutex && !simsound)
 		SndSys_LockRenderBuffer();
-	
+
 	ch = &channels[channel_ind];
 	sfx = ch->sfx;
 	if (sfx != NULL)

@@ -513,7 +513,7 @@ qbool CL_VM_UpdateView (double frametime)
 		/*
 		 * This should be fine for now but FTEQW uses flags for keydest
 		 * and checks that an array called "eyeoffset" is 0
-		 * 
+		 *
 		 * Just a note in case there's compatibility problems later
 		 */
 		PRVM_G_FLOAT(OFS_PARM2) = key_dest == key_game;

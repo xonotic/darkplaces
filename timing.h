@@ -36,7 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
     double currentTime = Sys_DirtyTime();				\
     Con_Printf ("%s: %.3g s\n", S, currentTime - _timing_start_);	\
   }
-  
+
 #define TIMING_TIMESTATEMENT(Stmt)	\
   {					\
     TIMING_BEGIN			\

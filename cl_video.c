@@ -179,7 +179,7 @@ static void LoadSubtitles( clvideo_t *video, const char *subtitlesfile )
 		if (video->subtitles == CLVIDEO_MAX_SUBTITLES)
 		{
 			Con_Printf(CON_WARN "WARNING: CLVIDEO_MAX_SUBTITLES = %i reached when reading subtitles from '%s'\n", CLVIDEO_MAX_SUBTITLES, subtitlesfile);
-			break;	
+			break;
 		}
 		// add a sub
 		video->subtitle_text[numsubs] = (char *) Mem_Alloc(cls.permanentmempool, strlen(com_token) + 1);
@@ -352,7 +352,7 @@ void CL_CloseVideo(clvideo_t * video)
 }
 
 // update all videos
-void CL_Video_Frame(void) 
+void CL_Video_Frame(void)
 {
 	clvideo_t *video;
 	int destframe;
@@ -386,7 +386,7 @@ void CL_Video_Frame(void)
 				do {
 					video->framenum++;
 					if (video->decodeframe(video->stream, video->imagedata, cl_videormask, cl_videogmask, cl_videobmask, cl_videobytesperpixel, cl_videobytesperpixel * video->width))
-					{ 
+					{
 						// finished?
 						CL_RestartVideo(video);
 						if (video->state == CLVIDEO_PLAY)
@@ -480,10 +480,10 @@ void CL_DrawVideo(void)
 	py = 0;
 	sx = vid_conwidth.integer;
 	sy = vid_conheight.integer;
-	st[0] = 0.0; st[1] = 0.0; 
-	st[2] = 1.0; st[3] = 0.0; 
-	st[4] = 0.0; st[5] = 1.0; 
-	st[6] = 1.0; st[7] = 1.0; 
+	st[0] = 0.0; st[1] = 0.0;
+	st[2] = 1.0; st[3] = 0.0;
+	st[4] = 0.0; st[5] = 1.0;
+	st[6] = 1.0; st[7] = 1.0;
 	if (cl_video_keepaspectratio.integer)
 	{
 		float a = video->getaspectratio(video->stream) / ((float)vid.width / (float)vid.height);
@@ -593,7 +593,7 @@ void CL_VideoStart(char *filename, const char *subtitlesfile)
 	CL_RestartVideo( cl_videos );
 }
 
-void CL_Video_KeyEvent( int key, int ascii, qbool down ) 
+void CL_Video_KeyEvent( int key, int ascii, qbool down )
 {
 	// only react to up events, to allow the user to delay the abortion point if it suddenly becomes interesting..
 	if( !down ) {

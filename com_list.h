@@ -224,7 +224,7 @@ static inline void List_Create(llist_t *list)
 
 /*
  * Insert a node between two known nodes.
- * 
+ *
  * Only use when prev and next are known.
  */
 static inline void __List_Add(llist_t *node, llist_t *prev, llist_t *next)

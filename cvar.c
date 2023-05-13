@@ -230,7 +230,7 @@ int Cvar_CompleteCountPossible(cvar_state_t *cvars, const char *partial, int nee
 			for (char **alias = cvar->aliases; alias && *alias; alias++)
 				if (!strncasecmp(partial, *alias, len) && (cvar->flags & neededflags))
 					h++;
-		
+
 	return h;
 }
 
@@ -261,7 +261,7 @@ const char **Cvar_CompleteBuildList(cvar_state_t *cvars, const char *partial, in
 			for (char **alias = cvar->aliases; alias && *alias; alias++)
 				if (!strncasecmp(partial, *alias, len) && (cvar->flags & neededflags))
 					buf[bpos++] = *alias;
-		
+
 
 	buf[bpos] = NULL;
 	return buf;
@@ -296,7 +296,7 @@ void Cvar_CompleteCvarPrint(cvar_state_t *cvars, const char *partial, int needed
 				if (!strncasecmp (partial, *alias, len) && (cvar->flags & neededflags))
 					Cvar_PrintHelp(cvar, *alias, true);
 
-		
+
 }
 
 // check if a cvar is held by some progs

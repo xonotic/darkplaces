@@ -26,12 +26,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /*
  * The VPK format is Valve's package format for Source engine games,
  * used to store game content.
- * 
+ *
  * Game content is spread across multiple VPK files. A single, special
  * VPK file, ending in _dir.vpk, contains a centralized directory
  * tree for all of the other files, and has its own header.
  * Although content can be stored in the directory file.
- * 
+ *
  * This is useful for navigating game content without having
  * to guess which VPK some file belongs to, while also
  * making game updates more efficient by spreading content

@@ -62,7 +62,7 @@ void Sys_Error (const char *error, ...)
 	va_end (argptr);
 
 	Con_Printf(CON_ERROR "Engine Error: %s\n", string);
-	
+
 	if(!nocrashdialog)
 		SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Engine Error", string, NULL);
 
@@ -222,7 +222,7 @@ int main (int argc, char *argv[])
 	Host_Main();
 
 	Sys_Quit(0);
-	
+
 	return 0;
 }
 

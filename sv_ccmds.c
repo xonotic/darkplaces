@@ -114,7 +114,7 @@ static void SV_Changelevel_f(cmd_state_t *cmd)
 	SV_SaveSpawnparms ();
 	strlcpy(level, Cmd_Argv(cmd, 1), sizeof(level));
 	SV_SpawnServer(level);
-	
+
 	if(sv.active && host.hook.ConnectLocal != NULL)
 		host.hook.ConnectLocal();
 }
@@ -146,7 +146,7 @@ static void SV_Restart_f(cmd_state_t *cmd)
 
 	strlcpy(mapname, sv.name, sizeof(mapname));
 	SV_SpawnServer(mapname);
-	
+
 	if(sv.active && host.hook.ConnectLocal != NULL)
 		host.hook.ConnectLocal();
 }
@@ -409,7 +409,7 @@ static void SV_Pause_f(cmd_state_t *cmd)
 		print("Pause not allowed.\n");
 		return;
 	}
-	
+
 	sv.paused ^= 1;
 	if (cmd->source != src_local)
 		SV_BroadcastPrintf("%s %spaused the game\n", host_client->name, sv.paused ? "" : "un");
@@ -768,7 +768,7 @@ static void SV_Status_f(cmd_state_t *cmd)
 			}
 			else
 				hours = 0;
-			
+
 			packetloss = 0;
 			if (client->netconnection)
 				for (j = 0;j < NETGRAPH_PACKETS;j++)
@@ -802,7 +802,7 @@ static void SV_Status_f(cmd_state_t *cmd)
 					frags = atoi(qcstatus);
 			}
 		}
-		
+
 		if (in == 0) // default layout
 		{
 			if (sv.protocol == PROTOCOL_QUAKE && svs.maxclients <= 99)
@@ -843,7 +843,7 @@ void SV_Name(int clientnum)
 		MSG_WriteByte (&sv.reliable_datagram, clientnum);
 		MSG_WriteString (&sv.reliable_datagram, host_client->name);
 		SV_WriteNetnameIntoDemo(host_client);
-	}	
+	}
 }
 
 /*
@@ -1379,10 +1379,10 @@ static void SV_Viewprev_f(cmd_state_t *cmd)
 
 static void SV_SendCvar_f(cmd_state_t *cmd)
 {
-	int i;	
+	int i;
 	const char *cvarname;
 	client_t *old;
-	
+
 	if(Cmd_Argc(cmd) != 2)
 		return;
 
@@ -1434,7 +1434,7 @@ static void SV_Ent_Create_f(cmd_state_t *cmd)
 
 		Matrix4x4_OriginFromMatrix(&view, org);
 		VectorSet(temp, 65536, 0, 0);
-		Matrix4x4_Transform(&view, temp, dest);		
+		Matrix4x4_Transform(&view, temp, dest);
 
 		trace = SV_TraceLine(org, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID, 0, 0, collision_extendmovelength.value);
 
@@ -1480,7 +1480,7 @@ static void SV_Ent_Create_f(cmd_state_t *cmd)
 
 	// Spawn it
 	PRVM_ED_CallPrespawnFunction(prog, ed);
-	
+
 	if(!PRVM_ED_CallSpawnFunction(prog, ed, NULL, NULL))
 	{
 		print("Could not spawn a \"%s\". No such entity or it has no spawn function\n", Cmd_Argv(cmd, 1));
@@ -1490,7 +1490,7 @@ static void SV_Ent_Create_f(cmd_state_t *cmd)
 		return;
 	}
 
-	PRVM_ED_CallPostspawnFunction(prog, ed);	
+	PRVM_ED_CallPostspawnFunction(prog, ed);
 
 	// Make it appear in the world
 	SV_LinkEdict(ed);
@@ -1530,10 +1530,10 @@ static void SV_Ent_Remove_f(cmd_state_t *cmd)
 
 		Matrix4x4_OriginFromMatrix(&view, org);
 		VectorSet(temp, 65536, 0, 0);
-		Matrix4x4_Transform(&view, temp, dest);		
+		Matrix4x4_Transform(&view, temp, dest);
 
 		trace = SV_TraceLine(org, dest, MOVE_NORMAL, NULL, SUPERCONTENTS_SOLID | SUPERCONTENTS_BODY, 0, 0, collision_extendmovelength.value);
-		
+
 		if(trace.ent)
 			ednum = (int)PRVM_EDICT_TO_PROG(trace.ent);
 		if(!trace.ent || !ednum)
@@ -1609,7 +1609,7 @@ void SV_InitOperatorCommands(void)
 	Cvar_RegisterVariable(&sv_status_privacy);
 	Cvar_RegisterVariable(&sv_status_show_qcstatus);
 	Cvar_RegisterVariable(&sv_namechangetimer);
-	
+
 	Cmd_AddCommand(CF_SERVER | CF_SERVER_FROM_CLIENT, "status", SV_Status_f, "print server status information");
 	Cmd_AddCommand(CF_SHARED, "map", SV_Map_f, "kick everyone off the server and start a new level");
 	Cmd_AddCommand(CF_SHARED, "restart", SV_Restart_f, "restart current level");
@@ -1641,7 +1641,7 @@ void SV_InitOperatorCommands(void)
 	Cmd_AddCommand(CF_CHEAT | CF_SERVER_FROM_CLIENT, "noclip", SV_Noclip_f, "noclip mode (flight without collisions, move through walls)");
 	Cmd_AddCommand(CF_CHEAT | CF_SERVER_FROM_CLIENT, "give", SV_Give_f, "alter inventory");
 	Cmd_AddCommand(CF_SERVER_FROM_CLIENT, "kill", SV_Kill_f, "die instantly");
-	
+
 	Cmd_AddCommand(CF_USERINFO, "color", SV_Color_f, "change your player shirt and pants colors");
 	Cmd_AddCommand(CF_USERINFO, "name", SV_Name_f, "change your player name");
 	Cmd_AddCommand(CF_USERINFO, "rate", SV_Rate_f, "change your network connection speed");

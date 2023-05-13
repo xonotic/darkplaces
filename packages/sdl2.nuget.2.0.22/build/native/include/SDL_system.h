@@ -42,7 +42,7 @@ extern "C" {
 
 /* Platform specific functions for Windows */
 #ifdef __WIN32__
-	
+
 typedef void (SDLCALL * SDL_WindowsMessageHook)(void *userdata, void *hWnd, unsigned int message, Uint64 wParam, Sint64 lParam);
 
 /**
@@ -155,9 +155,9 @@ extern DECLSPEC int SDLCALL SDL_LinuxSetThreadPriority(Sint64 threadID, int prio
  * \since This function is available since SDL 2.0.18.
  */
 extern DECLSPEC int SDLCALL SDL_LinuxSetThreadPriorityAndPolicy(Sint64 threadID, int sdlPriority, int schedPolicy);
- 
+
 #endif /* __LINUX__ */
-	
+
 /* Platform specific functions for iOS */
 #ifdef __IPHONEOS__
 

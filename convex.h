@@ -65,7 +65,7 @@ typedef struct convex_builder_state_s
 	convex_face_t faces[CONVEX_MAX_FACES];
 
 	// we consider points to be equivalent if they are within this distance
-	// suggested value is maxextent / 1048576.0f, which is a way of saying 
+	// suggested value is maxextent / 1048576.0f, which is a way of saying
 	// 'equivalent within 20 bits of precision'
 	float epsilon;
 }

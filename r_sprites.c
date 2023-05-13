@@ -27,7 +27,7 @@ extern cvar_t r_overheadsprites_scaley;
    If the sprite is out of view, track it.
    `origin`, `left` and `up` are changed by this function to achive a rotation around
    the hotspot.
-   
+
    --blub
  */
 #define SIDE_TOP 1
@@ -61,12 +61,12 @@ static void R_TrackSprite(const entity_render_t *ent, vec3_t origin, vec3_t left
 		float x, y;    // screen X and Y coordinates
 		float ax, ay;  // absolute coords, used for division
 		// I divide x and y by the greater absolute value to get ranges -1.0 to +1.0
-		
+
 		bCoord[2] *= r_refdef.view.frustum_x;
 		bCoord[1] *= r_refdef.view.frustum_y;
 
 		//Con_Printf("%f %f %f\n", bCoord[0], bCoord[1], bCoord[2]);
-		
+
 		ax = fabs(bCoord[1]);
 		ay = fabs(bCoord[2]);
 		// get the greater value and determine the screen edge it's on
@@ -84,8 +84,8 @@ static void R_TrackSprite(const entity_render_t *ent, vec3_t origin, vec3_t left
 			else
 				*edge = SIDE_LEFT;
 		}
-		
-		// umm... 
+
+		// umm...
 		if(ax < MIN_EPSILON) // this was == 0.0f before --blub
 			ax = MIN_EPSILON;
 		// get the -1 to +1 range
@@ -103,18 +103,18 @@ static void R_TrackSprite(const entity_render_t *ent, vec3_t origin, vec3_t left
 		// g is frustum Y
 		// y is y
 		// b is ay
-		
+
 		// real dist (r) shall be d, so
 		// r*r = d*d + dfxa*dfxa + dgyb*dgyb
 		// r*r = d*d * (1 + fxa*fxa + gyb*gyb)
 		// d*d = r*r / (1 + fxa*fxa + gyb*gyb)
 		// d = sqrt(r*r / (1 + fxa*fxa + gyb*gyb))
 		// thus:
-		distance = sqrt((distance*distance) / (1.0 +
-					r_refdef.view.frustum_x*r_refdef.view.frustum_x * x*x * ax*ax +
+		distance = sqrt((distance*distance) / (1.0
+					r_refdef.view.frustum_x*r_refdef.view.frustum_x * x*x * ax*ax
 					r_refdef.view.frustum_y*r_refdef.view.frustum_y * y*y * ay*ay));
 		// ^ the one we want        ^ the one we have       ^ our factors
-		
+
 		// Place the sprite a few units ahead of the player
 		VectorCopy(r_refdef.view.origin, origin);
 		VectorMA(origin, distance, r_refdef.view.forward, origin);
@@ -157,7 +157,7 @@ static void R_RotateSprite(const mspriteframe_t *frame, vec3_t origin, vec3_t le
 			90.0f,	// bottom
 			180.0f,	// right
 		};
-		
+
 		// rotate around the hotspot according to which edge it's on
 		// since the hotspot == the origin, only rotate the vectors
 		matrix4x4_t rotm;
@@ -168,7 +168,7 @@ static void R_RotateSprite(const mspriteframe_t *frame, vec3_t origin, vec3_t le
 
 		if(edge < 1 || edge > 4)
 			return; // this usually means something went wrong somewhere, there's no way to get a wrong edge value currently
-		
+
 		dir[0] = frame->right + frame->left;
 		dir[1] = frame->down + frame->up;
 
@@ -257,7 +257,7 @@ static void R_Model_Sprite_Draw_TransparentCallback(const entity_render_t *ent, 
 		// fixed HUD pixel size specified in sprite
 		// honors scale
 		// honors a global label scaling cvar
-	
+
 		if(r_fb.water.renderingscene) // labels are considered HUD items, and don't appear in reflections
 			return;
 
@@ -267,7 +267,7 @@ static void R_Model_Sprite_Draw_TransparentCallback(const entity_render_t *ent, 
 		// It has to be done before the calculations, because it moves the origin.
 		if(r_track_sprites.integer)
 			R_TrackSprite(ent, org, left, up, &edge, &dir_angle);
-		
+
 		scale = 2 * ent->scale * (DotProduct(r_refdef.view.forward, org) - DotProduct(r_refdef.view.forward, r_refdef.view.origin)) * r_labelsprites_scale.value;
 		VectorScale(left, scale * r_refdef.view.frustum_x / vid_conwidth.integer, left); // 1px
 		VectorScale(up, scale * r_refdef.view.frustum_y / vid_conheight.integer, up); // 1px
@@ -290,7 +290,7 @@ static void R_Model_Sprite_Draw_TransparentCallback(const entity_render_t *ent, 
 		// It has to be done before the calculations, because it moves the origin.
 		if(r_track_sprites.integer)
 			R_TrackSprite(ent, org, left, up, &edge, &dir_angle);
-		
+
 		scale = 2 * (DotProduct(r_refdef.view.forward, org) - DotProduct(r_refdef.view.forward, r_refdef.view.origin));
 
 		if(r_labelsprites_roundtopixels.integer)
@@ -391,7 +391,7 @@ static void R_Model_Sprite_Draw_TransparentCallback(const entity_render_t *ent, 
 			RSurf_ActiveCustomEntity(&identitymatrix, &identitymatrix, ent->flags, 0, ent->colormod[0], ent->colormod[1], ent->colormod[2], ent->alpha * ent->frameblend[i].lerp, 4, vertex3f, spritetexcoord2f, NULL, NULL, NULL, NULL, 2, polygonelement3i, polygonelement3s, false, false);
 			frame = model->sprite.sprdata_frames + ent->frameblend[i].subframe;
 			texture = R_GetCurrentTexture(model->data_textures + ent->frameblend[i].subframe);
-		
+
 			// sprites are fullbright by default, but if this one is not fullbright we
 			// need to combine the lighting into ambient as sprite lighting is not
 			// directional

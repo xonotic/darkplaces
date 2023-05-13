@@ -86,10 +86,10 @@ void R_MeshQueue_RenderTransparent(void)
 		trans_sortarraysize = r_transparent_sortarraysize.integer;
 		if (trans_hash)
 			Mem_Free(trans_hash);
-		trans_hash = (meshqueue_t **)Mem_Alloc(cls.permanentmempool, sizeof(meshqueue_t *) * trans_sortarraysize); 
+		trans_hash = (meshqueue_t **)Mem_Alloc(cls.permanentmempool, sizeof(meshqueue_t *) * trans_sortarraysize);
 		if (trans_hashpointer)
 			Mem_Free(trans_hashpointer);
-		trans_hashpointer = (meshqueue_t ***)Mem_Alloc(cls.permanentmempool, sizeof(meshqueue_t **) * trans_sortarraysize); 
+		trans_hashpointer = (meshqueue_t ***)Mem_Alloc(cls.permanentmempool, sizeof(meshqueue_t **) * trans_sortarraysize);
 	}
 
 	// build index

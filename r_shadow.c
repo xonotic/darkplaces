@@ -877,7 +877,7 @@ int R_Shadow_CalcTriangleSideMask(const vec3_t p1, const vec3_t p2, const vec3_t
 	if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
 		mask &= (3<<4)
 			| (dn1 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
-			| (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))			
+			| (dn2 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2))
 			| (dn3 >= 0 ? (1<<0)|(2<<2) : (2<<0)|(1<<2));
 
 	dp1 = p1[1] + p1[2], dn1 = p1[1] - p1[2], ap1 = fabs(dp1), an1 = fabs(dn1),
@@ -886,7 +886,7 @@ int R_Shadow_CalcTriangleSideMask(const vec3_t p1, const vec3_t p2, const vec3_t
 	if(ap1 > bias*an1 && ap2 > bias*an2 && ap3 > bias*an3)
 		mask &= (3<<0)
 			| (dp1 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
-			| (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))			
+			| (dp2 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4))
 			| (dp3 >= 0 ? (1<<2)|(1<<4) : (2<<2)|(2<<4));
 	if(an1 > bias*ap1 && an2 > bias*ap2 && an3 > bias*ap3)
 		mask &= (3<<0)
@@ -1386,7 +1386,7 @@ void R_Shadow_RenderMode_Begin(void)
 	GL_DepthMask(false);
 	GL_Color(0, 0, 0, 1);
 	GL_Scissor(r_refdef.view.viewport.x, r_refdef.view.viewport.y, r_refdef.view.viewport.width, r_refdef.view.viewport.height);
-	
+
 	r_shadow_rendermode = R_SHADOW_RENDERMODE_NONE;
 	r_shadow_lightingrendermode = R_SHADOW_RENDERMODE_LIGHT_GLSL;
 
@@ -1778,7 +1778,7 @@ static void R_Shadow_BounceGrid_UpdateSpacing(void)
 		dlight_t *light;
 		rtlight_t *rtlight;
 
-		// calculate bounds enclosing world lights as they should be noticably tighter 
+		// calculate bounds enclosing world lights as they should be noticably tighter
 		// than the world bounds on maps with unlit monster containers (see e1m7 etc)
 		range = (unsigned int)Mem_ExpandableArray_IndexRange(&r_shadow_worldlightsarray); // checked
 		for (lightindex = 0;lightindex < range;lightindex++)
@@ -2760,9 +2760,9 @@ void R_Shadow_UpdateBounceGridTexture(void)
 	qbool settingschanged;
 
 	enable = R_Shadow_BounceGrid_CheckEnable(flag);
-	
+
 	R_Shadow_BounceGrid_GenerateSettings(&settings);
-	
+
 	// changing intensity does not require an update
 	r_shadow_bouncegrid_state.intensity = r_shadow_bouncegrid_intensity.value;
 

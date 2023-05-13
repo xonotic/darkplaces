@@ -229,7 +229,7 @@ int i;
 	&&handle_OP_GE_I,
 	&&handle_OP_LT_I,
 	&&handle_OP_GT_I,
-	
+
 	&&handle_OP_LE_IF,
 	&&handle_OP_GE_IF,
 	&&handle_OP_LT_IF,
@@ -274,7 +274,7 @@ int i;
 	&&handle_OP_GSTOREP_ENT,
 	&&handle_OP_GSTOREP_FLD,
 	&&handle_OP_GSTOREP_S,
-	&&handle_OP_GSTOREP_FNC,		
+	&&handle_OP_GSTOREP_FNC,
 	&&handle_OP_GSTOREP_V,
 	&&handle_OP_GADDRESS,
 	&&handle_OP_GLOAD_I,
@@ -694,7 +694,7 @@ int i;
 			HANDLE_OPCODE(OP_CALL6):
 			HANDLE_OPCODE(OP_CALL7):
 			HANDLE_OPCODE(OP_CALL8):
-#ifdef PRVMTIMEPROFILING 
+#ifdef PRVMTIMEPROFILING
 				tm = Sys_DirtyTime();
 				prog->xfunction->tprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
 				starttm = tm;
@@ -727,7 +727,7 @@ int i;
 					if (builtinnumber < prog->numbuiltins && prog->builtins[builtinnumber])
 					{
 						prog->builtins[builtinnumber](prog);
-#ifdef PRVMTIMEPROFILING 
+#ifdef PRVMTIMEPROFILING
 						tm = Sys_DirtyTime();
 						enterfunc->tprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
 						prog->xfunction->tbprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
@@ -760,7 +760,7 @@ int i;
 
 			HANDLE_OPCODE(OP_DONE):
 			HANDLE_OPCODE(OP_RETURN):
-#ifdef PRVMTIMEPROFILING 
+#ifdef PRVMTIMEPROFILING
 				tm = Sys_DirtyTime();
 				prog->xfunction->tprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
 				starttm = tm;

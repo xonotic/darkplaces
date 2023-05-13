@@ -2499,7 +2499,7 @@ void SV_GetEntityMatrix (prvm_prog_t *prog, prvm_edict_t *ent, matrix4x4_t *out,
 	scale = PRVM_serveredictfloat(ent, scale);
 	if (!scale)
 		scale = 1.0f;
-	
+
 	if (viewmatrix)
 		Matrix4x4_CreateFromQuakeEntity(out, PRVM_serveredictvector(ent, origin)[0], PRVM_serveredictvector(ent, origin)[1], PRVM_serveredictvector(ent, origin)[2] + PRVM_serveredictvector(ent, view_ofs)[2], PRVM_serveredictvector(ent, v_angle)[0], PRVM_serveredictvector(ent, v_angle)[1], PRVM_serveredictvector(ent, v_angle)[2], scale * cl_viewmodel_scale.value);
 	else
@@ -2902,7 +2902,7 @@ static void VM_SV_pointparticles(prvm_prog_t *prog)
 qbool SV_VM_ConsoleCommand (const char *text)
 {
 	prvm_prog_t *prog = SVVM_prog;
-	return PRVM_ConsoleCommand(prog, text, &prog->funcoffsets.ConsoleCmd, true, PRVM_EDICT_TO_PROG(sv.world.prog->edicts), sv.time,  !(!sv.active || !prog || !prog->loaded), "QC function ConsoleCmd is missing"); 
+	return PRVM_ConsoleCommand(prog, text, &prog->funcoffsets.ConsoleCmd, true, PRVM_EDICT_TO_PROG(sv.world.prog->edicts), sv.time,  !(!sv.active || !prog || !prog->loaded), "QC function ConsoleCmd is missing");
 }
 
 // #352 void(string cmdname) registercommand (EXT_CSQC)

@@ -40,7 +40,7 @@ void SV_WriteDemoMessage(client_t *client, sizebuf_t *sendbuffer, qbool clientto
 		return;
 	if(sendbuffer->cursize == 0)
 		return;
-	
+
 	temp = sendbuffer->cursize | (clienttoserver ? DEMOMSG_CLIENT_TO_SERVER : 0);
 	len = LittleLong(temp);
 	FS_Write(client->sv_demo_file, &len, 4);
@@ -60,7 +60,7 @@ void SV_StopDemoRecording(client_t *client)
 
 	if(client->sv_demo_file == NULL)
 		return;
-	
+
 	buf.data = bufdata;
 	buf.maxsize = sizeof(bufdata);
 	SZ_Clear(&buf);

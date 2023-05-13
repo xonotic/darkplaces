@@ -215,7 +215,7 @@ void Mod_Skeletal_AnimateVertices_SSE(const model_t * RESTRICT model, const fram
 				_mm_store_ps(r->m[1], r1);
 				_mm_store_ps(r->m[2], r2);
 				_mm_store_ps(r->m[3], r3);
-			}	
+			}
 		}
 	}
 

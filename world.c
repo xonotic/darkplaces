@@ -515,7 +515,7 @@ enum
 	dContactMotionN		= 0x080,
 	dContactSlip1		= 0x100,
 	dContactSlip2		= 0x200,
-	
+
 	dContactApprox0		= 0x0000,
 	dContactApprox1_1	= 0x1000,
 	dContactApprox1_2	= 0x2000,
@@ -1613,11 +1613,11 @@ static void World_Physics_UpdateODE(world_t *world)
 	dWorldSetAutoDisableFlag(odeworld, (physics_ode_autodisable.integer) ? 1 : 0);
 	if (physics_ode_autodisable.integer)
 	{
-		dWorldSetAutoDisableSteps(odeworld, bound(1, physics_ode_autodisable_steps.integer, 100)); 
+		dWorldSetAutoDisableSteps(odeworld, bound(1, physics_ode_autodisable_steps.integer, 100));
 		dWorldSetAutoDisableTime(odeworld, physics_ode_autodisable_time.value);
 		dWorldSetAutoDisableAverageSamplesCount(odeworld, bound(1, physics_ode_autodisable_threshold_samples.integer, 100));
-		dWorldSetAutoDisableLinearThreshold(odeworld, physics_ode_autodisable_threshold_linear.value); 
-		dWorldSetAutoDisableAngularThreshold(odeworld, physics_ode_autodisable_threshold_angular.value); 
+		dWorldSetAutoDisableLinearThreshold(odeworld, physics_ode_autodisable_threshold_linear.value);
+		dWorldSetAutoDisableAngularThreshold(odeworld, physics_ode_autodisable_threshold_angular.value);
 	}
 }
 
@@ -2072,8 +2072,8 @@ static void World_Physics_Frame_JointFromEntity(world_t *world, prvm_edict_t *ed
 }
 
 // test convex geometry data
-// planes for a cube, these should coincide with the 
-dReal test_convex_planes[] = 
+// planes for a cube, these should coincide with the
+dReal test_convex_planes[] =
 {
     1.0f ,0.0f ,0.0f ,2.25f,
     0.0f ,1.0f ,0.0f ,2.25f,
@@ -2084,7 +2084,7 @@ dReal test_convex_planes[] =
 };
 const unsigned int test_convex_planecount = 6;
 // points for a cube
-dReal test_convex_points[] = 
+dReal test_convex_points[] =
 {
 	2.25f,2.25f,2.25f,    // point 0
 	-2.25f,2.25f,2.25f,   // point 1
@@ -2096,8 +2096,8 @@ dReal test_convex_points[] =
     -2.25f,-2.25f,-2.25f, // point 7
 };
 const unsigned int test_convex_pointcount = 8;
-// polygons for a cube (6 squares), index 
-unsigned int test_convex_polygons[] = 
+// polygons for a cube (6 squares), index
+unsigned int test_convex_polygons[] =
 {
 	4,0,2,6,4, // positive X
     4,1,0,4,5, // positive Y
@@ -2385,7 +2385,7 @@ static void World_Physics_Frame_BodyFromEntity(world_t *world, prvm_edict_t *ed)
 				{
 					// already formed a polygon?
 					if (used[triangleindex])
-						continue; 
+						continue;
 					// init polygon
 					// switch clockwise->counterclockwise
 					ie = &model->brush.collisionmesh->element3i[triangleindex*3];
@@ -2467,8 +2467,8 @@ static void World_Physics_Frame_BodyFromEntity(world_t *world, prvm_edict_t *ed)
 				polygons = polygonsData;
 				for (i = 0; i < numplanes; i++)
 				{
-					if((pointsData[(polygons[1]*3)+0]*pointsData[(polygons[2]*3)+1]*pointsData[(polygons[3]*3)+2] +
-						pointsData[(polygons[1]*3)+1]*pointsData[(polygons[2]*3)+2]*pointsData[(polygons[3]*3)+0] +
+					if((pointsData[(polygons[1]*3)+0]*pointsData[(polygons[2]*3)+1]*pointsData[(polygons[3]*3)+2]
+						pointsData[(polygons[1]*3)+1]*pointsData[(polygons[2]*3)+2]*pointsData[(polygons[3]*3)+0]
 						pointsData[(polygons[1]*3)+2]*pointsData[(polygons[2]*3)+0]*pointsData[(polygons[3]*3)+1] -
 						pointsData[(polygons[1]*3)+2]*pointsData[(polygons[2]*3)+1]*pointsData[(polygons[3]*3)+0] -
 						pointsData[(polygons[1]*3)+1]*pointsData[(polygons[2]*3)+0]*pointsData[(polygons[3]*3)+2] -
@@ -2919,7 +2919,7 @@ static void nearCallback (void *data, dGeomID o1, dGeomID o2)
 	// at least one object has to be using MOVETYPE_PHYSICS and should be enabled or we just don't care
 	if (!b1enabled && !b2enabled)
 		return;
-	
+
 	// exit without doing anything if the two bodies are connected by a joint
 	if (b1 && b2 && dAreConnectedExcluding(b1, b2, dJointTypeContact))
 		return;
@@ -3040,7 +3040,7 @@ void World_Physics_Frame(world_t *world, double frametime, double gravity)
 				world->physics.ode_iterations++;
 				world->physics.ode_time -= world->physics.ode_step;
 			}
-		}	
+		}
 		world->physics.ode_movelimit = physics_ode_movelimit.value / world->physics.ode_step;
 		World_Physics_UpdateODE(world);
 

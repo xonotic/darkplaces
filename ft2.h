@@ -9,7 +9,7 @@
 
 #include "utf8lib.h"
 
-/* 
+/*
  * From http://www.unicode.org/Public/UNIDATA/Blocks.txt
  *
  *   E000..F8FF; Private Use Area
@@ -46,7 +46,7 @@ typedef struct ft2_font_s
 	qbool        image_font; // only fallbacks are freetype fonts
 
 	// TODO: clean this up and do not expose everything.
-	
+
 	const unsigned char  *data; // FT2 needs it to stay
 	//fs_offset_t     datasize;
 	void           *face;
