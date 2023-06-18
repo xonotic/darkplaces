@@ -101,6 +101,7 @@ OBJ_COMMON= \
 	image.o \
 	image_png.o \
 	jpeg.o \
+	json.o \
 	keys.o \
 	lhnet.o \
 	libcurl.o \
@@ -116,6 +117,7 @@ OBJ_COMMON= \
 	model_sprite.o \
 	netconn.o \
 	palette.o \
+	parser.o \
 	polygon.o \
 	portals.o \
 	protocol.o \
@@ -147,6 +149,7 @@ OBJ_COMMON= \
 	svvm_cmds.o \
 	sys_shared.o \
 	taskqueue.o \
+	token.o \
 	vid_shared.o \
 	view.o \
 	wad.o \

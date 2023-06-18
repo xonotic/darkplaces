@@ -248,6 +248,7 @@
     <ClCompile Include="image.c" />
     <ClCompile Include="image_png.c" />
     <ClCompile Include="jpeg.c" />
+    <ClCompile Include="json.c" />
     <ClCompile Include="keys.c" />
     <ClCompile Include="lhnet.c" />
     <ClCompile Include="libcurl.c" />
@@ -265,6 +266,7 @@
     <ClCompile Include="mvm_cmds.c" />
     <ClCompile Include="netconn.c" />
     <ClCompile Include="palette.c" />
+    <ClCompile Include="parser.c" />
     <ClCompile Include="polygon.c" />
     <ClCompile Include="portals.c" />
     <ClCompile Include="protocol.c" />
@@ -305,6 +307,7 @@
     <ClCompile Include="sys_shared.c" />
     <ClCompile Include="taskqueue.c" />
     <ClCompile Include="thread_sdl.c" />
+    <ClCompile Include="token.c" />
     <ClCompile Include="utf8lib.c" />
     <ClCompile Include="vid_sdl.c" />
     <ClCompile Include="vid_shared.c" />
@@ -384,6 +387,7 @@
     <ClInclude Include="mprogdefs.h" />
     <ClInclude Include="netconn.h" />
     <ClInclude Include="palette.h" />
+    <ClInclude Include="parser.h" />
     <ClInclude Include="polygon.h" />
     <ClInclude Include="portals.h" />
     <ClInclude Include="prvm_offsets.h" />
@@ -423,6 +427,7 @@
     <ClInclude Include="taskqueue.h" />
     <ClInclude Include="thread.h" />
     <ClInclude Include="timing.h" />
+    <ClInclude Include="token.h" />
     <ClInclude Include="utf8lib.h" />
     <ClInclude Include="vid.h" />
     <ClInclude Include="view.h" />
