@@ -605,6 +605,7 @@ static void Cmd_StuffCmds_f (cmd_state_t *cmd)
 static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 {
 	char *f;
+	long int fsize;
 	size_t filenameLen = strlen(filename);
 	qbool isdefaultcfg =
 		!strcmp(filename, "default.cfg") ||
@@ -617,13 +618,21 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 			return; // don't execute config.cfg
 	}
 
-	f = (char *)FS_LoadFile (filename, tempmempool, false, NULL);
+	f = (char *)FS_LoadFile (filename, tempmempool, false, &fsize);
 	if (!f)
 	{
 		Con_Printf("couldn't exec %s\n",filename);
 		return;
 	}
 	Con_Printf("execing %s\n",filename);
+
+	if (f[fsize - 1] != '\n')
+	{
+		f = (char *)Mem_Realloc(cbuf_mempool, f, fsize + 2);
+		f[fsize] = '\n';
+		f[fsize + 1] = '\0';
+		++fsize;
+	}
 
 	// if executing default.cfg for the first time, lock the cvar defaults
 	// it may seem backwards to insert this text BEFORE the default.cfg
