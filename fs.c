@@ -3382,9 +3382,10 @@ FS_LoadAndCloseQFile
 
 Loads full content of a qfile_t and closes it.
 Always appends a 0 byte.
+You may specify to allocate extra bytes for the file content buffer, by using the `extrabytes` parameter.
 ============
 */
-static unsigned char *FS_LoadAndCloseQFile (qfile_t *file, const char *path, mempool_t *pool, qbool quiet, fs_offset_t *filesizepointer)
+static unsigned char *FS_LoadAndCloseQFile (qfile_t *file, const char *path, mempool_t *pool, qbool quiet, unsigned long extrabytes, fs_offset_t *filesizepointer)
 {
 	unsigned char *buf = NULL;
 	fs_offset_t filesize = 0;
@@ -3399,7 +3400,7 @@ static unsigned char *FS_LoadAndCloseQFile (qfile_t *file, const char *path, mem
 			return NULL;
 		}
 
-		buf = (unsigned char *)Mem_Alloc (pool, filesize + 1);
+		buf = (unsigned char *)Mem_Alloc (pool, filesize + 1 + extrabytes);
 		buf[filesize] = '\0';
 		FS_Read (file, buf, filesize);
 		FS_Close (file);
@@ -3424,7 +3425,21 @@ Always appends a 0 byte.
 unsigned char *FS_LoadFile (const char *path, mempool_t *pool, qbool quiet, fs_offset_t *filesizepointer)
 {
 	qfile_t *file = FS_OpenVirtualFile(path, quiet);
-	return FS_LoadAndCloseQFile(file, path, pool, quiet, filesizepointer);
+	return FS_LoadAndCloseQFile(file, path, pool, quiet, 0, filesizepointer);
+}
+
+/*
+============
+FS_LoadFileExtraBuffer
+
+Filename are relative to the quake directory.
+Always appends a 0 byte, and optionally extra bytes.
+============
+*/
+unsigned char *FS_LoadFileExtraBuffer (const char *path, mempool_t *pool, qbool quiet, unsigned long extrabytes, fs_offset_t *filesizepointer)
+{
+	qfile_t *file = FS_OpenVirtualFile(path, quiet);
+	return FS_LoadAndCloseQFile(file, path, pool, quiet, extrabytes, filesizepointer);
 }
 
 
@@ -3439,7 +3454,7 @@ Always appends a 0 byte.
 unsigned char *FS_SysLoadFile (const char *path, mempool_t *pool, qbool quiet, fs_offset_t *filesizepointer)
 {
 	qfile_t *file = FS_SysOpen(path, "rb", false);
-	return FS_LoadAndCloseQFile(file, path, pool, quiet, filesizepointer);
+	return FS_LoadAndCloseQFile(file, path, pool, quiet, 0, filesizepointer);
 }
 
 

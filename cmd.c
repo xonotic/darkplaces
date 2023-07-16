@@ -618,7 +618,7 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 			return; // don't execute config.cfg
 	}
 
-	f = (char *)FS_LoadFile (filename, tempmempool, false, &fsize);
+	f = (char *)FS_LoadFileExtraBuffer (filename, tempmempool, false, 2, &fsize);
 	if (!f)
 	{
 		Con_Printf("couldn't exec %s\n",filename);
@@ -628,7 +628,6 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 
 	if (f[fsize - 1] != '\n')
 	{
-		f = (char *)Mem_Realloc(cbuf_mempool, f, fsize + 2);
 		f[fsize] = '\n';
 		f[fsize + 1] = '\0';
 		++fsize;

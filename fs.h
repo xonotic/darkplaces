@@ -118,6 +118,7 @@ fssearch_t *FS_Search(const char *pattern, int caseinsensitive, int quiet, const
 void FS_FreeSearch(fssearch_t *search);
 
 unsigned char *FS_LoadFile (const char *path, mempool_t *pool, qbool quiet, fs_offset_t *filesizepointer);
+unsigned char *FS_LoadFileExtraBuffer (const char *path, mempool_t *pool, qbool quiet, unsigned long extrabytes, fs_offset_t *filesizepointer);
 unsigned char *FS_SysLoadFile (const char *path, mempool_t *pool, qbool quiet, fs_offset_t *filesizepointer);
 qbool FS_WriteFileInBlocks (const char *filename, const void *const *data, const fs_offset_t *len, size_t count);
 qbool FS_WriteFile (const char *filename, const void *data, fs_offset_t len);
