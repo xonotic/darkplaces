@@ -605,7 +605,7 @@ static void Cmd_StuffCmds_f (cmd_state_t *cmd)
 static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 {
 	char *f;
-	long int fsize;
+	fs_offset_t fsize;
 	size_t filenameLen = strlen(filename);
 	qbool isdefaultcfg =
 		!strcmp(filename, "default.cfg") ||
