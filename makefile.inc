@@ -509,6 +509,7 @@ clean:
 	-$(CMD_RM) $(EXE_SVNEXUIZ)
 	-$(CMD_RM) $(EXE_SDLNEXUIZ)
 	-$(CMD_RM) *$(LDFTYPE)
+	-$(CMD_RM) darkplaces-emscripten.html
 	-$(CMD_RM) *.d
 	-$(CMD_RM) *.gch
 	-$(CMD_RM) build-obj/
