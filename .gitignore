@@ -7,6 +7,7 @@ ChangeLog
 darkplaces-agl
 darkplaces-glx
 darkplaces-sdl
+darkplaces-emscripten.html
 darkplaces-dedicated
 gmon.out
 *.ncb
