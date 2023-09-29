@@ -4,6 +4,7 @@ CHECKLEVEL2 = @if [ "$(LEVEL)" != 2 ]; then $(MAKE) help; false; fi
 
 # Choose the compiler you want to use
 CC?=gcc
+LDFTYPE?=.o
 
 # athlon optimizations
 #CPUOPTIMIZATIONS?=-march=athlon
@@ -43,126 +44,126 @@ STRIP?=strip
 
 ###### Sound #####
 
-OBJ_SND_COMMON=snd_main.o snd_mem.o snd_mix.o snd_ogg.o snd_wav.o $(OBJ_SND_XMP)
+OBJ_SND_COMMON=snd_main$(LDFTYPE) snd_mem$(LDFTYPE) snd_mix$(LDFTYPE) snd_ogg$(LDFTYPE) snd_wav$(LDFTYPE) $(OBJ_SND_XMP)
 
 # No sound
-OBJ_SND_NULL=snd_null.o
+OBJ_SND_NULL=snd_null$(LDFTYPE)
 LIB_SND_NULL=
 
 ###### Common objects and flags #####
 
 # Common objects
 OBJ_COMMON= \
-	bih.o \
-	crypto.o \
-	cd_shared.o \
-	cl_cmd.o \
-	cl_collision.o \
-	cl_demo.o \
-	cl_ents.o \
-	cl_ents4.o \
-	cl_ents5.o \
-	cl_ents_nq.o \
-	cl_ents_qw.o \
-	cl_input.o \
-	cl_main.o \
-	cl_parse.o \
-	cl_particles.o \
-	cl_screen.o \
-	cl_video.o \
-	cl_video_libavw.o \
-	clvm_cmds.o \
-	cmd.o \
-	collision.o \
-	com_crc16.o \
-	com_ents.o \
-	com_ents4.o \
-	com_game.o \
-	com_infostring.o \
-	com_msg.o \
-	common.o \
-	console.o \
-	csprogs.o \
-	curves.o \
-	cvar.o \
-	dpvsimpledecode.o \
-	filematch.o \
-	fractalnoise.o \
-	fs.o \
-	ft2.o \
-	utf8lib.o \
-	gl_backend.o \
-	gl_draw.o \
-	gl_rmain.o \
-	gl_rsurf.o \
-	gl_textures.o \
-	hmac.o \
-	host.o \
-	image.o \
-	image_png.o \
-	jpeg.o \
-	keys.o \
-	lhnet.o \
-	libcurl.o \
-	mathlib.o \
-	matrixlib.o \
-	mdfour.o \
-	meshqueue.o \
-	mod_skeletal_animatevertices_sse.o \
-	mod_skeletal_animatevertices_generic.o \
-	model_alias.o \
-	model_brush.o \
-	model_shared.o \
-	model_sprite.o \
-	netconn.o \
-	palette.o \
-	phys.o \
-	polygon.o \
-	portals.o \
-	protocol.o \
-	prvm_cmds.o \
-	prvm_edict.o \
-	prvm_exec.o \
-	r_explosion.o \
-	r_lightning.o \
-	r_modules.o \
-	r_shadow.o \
-	r_sky.o \
-	r_sprites.o \
-	r_stats.o \
-	sbar.o \
-	sv_ccmds.o \
-	sv_demo.o \
-	sv_ents.o \
-	sv_ents4.o \
-	sv_ents5.o \
-	sv_ents_csqc.o \
-	sv_ents_nq.o \
-	sv_main.o \
-	sv_move.o \
-	sv_phys.o \
-	sv_save.o \
-	sv_send.o \
-	sv_user.o \
-	svbsp.o \
-	svvm_cmds.o \
-	sys_shared.o \
-	taskqueue.o \
-	vid_shared.o \
-	view.o \
-	wad.o \
-	world.o \
-	zone.o
+	bih$(LDFTYPE) \
+	crypto$(LDFTYPE) \
+	cd_shared$(LDFTYPE) \
+	cl_cmd$(LDFTYPE) \
+	cl_collision$(LDFTYPE) \
+	cl_demo$(LDFTYPE) \
+	cl_ents$(LDFTYPE) \
+	cl_ents4$(LDFTYPE) \
+	cl_ents5$(LDFTYPE) \
+	cl_ents_nq$(LDFTYPE) \
+	cl_ents_qw$(LDFTYPE) \
+	cl_input$(LDFTYPE) \
+	cl_main$(LDFTYPE) \
+	cl_parse$(LDFTYPE) \
+	cl_particles$(LDFTYPE) \
+	cl_screen$(LDFTYPE) \
+	cl_video$(LDFTYPE) \
+	cl_video_libavw$(LDFTYPE) \
+	clvm_cmds$(LDFTYPE) \
+	cmd$(LDFTYPE) \
+	collision$(LDFTYPE) \
+	com_crc16$(LDFTYPE) \
+	com_ents$(LDFTYPE) \
+	com_ents4$(LDFTYPE) \
+	com_game$(LDFTYPE) \
+	com_infostring$(LDFTYPE) \
+	com_msg$(LDFTYPE) \
+	common$(LDFTYPE) \
+	console$(LDFTYPE) \
+	csprogs$(LDFTYPE) \
+	curves$(LDFTYPE) \
+	cvar$(LDFTYPE) \
+	dpvsimpledecode$(LDFTYPE) \
+	filematch$(LDFTYPE) \
+	fractalnoise$(LDFTYPE) \
+	fs$(LDFTYPE) \
+	ft2$(LDFTYPE) \
+	utf8lib$(LDFTYPE) \
+	gl_backend$(LDFTYPE) \
+	gl_draw$(LDFTYPE) \
+	gl_rmain$(LDFTYPE) \
+	gl_rsurf$(LDFTYPE) \
+	gl_textures$(LDFTYPE) \
+	hmac$(LDFTYPE) \
+	host$(LDFTYPE) \
+	image$(LDFTYPE) \
+	image_png$(LDFTYPE) \
+	jpeg$(LDFTYPE) \
+	keys$(LDFTYPE) \
+	lhnet$(LDFTYPE) \
+	libcurl$(LDFTYPE) \
+	mathlib$(LDFTYPE) \
+	matrixlib$(LDFTYPE) \
+	mdfour$(LDFTYPE) \
+	meshqueue$(LDFTYPE) \
+	mod_skeletal_animatevertices_sse$(LDFTYPE) \
+	mod_skeletal_animatevertices_generic$(LDFTYPE) \
+	model_alias$(LDFTYPE) \
+	model_brush$(LDFTYPE) \
+	model_shared$(LDFTYPE) \
+	model_sprite$(LDFTYPE) \
+	netconn$(LDFTYPE) \
+	palette$(LDFTYPE) \
+	phys$(LDFTYPE) \
+	polygon$(LDFTYPE) \
+	portals$(LDFTYPE) \
+	protocol$(LDFTYPE) \
+	prvm_cmds$(LDFTYPE) \
+	prvm_edict$(LDFTYPE) \
+	prvm_exec$(LDFTYPE) \
+	r_explosion$(LDFTYPE) \
+	r_lightning$(LDFTYPE) \
+	r_modules$(LDFTYPE) \
+	r_shadow$(LDFTYPE) \
+	r_sky$(LDFTYPE) \
+	r_sprites$(LDFTYPE) \
+	r_stats$(LDFTYPE) \
+	sbar$(LDFTYPE) \
+	sv_ccmds$(LDFTYPE) \
+	sv_demo$(LDFTYPE) \
+	sv_ents$(LDFTYPE) \
+	sv_ents4$(LDFTYPE) \
+	sv_ents5$(LDFTYPE) \
+	sv_ents_csqc$(LDFTYPE) \
+	sv_ents_nq$(LDFTYPE) \
+	sv_main$(LDFTYPE) \
+	sv_move$(LDFTYPE) \
+	sv_phys$(LDFTYPE) \
+	sv_save$(LDFTYPE) \
+	sv_send$(LDFTYPE) \
+	sv_user$(LDFTYPE) \
+	svbsp$(LDFTYPE) \
+	svvm_cmds$(LDFTYPE) \
+	sys_shared$(LDFTYPE) \
+	taskqueue$(LDFTYPE) \
+	vid_shared$(LDFTYPE) \
+	view$(LDFTYPE) \
+	wad$(LDFTYPE) \
+	world$(LDFTYPE) \
+	zone$(LDFTYPE)
 
 OBJ_MENU= \
-	menu.o \
-	mvm_cmds.o
+	menu$(LDFTYPE) \
+	mvm_cmds$(LDFTYPE)
 
-# note that builddate.c is very intentionally not compiled to a .o before
+# note that builddate.c is very intentionally not compiled to a $(LDFTYPE) before
 # being linked, because it should be recompiled every time an executable is
 # built to give the executable a proper date string
-OBJ_SV= builddate.c sys_unix.o vid_null.o thread_null.o $(OBJ_SND_NULL) $(OBJ_COMMON)
-OBJ_SDL= builddate.c sys_sdl.o vid_sdl.o thread_sdl.o $(OBJ_MENU) $(OBJ_SND_COMMON) $(OBJ_SND_XMP) snd_sdl.o $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
+OBJ_SV= builddate.c sys_unix$(LDFTYPE) vid_null$(LDFTYPE) thread_null$(LDFTYPE) $(OBJ_SND_NULL) $(OBJ_COMMON)
+OBJ_SDL= builddate.c sys_sdl$(LDFTYPE) vid_sdl$(LDFTYPE) thread_sdl$(LDFTYPE) $(OBJ_MENU) $(OBJ_SND_COMMON) $(OBJ_SND_XMP) snd_sdl$(LDFTYPE) $(OBJ_VIDEO_CAPTURE) $(OBJ_COMMON)
 
 
 # Compilation
@@ -428,61 +429,61 @@ prepare :
 
 
 #this checks USEODE when compiling so it needs the ODE flags as well
-cl_parse.o: cl_parse.c
+cl_parse$(LDFTYPE): cl_parse.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-cs_progs.o: cs_progs.c
+cs_progs$(LDFTYPE): cs_progs.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-sv_main.o: sv_main.c
+sv_main$(LDFTYPE): sv_main.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-sv_phys.o: sv_phys.c
+sv_phys$(LDFTYPE): sv_phys.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-prvm_cmds.o: prvm_cmds.c
+prvm_cmds$(LDFTYPE): prvm_cmds.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-world.o: world.c
+world$(LDFTYPE): world.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_ODE)
 
-crypto.o: crypto.c
+crypto$(LDFTYPE): crypto.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_CRYPTO) $(CFLAGS_CRYPTO_RIJNDAEL)
 
-mod_skeletal_animatevertices_sse.o: mod_skeletal_animatevertices_sse.c
+mod_skeletal_animatevertices_sse$(LDFTYPE): mod_skeletal_animatevertices_sse.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SSE)
 
-snd_xmp.o: snd_xmp.c
+snd_xmp$(LDFTYPE): snd_xmp.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SND_XMP)
 
 #this checks USEXMP when compiling so it needs the XMP flags as well
-snd_main.o: snd_main.c
+snd_main$(LDFTYPE): snd_main.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SND_XMP)
 
 #this checks USEXMP when compiling so it needs the XMP flags as well
-snd_mem.o: snd_mem.c
+snd_mem$(LDFTYPE): snd_mem.c
 	$(CHECKLEVEL2)
 	$(DO_CC) $(CFLAGS_SND_XMP)
 
-darkplaces.o: %.o : %.rc
+darkplaces$(LDFTYPE): %$(LDFTYPE) : %.rc
 	$(CHECKLEVEL2)
 	$(WINDRES) -o $@ $<
 
-nexuiz.o: %.o : %.rc
+nexuiz$(LDFTYPE): %$(LDFTYPE) : %.rc
 	$(CHECKLEVEL2)
 	$(WINDRES) -o $@ $<
 
-.c.o:
+.c$(LDFTYPE):
 	$(CHECKLEVEL2)
 	$(DO_CC)
 
@@ -507,7 +508,7 @@ clean:
 	-$(CMD_RM) $(EXE_SDL)
 	-$(CMD_RM) $(EXE_SVNEXUIZ)
 	-$(CMD_RM) $(EXE_SDLNEXUIZ)
-	-$(CMD_RM) *.o
+	-$(CMD_RM) *$(LDFTYPE)
 	-$(CMD_RM) *.d
 	-$(CMD_RM) *.gch
 	-$(CMD_RM) build-obj/
