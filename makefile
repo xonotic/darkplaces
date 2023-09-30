@@ -1,7 +1,7 @@
 #####  DP_MAKE_TARGET autodetection and arch specific variables #####
 
 ifndef DP_MAKE_TARGET
-
+LDFLAGS_EXTRASV ?= $(LDFLAGS_EXTRA)
 # Win32
 ifdef WINDIR
 	DP_MAKE_TARGET=mingw
