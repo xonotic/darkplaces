@@ -26,7 +26,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define GAMENAME "id1"
 #define STARTCONFIGFILENAME "quake.rc"
-#define CONFIGFILENAME "config.cfg"
+#ifndef __EMSCRIPTEN__
+    #define CONFIGFILENAME "config.cfg"
+#else
+    #define CONFIGFILENAME "/data/config.cfg"
+#endif
 
 // moveflags values
 #define MOVEFLAG_VALID 0x80000000

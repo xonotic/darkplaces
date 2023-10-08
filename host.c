@@ -728,7 +728,9 @@ static inline double Host_UpdateTime (double newtime, double oldtime)
 
 	return time;
 }
-
+#ifdef __EMSCRIPTEN__
+EM_JS(void,emshutdown,(),{FS.syncfs(); window.close();});
+#endif
 void Host_Loop(void){
 	// Something bad happened, or the server disconnected
 	if (setjmp(host.abortframe))
@@ -745,6 +747,11 @@ void Host_Loop(void){
 
 	sleeptime -= Sys_DirtyTime() - host.dirtytime; // execution time
 	host.sleeptime = Host_Sleep(sleeptime);
+	#ifdef __EMSCRIPTEN__
+	if(host.state == host_shutdown){
+		emshutdown();
+	}
+	#endif
 }
 
 void Host_Main(void)
