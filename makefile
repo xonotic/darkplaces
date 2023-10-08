@@ -276,7 +276,7 @@ endif
 # jpeg
 ifeq ($(DP_LINK_JPEG), shared)
 	CFLAGS_LIBJPEG=-DLINK_TO_LIBJPEG
-	LIB_JPEG=-ljpeg
+	LIB_JPEG?=-ljpeg
 endif
 ifeq ($(DP_LINK_JPEG), dlopen)
 	CFLAGS_LIBJPEG=
