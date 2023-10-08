@@ -214,6 +214,7 @@ void Host_SaveConfig(const char *file)
 
 		FS_Close (f);
 	}
+	EM_ASM(FS.syncfs());
 }
 
 static void Host_SaveConfig_f(cmd_state_t *cmd)
