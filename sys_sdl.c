@@ -142,7 +142,7 @@ char *Sys_ConsoleInput(void)
 			len = 0;
 	}
 #else
-	#ifndef DP_WASM
+	#ifndef __EMSCRIPTEN__
 	fd_set fdset;
 	struct timeval timeout;
 	FD_ZERO(&fdset);

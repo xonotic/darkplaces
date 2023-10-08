@@ -22,11 +22,17 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #include "quakedef.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
+
 #include <time.h>
 #include "libcurl.h"
 #include "taskqueue.h"
 #include "utf8lib.h"
 
+double timee, oldtime, sleeptime;
 /*
 
 A server can always be started, even if the system started out as a client
@@ -723,9 +729,26 @@ static inline double Host_UpdateTime (double newtime, double oldtime)
 	return time;
 }
 
+void Host_Loop(void){
+	// Something bad happened, or the server disconnected
+	if (setjmp(host.abortframe))
+	{
+		host.state = host_active; // In case we were loading
+	}
+
+	host.dirtytime = Sys_DirtyTime();
+	host.realtime += timee = Host_UpdateTime(host.dirtytime, oldtime);
+
+	sleeptime = Host_Frame(timee);
+	oldtime = host.dirtytime;
+	++host.framecount;
+
+	sleeptime -= Sys_DirtyTime() - host.dirtytime; // execution time
+	host.sleeptime = Host_Sleep(sleeptime);
+}
+
 void Host_Main(void)
 {
-	double time, oldtime, sleeptime;
 
 	Host_Init(); // Start!
 
@@ -733,25 +756,13 @@ void Host_Main(void)
 	oldtime = Sys_DirtyTime();
 
 	// Main event loop
+	#ifdef __EMSCRIPTEN__
+	emscripten_set_main_loop(Host_Loop,60,true);
+	#else
 	while(host.state != host_shutdown)
 	{
-		// Something bad happened, or the server disconnected
-		if (setjmp(host.abortframe))
-		{
-			host.state = host_active; // In case we were loading
-			continue;
-		}
-
-		host.dirtytime = Sys_DirtyTime();
-		host.realtime += time = Host_UpdateTime(host.dirtytime, oldtime);
-
-		sleeptime = Host_Frame(time);
-		oldtime = host.dirtytime;
-		++host.framecount;
-
-		sleeptime -= Sys_DirtyTime() - host.dirtytime; // execution time
-		host.sleeptime = Host_Sleep(sleeptime);
+		Host_Loop();
 	}
-
+	#endif
 	return;
 }
