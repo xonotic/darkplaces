@@ -142,6 +142,7 @@ char *Sys_ConsoleInput(void)
 			len = 0;
 	}
 #else
+	#ifndef DP_WASM
 	fd_set fdset;
 	struct timeval timeout;
 	FD_ZERO(&fdset);
@@ -158,6 +159,8 @@ char *Sys_ConsoleInput(void)
 			return text;
 		}
 	}
+	#endif
+	
 #endif
 	return NULL;
 }

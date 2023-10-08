@@ -54,6 +54,7 @@ static void Key_History_Init(void)
 
 // not necessary for mobile
 #ifndef DP_MOBILETOUCH
+#ifndef DP_WASM
 	historyfile = FS_OpenRealFile("darkplaces_history.txt", "rb", false); // rb to handle unix line endings on windows too
 	if(historyfile)
 	{
@@ -86,6 +87,7 @@ static void Key_History_Init(void)
 		FS_Close(historyfile);
 	}
 #endif
+#endif
 
 	history_line = -1;
 }
@@ -96,6 +98,7 @@ static void Key_History_Shutdown(void)
 
 // not necessary for mobile
 #ifndef DP_MOBILETOUCH
+#ifndef DP_WASM
 	qfile_t *historyfile = FS_OpenRealFile("darkplaces_history.txt", "w", false);
 	if(historyfile)
 	{
@@ -104,6 +107,7 @@ static void Key_History_Shutdown(void)
 			FS_Printf(historyfile, "%s\n", ConBuffer_GetLine(&history, i));
 		FS_Close(historyfile);
 	}
+#endif
 #endif
 
 	ConBuffer_Shutdown(&history);
