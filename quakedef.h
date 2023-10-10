@@ -29,7 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __EMSCRIPTEN__
     #define CONFIGFILENAME "config.cfg"
 #else
-    #define CONFIGFILENAME "/config/config.cfg"
+    #define CONFIGFILENAME "/save/config.cfg"
 #endif
 
 // moveflags values

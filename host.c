@@ -43,6 +43,148 @@ A client can NOT be started if the system started as a dedicated server.
 Memory is cleared / released when a server or client begins, not when they end.
 
 */
+#ifdef __EMSCRIPTEN__
+
+EM_JS(bool,syncFS,(bool x),{
+	FS.syncfs(x,function(e){
+		if(e){
+			alert("FileSystem Save Error: "+e);
+			return false;
+		} else{
+			console.log("Filesystem Saved!");
+			return true;
+		}
+	})});
+
+EM_JS(void,emshutdown,(),{
+	FS.syncfs(false,function(e){
+		if(e){
+			alert("FileSystem Save Error: "+e+" while shutting down.");
+			return false;
+		} else{
+			console.log("Filesystem Saved!");
+			return true;
+		}
+	});
+	window.close();
+})
+
+EM_JS(char*,rm,(char* x),{
+	const mode = FS.lookupPath(UTF8ToString(x)).node.mode;
+	if(FS.isFile(mode)){
+		FS.unlink(UTF8ToString(x));
+		return stringToNewUTF8("File removed"); 
+	}
+	else {
+		return stringToNewUTF8(x+" is not a File.");
+	}
+	});
+
+EM_JS(char*,rmdir,(char* x),{
+	const mode = FS.lookupPath(UTF8ToString(x)).node.mode;
+	if(FS.isDir(mode)){
+		try{FS.rmdir(UTF8ToString(x));} catch (error) {return stringToNewUTF8("Unable to remove directory. Is it not empty?");}
+		 
+		return stringToNewUTF8("Directory removed"); 
+	}
+	else {
+		return stringToNewUTF8(x+" is not a directory.");
+	}
+	});
+
+EM_JS(void,readyup,(),{
+	if (isready() == 0) {
+		alert("No GameData Found. Please upload all GameData using the \"em_upload\" command, save with \"em_save\" and restart the game!");
+		//straight off stackoverflow(well, slightly changed). Thanks, Riot!
+		FS.mkdir("/save/data");
+	}
+});
+
+EM_JS(char*,upload,(char* todirectory),{
+	if(UTF8ToString(todirectory).slice(-1) != "/"){
+		currentname = UTF8ToString(todirectory) + "/";
+	}
+	else{
+		currentname = UTF8ToString(todirectory);
+	}
+	
+	file_selector.click();
+	return stringToNewUTF8("Upload started");
+
+});
+
+EM_JS(char*, listfiles,(char* directory),{ if(UTF8ToString(directory) == ""){
+	console.log("listing cwd"); 
+	return stringToNewUTF8(FS.readdir(FS.cwd()).toString())
+}  
+try{
+return  stringToNewUTF8(FS.readdir(UTF8ToString(directory)).toString()); 
+} catch(error){
+	return stringToNewUTF8("directory not found");
+}
+});
+
+void listfiles_f(cmd_state_t *cmd){
+	if(Cmd_Argc(cmd) != 2){
+		
+		Con_Printf(listfiles(""));
+		Con_Printf("\n");
+	}
+	else{
+		Con_Printf(listfiles(Cmd_Argv(cmd,1)) );
+		Con_Printf("\n");
+	}
+}
+void savefs_f(cmd_state_t *cmd){
+	Con_Printf("Saving Files\n");
+	if(syncFS(false)){
+		Con_Printf("Files Saved to Browser Storage\n");
+	} else{
+		Con_Printf("File Save failed.\n");
+	}
+}
+
+void upload_f(cmd_state_t *cmd){
+	if(Cmd_Argc(cmd) != 2){
+		Con_Printf(upload("/save/data"));
+		Con_Printf("\n");
+	}
+	else{
+		Con_Printf(upload(Cmd_Argv(cmd,1)));
+		Con_Printf("\n");
+	}
+}
+
+void rm_f(cmd_state_t *cmd){
+	if(Cmd_Argc(cmd) != 2){
+		Con_Printf("No file to remove");
+	}
+	else{
+		Con_Printf(rm(Cmd_Argv(cmd,1)));
+		Con_Printf("\n");
+	}
+}
+
+void rmdir_f(cmd_state_t *cmd){
+	if(Cmd_Argc(cmd) != 2){
+		Con_Printf("No directory to remove");
+	}
+	else{
+		Con_Printf(rmdir(Cmd_Argv(cmd,1)));
+		Con_Printf("\n");
+	}
+}
+bool engineup = false;
+
+void fillcanvas(){
+		EmscriptenFullscreenStrategy strat;
+		strat.scaleMode = EMSCRIPTEN_FULLSCREEN_CANVAS_SCALE_HIDEF;
+		strat.canvasResolutionScaleMode = EMSCRIPTEN_FULLSCREEN_CANVAS_SCALE_HIDEF;
+		strat.filteringMode = EMSCRIPTEN_FULLSCREEN_FILTERING_DEFAULT;
+		emscripten_enter_soft_fullscreen("canvas",&strat);
+}
+
+#endif
 
 host_static_t host;
 
@@ -66,6 +208,8 @@ cvar_t sessionid = {CF_CLIENT | CF_SERVER | CF_READONLY, "sessionid", "", "ID of
 cvar_t locksession = {CF_CLIENT | CF_SERVER, "locksession", "0", "Lock the session? 0 = no, 1 = yes and abort on failure, 2 = yes and continue on failure"};
 
 cvar_t host_isclient = {CF_SHARED | CF_READONLY, "_host_isclient", "0", "If 1, clientside is active."};
+
+
 
 /*
 ================
@@ -214,7 +358,7 @@ void Host_SaveConfig(const char *file)
 
 		FS_Close (f);
 	}
-	EM_ASM(FS.syncfs());
+	syncFS(false);
 }
 
 static void Host_SaveConfig_f(cmd_state_t *cmd)
@@ -253,6 +397,9 @@ Resets key bindings and cvars to defaults and then reloads scripts
 */
 static void Host_LoadConfig_f(cmd_state_t *cmd)
 {
+	#ifdef __EMSCRIPTEN__
+		syncFS(true);
+	#endif
 	// reset all cvars, commands and aliases to init values
 	Cmd_RestoreInitState();
 #ifdef CONFIG_MENU
@@ -276,6 +423,13 @@ static void Host_InitLocal (void)
 	Cmd_AddCommand(CF_SHARED, "saveconfig", Host_SaveConfig_f, "save settings to config.cfg (or a specified filename) immediately (also automatic when quitting)");
 	Cmd_AddCommand(CF_SHARED, "loadconfig", Host_LoadConfig_f, "reset everything and reload configs");
 	Cmd_AddCommand(CF_SHARED, "sendcvar", SendCvar_f, "sends the value of a cvar to the server as a sentcvar command, for use by QuakeC");
+	#ifdef __EMSCRIPTEN__
+		Cmd_AddCommand(CF_SHARED, "em_ls", listfiles_f, "Lists Files in specified directory defaulting to the current working directory (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "em_upload", upload_f, "Upload file to specified directory defaulting to /save/data (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "em_save", savefs_f, "Save file changes to browser (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "em_rm", rm_f, "Remove a file from game Filesystem (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "em_rmdir", rmdir_f, "Remove a directory from game Filesystem (Emscripten Only)");
+	#endif
 	Cvar_RegisterVariable (&host_framerate);
 	Cvar_RegisterCallback (&host_framerate, Host_Framerate_c);
 	Cvar_RegisterVariable (&host_speeds);
@@ -371,6 +525,10 @@ Host_Init
 */
 static void Host_Init (void)
 {
+	#ifdef __EMSCRIPTEN__
+		readyup();
+		fillcanvas();
+	#endif
 	int i;
 	const char* os;
 	char vabuf[1024];
@@ -452,7 +610,11 @@ static void Host_Init (void)
 	FS_Init();
 
 	// construct a version string for the corner of the console
-	os = DP_OS_NAME;
+	#ifndef __EMSCRIPTEN__
+		os = DP_OS_NAME;
+	#else
+		os = "Emscripten";
+	#endif
 	dpsnprintf (engineversion, sizeof (engineversion), "%s %s %s", gamename, os, buildstring);
 	Con_Printf("%s\n", engineversion);
 
@@ -562,7 +724,10 @@ static void Host_Init (void)
 	}
 
 	Con_DPrint("========Initialized=========\n");
-
+	
+	#ifdef __EMSCRIPTEN__
+		engineup = true;
+	#endif
 	if (cls.state != ca_dedicated)
 		SV_StartThread();
 }
@@ -729,11 +894,15 @@ static inline double Host_UpdateTime (double newtime, double oldtime)
 
 	return time;
 }
-#ifdef __EMSCRIPTEN__
-EM_JS(void,emshutdown,(),{FS.syncfs(); window.close();});
-#endif
+
 void Host_Loop(void){
 	// Something bad happened, or the server disconnected
+	#ifdef __EMSCRIPTEN__
+		if(engineup == false){
+			return;
+		}
+	#endif
+
 	if (setjmp(host.abortframe))
 	{
 		host.state = host_active; // In case we were loading
@@ -748,18 +917,19 @@ void Host_Loop(void){
 
 	sleeptime -= Sys_DirtyTime() - host.dirtytime; // execution time
 	host.sleeptime = Host_Sleep(sleeptime);
+
 	#ifdef __EMSCRIPTEN__
-	if(host.state == host_shutdown){
-		emshutdown();
-	}
+	if(host.state == host_shutdown){emshutdown(); engineup = false;}
 	#endif
+	
 }
+
+
 
 void Host_Main(void)
 {
-
+	
 	Host_Init(); // Start!
-
 	host.realtime = 0;
 	oldtime = Sys_DirtyTime();
 

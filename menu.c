@@ -21,9 +21,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cdaudio.h"
 #include "image.h"
 #include "progsvm.h"
-
 #include "mprogdefs.h"
+#ifdef __EMSCRIPTEN__
+	#include <emscripten.h>
 
+#endif
 #define TYPE_DEMO 1
 #define TYPE_GAME 2
 #define TYPE_BOTH 3
@@ -358,7 +360,7 @@ static int	m_main_cursor;
 static qbool m_missingdata = false;
 
 static int MAIN_ITEMS = 4; // Nehahra: Menu Disable
-
+static qbool emmenu = false;
 
 void M_Menu_Main_f(cmd_state_t *cmd)
 {
@@ -412,10 +414,15 @@ void M_Menu_Main_f(cmd_state_t *cmd)
 		MAIN_ITEMS = 5;
 
 	// check if the game data is missing and use a different main menu if so
+
 	m_missingdata = !forceqmenu.integer && !Draw_IsPicLoaded(Draw_CachePic_Flags(s, CACHEPICFLAG_FAILONMISSING));
 	if (m_missingdata)
 		MAIN_ITEMS = 2;
 
+	#ifdef __EMSCRIPTEN__
+		MAIN_ITEMS=1;
+		emmenu = true;
+	#endif
 	/*
 	if (key_dest != key_menu)
 	{
@@ -435,7 +442,14 @@ static void M_Main_Draw (void)
 	cachepic_t	*p;
 	char vabuf[1024];
 
-	if (m_missingdata)
+	if(emmenu){
+		M_Background(640, 480); //fall back is always to 640x480, this makes it most readable at that.
+		float y;
+		const char *s;
+		y = 480/3-16;
+		s = "Press Enter to Start Game";M_PrintRed ((640-strlen(s)*8)*0.5, (480/3)-16, s);y+=8;
+	}
+	else if (m_missingdata)
 	{
 		float y;
 		const char *s;
@@ -495,7 +509,11 @@ static void M_Main_Draw (void)
 
 	M_DrawPic (54, 32 + m_main_cursor * 20, va(vabuf, sizeof(vabuf), "gfx/menudot%i", f+1));
 }
+void M_Menu_Restart_f(cmd_state_t *cmd){
 
+	Cbuf_AddText(cmd, "loadconfig\nmenu_reset\n");
+	Cbuf_Execute(cmd->cbuf);
+}
 
 static void M_Main_Key(cmd_state_t *cmd, int key, int ascii)
 {
@@ -523,7 +541,10 @@ static void M_Main_Key(cmd_state_t *cmd, int key, int ascii)
 
 	case K_ENTER:
 		m_entersound = true;
-
+		if(emmenu){
+			emmenu = false;
+			M_Menu_Restart_f(cmd);
+		}
 		if (m_missingdata)
 		{
 			switch (m_main_cursor)
@@ -2733,6 +2754,7 @@ static void M_Keys_Key(cmd_state_t *cmd, int k, int ascii)
 		break;
 	}
 }
+
 
 void M_Menu_Reset_f(cmd_state_t *cmd)
 {
