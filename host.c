@@ -158,6 +158,7 @@ void upload_f(cmd_state_t *cmd){
 void rm_f(cmd_state_t *cmd){
 	if(Cmd_Argc(cmd) != 2){
 		Con_Printf("No file to remove");
+		Con_Printf("\n");
 	}
 	else{
 		Con_Printf(rm(Cmd_Argv(cmd,1)));
@@ -168,6 +169,7 @@ void rm_f(cmd_state_t *cmd){
 void rmdir_f(cmd_state_t *cmd){
 	if(Cmd_Argc(cmd) != 2){
 		Con_Printf("No directory to remove");
+		Con_Printf("\n");
 	}
 	else{
 		Con_Printf(rmdir(Cmd_Argv(cmd,1)));
@@ -425,10 +427,10 @@ static void Host_InitLocal (void)
 	Cmd_AddCommand(CF_SHARED, "sendcvar", SendCvar_f, "sends the value of a cvar to the server as a sentcvar command, for use by QuakeC");
 	#ifdef __EMSCRIPTEN__
 		Cmd_AddCommand(CF_SHARED, "em_ls", listfiles_f, "Lists Files in specified directory defaulting to the current working directory (Emscripten Only)");
-		Cmd_AddCommand(CF_SHARED, "em_upload", upload_f, "Upload file to specified directory defaulting to /save/data (Emscripten Only)");
-		Cmd_AddCommand(CF_SHARED, "em_save", savefs_f, "Save file changes to browser (Emscripten Only)");
-		Cmd_AddCommand(CF_SHARED, "em_rm", rm_f, "Remove a file from game Filesystem (Emscripten Only)");
-		Cmd_AddCommand(CF_SHARED, "em_rmdir", rmdir_f, "Remove a directory from game Filesystem (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "upload", upload_f, "Upload file to specified directory defaulting to /save/data (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "save", savefs_f, "Save file changes to browser (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "rm", rm_f, "Remove a file from game Filesystem (Emscripten Only)");
+		Cmd_AddCommand(CF_SHARED, "rmdir", rmdir_f, "Remove a directory from game Filesystem (Emscripten Only)");
 	#endif
 	Cvar_RegisterVariable (&host_framerate);
 	Cvar_RegisterCallback (&host_framerate, Host_Framerate_c);
