@@ -838,7 +838,10 @@ void GL_Setup(void)
 		if (samples > 1)
 			qglEnable(GL_MULTISAMPLE);
 		else
+		{
+			qglDisable(GL_MULTISAMPLE);
 			vid.allowalphatocoverage = false;
+		}
 	}
 	// currently MSAA antialiasing is not implemented for fbo viewports, so we actually have to force this off anyway.
 	vid.allowalphatocoverage = false;
