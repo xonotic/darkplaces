@@ -1566,7 +1566,6 @@ static void SCR_DrawLoadingScreen(void);
 static void SCR_DrawScreen (void)
 {
 	Draw_Frame();
-	DrawQ_Start();
 	R_Mesh_Start();
 	R_UpdateVariables();
 
