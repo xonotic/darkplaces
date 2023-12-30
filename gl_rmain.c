@@ -5825,6 +5825,7 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 	if (r_timereport_active)
 		R_TimeReport("skystartframe");
 
+	// TODO: move after depth pass or opaque pass
 	if (cl.csqc_vidvars.drawworld)
 	{
 		// don't let sound skip if going slow
@@ -5833,6 +5834,7 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 
 		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
 		{
+			// TODO: call DrawSky only if visible?
 			r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
 			if (r_timereport_active)
 				R_TimeReport("worldsky");
@@ -5841,6 +5843,7 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 		if (R_DrawBrushModelsSky() && r_timereport_active)
 			R_TimeReport("bmodelsky");
 
+		// TODO: skip it if sky is not visible
 		if (skyrendermasked && skyrenderlater)
 		{
 			// we have to force off the water clipping plane while rendering sky
@@ -8980,8 +8983,11 @@ static void R_QueueModelSurfaceList(entity_render_t *ent, int numsurfaces, const
 			rsurface.lightmaptexture = NULL;
 			rsurface.deluxemaptexture = NULL;
 			rsurface.uselightmaptexture = false;
-			// simply scan ahead until we find a different texture or lightmap state
-			for (;j < numsurfaces && texture == surfacelist[j]->texture;j++)
+			// simply scan ahead until we find a different texture state on prepass
+			// or draw it all(pre-filtered) on depth pass
+			if(depthonly)
+				j = numsurfaces;
+			else for (;j < numsurfaces && texture == surfacelist[j]->texture;j++)
 				;
 		}
 		else
@@ -9949,6 +9955,7 @@ void R_DrawModelSurfaces(entity_render_t *ent, qbool skysurfaces, qbool writedep
 	if (model == NULL)
 		return;
 
+	// Reallocate buffer if too small
 	if (r_maxsurfacelist < model->num_surfaces)
 	{
 		r_maxsurfacelist = model->num_surfaces;
@@ -9993,10 +10000,16 @@ void R_DrawModelSurfaces(entity_render_t *ent, qbool skysurfaces, qbool writedep
 	if (ent == r_refdef.scene.worldentity)
 	{
 		// for the world entity, check surfacevisible
-		for (i = model->submodelsurfaces_start;i < model->submodelsurfaces_end;i++)
+		if(!depthonly) for (i = model->submodelsurfaces_start;i < model->submodelsurfaces_end;i++)
 		{
 			j = model->modelsurfaces_sorted[i];
 			if (r_refdef.viewcache.world_surfacevisible[j])
+				r_surfacelist[numsurfacelist++] = surfaces + j;
+		}
+		else for (i = model->submodelsurfaces_start;i < model->submodelsurfaces_end;i++)
+		{
+			j = model->modelsurfaces_sorted[i];
+			if (r_refdef.viewcache.world_surfacevisible[j] && !(surfaces[j].texture->currentmaterialflags & (MATERIALFLAG_NODEPTHTEST | MATERIALFLAG_BLENDED | MATERIALFLAG_ALPHATEST)) && !(r_fb.water.renderingscene && (surfaces[j].texture->currentmaterialflags & (MATERIALFLAG_WATERSHADER | MATERIALFLAG_REFLECTION))))
 				r_surfacelist[numsurfacelist++] = surfaces + j;
 		}
 
