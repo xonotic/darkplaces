@@ -671,6 +671,7 @@ extern void (GLAPIENTRY *qglDrawArrays)(GLenum mode, GLint first, GLsizei count)
 extern void (GLAPIENTRY *qglDrawBuffer)(GLenum mode);
 extern void (GLAPIENTRY *qglDrawBuffers)(GLsizei n, const GLenum *bufs);
 extern void (GLAPIENTRY *qglDrawElements)(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
+extern void (GLAPIENTRY *qglMultiDrawElements)(GLenum mode, const GLsizei *count, GLenum type, const GLvoid *indices, GLsizei drawcount);
 extern void (GLAPIENTRY *qglEnable)(GLenum cap);
 extern void (GLAPIENTRY *qglEnableVertexAttribArray)(GLuint index);
 extern void (GLAPIENTRY *qglEndQuery)(GLenum target);
@@ -851,6 +852,7 @@ extern void (GLAPIENTRY *qglViewport)(GLint x, GLint y, GLsizei width, GLsizei h
 #define qglDrawBuffer glDrawBuffer
 #define qglDrawBuffers glDrawBuffers
 #define qglDrawElements glDrawElements
+#define qglMultiDrawElements glMultiDrawElements
 #define qglEnable glEnable
 #define qglEnableVertexAttribArray glEnableVertexAttribArray
 #define qglEndQuery glEndQuery

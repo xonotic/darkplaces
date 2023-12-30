@@ -278,6 +278,7 @@ void (GLAPIENTRY *qglDrawArrays)(GLenum mode, GLint first, GLsizei count);
 void (GLAPIENTRY *qglDrawBuffer)(GLenum mode);
 void (GLAPIENTRY *qglDrawBuffers)(GLsizei n, const GLenum *bufs);
 void (GLAPIENTRY *qglDrawElements)(GLenum mode, GLsizei count, GLenum type, const GLvoid *indices);
+void (GLAPIENTRY *qglMultiDrawElements)(GLenum mode, const GLsizei *count, GLenum type, const GLvoid *indices, GLsizei drawcount);
 void (GLAPIENTRY *qglEnable)(GLenum cap);
 void (GLAPIENTRY *qglEnableVertexAttribArray)(GLuint index);
 void (GLAPIENTRY *qglEndQuery)(GLenum target);
@@ -473,6 +474,7 @@ static glfunction_t openglfuncs[] =
 	{"core", "glDrawBuffer", (void **) &qglDrawBuffer},
 	{"core", "glDrawBuffers", (void **) &qglDrawBuffers},
 	{"core", "glDrawElements", (void **) &qglDrawElements},
+	{"core", "glMultiDrawElements", (void **) &qglMultiDrawElements},
 	{"core", "glEnable", (void **) &qglEnable},
 	{"core", "glEnableVertexAttribArray", (void **) &qglEnableVertexAttribArray},
 	{"core", "glEndQuery", (void **) &qglEndQuery},

@@ -933,7 +933,7 @@ static void GL_BindVBO(int bufferobject)
 	}
 }
 
-static void GL_BindEBO(int bufferobject)
+void GL_BindEBO(int bufferobject)
 {
 	if (gl_state.elementbufferobject != bufferobject)
 	{

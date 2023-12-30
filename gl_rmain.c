@@ -8472,6 +8472,9 @@ void RSurf_PrepareVerticesForBatch(int batchneed, int texturenumsurfaces, const 
 	}
 }
 
+static void **drawbatch_buffer = NULL;
+static size_t drawbatch_buffer_size = 0;
+extern void GL_BindEBO(int bufferobject);
 void RSurf_DrawBatch(void)
 {
 	// sometimes a zero triangle surface (usually a degenerate patch) makes it
@@ -8507,11 +8510,36 @@ void RSurf_DrawBatch(void)
 	if (rsurface.batchmultidraw)
 	{
 		// issue multiple draws rather than copying index data
-		int numsurfaces = rsurface.batchmultidrawnumsurfaces;
-		const msurface_t **surfacelist = rsurface.batchmultidrawsurfacelist;
-		int i, j, k, firstvertex, endvertex, firsttriangle, endtriangle;
-		for (i = 0;i < numsurfaces;)
+		const msurface_t **surfacelist;
+		int numsurfaces;
+		int drawcount;
+		void **firstoffset;
+		GLsizei *indcount;
+		int i, j, k, firstvertex, endvertex, firsttriangle, endtriangle, idraw;
+		surfacelist = rsurface.batchmultidrawsurfacelist;
+		numsurfaces = rsurface.batchmultidrawnumsurfaces;
+		// count entries in batch
+		drawcount = 1;
+		for (k = 0, j = 1; j < numsurfaces; k = j, j++)
+			if (surfacelist[j] != surfacelist[k] + 1)
+				drawcount++;
 		{
+			size_t size;
+			size = drawcount * (sizeof(void*) + sizeof(GLsizei));
+			if(size > drawbatch_buffer_size) {
+				Mem_Free(drawbatch_buffer);
+				drawbatch_buffer = NULL;
+			}
+			if(!drawbatch_buffer) {
+				drawbatch_buffer_size = size < 128 ? 128 : size;
+				drawbatch_buffer = (void**)Mem_Alloc(r_main_mempool, drawbatch_buffer_size * (sizeof(void*) + sizeof(GLsizei)));
+			}
+			firstoffset = drawbatch_buffer;
+			indcount = (GLsizei*)(drawbatch_buffer + drawcount);
+		}
+		for (i = 0, idraw = 0;i < numsurfaces; idraw++)
+		{
+			assert(idraw < drawcount);
 			// combine consecutive surfaces as one draw
 			for (k = i, j = i + 1;j < numsurfaces;k = j, j++)
 				if (surfacelist[j] != surfacelist[k] + 1)
@@ -8520,8 +8548,35 @@ void RSurf_DrawBatch(void)
 			endvertex = surfacelist[k]->num_firstvertex + surfacelist[k]->num_vertices;
 			firsttriangle = surfacelist[i]->num_firsttriangle;
 			endtriangle = surfacelist[k]->num_firsttriangle + surfacelist[k]->num_triangles;
-			R_Mesh_Draw(firstvertex, endvertex - firstvertex, firsttriangle, endtriangle - firsttriangle, rsurface.batchelement3i, rsurface.batchelement3i_indexbuffer, rsurface.batchelement3i_bufferoffset, rsurface.batchelement3s, rsurface.batchelement3s_indexbuffer, rsurface.batchelement3s_bufferoffset);
+			if(rsurface.batchelement3s_indexbuffer) {
+				firstoffset[idraw] = (void*)(rsurface.batchelement3s_bufferoffset + (firsttriangle * 3 * sizeof(GLushort)));
+				indcount[idraw] = (endtriangle - firsttriangle) * 3;
+				r_refdef.stats[r_stat_draws]++;
+				r_refdef.stats[r_stat_draws_vertices] += endvertex - firstvertex;
+				r_refdef.stats[r_stat_draws_elements] += endtriangle - firsttriangle;
+			} else if (rsurface.batchelement3i_indexbuffer) {
+				firstoffset[idraw] = (void*)(rsurface.batchelement3i_bufferoffset + (firsttriangle * 3 * sizeof(GLuint)));
+				indcount[idraw] = (endtriangle - firsttriangle) * 3;
+				r_refdef.stats[r_stat_draws]++;
+				r_refdef.stats[r_stat_draws_vertices] += endvertex - firstvertex;
+				r_refdef.stats[r_stat_draws_elements] += endtriangle - firsttriangle;
+			} else {
+				// fallback for dynamic surface and glDrawArray
+				R_Mesh_Draw(firstvertex, endvertex - firstvertex, firsttriangle, endtriangle - firsttriangle, rsurface.batchelement3i, rsurface.batchelement3i_indexbuffer, rsurface.batchelement3i_bufferoffset, rsurface.batchelement3s, rsurface.batchelement3s_indexbuffer, rsurface.batchelement3s_bufferoffset);
+			}
 			i = j;
+		}
+
+		if (rsurface.batchelement3s_indexbuffer) {
+			CHECKGLERROR
+			GL_BindEBO(rsurface.batchelement3s_indexbuffer->bufferobject);
+			qglMultiDrawElements(GL_TRIANGLES, indcount, GL_UNSIGNED_SHORT, firstoffset, drawcount);
+			CHECKGLERROR
+		} else if (rsurface.batchelement3i_indexbuffer) {
+			CHECKGLERROR
+			GL_BindEBO(rsurface.batchelement3i_indexbuffer->bufferobject);
+			qglMultiDrawElements(GL_TRIANGLES, indcount, GL_UNSIGNED_INT, firstoffset, drawcount);
+			CHECKGLERROR
 		}
 	}
 	else
