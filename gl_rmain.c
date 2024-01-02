@@ -7257,26 +7257,6 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 		// don't let sound skip if going slow
 		if (r_refdef.scene.extraupdate)
 			S_ExtraUpdate ();
-
-		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
-		{
-			r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
-			if (r_timereport_active)
-				R_TimeReport("worldsky");
-		}
-
-		if (R_DrawBrushModelsSky() && r_timereport_active)
-			R_TimeReport("bmodelsky");
-
-		if (skyrendermasked && skyrenderlater)
-		{
-			// we have to force off the water clipping plane while rendering sky
-			R_SetupView(false, fbo, depthtexture, colortexture);
-			R_Sky();
-			R_SetupView(true, fbo, depthtexture, colortexture);
-			if (r_timereport_active)
-				R_TimeReport("sky");
-		}
 	}
 
 	R_Shadow_PrepareModelShadows();
@@ -7329,6 +7309,30 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 	// don't let sound skip if going slow
 	if (r_refdef.scene.extraupdate)
 		S_ExtraUpdate ();
+
+	if (cl.csqc_vidvars.drawworld)
+	{
+		// don't let sound skip if going slow
+		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
+		{
+			r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
+			if (r_timereport_active)
+				R_TimeReport("worldsky");
+		}
+
+		if (R_DrawBrushModelsSky() && r_timereport_active)
+			R_TimeReport("bmodelsky");
+
+		if (skyrendermasked && skyrenderlater)
+		{
+			// we have to force off the water clipping plane while rendering sky
+			R_SetupView(false, fbo, depthtexture, colortexture);
+			R_Sky();
+			R_SetupView(true, fbo, depthtexture, colortexture);
+			if (r_timereport_active)
+				R_TimeReport("sky");
+		}
+	}
 
 	if ((r_shadows.integer == 1 || (r_shadows.integer > 0 && !shadowmapping)) && !r_shadows_drawafterrtlighting.integer && r_refdef.scene.lightmapintensity > 0)
 	{
