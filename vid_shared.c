@@ -1197,14 +1197,19 @@ void VID_CheckExtensions(void)
 		vid.samples = samples;
 		if (samples > 1)
 			qglEnable(GL_MULTISAMPLE_ARB);
-		else
+		else {
+			qglDisable(GL_MULTISAMPLE_ARB);
 			vid.allowalphatocoverage = false;
+		}
 	}
 	else
 	{
 		vid.allowalphatocoverage = false;
 		vid.samples = 1;
 	}
+
+	if (vid_bitsperpixel.integer >= 24)
+		qglDisable(GL_DITHER);
 
 	// VorteX: set other info (maybe place them in VID_InitMode?)
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
