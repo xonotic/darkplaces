@@ -7,6 +7,7 @@ cvar_t r_sky = {CVAR_SAVE, "r_sky", "1", "enables sky rendering (black otherwise
 cvar_t r_skyscroll1 = {CVAR_SAVE, "r_skyscroll1", "1", "speed at which upper clouds layer scrolls in quake sky"};
 cvar_t r_skyscroll2 = {CVAR_SAVE, "r_skyscroll2", "2", "speed at which lower clouds layer scrolls in quake sky"};
 cvar_t r_sky_scissor = {0, "r_sky_scissor", "1", "limit rendering of sky to approximately the area of the sky surfaces"};
+extern cvar_t r_skylast;
 int skyrenderlater;
 int skyrendermasked;
 int skyscissor[4];
@@ -306,9 +307,11 @@ static void R_SkyBox(void)
 {
 	int i;
 	RSurf_ActiveCustomEntity(&skymatrix, &skyinversematrix, 0, 0, 1, 1, 1, 1, 6*4, skyboxvertex3f, skyboxtexcoord2f, NULL, NULL, NULL, NULL, 6*2, skyboxelement3i, skyboxelement3s, false, false);
+	int flags = MATERIALFLAG_SKY | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE;
+	flags |= r_skylast.integer > 0 ? 0 : MATERIALFLAG_NODEPTHTEST;
 	for (i = 0;i < 6;i++)
 		if(skyboxskinframe[i])
-			R_DrawCustomSurface(skyboxskinframe[i], &identitymatrix, MATERIALFLAG_SKY | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE, i*4, 4, i*2, 2, false, false);
+			R_DrawCustomSurface(skyboxskinframe[i], &identitymatrix, flags, i*4, 4, i*2, 2, false, false);
 }
 
 #define skygridx 32
@@ -395,9 +398,12 @@ static void R_SkySphere(void)
 	speedscale -= floor(speedscale);
 	Matrix4x4_CreateTranslate(&scroll2matrix, speedscale, speedscale, 0);
 
+	int flags = MATERIALFLAG_SKY | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE;
+	flags |= r_skylast.integer > 0 ? 0 : MATERIALFLAG_NODEPTHTEST;
+
 	RSurf_ActiveCustomEntity(&skymatrix, &skyinversematrix, 0, 0, 1, 1, 1, 1, skysphere_numverts, skysphere_vertex3f, skysphere_texcoord2f, NULL, NULL, NULL, NULL, skysphere_numtriangles, skysphere_element3i, skysphere_element3s, false, false);
-	R_DrawCustomSurface(r_refdef.scene.worldmodel->brush.solidskyskinframe, &scroll1matrix, MATERIALFLAG_SKY | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE | MATERIALFLAG_NODEPTHTEST                                            , 0, skysphere_numverts, 0, skysphere_numtriangles, false, false);
-	R_DrawCustomSurface(r_refdef.scene.worldmodel->brush.alphaskyskinframe, &scroll2matrix, MATERIALFLAG_SKY | MATERIALFLAG_FULLBRIGHT | MATERIALFLAG_NOCULLFACE | MATERIALFLAG_NODEPTHTEST | MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED, 0, skysphere_numverts, 0, skysphere_numtriangles, false, false);
+	R_DrawCustomSurface(r_refdef.scene.worldmodel->brush.solidskyskinframe, &scroll1matrix, flags, 0, skysphere_numverts, 0, skysphere_numtriangles, false, false);
+	R_DrawCustomSurface(r_refdef.scene.worldmodel->brush.alphaskyskinframe, &scroll2matrix, flags | MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED, 0, skysphere_numverts, 0, skysphere_numtriangles, false, false);
 }
 
 void R_Sky(void)

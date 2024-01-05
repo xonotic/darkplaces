@@ -83,6 +83,7 @@ cvar_t r_equalize_entities_by = {CVAR_SAVE, "r_equalize_entities_by", "0.7", "li
 cvar_t r_equalize_entities_to = {CVAR_SAVE, "r_equalize_entities_to", "0.8", "light equalizing: target light level (DEPRECATED)"};
 
 cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "0", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
+cvar_t r_skylast = {CVAR_SAVE, "r_skylast", "0", "renders sky after normal rendering ends to eliminate overdraw, values: 0 = nodepth sky first, 1 = sky after depth pass(if enabled), 2 = sky after world, 3 = sky after entities"};
 cvar_t r_useinfinitefarclip = {CVAR_SAVE, "r_useinfinitefarclip", "1", "enables use of a special kind of projection matrix that has an extremely large farclip"};
 cvar_t r_farclip_base = {0, "r_farclip_base", "65536", "farclip (furthest visible distance) for rendering when r_useinfinitefarclip is 0"};
 cvar_t r_farclip_world = {0, "r_farclip_world", "2", "adds map size to farclip multiplied by this value"};
@@ -4210,6 +4211,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_equalize_entities_by);
 	Cvar_RegisterVariable(&r_equalize_entities_to);
 	Cvar_RegisterVariable(&r_depthfirst);
+	Cvar_RegisterVariable(&r_skylast);
 	Cvar_RegisterVariable(&r_useinfinitefarclip);
 	Cvar_RegisterVariable(&r_farclip_base);
 	Cvar_RegisterVariable(&r_farclip_world);
@@ -7228,6 +7230,27 @@ static void R_DrawModelDecals(void);
 extern cvar_t cl_decals_newsystem;
 extern qboolean r_shadow_usingdeferredprepass;
 extern int r_shadow_shadowmapatlas_modelshadows_size;
+static void R_RenderSky(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture) {
+	if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
+	{
+		r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
+		if (r_timereport_active)
+			R_TimeReport("worldsky");
+	}
+
+	if (R_DrawBrushModelsSky() && r_timereport_active)
+		R_TimeReport("bmodelsky");
+
+	if (skyrendermasked && skyrenderlater)
+	{
+		// we have to force off the water clipping plane while rendering sky
+		R_SetupView(false, fbo, depthtexture, colortexture);
+		R_Sky();
+		R_SetupView(true, fbo, depthtexture, colortexture);
+		if (r_timereport_active)
+			R_TimeReport("sky");
+	}
+}
 void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 {
 	qboolean shadowmapping = false;
@@ -7257,6 +7280,8 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 		// don't let sound skip if going slow
 		if (r_refdef.scene.extraupdate)
 			S_ExtraUpdate ();
+		if(r_skylast.integer <= 0)
+			R_RenderSky(fbo, depthtexture, colortexture);
 	}
 
 	R_Shadow_PrepareModelShadows();
@@ -7290,6 +7315,8 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 		if (r_timereport_active)
 			R_TimeReport("modeldepth");
 	}
+	if (cl.csqc_vidvars.drawworld && r_skylast.integer == 1)
+		R_RenderSky(fbo, depthtexture, colortexture);
 
 	if (cl.csqc_vidvars.drawworld && r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->Draw)
 	{
@@ -7301,6 +7328,8 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 	// don't let sound skip if going slow
 	if (r_refdef.scene.extraupdate)
 		S_ExtraUpdate ();
+	if (cl.csqc_vidvars.drawworld && r_skylast.integer == 2)
+		R_RenderSky(fbo, depthtexture, colortexture);
 
 	R_DrawModels();
 	if (r_timereport_active)
@@ -7310,29 +7339,8 @@ void R_RenderScene(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture)
 	if (r_refdef.scene.extraupdate)
 		S_ExtraUpdate ();
 
-	if (cl.csqc_vidvars.drawworld)
-	{
-		// don't let sound skip if going slow
-		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
-		{
-			r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
-			if (r_timereport_active)
-				R_TimeReport("worldsky");
-		}
-
-		if (R_DrawBrushModelsSky() && r_timereport_active)
-			R_TimeReport("bmodelsky");
-
-		if (skyrendermasked && skyrenderlater)
-		{
-			// we have to force off the water clipping plane while rendering sky
-			R_SetupView(false, fbo, depthtexture, colortexture);
-			R_Sky();
-			R_SetupView(true, fbo, depthtexture, colortexture);
-			if (r_timereport_active)
-				R_TimeReport("sky");
-		}
-	}
+	if (cl.csqc_vidvars.drawworld && r_skylast.integer >= 3)
+		R_RenderSky(fbo, depthtexture, colortexture);
 
 	if ((r_shadows.integer == 1 || (r_shadows.integer > 0 && !shadowmapping)) && !r_shadows_drawafterrtlighting.integer && r_refdef.scene.lightmapintensity > 0)
 	{
