@@ -2939,9 +2939,6 @@ void CL_UpdateScreen(void)
 	SCR_CaptureVideo();
 #endif
 
-	if (qglFlush)
-		qglFlush(); // FIXME: should we really be using qglFlush here?
-
 	if (!vid_activewindow)
 		VID_SetMouse(false, false, false);
 	else if (key_consoleactive)
