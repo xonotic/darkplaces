@@ -1940,10 +1940,10 @@ void GLES_Init(void)
 	if (!gl_platformextensions)
 		gl_platformextensions = "";
 	
-	Con_Printf("GL_VENDOR: %s\n", gl_vendor);
-	Con_Printf("GL_RENDERER: %s\n", gl_renderer);
-	Con_Printf("GL_VERSION: %s\n", gl_version);
-	Con_DPrintf("GL_EXTENSIONS: %s\n", gl_extensions);
+	Con_Printf("GLES_VENDOR: %s\n", gl_vendor);
+	Con_Printf("GLES_RENDERER: %s\n", gl_renderer);
+	Con_Printf("GLES_VERSION: %s\n", gl_version);
+	Con_DPrintf("GLES_EXTENSIONS: %s\n", gl_extensions);
 	Con_DPrintf("%s_EXTENSIONS: %s\n", gl_platform, gl_platformextensions);
 	
 	// LordHavoc: report supported extensions
@@ -1961,7 +1961,7 @@ void GLES_Init(void)
 	vid.support.arb_query_buffer_object = false;
 	vid.support.arb_shadow = false;
 	vid.support.arb_texture_compression = false; // different (vendor-specific) formats than on desktop OpenGL...
-	vid.support.arb_texture_cube_map = SDL_GL_ExtensionSupported("GL_OES_texture_cube_map") != 0;
+	vid.support.arb_texture_cube_map = true;
 	vid.support.arb_texture_env_combine = false;
 	vid.support.arb_texture_gather = false;
 	vid.support.arb_texture_non_power_of_two = strstr(gl_extensions, "GL_OES_texture_npot") != NULL;
@@ -1990,6 +1990,17 @@ void GLES_Init(void)
 	vid.support.arb_texture_float = SDL_GL_ExtensionSupported("GL_OES_texture_float") != 0;
 	vid.support.arb_half_float_pixel = SDL_GL_ExtensionSupported("GL_OES_texture_half_float") != 0;
 	vid.support.arb_half_float_vertex = SDL_GL_ExtensionSupported("GL_OES_vertex_half_float") != 0;
+	{
+		char *s;
+		// detect what GLSL version is available, to enable features like r_glsl_skeletal and higher quality reliefmapping
+		vid.support.glshaderversion = 100;
+		s = (char *) qglGetString(GL_SHADING_LANGUAGE_VERSION);
+		if (s)
+			vid.support.glshaderversion = (int)(atof(strrchr(s, ' ') + 1) * 100.0f + 0.5f);
+		if (vid.support.glshaderversion < 100)
+			vid.support.glshaderversion = 100;
+		Con_DPrintf("Detected GLSL #version %i\n", vid.support.glshaderversion);
+	}
 
 	// NOTE: On some devices, a value of 512 gives better FPS than the maximum.
 	qglGetIntegerv(GL_MAX_TEXTURE_SIZE, (GLint*)&vid.maxtexturesize_2d);
@@ -2634,6 +2645,7 @@ static qboolean VID_InitModeGL(viddef_mode_t *mode)
 	SDL_GL_SetAttribute (SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 	SDL_GL_SetAttribute (SDL_GL_CONTEXT_MINOR_VERSION, 0);
 	SDL_GL_SetAttribute (SDL_GL_RETAINED_BACKING, 1);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #endif
 #endif
 

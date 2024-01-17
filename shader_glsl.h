@@ -21,7 +21,7 @@
 "# endif\n",
 "#endif\n",
 "\n",
-"#define sat(x) clamp(x, 0, 1)\n",
+"#define sat(x) clamp(x, 0.0, 1.0)\n",
 "#define possat(x) sat(x)\n",//As replacement of max(x, 0) when x<=1, better for gpus that can't do 0-cycle max(x, 0)
 "#define minonesat(x) sat(x)\n",//As replacement of min(x, 1) when x>=0, better for gpus that can't do 0-cycle min(x, 1)
 "#define possatdot(x, y) possat(dot(x, y))\n",
@@ -1543,7 +1543,7 @@
 "	#ifdef USEDIFFUSE\n",
 "		myhalf3 lightnormal = cast_myhalf3(normalize(LightVector));\n",
 "	#endif\n",
-"	#define lightcolor 1\n",
+"	#define lightcolor 1.0\n",
 "#endif // MODE_LIGHTDIRECTION\n",
 "#ifdef MODE_LIGHTDIRECTIONMAP_MODELSPACE\n",
 "   #define SHADING\n",

@@ -1105,6 +1105,7 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 
 	strlcat(permutationname, modeinfo->filename, sizeof(permutationname));
 
+	#ifndef USE_GLES2
 	// we need 140 for r_glsl_skeletal (GL_ARB_uniform_buffer_object)
 	if(vid.support.glshaderversion >= 140)
 	{
@@ -1135,6 +1136,26 @@ static void R_GLSL_CompilePermutation(r_glsl_permutation_t *p, unsigned int mode
 		geomstrings_list[geomstrings_count++] = "#define GLSL120\n";
 		fragstrings_list[fragstrings_count++] = "#define GLSL120\n";
 	}
+	#else
+	if(vid.support.glshaderversion >= 300)
+	{
+		vertstrings_list[vertstrings_count++] = "#version 300 es\n";
+		geomstrings_list[geomstrings_count++] = "#version 300 es\n";
+		fragstrings_list[fragstrings_count++] = "#version 300 es\n";
+		vertstrings_list[vertstrings_count++] = "#define GLSL140\n";
+		geomstrings_list[geomstrings_count++] = "#define GLSL140\n";
+		fragstrings_list[fragstrings_count++] = "#define GLSL140\n";
+	}
+	else
+	{
+		vertstrings_list[vertstrings_count++] = "#version 100 es\n";
+		geomstrings_list[geomstrings_count++] = "#version 100 es\n";
+		fragstrings_list[fragstrings_count++] = "#version 100 es\n";
+		vertstrings_list[vertstrings_count++] = "#define GLSL120\n";
+		geomstrings_list[geomstrings_count++] = "#define GLSL120\n";
+		fragstrings_list[fragstrings_count++] = "#define GLSL120\n";
+	}
+	#endif
 	// GLES also adds several things from GLSL120
 	switch(vid.renderpath)
 	{

@@ -401,6 +401,11 @@ ifeq ($(DP_SOUND_API),3DRAS)
 	LIB_SOUND=$(LIB_SND_3DRAS)
 endif
 
+ifeq ($(DP_GLES),2)
+	LIB_GLES=-lGLESv2
+	CFLAGS_GLES=-DUSE_GLES2
+endif
+
 ##### Extra CFLAGS #####
 
 CFLAGS_MAKEDEP?=-MMD
