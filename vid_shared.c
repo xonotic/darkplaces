@@ -358,6 +358,8 @@ void (GLAPIENTRY *qglPolygonStipple)(const GLubyte *mask);
 void (GLAPIENTRY *qglLineWidth)(GLfloat width);
 void (GLAPIENTRY *qglPointSize)(GLfloat size);
 
+void (GLAPIENTRY *qglInvalidateFramebuffer)(GLenum target, GLsizei numAttachments, const GLenum *attachments);
+
 void (GLAPIENTRY *qglBlendEquationEXT)(GLenum);
 
 void (GLAPIENTRY *qglStencilOpSeparate)(GLenum, GLenum, GLenum, GLenum);
@@ -766,6 +768,11 @@ static dllfunction_t blendequationfuncs[] =
 	{NULL, NULL}
 };
 
+static dllfunction_t invalidatesubdatafuncs[] =
+{
+	{"glInvalidateFramebuffer", (void**) &qglInvalidateFramebuffer},
+	{NULL, NULL}
+};
 static dllfunction_t gl20shaderfuncs[] =
 {
 	{"glDeleteShader", (void **) &qglDeleteShader},
@@ -1065,6 +1072,7 @@ void VID_CheckExtensions(void)
 	vid.support.ati_separate_stencil = GL_CheckExtension("separatestencil", gl2separatestencilfuncs, "-noseparatestencil", true) || GL_CheckExtension("GL_ATI_separate_stencil", atiseparatestencilfuncs, "-noseparatestencil", false);
 	vid.support.ext_blend_minmax = GL_CheckExtension("GL_EXT_blend_minmax", blendequationfuncs, "-noblendminmax", false);
 	vid.support.ext_blend_subtract = GL_CheckExtension("GL_EXT_blend_subtract", blendequationfuncs, "-noblendsubtract", false);
+	GL_CheckExtension("GL_ARB_invalidate_subdata", invalidatesubdatafuncs, "-noinvalidate", false);
 	vid.support.ext_blend_func_separate = GL_CheckExtension("GL_EXT_blend_func_separate", blendfuncseparatefuncs, "-noblendfuncseparate", false);
 	vid.support.ext_draw_range_elements = GL_CheckExtension("drawrangeelements", drawrangeelementsfuncs, "-nodrawrangeelements", true) || GL_CheckExtension("GL_EXT_draw_range_elements", drawrangeelementsextfuncs, "-nodrawrangeelements", false);
 	vid.support.arb_framebuffer_object = GL_CheckExtension("GL_ARB_framebuffer_object", arbfbofuncs, "-nofbo", false);

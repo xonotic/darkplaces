@@ -1109,6 +1109,8 @@ extern void (GLAPIENTRY *qglSampleCoverageARB)(GLclampf value, GLboolean invert)
 
 extern void (GLAPIENTRY *qglPointSize)(GLfloat size);
 
+extern void (GLAPIENTRY *qglInvalidateFramebuffer)(GLenum target, GLsizei numAttachments, const GLenum *attachments);
+
 //GL_EXT_packed_depth_stencil
 #define GL_DEPTH_STENCIL_EXT            0x84F9
 #define GL_UNSIGNED_INT_24_8_EXT        0x84FA

@@ -34,6 +34,7 @@ extern cvar_t r_sky;
 extern cvar_t r_skyscroll1;
 extern cvar_t r_skyscroll2;
 extern cvar_t r_sky_scissor;
+extern cvar_t r_skylast;
 extern cvar_t r_q3bsp_renderskydepth;
 extern int skyrenderlater, skyrendermasked;
 extern int skyscissor[4];
@@ -216,6 +217,7 @@ void R_AnimCache_CacheVisibleEntities(void);
 extern cvar_t r_render;
 extern cvar_t r_renderview;
 extern cvar_t r_waterwarp;
+extern cvar_t r_fbdiscard;
 
 extern cvar_t r_textureunits;
 

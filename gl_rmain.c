@@ -84,6 +84,7 @@ cvar_t r_equalize_entities_to = {CVAR_SAVE, "r_equalize_entities_to", "0.8", "li
 
 cvar_t r_depthfirst = {CVAR_SAVE, "r_depthfirst", "0", "renders a depth-only version of the scene before normal rendering begins to eliminate overdraw, values: 0 = off, 1 = world depth, 2 = world and model depth"};
 cvar_t r_skylast = {CVAR_SAVE, "r_skylast", "0", "renders sky after normal rendering ends to eliminate overdraw, values: 0 = nodepth sky first, 1 = sky after depth pass(if enabled), 2 = sky after world, 3 = sky after entities"};
+cvar_t r_fbdiscard = {CVAR_SAVE, "r_fbdiscard", "0", "Discard color buffer, increases performance, but creates visual glitches in menu"};
 cvar_t r_useinfinitefarclip = {CVAR_SAVE, "r_useinfinitefarclip", "1", "enables use of a special kind of projection matrix that has an extremely large farclip"};
 cvar_t r_farclip_base = {0, "r_farclip_base", "65536", "farclip (furthest visible distance) for rendering when r_useinfinitefarclip is 0"};
 cvar_t r_farclip_world = {0, "r_farclip_world", "2", "adds map size to farclip multiplied by this value"};
@@ -4233,6 +4234,7 @@ void GL_Main_Init(void)
 	Cvar_RegisterVariable(&r_equalize_entities_to);
 	Cvar_RegisterVariable(&r_depthfirst);
 	Cvar_RegisterVariable(&r_skylast);
+	Cvar_RegisterVariable(&r_fbdiscard);
 	Cvar_RegisterVariable(&r_useinfinitefarclip);
 	Cvar_RegisterVariable(&r_farclip_base);
 	Cvar_RegisterVariable(&r_farclip_world);
