@@ -2081,7 +2081,9 @@ static void SCR_DrawTouchscreenOverlay(void)
 	}
 }
 
-static const GLuint drawbuffers[6] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_STENCIL_ATTACHMENT, GL_DEPTH_ATTACHMENT};
+#ifndef USE_GLES2
+static const GLuint drawbuffers[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+#endif
 void R_ClearScreen(qboolean fogcolor)
 {
 	float clearcolor[4];
@@ -2102,10 +2104,12 @@ void R_ClearScreen(qboolean fogcolor)
 	// to avoid clamping interfering with strange shadow volume
 	// drawing orders
 	// clear the screen
-	if(r_sky.integer && !r_refdef.view.isoverlay && r_fbdiscard.integer && qglInvalidateFramebuffer) {
+	#ifndef USE_GLES2
+	if(r_sky.integer && !r_refdef.view.isoverlay && r_fbdiscard.integer > 1 && qglInvalidateFramebuffer) {
 		invalidated = true;
-		qglInvalidateFramebuffer(GL_FRAMEBUFFER, 6, drawbuffers);
+		qglInvalidateFramebuffer(GL_FRAMEBUFFER, 4, drawbuffers);
 	}
+	#endif
 	GL_Clear((invalidated ? 0 : GL_COLOR_BUFFER_BIT) | GL_DEPTH_BUFFER_BIT | (vid.stencil ? GL_STENCIL_BUFFER_BIT : 0), clearcolor, 1.0f, 128);
 }
 

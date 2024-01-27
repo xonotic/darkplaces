@@ -2894,6 +2894,9 @@ void VID_Shutdown (void)
 	gl_platformextensions = "";
 }
 
+#ifndef USE_GLES2
+static const GLuint drawbuffers[] = {GL_DEPTH_STENCIL_ATTACHMENT/*GL_STENCIL_ATTACHMENT, GL_DEPTH_ATTACHMENT*/};
+#endif
 void VID_Finish (void)
 {
 #if SDL_MAJOR_VERSION == 1
@@ -2921,6 +2924,10 @@ void VID_Finish (void)
 			CHECKGLERROR
 			if (r_speeds.integer == 2 || gl_finish.integer)
 				GL_Finish();
+			#ifndef USE_GLES2
+			if(r_fbdiscard.integer && qglInvalidateFramebuffer)
+				qglInvalidateFramebuffer(GL_FRAMEBUFFER, sizeof(drawbuffers)/sizeof(*drawbuffers), drawbuffers);
+			#endif
 
 #if SDL_MAJOR_VERSION != 1
 {
