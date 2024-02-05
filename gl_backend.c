@@ -12,6 +12,7 @@ cvar_t r_render = {CF_CLIENT, "r_render", "1", "enables rendering 3D views (you 
 cvar_t r_renderview = {CF_CLIENT, "r_renderview", "1", "enables rendering 3D views (you want this on!)"};
 cvar_t r_waterwarp = {CF_CLIENT | CF_ARCHIVE, "r_waterwarp", "1", "warp view while underwater"};
 cvar_t gl_polyblend = {CF_CLIENT | CF_ARCHIVE, "gl_polyblend", "1", "tints view while underwater, hurt, etc"};
+cvar_t gl_dither = {CF_CLIENT | CF_ARCHIVE, "gl_dither", "0", "enables OpenGL dithering (16bit looks bad with this off)"};
 
 cvar_t v_flipped = {CF_CLIENT, "v_flipped", "0", "mirror the screen (poor man's left handed mode)"};
 qbool v_flipped_state = false;
@@ -368,6 +369,7 @@ void gl_backend_init(void)
 	Cvar_RegisterVariable(&r_waterwarp);
 	Cvar_RegisterVariable(&gl_polyblend);
 	Cvar_RegisterVariable(&v_flipped);
+	Cvar_RegisterVariable(&gl_dither);
 	Cvar_RegisterVariable(&gl_debug);
 	Cvar_RegisterVariable(&gl_paranoid);
 	Cvar_RegisterVariable(&gl_printcheckerror);

@@ -843,8 +843,6 @@ void GL_Setup(void)
 			vid.allowalphatocoverage = false;
 		}
 	}
-	if (vid_bitsperpixel.integer >= 24)
-		qglDisable(GL_DITHER);
 	// currently MSAA antialiasing is not implemented for fbo viewports, so we actually have to force this off anyway.
 	vid.allowalphatocoverage = false;
 #endif
