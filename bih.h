@@ -36,9 +36,6 @@ typedef struct bih_node_s
 {
 	bih_nodetype_t type; // = BIH_SPLITX and similar values
 	// TODO: store just one float for distance, and have BIH_SPLITMINX and BIH_SPLITMAXX distinctions, to reduce memory footprint and traversal time, as described in the paper (vrst02_boxtree.pdf)
-	// TODO: move bounds data to parent node and remove it from leafs?
-	float mins[3];
-	float maxs[3];
 	union {
 		struct{
 			// node indexes of children (always > this node's index)

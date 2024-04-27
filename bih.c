@@ -62,26 +62,19 @@ static int BIH_BuildNode(bih_t *bih, int numchildren, int *leaflist, float *tota
 	}
 	nodenum = bih->numnodes++;
 	node = bih->nodes + nodenum;
-	// store bounds for node
-	node->mins[0] = mins[0];
-	node->mins[1] = mins[1];
-	node->mins[2] = mins[2];
-	node->maxs[0] = maxs[0];
-	node->maxs[1] = maxs[1];
-	node->maxs[2] = maxs[2];
-	node->front = 0;
-	node->back = 0;
-	node->frontmin = 0;
-	node->backmax = 0;
-	memset(node->children, -1, sizeof(node->children));
 	// check if there are few enough children to store an unordered node
 	if (numchildren <= BIH_MAXUNORDEREDCHILDREN)
 	{
 		node->type = BIH_UNORDERED;
+		memset(node->children, -1, sizeof(node->children));
 		for (j = 0;j < numchildren;j++)
 			node->children[j] = leaflist[j];
 		return nodenum;
 	}
+	node->front = 0;
+	node->back = 0;
+	node->frontmin = 0;
+	node->backmax = 0;
 	// pick longest axis
 	longestaxis = 0;
 	if (size[0] < size[1]) longestaxis = 1;
@@ -94,7 +87,7 @@ static int BIH_BuildNode(bih_t *bih, int numchildren, int *leaflist, float *tota
 		// pick an axis
 		axis = (longestaxis + j) % 3;
 		// sort children into front and back lists
-		splitdist = (node->mins[axis] + node->maxs[axis]) * 0.5f;
+		splitdist = (mins[axis] + maxs[axis]) * 0.5f;
 		front = 0;
 		back = 0;
 		for (i = 0;i < numchildren;i++)

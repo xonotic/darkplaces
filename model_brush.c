@@ -6780,44 +6780,42 @@ void Mod_CollisionBIH_TracePoint(model_t *model, const frameblend_t *frameblend,
 		nodenum = nodestack[--nodestackpos];
 		node = bih->nodes + nodenum;
 		assert(node->type <= BIH_UNORDERED);
-#if 1
-		if (!BoxesOverlap(start, start, node->mins, node->maxs))
-			continue;
-#endif
-		if (node->type != BIH_UNORDERED)
-		{
-			if(nodestackpos > 1024 - 2)
-				//Out of stack
-				continue;
-			axis = node->type - BIH_SPLITX;
-			if (start[axis] >= node->frontmin)
-				nodestack[nodestackpos++] = node->front;
-			if (start[axis] <= node->backmax)
-				nodestack[nodestackpos++] = node->back;
-		}
-		else
-		{
-			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
-			{
-				leaf = bih->leafs + node->children[axis];
-#if 1
-				if (!BoxesOverlap(start, start, leaf->mins, leaf->maxs))
+		switch(node->type) {
+			case BIH_SPLITX:
+			case BIH_SPLITY:
+			case BIH_SPLITZ:
+				if(nodestackpos > 1024 - 2)
+					//Out of stack
 					continue;
-#endif
-				switch(leaf->type)
+				axis = node->type - BIH_SPLITX;
+				if (start[axis] >= node->frontmin)
+					nodestack[nodestackpos++] = node->front;
+				if (start[axis] <= node->backmax)
+					nodestack[nodestackpos++] = node->back;
+				break;
+			case BIH_UNORDERED:
+				for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 				{
-				case BIH_BRUSH:
-					brush = model->brush.data_brushes[leaf->itemindex].colbrushf;
-					Collision_TracePointBrushFloat(trace, start, brush);
-					break;
-				case BIH_COLLISIONTRIANGLE:
-					// collision triangle - skipped because they have no volume
-					break;
-				case BIH_RENDERTRIANGLE:
-					// render triangle - skipped because they have no volume
-					break;
+					leaf = bih->leafs + node->children[axis];
+#if 1
+					if (!BoxesOverlap(start, start, leaf->mins, leaf->maxs))
+						continue;
+#endif
+					switch(leaf->type)
+					{
+					case BIH_BRUSH:
+						brush = model->brush.data_brushes[leaf->itemindex].colbrushf;
+						Collision_TracePointBrushFloat(trace, start, brush);
+						break;
+					case BIH_COLLISIONTRIANGLE:
+						// collision triangle - skipped because they have no volume
+						break;
+					case BIH_RENDERTRIANGLE:
+						// render triangle - skipped because they have no volume
+						break;
+					}
 				}
-			}
+				break;
 		}
 	}
 }
@@ -6829,7 +6827,7 @@ static void Mod_CollisionBIH_TraceLineShared(model_t *model, const frameblend_t 
 	const colbrushf_t *brush;
 	const int *e;
 	const texture_t *texture;
-	vec3_t nodebigmins, nodebigmaxs, nodestart, nodeend, sweepnodemins, sweepnodemaxs;
+	vec3_t nodestart, nodeend, sweepnodemins, sweepnodemaxs;
 	vec_t d1, d2, d3, d4, f, nodestackline[1024][6];
 	int axis, nodenum, nodestackpos = 0, nodestack[1024];
 
@@ -6864,14 +6862,6 @@ static void Mod_CollisionBIH_TraceLineShared(model_t *model, const frameblend_t 
 		node = bih->nodes + nodenum;
 		VectorCopy(nodestackline[nodestackpos], nodestart);
 		VectorCopy(nodestackline[nodestackpos] + 3, nodeend);
-		sweepnodemins[0] = min(nodestart[0], nodeend[0]) - 1;
-		sweepnodemins[1] = min(nodestart[1], nodeend[1]) - 1;
-		sweepnodemins[2] = min(nodestart[2], nodeend[2]) - 1;
-		sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + 1;
-		sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + 1;
-		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
-		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs) && !collision_bih_fullrecursion.integer)
-			continue;
 		assert(node->type <= BIH_UNORDERED);
 		if (node->type != BIH_UNORDERED)
 		{
@@ -6998,25 +6988,17 @@ static void Mod_CollisionBIH_TraceLineShared(model_t *model, const frameblend_t 
 		else
 		{
 			// calculate sweep bounds for this node
-			// copy node bounds into local variables
-			VectorCopy(node->mins, nodebigmins);
-			VectorCopy(node->maxs, nodebigmaxs);
-			// clip line to this node bounds
-			axis = 0; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
-			axis = 1; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
-			axis = 2; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
-			// some of the line intersected the enlarged node box
-			// calculate sweep bounds for this node
-			sweepnodemins[0] = min(nodestart[0], nodeend[0]) - 1;
-			sweepnodemins[1] = min(nodestart[1], nodeend[1]) - 1;
-			sweepnodemins[2] = min(nodestart[2], nodeend[2]) - 1;
-			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + 1;
-			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + 1;
-			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
+			sweepnodemins[0] = min(nodestart[0], nodeend[0]) - ON_EPSILON;
+			sweepnodemins[1] = min(nodestart[1], nodeend[1]) - ON_EPSILON;
+			sweepnodemins[2] = min(nodestart[2], nodeend[2]) - ON_EPSILON;
+			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + ON_EPSILON;
+			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + ON_EPSILON;
+			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + ON_EPSILON;
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
 				leaf = bih->leafs + node->children[axis];
 				// TODO: This is very expensive in Steel Storm. Framerate halved during even light combat.
+				// TODO: make line-box intersection test
 				if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, leaf->mins, leaf->maxs))
 					continue;
 				switch(leaf->type)
@@ -7062,7 +7044,7 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 	const int *e;
 	const texture_t *texture;
 	vec3_t start, end, startmins, startmaxs, endmins, endmaxs, mins, maxs;
-	vec3_t nodebigmins, nodebigmaxs, nodestart, nodeend, sweepnodemins, sweepnodemaxs;
+	vec3_t nodestart, nodeend, sweepnodemins, sweepnodemaxs;
 	vec_t d1, d2, d3, d4, f, nodestackline[1024][6];
 	int axis, nodenum, nodestackpos = 0, nodestack[1024];
 
@@ -7101,13 +7083,27 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 	maxs[1] = max(startmaxs[1], endmaxs[1]);
 	maxs[2] = max(startmaxs[2], endmaxs[2]);
 
+	// clip line with bih bounding box
+	// overkill?
+	VectorCopy(start, nodestart);
+	VectorCopy(end, nodeend);
+	sweepnodemins[0] = bih->mins[0];;
+	sweepnodemins[1] = bih->mins[1];;
+	sweepnodemins[2] = bih->mins[2];;
+	sweepnodemaxs[0] = bih->maxs[0];
+	sweepnodemaxs[1] = bih->maxs[1];
+	sweepnodemaxs[2] = bih->maxs[2];
+	axis = 0; d1 = nodestart[axis] - sweepnodemins[axis]; d2 = nodeend[axis] - sweepnodemins[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } d1 = sweepnodemaxs[axis] - nodestart[axis]; d2 = sweepnodemaxs[axis] - nodeend[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); }
+	axis = 1; d1 = nodestart[axis] - sweepnodemins[axis]; d2 = nodeend[axis] - sweepnodemins[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } d1 = sweepnodemaxs[axis] - nodestart[axis]; d2 = sweepnodemaxs[axis] - nodeend[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); }
+	axis = 2; d1 = nodestart[axis] - sweepnodemins[axis]; d2 = nodeend[axis] - sweepnodemins[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } d1 = sweepnodemaxs[axis] - nodestart[axis]; d2 = sweepnodemaxs[axis] - nodeend[axis]; if (d1 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); }
+
 	// push first node
-	nodestackline[nodestackpos][0] = start[0];
-	nodestackline[nodestackpos][1] = start[1];
-	nodestackline[nodestackpos][2] = start[2];
-	nodestackline[nodestackpos][3] = end[0];
-	nodestackline[nodestackpos][4] = end[1];
-	nodestackline[nodestackpos][5] = end[2];
+	nodestackline[nodestackpos][0] = nodestart[0];
+	nodestackline[nodestackpos][1] = nodestart[1];
+	nodestackline[nodestackpos][2] = nodestart[2];
+	nodestackline[nodestackpos][3] = nodeend[0];
+	nodestackline[nodestackpos][4] = nodeend[1];
+	nodestackline[nodestackpos][5] = nodeend[2];
 	nodestack[nodestackpos++] = nodenum;
 	while (nodestackpos)
 	{
@@ -7115,15 +7111,6 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 		node = bih->nodes + nodenum;
 		VectorCopy(nodestackline[nodestackpos], nodestart);
 		VectorCopy(nodestackline[nodestackpos] + 3, nodeend);
-		sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0] - 1;
-		sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1] - 1;
-		sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2] - 1;
-		sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0] + 1;
-		sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1] + 1;
-		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
-		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
-			continue;
-		assert(node->type <= BIH_UNORDERED);
 		if (node->type != BIH_UNORDERED)
 		{
 			if(nodestackpos > 1024 - 2)
@@ -7246,22 +7233,14 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 		}
 		else
 		{
-			// calculate sweep bounds for this node
-			// copy node bounds into local variables and expand to get Minkowski Sum of the two shapes
-			VectorSubtract(node->mins, maxs, nodebigmins);
-			VectorSubtract(node->maxs, mins, nodebigmaxs);
-			// clip line to this node bounds
-			axis = 0; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
-			axis = 1; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
-			axis = 2; d1 = nodestart[axis] - nodebigmins[axis]; d2 = nodeend[axis] - nodebigmins[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); } d1 = nodebigmaxs[axis] - nodestart[axis]; d2 = nodebigmaxs[axis] - nodeend[axis]; if (d1 < 0) { if (d2 < 0) continue; f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodestart); } else if (d2 < 0) { f = d1 / (d1 - d2); VectorLerp(nodestart, f, nodeend, nodeend); }
 			// some of the line intersected the enlarged node box
 			// calculate sweep bounds for this node
-			sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0] - 1;
-			sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1] - 1;
-			sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2] - 1;
-			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0] + 1;
-			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1] + 1;
-			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
+			sweepnodemins[0] = min(nodestart[0], nodeend[0]) + mins[0] - ON_EPSILON;
+			sweepnodemins[1] = min(nodestart[1], nodeend[1]) + mins[1] - ON_EPSILON;
+			sweepnodemins[2] = min(nodestart[2], nodeend[2]) + mins[2] - ON_EPSILON;
+			sweepnodemaxs[0] = max(nodestart[0], nodeend[0]) + maxs[0] + ON_EPSILON;
+			sweepnodemaxs[1] = max(nodestart[1], nodeend[1]) + maxs[1] + ON_EPSILON;
+			sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + ON_EPSILON;
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
 				leaf = bih->leafs + node->children[axis];
