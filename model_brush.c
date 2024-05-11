@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "curves.h"
 #include "wad.h"
 
+#include <assert.h>
 
 //cvar_t r_subdivide_size = {CVAR_SAVE, "r_subdivide_size", "128", "how large water polygons should be (smaller values produce more polygons which give better warping effects)"};
 cvar_t mod_bsp_portalize = {0, "mod_bsp_portalize", "1", "enables portal generation from BSP tree (may take several seconds per map), used by r_drawportals, r_useportalculling, r_shadow_realtime_world_compileportalculling, sv_cullentities_portal"};
@@ -6905,19 +6906,23 @@ void Mod_CollisionBIH_TracePoint(dp_model_t *model, const frameblend_t *frameble
 	{
 		nodenum = nodestack[--nodestackpos];
 		node = bih->nodes + nodenum;
+		assert(node->type <= BIH_UNORDERED);
 #if 1
 		if (!BoxesOverlap(start, start, node->mins, node->maxs))
 			continue;
 #endif
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			axis = node->type - BIH_SPLITX;
 			if (start[axis] >= node->frontmin)
 				nodestack[nodestackpos++] = node->front;
 			if (start[axis] <= node->backmax)
 				nodestack[nodestackpos++] = node->back;
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
@@ -6994,8 +6999,12 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs) && !collision_bih_fullrecursion.integer)
 			continue;
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		assert(node->type <= BIH_UNORDERED);
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			// recurse children of the split
 			axis = node->type - BIH_SPLITX;
 			d1 = node->backmax - nodestart[axis];
@@ -7113,7 +7122,7 @@ static void Mod_CollisionBIH_TraceLineShared(dp_model_t *model, const frameblend
 				break;
 			}
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			// calculate sweep bounds for this node
 			// copy node bounds into local variables
@@ -7240,8 +7249,12 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
 			continue;
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		assert(node->type <= BIH_UNORDERED);
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			// recurse children of the split
 			axis = node->type - BIH_SPLITX;
 			d1 = node->backmax - nodestart[axis] - mins[axis];
@@ -7357,7 +7370,7 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 				break;
 			}
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			// calculate sweep bounds for this node
 			// copy node bounds into local variables and expand to get Minkowski Sum of the two shapes
