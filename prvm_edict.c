@@ -2118,6 +2118,7 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 		a = (unsigned short)LittleShort(instatements[i].a);
 		b = (unsigned short)LittleShort(instatements[i].b);
 		c = (unsigned short)LittleShort(instatements[i].c);
+		d = 0;
 		switch (op)
 		{
 		case OP_IF:
@@ -2125,8 +2126,10 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			b = (short)b;
 			if (a >= prog->progs_numglobals || b + i < 0 || b + i >= prog->progs_numstatements)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds IF/IFNOT (statement %d) in %s", i, prog->name);
-			prog->statements[i].op = op;
+			//To be rewritten
+			prog->statements[i].ins = op - OP_IF + INS_IF;
 			prog->statements[i].operand[0] = remapglobal(a);
+			//prog->statements[i].operand[1] = OP_IF - op;
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = -1;
 			prog->statements[i].jumpabsolute = i + b;
@@ -2135,7 +2138,7 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			a = (short)a;
 			if (a + i < 0 || a + i >= prog->progs_numstatements)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds GOTO (statement %d) in %s", i, prog->name);
-			prog->statements[i].op = op;
+			prog->statements[i].ins = INS_GOTO;
 			prog->statements[i].operand[0] = -1;
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = -1;
@@ -2143,45 +2146,74 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			break;
 		default:
 			Con_DPrintf("PRVM_LoadProgs: unknown opcode %d at statement %d in %s\n", (int)op, i, prog->name);
+		#if 1
+			prog->statements[i].ins = INS_ILL;
+			prog->statements[i].operand[0] = -1;
+			prog->statements[i].operand[1] = -1;
+			prog->statements[i].operand[2] = -1;
+			prog->statements[i].jumpabsolute = -1;
 			break;
+		#endif
 		// global global global
-		case OP_ADD_F:
-		case OP_ADD_V:
-		case OP_SUB_F:
-		case OP_SUB_V:
-		case OP_MUL_F:
-		case OP_MUL_V:
+		//rewritten
 		case OP_MUL_FV:
-		case OP_MUL_VF:
-		case OP_DIV_F:
+			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals || c >= prog->progs_numglobals)
+				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d)", i);
+			prog->statements[i].ins = INS_MUL_VF;
+			prog->statements[i].operand[0] = remapglobal(b);
+			prog->statements[i].operand[1] = remapglobal(a);
+			prog->statements[i].operand[2] = remapglobal(c);
+			prog->statements[i].jumpabsolute = -1;
+			break;
+		//remapped
+		case OP_LOAD_FLD:
+		case OP_LOAD_ENT:
+		case OP_LOAD_S:
+		case OP_LOAD_FNC:
+			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals || c >= prog->progs_numglobals)
+				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d)", i);
+			prog->statements[i].ins = INS_LOAD_SCALAR;
+			prog->statements[i].operand[0] = remapglobal(a);
+			prog->statements[i].operand[1] = remapglobal(b);
+			prog->statements[i].operand[2] = remapglobal(c);
+			prog->statements[i].jumpabsolute = -1;
+			break;
+		//regular
 		case OP_BITAND:
 		case OP_BITOR:
+		case OP_AND:
+		case OP_OR:
+		d = (OP_AND - INS_AND) - (OP_ADDRESS - INS_ADDRESS);
+		case OP_ADDRESS:
+		d += 4;//Skip loads
+		case OP_LOAD_V://LOAD_VECTOR
+		case OP_LOAD_F://LOAD_SCALAR
 		case OP_GE:
 		case OP_LE:
 		case OP_GT:
 		case OP_LT:
-		case OP_AND:
-		case OP_OR:
-		case OP_EQ_F:
-		case OP_EQ_V:
-		case OP_EQ_S:
-		case OP_EQ_E:
-		case OP_EQ_FNC:
 		case OP_NE_F:
 		case OP_NE_V:
 		case OP_NE_S:
 		case OP_NE_E:
 		case OP_NE_FNC:
-		case OP_ADDRESS:
-		case OP_LOAD_F:
-		case OP_LOAD_FLD:
-		case OP_LOAD_ENT:
-		case OP_LOAD_S:
-		case OP_LOAD_FNC:
-		case OP_LOAD_V:
+		case OP_EQ_F:
+		case OP_EQ_V:
+		case OP_EQ_S:
+		case OP_EQ_E:
+		case OP_EQ_FNC:
+		case OP_ADD_F:
+		case OP_ADD_V:
+		case OP_SUB_F:
+		case OP_SUB_V:
+		case OP_DIV_F:
+		case OP_MUL_VF:
+		d++;
+		case OP_MUL_V:
+		case OP_MUL_F:
 			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals || c >= prog->progs_numglobals)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d)", i);
-			prog->statements[i].op = op;
+			prog->statements[i].ins = op - d;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = remapglobal(b);
 			prog->statements[i].operand[2] = remapglobal(c);
@@ -2195,29 +2227,42 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 		case OP_NOT_ENT:
 			if (a >= prog->progs_numglobals || c >= prog->progs_numglobals)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d) in %s", i, prog->name);
-			prog->statements[i].op = op;
+			prog->statements[i].ins = op - OP_NOT_F + INS_NOT_F;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = remapglobal(c);
 			prog->statements[i].jumpabsolute = -1;
 			break;
 		// 2 globals
+		case OP_STATE:
+		//d = INS_STATE - INS_STOREP_VECTOR;
+			//DELETEME
+			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals)
+				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d) in %s", i, prog->name);
+			prog->statements[i].ins = INS_STATE;
+			prog->statements[i].operand[0] = remapglobal(a);
+			prog->statements[i].operand[1] = remapglobal(b);
+			prog->statements[i].operand[2] = -1;
+			prog->statements[i].jumpabsolute = -1;
+			break;
+		case OP_STOREP_V:
+		d++;
 		case OP_STOREP_F:
 		case OP_STOREP_ENT:
 		case OP_STOREP_FLD:
 		case OP_STOREP_S:
 		case OP_STOREP_FNC:
+		d += INS_STOREP_SCALAR - INS_STORE_VECTOR;
+		case OP_STORE_V:
+		d++;
 		case OP_STORE_F:
 		case OP_STORE_ENT:
 		case OP_STORE_FLD:
 		case OP_STORE_S:
 		case OP_STORE_FNC:
-		case OP_STATE:
-		case OP_STOREP_V:
-		case OP_STORE_V:
 			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d) in %s", i, prog->name);
-			prog->statements[i].op = op;
+			prog->statements[i].ins = INS_STORE_SCALAR + d;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = remapglobal(b);
 			prog->statements[i].operand[2] = -1;
@@ -2238,11 +2283,19 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 		case OP_CALL6:
 		case OP_CALL7:
 		case OP_CALL8:
+			if ( a >= prog->progs_numglobals)
+				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d) in %s", i, prog->name);
+			prog->statements[i].ins = INS_CALL;
+			prog->statements[i].operand[0] = remapglobal(a);
+			prog->statements[i].operand[1] = op - OP_CALL0;//argc
+			prog->statements[i].operand[2] = -1;
+			prog->statements[i].jumpabsolute = -1;
+			break;
 		case OP_DONE:
 		case OP_RETURN:
 			if ( a >= prog->progs_numglobals)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d) in %s", i, prog->name);
-			prog->statements[i].op = op;
+			prog->statements[i].ins = INS_DONE;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = -1;
@@ -2254,11 +2307,10 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 	{
 		prog->error_cmd("PRVM_LoadProgs: empty program in %s", prog->name);
 	}
-	else switch(prog->statements[prog->numstatements - 1].op)
+	else switch(prog->statements[prog->numstatements - 1].ins)
 	{
-		case OP_RETURN:
-		case OP_GOTO:
-		case OP_DONE:
+		case INS_GOTO:
+		case INS_DONE:
 			break;
 		default:
 			prog->error_cmd("PRVM_LoadProgs: program may fall off the edge (does not end with RETURN, GOTO or DONE) in %s", prog->name);

@@ -33,87 +33,72 @@
 # define USE_COMPUTED_GOTOS 1
 #endif
 
+
 #if USE_COMPUTED_GOTOS
   // Must exactly match opcode_e enum in pr_comp.h
     const static void *dispatchtable[] = {
-	&&handle_OP_DONE,
-	&&handle_OP_MUL_F,
-	&&handle_OP_MUL_V,
-	&&handle_OP_MUL_FV,
-	&&handle_OP_MUL_VF,
-	&&handle_OP_DIV_F,
-	&&handle_OP_ADD_F,
-	&&handle_OP_ADD_V,
-	&&handle_OP_SUB_F,
-	&&handle_OP_SUB_V,
+	&&handle_INS_DONE,
+	&&handle_INS_MUL_F,
+	&&handle_INS_MUL_V,
+	#if 0
+	NULL,
+	#endif
+	&&handle_INS_MUL_VF,
+	&&handle_INS_DIV_F,
+	&&handle_INS_ADD_F,
+	&&handle_INS_ADD_V,
+	&&handle_INS_SUB_F,
+	&&handle_INS_SUB_V,
 
-	&&handle_OP_EQ_F,
-	&&handle_OP_EQ_V,
-	&&handle_OP_EQ_S,
-	&&handle_OP_EQ_E,
-	&&handle_OP_EQ_FNC,
+	&&handle_INS_EQ_F,
+	&&handle_INS_EQ_V,
+	&&handle_INS_EQ_S,
+	&&handle_INS_EQ_E,
+	&&handle_INS_EQ_FNC,
 
-	&&handle_OP_NE_F,
-	&&handle_OP_NE_V,
-	&&handle_OP_NE_S,
-	&&handle_OP_NE_E,
-	&&handle_OP_NE_FNC,
+	&&handle_INS_NE_F,
+	&&handle_INS_NE_V,
+	&&handle_INS_NE_S,
+	&&handle_INS_NE_E,
+	&&handle_INS_NE_FNC,
 
-	&&handle_OP_LE,
-	&&handle_OP_GE,
-	&&handle_OP_LT,
-	&&handle_OP_GT,
+	&&handle_INS_LE,
+	&&handle_INS_GE,
+	&&handle_INS_LT,
+	&&handle_INS_GT,
 
-	&&handle_OP_LOAD_F,
-	&&handle_OP_LOAD_V,
-	&&handle_OP_LOAD_S,
-	&&handle_OP_LOAD_ENT,
-	&&handle_OP_LOAD_FLD,
-	&&handle_OP_LOAD_FNC,
+	&&handle_INS_LOAD_SCALAR,
+	&&handle_INS_LOAD_VECTOR,
 
-	&&handle_OP_ADDRESS,
+	&&handle_INS_ADDRESS,
 
-	&&handle_OP_STORE_F,
-	&&handle_OP_STORE_V,
-	&&handle_OP_STORE_S,
-	&&handle_OP_STORE_ENT,
-	&&handle_OP_STORE_FLD,
-	&&handle_OP_STORE_FNC,
+	&&handle_INS_STORE_SCALAR,
+	&&handle_INS_STORE_VECTOR,
 
-	&&handle_OP_STOREP_F,
-	&&handle_OP_STOREP_V,
-	&&handle_OP_STOREP_S,
-	&&handle_OP_STOREP_ENT,
-	&&handle_OP_STOREP_FLD,
-	&&handle_OP_STOREP_FNC,
+	&&handle_INS_STOREP_SCALAR,
+	&&handle_INS_STOREP_VECTOR,
 
-	&&handle_OP_RETURN,
-	&&handle_OP_NOT_F,
-	&&handle_OP_NOT_V,
-	&&handle_OP_NOT_S,
-	&&handle_OP_NOT_ENT,
-	&&handle_OP_NOT_FNC,
-	&&handle_OP_IF,
-	&&handle_OP_IFNOT,
-	&&handle_OP_CALL0,
-	&&handle_OP_CALL1,
-	&&handle_OP_CALL2,
-	&&handle_OP_CALL3,
-	&&handle_OP_CALL4,
-	&&handle_OP_CALL5,
-	&&handle_OP_CALL6,
-	&&handle_OP_CALL7,
-	&&handle_OP_CALL8,
-	&&handle_OP_STATE,
-	&&handle_OP_GOTO,
-	&&handle_OP_AND,
-	&&handle_OP_OR,
+	&&handle_INS_NOT_F,
+	&&handle_INS_NOT_V,
+	&&handle_INS_NOT_S,
+	&&handle_INS_NOT_ENT,
+	&&handle_INS_NOT_FNC,
+	&&handle_INS_IF,
+	&&handle_INS_IFNOT,
+	&&handle_INS_CALL,
 
-	&&handle_OP_BITAND,
-	&&handle_OP_BITOR
+	&&handle_INS_STATE,
+	&&handle_INS_GOTO,
+	&&handle_INS_AND,
+	&&handle_INS_OR,
+
+	&&handle_INS_BITAND,
+	&&handle_INS_BITOR,
+
+	&&handle_INS_ILL
 	    };
 #define DISPATCH_OPCODE() \
-    goto *dispatchtable[(++st)->op]
+    goto *dispatchtable[(++st)->ins]
 #define HANDLE_OPCODE(opcode) handle_##opcode
 
     DISPATCH_OPCODE(); // jump to first opcode
@@ -155,44 +140,38 @@
 					PRVM_Breakpoint(prog, prog->break_stack_index, "Breakpoint hit");
 				}
 #endif
-			switch (st->op)
+			switch (st->ins)
 			{
 #endif
-			HANDLE_OPCODE(OP_ADD_F):
+			HANDLE_OPCODE(INS_ADD_F):
 				OPC->_float = OPA->_float + OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_ADD_V):
+			HANDLE_OPCODE(INS_ADD_V):
 				OPC->vector[0] = OPA->vector[0] + OPB->vector[0];
 				OPC->vector[1] = OPA->vector[1] + OPB->vector[1];
 				OPC->vector[2] = OPA->vector[2] + OPB->vector[2];
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_SUB_F):
+			HANDLE_OPCODE(INS_SUB_F):
 				OPC->_float = OPA->_float - OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_SUB_V):
+			HANDLE_OPCODE(INS_SUB_V):
 				OPC->vector[0] = OPA->vector[0] - OPB->vector[0];
 				OPC->vector[1] = OPA->vector[1] - OPB->vector[1];
 				OPC->vector[2] = OPA->vector[2] - OPB->vector[2];
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_MUL_F):
+			HANDLE_OPCODE(INS_MUL_F):
 				OPC->_float = OPA->_float * OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_MUL_V):
+			HANDLE_OPCODE(INS_MUL_V):
 				OPC->_float = OPA->vector[0]*OPB->vector[0] + OPA->vector[1]*OPB->vector[1] + OPA->vector[2]*OPB->vector[2];
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_MUL_FV):
-				tempfloat = OPA->_float;
-				OPC->vector[0] = tempfloat * OPB->vector[0];
-				OPC->vector[1] = tempfloat * OPB->vector[1];
-				OPC->vector[2] = tempfloat * OPB->vector[2];
-				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_MUL_VF):
+			HANDLE_OPCODE(INS_MUL_VF):
 				tempfloat = OPB->_float;
 				OPC->vector[0] = tempfloat * OPA->vector[0];
 				OPC->vector[1] = tempfloat * OPA->vector[1];
 				OPC->vector[2] = tempfloat * OPA->vector[2];
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_DIV_F):
+			HANDLE_OPCODE(INS_DIV_F):
 				if( OPB->_float != 0.0f )
 				{
 					OPC->_float = OPA->_float / OPB->_float;
@@ -207,95 +186,87 @@
 					OPC->_float = 0.0f;
 				}
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_BITAND):
+			HANDLE_OPCODE(INS_BITAND):
 				OPC->_float = (prvm_int_t)OPA->_float & (prvm_int_t)OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_BITOR):
+			HANDLE_OPCODE(INS_BITOR):
 				OPC->_float = (prvm_int_t)OPA->_float | (prvm_int_t)OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_GE):
+			HANDLE_OPCODE(INS_GE):
 				OPC->_float = OPA->_float >= OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_LE):
+			HANDLE_OPCODE(INS_LE):
 				OPC->_float = OPA->_float <= OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_GT):
+			HANDLE_OPCODE(INS_GT):
 				OPC->_float = OPA->_float > OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_LT):
+			HANDLE_OPCODE(INS_LT):
 				OPC->_float = OPA->_float < OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_AND):
+			HANDLE_OPCODE(INS_AND):
 				OPC->_float = FLOAT_IS_TRUE_FOR_INT(OPA->_int) && FLOAT_IS_TRUE_FOR_INT(OPB->_int); // TODO change this back to float, and add AND_I to be used by fteqcc for anything not a float
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_OR):
+			HANDLE_OPCODE(INS_OR):
 				OPC->_float = FLOAT_IS_TRUE_FOR_INT(OPA->_int) || FLOAT_IS_TRUE_FOR_INT(OPB->_int); // TODO change this back to float, and add OR_I to be used by fteqcc for anything not a float
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NOT_F):
+			HANDLE_OPCODE(INS_NOT_F):
 				OPC->_float = !FLOAT_IS_TRUE_FOR_INT(OPA->_int);
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NOT_V):
+			HANDLE_OPCODE(INS_NOT_V):
 				OPC->_float = !OPA->vector[0] && !OPA->vector[1] && !OPA->vector[2];
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NOT_S):
+			HANDLE_OPCODE(INS_NOT_S):
 				OPC->_float = !OPA->string || !*PRVM_GetString(prog, OPA->string);
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NOT_FNC):
+			HANDLE_OPCODE(INS_NOT_FNC):
 				OPC->_float = !OPA->function;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NOT_ENT):
+			HANDLE_OPCODE(INS_NOT_ENT):
 				OPC->_float = (OPA->edict == 0);
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_EQ_F):
+			HANDLE_OPCODE(INS_EQ_F):
 				OPC->_float = OPA->_float == OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_EQ_V):
+			HANDLE_OPCODE(INS_EQ_V):
 				OPC->_float = (OPA->vector[0] == OPB->vector[0]) && (OPA->vector[1] == OPB->vector[1]) && (OPA->vector[2] == OPB->vector[2]);
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_EQ_S):
+			HANDLE_OPCODE(INS_EQ_S):
 				OPC->_float = !strcmp(PRVM_GetString(prog, OPA->string),PRVM_GetString(prog, OPB->string));
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_EQ_E):
+			HANDLE_OPCODE(INS_EQ_E):
 				OPC->_float = OPA->_int == OPB->_int;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_EQ_FNC):
+			HANDLE_OPCODE(INS_EQ_FNC):
 				OPC->_float = OPA->function == OPB->function;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NE_F):
+			HANDLE_OPCODE(INS_NE_F):
 				OPC->_float = OPA->_float != OPB->_float;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NE_V):
+			HANDLE_OPCODE(INS_NE_V):
 				OPC->_float = (OPA->vector[0] != OPB->vector[0]) || (OPA->vector[1] != OPB->vector[1]) || (OPA->vector[2] != OPB->vector[2]);
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NE_S):
+			HANDLE_OPCODE(INS_NE_S):
 				OPC->_float = strcmp(PRVM_GetString(prog, OPA->string),PRVM_GetString(prog, OPB->string));
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NE_E):
+			HANDLE_OPCODE(INS_NE_E):
 				OPC->_float = OPA->_int != OPB->_int;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_NE_FNC):
+			HANDLE_OPCODE(INS_NE_FNC):
 				OPC->_float = OPA->function != OPB->function;
 				DISPATCH_OPCODE();
 
 		//==================
-			HANDLE_OPCODE(OP_STORE_F):
-			HANDLE_OPCODE(OP_STORE_ENT):
-			HANDLE_OPCODE(OP_STORE_FLD):		// integers
-			HANDLE_OPCODE(OP_STORE_S):
-			HANDLE_OPCODE(OP_STORE_FNC):		// pointers
+			HANDLE_OPCODE(INS_STORE_SCALAR):
 				OPB->_int = OPA->_int;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_STORE_V):
+			HANDLE_OPCODE(INS_STORE_VECTOR):
 				OPB->ivector[0] = OPA->ivector[0];
 				OPB->ivector[1] = OPA->ivector[1];
 				OPB->ivector[2] = OPA->ivector[2];
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_STOREP_F):
-			HANDLE_OPCODE(OP_STOREP_ENT):
-			HANDLE_OPCODE(OP_STOREP_FLD):		// integers
-			HANDLE_OPCODE(OP_STOREP_S):
-			HANDLE_OPCODE(OP_STOREP_FNC):		// pointers
+			HANDLE_OPCODE(INS_STOREP_SCALAR):
 				if ((prvm_uint_t)OPB->_int - cached_entityfields >= cached_entityfieldsarea_entityfields)
 				{
 					if ((prvm_uint_t)OPB->_int >= cached_entityfieldsarea)
@@ -313,7 +284,7 @@
 				ptr = (prvm_eval_t *)(cached_edictsfields + OPB->_int);
 				ptr->_int = OPA->_int;
 				DISPATCH_OPCODE();
-			HANDLE_OPCODE(OP_STOREP_V):
+			HANDLE_OPCODE(INS_STOREP_VECTOR):
 				if ((prvm_uint_t)OPB->_int - cached_entityfields > (prvm_uint_t)cached_entityfieldsarea_entityfields_3)
 				{
 					if ((prvm_uint_t)OPB->_int > cached_entityfieldsarea_3)
@@ -334,7 +305,7 @@
 				ptr->ivector[2] = OPA->ivector[2];
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_ADDRESS):
+			HANDLE_OPCODE(INS_ADDRESS):
 				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
@@ -358,11 +329,7 @@
 				OPC->_int = OPA->edict * cached_entityfields + OPB->_int;
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_LOAD_F):
-			HANDLE_OPCODE(OP_LOAD_FLD):
-			HANDLE_OPCODE(OP_LOAD_ENT):
-			HANDLE_OPCODE(OP_LOAD_S):
-			HANDLE_OPCODE(OP_LOAD_FNC):
+			HANDLE_OPCODE(INS_LOAD_SCALAR):
 				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
@@ -379,7 +346,7 @@
 				OPC->_int = ((prvm_eval_t *)(ed->fields.ip + OPB->_int))->_int;
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_LOAD_V):
+			HANDLE_OPCODE(INS_LOAD_VECTOR):
 				if ((prvm_uint_t)OPA->edict >= cached_max_edicts)
 				{
 					PRE_ERROR();
@@ -401,7 +368,7 @@
 
 		//==================
 
-			HANDLE_OPCODE(OP_IFNOT):
+			HANDLE_OPCODE(INS_IFNOT):
 				if(!FLOAT_IS_TRUE_FOR_INT(OPA->_int))
 				// TODO add an "int-if", and change this one to OPA->_float
 				// although mostly unneeded, thanks to the only float being false being 0x0 and 0x80000000 (negative zero)
@@ -420,7 +387,7 @@
 				}
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_IF):
+			HANDLE_OPCODE(INS_IF):
 				if(FLOAT_IS_TRUE_FOR_INT(OPA->_int))
 				// TODO add an "int-if", and change this one, as well as the FLOAT_IS_TRUE_FOR_INT usages, to OPA->_float
 				// although mostly unneeded, thanks to the only float being false being 0x0 and 0x80000000 (negative zero)
@@ -439,7 +406,7 @@
 				}
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_GOTO):
+			HANDLE_OPCODE(INS_GOTO):
 				ADVANCE_PROFILE_BEFORE_JUMP();
 				st = cached_statements + st->jumpabsolute - 1;	// offset the st++
 				startst = st;
@@ -452,15 +419,7 @@
 				}
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_CALL0):
-			HANDLE_OPCODE(OP_CALL1):
-			HANDLE_OPCODE(OP_CALL2):
-			HANDLE_OPCODE(OP_CALL3):
-			HANDLE_OPCODE(OP_CALL4):
-			HANDLE_OPCODE(OP_CALL5):
-			HANDLE_OPCODE(OP_CALL6):
-			HANDLE_OPCODE(OP_CALL7):
-			HANDLE_OPCODE(OP_CALL8):
+			HANDLE_OPCODE(INS_CALL):
 #ifdef PRVMTIMEPROFILING 
 				tm = Sys_DirtyTime();
 				prog->xfunction->tprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
@@ -469,7 +428,7 @@
 				ADVANCE_PROFILE_BEFORE_JUMP();
 				startst = st;
 				prog->xstatement = st - cached_statements;
-				prog->argc = st->op - OP_CALL0;
+				prog->argc = st->operand[1];
 				if (!OPA->function)
 				{
 					prog->error_cmd("NULL function in %s", prog->name);
@@ -525,8 +484,7 @@
 				startst = st;
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_DONE):
-			HANDLE_OPCODE(OP_RETURN):
+			HANDLE_OPCODE(INS_DONE):
 #ifdef PRVMTIMEPROFILING 
 				tm = Sys_DirtyTime();
 				prog->xfunction->tprofile += (tm - starttm >= 0 && tm - starttm < 1800) ? (tm - starttm) : 0;
@@ -545,7 +503,7 @@
 					goto cleanup; // all done
 				DISPATCH_OPCODE();
 
-			HANDLE_OPCODE(OP_STATE):
+			HANDLE_OPCODE(INS_STATE):
 				if(cached_flag & PRVM_OP_STATE)
 				{
 					ed = PRVM_PROG_TO_EDICT(PRVM_gameglobaledict(self));
@@ -830,11 +788,14 @@
 
 */
 
+			HANDLE_OPCODE(INS_ILL):
 #if !USE_COMPUTED_GOTOS
 			default:
+#endif
 				PRE_ERROR();
-				prog->error_cmd("Bad opcode %i in %s", st->op, prog->name);
+				prog->error_cmd("Bad opcode %i in %s", st->ins, prog->name);
 				goto cleanup;
+#if !USE_COMPUTED_GOTOS
 			}
 #if PRVMSLOWINTERPRETER
 			{

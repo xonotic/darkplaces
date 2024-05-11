@@ -27,7 +27,7 @@ const char *prvm_opnames[] =
 
 "MUL_F",
 "MUL_V",
-"MUL_FV",
+//1
 "MUL_VF",
 
 "DIV",
@@ -55,30 +55,21 @@ const char *prvm_opnames[] =
 "^2LT",
 "^2GT",
 
-"^6FIELD_F",
-"^6FIELD_V",
-"^6FIELD_S",
-"^6FIELD_ENT",
-"^6FIELD_FLD",
-"^6FIELD_FNC",
+"^6FIELD_SCALAR",
+"^6FIELD_VECTOR",
+//4
 
 "^1ADDRESS",
 
-"STORE_F",
-"STORE_V",
-"STORE_S",
-"STORE_ENT",
-"STORE_FLD",
-"STORE_FNC",
+"STORE_SCALAR",
+"STORE_VECTOR",
+//4
 
-"^1STOREP_F",
-"^1STOREP_V",
-"^1STOREP_S",
-"^1STOREP_ENT",
-"^1STOREP_FLD",
-"^1STOREP_FNC",
+"^1STOREP_SCALAR",
+"^1STOREP_VECTOR",
+//4
 
-"^5RETURN",
+//1
 
 "^2NOT_F",
 "^2NOT_V",
@@ -89,15 +80,8 @@ const char *prvm_opnames[] =
 "^5IF",
 "^5IFNOT",
 
-"^3CALL0",
-"^3CALL1",
-"^3CALL2",
-"^3CALL3",
-"^3CALL4",
-"^3CALL5",
-"^3CALL6",
-"^3CALL7",
-"^3CALL8",
+"^3CALL",
+//8
 
 "^1STATE",
 
@@ -140,12 +124,12 @@ static void PRVM_PrintStatement(prvm_prog_t *prog, mstatement_t *s)
 	if (prvm_statementprofiling.integer)
 		Con_Printf("%7.0f ", prog->statement_profile[s - prog->statements]);
 
-	if ( (unsigned)s->op < sizeof(prvm_opnames)/sizeof(prvm_opnames[0]))
+	if ( (unsigned)s->ins < sizeof(prvm_opnames)/sizeof(prvm_opnames[0]))
 	{
-		Con_Printf("%s ",  prvm_opnames[s->op]);
-		i = strlen(prvm_opnames[s->op]);
+		Con_Printf("%s ",  prvm_opnames[s->ins]);
+		i = strlen(prvm_opnames[s->ins]);
 		// don't count a preceding color tag when padding the name
-		if (prvm_opnames[s->op][0] == STRING_COLOR_TAG)
+		if (prvm_opnames[s->ins][0] == STRING_COLOR_TAG)
 			i -= 2;
 		for ( ; i<10 ; i++)
 			Con_Print(" ");

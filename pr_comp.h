@@ -122,6 +122,73 @@ typedef enum opcode_e
 }
 opcode_t;
 
+typedef enum instruction_e
+{
+	INS_DONE = 0,
+	INS_MUL_F,
+	INS_MUL_V,
+	//GAP: 1(rewritten)
+	INS_MUL_VF,
+	INS_DIV_F,
+	INS_ADD_F,
+	INS_ADD_V,
+	INS_SUB_F,
+	INS_SUB_V,
+
+	INS_EQ_F,
+	INS_EQ_V,
+	INS_EQ_S,
+	INS_EQ_E,
+	INS_EQ_FNC,
+
+	INS_NE_F,
+	INS_NE_V,
+	INS_NE_S,
+	INS_NE_E,
+	INS_NE_FNC,
+
+	INS_LE,
+	INS_GE,
+	INS_LT,
+	INS_GT,
+
+	INS_LOAD_SCALAR,
+	INS_LOAD_VECTOR,
+	//GAP: 4(remapped)
+
+	INS_ADDRESS,
+
+	INS_STORE_SCALAR,
+	INS_STORE_VECTOR,
+	//GAP: 4(remapped)
+
+	INS_STOREP_SCALAR,
+	INS_STOREP_VECTOR,
+	//GAP: 4(remapped)
+
+	//GAP: 1(remapped)
+	INS_NOT_F,
+	INS_NOT_V,
+	INS_NOT_S,
+	INS_NOT_ENT,
+	INS_NOT_FNC,
+	INS_IF,
+	INS_IFNOT,
+	INS_CALL,//argc in OPB
+	//GAP: 8(rewritten)
+	INS_STATE,
+	INS_GOTO,
+	INS_AND,
+	INS_OR,
+
+	INS_BITAND,
+	INS_BITOR,
+
+	//SIGILL the VM
+	INS_ILL,
+	INSNS
+}
+instruction_t;
 
 typedef struct statement_s
 {
@@ -186,7 +253,7 @@ mfunction_t;
 
 typedef struct mstatement_s
 {
-	opcode_t	op;
+	instruction_t		ins;
 	int			operand[3]; // always a global or -1 for unused
 	int			jumpabsolute; // only used by IF, IFNOT, GOTO
 }
