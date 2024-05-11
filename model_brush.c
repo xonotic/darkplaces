@@ -6779,19 +6779,23 @@ void Mod_CollisionBIH_TracePoint(model_t *model, const frameblend_t *frameblend,
 	{
 		nodenum = nodestack[--nodestackpos];
 		node = bih->nodes + nodenum;
+		assert(node->type <= BIH_UNORDERED);
 #if 1
 		if (!BoxesOverlap(start, start, node->mins, node->maxs))
 			continue;
 #endif
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			axis = node->type - BIH_SPLITX;
 			if (start[axis] >= node->frontmin)
 				nodestack[nodestackpos++] = node->front;
 			if (start[axis] <= node->backmax)
 				nodestack[nodestackpos++] = node->back;
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			for (axis = 0;axis < BIH_MAXUNORDEREDCHILDREN && node->children[axis] >= 0;axis++)
 			{
@@ -6868,8 +6872,12 @@ static void Mod_CollisionBIH_TraceLineShared(model_t *model, const frameblend_t 
 		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs) && !collision_bih_fullrecursion.integer)
 			continue;
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		assert(node->type <= BIH_UNORDERED);
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			// recurse children of the split
 			axis = node->type - BIH_SPLITX;
 			d1 = node->backmax - nodestart[axis];
@@ -6987,7 +6995,7 @@ static void Mod_CollisionBIH_TraceLineShared(model_t *model, const frameblend_t 
 				break;
 			}
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			// calculate sweep bounds for this node
 			// copy node bounds into local variables
@@ -7115,8 +7123,12 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 		sweepnodemaxs[2] = max(nodestart[2], nodeend[2]) + maxs[2] + 1;
 		if (!BoxesOverlap(sweepnodemins, sweepnodemaxs, node->mins, node->maxs))
 			continue;
-		if (node->type <= BIH_SPLITZ && nodestackpos+2 <= 1024)
+		assert(node->type <= BIH_UNORDERED);
+		if (node->type != BIH_UNORDERED)
 		{
+			if(nodestackpos > 1024 - 2)
+				//Out of stack
+				continue;
 			// recurse children of the split
 			axis = node->type - BIH_SPLITX;
 			d1 = node->backmax - nodestart[axis] - mins[axis];
@@ -7232,7 +7244,7 @@ void Mod_CollisionBIH_TraceBrush(model_t *model, const frameblend_t *frameblend,
 				break;
 			}
 		}
-		else if (node->type == BIH_UNORDERED)
+		else
 		{
 			// calculate sweep bounds for this node
 			// copy node bounds into local variables and expand to get Minkowski Sum of the two shapes
