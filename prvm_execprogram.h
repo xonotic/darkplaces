@@ -84,7 +84,6 @@
 	&&handle_INS_NOT_ENT,
 	&&handle_INS_NOT_FNC,
 	&&handle_INS_IF,
-	&&handle_INS_IFNOT,
 	&&handle_INS_CALL,
 
 	&&handle_INS_STATE,
@@ -368,8 +367,8 @@
 
 		//==================
 
-			HANDLE_OPCODE(INS_IFNOT):
-				if(!FLOAT_IS_TRUE_FOR_INT(OPA->_int))
+			HANDLE_OPCODE(INS_IF):
+				if((!!FLOAT_IS_TRUE_FOR_INT(OPA->_int)) ^ st->operand[1])
 				// TODO add an "int-if", and change this one to OPA->_float
 				// although mostly unneeded, thanks to the only float being false being 0x0 and 0x80000000 (negative zero)
 				// and entity, string, field values can never have that value
@@ -382,25 +381,6 @@
 					{
 						prog->xstatement = st - cached_statements;
 						PRVM_Profile(prog, 1<<30, 1000000, 0);
-						prog->error_cmd("%s runaway loop counter hit limit of %d jumps\ntip: read above for list of most-executed functions", prog->name, jumpcount);
-					}
-				}
-				DISPATCH_OPCODE();
-
-			HANDLE_OPCODE(INS_IF):
-				if(FLOAT_IS_TRUE_FOR_INT(OPA->_int))
-				// TODO add an "int-if", and change this one, as well as the FLOAT_IS_TRUE_FOR_INT usages, to OPA->_float
-				// although mostly unneeded, thanks to the only float being false being 0x0 and 0x80000000 (negative zero)
-				// and entity, string, field values can never have that value
-				{
-					ADVANCE_PROFILE_BEFORE_JUMP();
-					st = cached_statements + st->jumpabsolute - 1;	// offset the st++
-					startst = st;
-					// no bounds check needed, it is done when loading progs
-					if (++jumpcount == 10000000 && prvm_runawaycheck)
-					{
-						prog->xstatement = st - cached_statements;
-						PRVM_Profile(prog, 1<<30, 0.01, 0);
 						prog->error_cmd("%s runaway loop counter hit limit of %d jumps\ntip: read above for list of most-executed functions", prog->name, jumpcount);
 					}
 				}

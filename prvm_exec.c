@@ -78,7 +78,7 @@ const char *prvm_opnames[] =
 "^2NOT_FNC",
 
 "^5IF",
-"^5IFNOT",
+//1
 
 "^3CALL",
 //8

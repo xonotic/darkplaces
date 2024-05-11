@@ -2127,10 +2127,9 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			if (a >= prog->progs_numglobals || b + i < 0 || b + i >= prog->progs_numstatements)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds IF/IFNOT (statement %d) in %s", i, prog->name);
 			//To be rewritten
-			prog->statements[i].ins = op - OP_IF + INS_IF;
+			prog->statements[i].ins = INS_IF;
 			prog->statements[i].operand[0] = remapglobal(a);
-			//prog->statements[i].operand[1] = OP_IF - op;
-			prog->statements[i].operand[1] = -1;
+			prog->statements[i].operand[1] = op - OP_IF;
 			prog->statements[i].operand[2] = -1;
 			prog->statements[i].jumpabsolute = i + b;
 			break;

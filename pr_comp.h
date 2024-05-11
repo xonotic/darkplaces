@@ -173,7 +173,7 @@ typedef enum instruction_e
 	INS_NOT_ENT,
 	INS_NOT_FNC,
 	INS_IF,
-	INS_IFNOT,
+	//GAP: 1(rewritten)
 	INS_CALL,//argc in OPB
 	//GAP: 8(rewritten)
 	INS_STATE,
