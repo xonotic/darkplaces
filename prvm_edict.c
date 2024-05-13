@@ -2126,7 +2126,6 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			b = (short)b;
 			if (a >= prog->progs_numglobals || b + i < 0 || b + i >= prog->progs_numstatements)
 				prog->error_cmd("PRVM_LoadProgs: out of bounds IF/IFNOT (statement %d) in %s", i, prog->name);
-			//To be rewritten
 			prog->statements[i].ins = INS_IF;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = op - OP_IF;
@@ -2177,6 +2176,23 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 			prog->statements[i].operand[2] = remapglobal(c);
 			prog->statements[i].jumpabsolute = -1;
 			break;
+		case OP_GT:
+		case OP_LT:
+		case OP_GE:
+		case OP_LE:
+			//TODO: rewrite all float comparasions in one instruction
+			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals || c >= prog->progs_numglobals)
+				prog->error_cmd("PRVM_LoadProgs: out of bounds global index (statement %d)", i);
+			if(op == OP_LT)
+				d = 1;
+			else if (op == OP_GT)
+				d = 3;
+			prog->statements[i].ins = op - OP_LE + INS_LE - d;
+			prog->statements[i].operand[0] = remapglobal(a);
+			prog->statements[i].operand[1] = remapglobal(b);
+			prog->statements[i].operand[2] = remapglobal(c);
+			prog->statements[i].jumpabsolute = !!d;
+			break;
 		//regular
 		case OP_BITAND:
 		case OP_BITOR:
@@ -2187,10 +2203,7 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char * filename, unsigned char * da
 		d += 4;//Skip loads
 		case OP_LOAD_V://LOAD_VECTOR
 		case OP_LOAD_F://LOAD_SCALAR
-		case OP_GE:
-		case OP_LE:
-		case OP_GT:
-		case OP_LT:
+		d += 2;//Skip LT, GT
 		case OP_NE_F:
 		case OP_NE_V:
 		case OP_NE_S:

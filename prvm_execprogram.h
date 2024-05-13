@@ -40,9 +40,6 @@
 	&&handle_INS_DONE,
 	&&handle_INS_MUL_F,
 	&&handle_INS_MUL_V,
-	#if 0
-	NULL,
-	#endif
 	&&handle_INS_MUL_VF,
 	&&handle_INS_DIV_F,
 	&&handle_INS_ADD_F,
@@ -64,8 +61,6 @@
 
 	&&handle_INS_LE,
 	&&handle_INS_GE,
-	&&handle_INS_LT,
-	&&handle_INS_GT,
 
 	&&handle_INS_LOAD_SCALAR,
 	&&handle_INS_LOAD_VECTOR,
@@ -192,16 +187,10 @@
 				OPC->_float = (prvm_int_t)OPA->_float | (prvm_int_t)OPB->_float;
 				DISPATCH_OPCODE();
 			HANDLE_OPCODE(INS_GE):
-				OPC->_float = OPA->_float >= OPB->_float;
+				OPC->_float = st->jumpabsolute ^ (OPA->_float >= OPB->_float);
 				DISPATCH_OPCODE();
 			HANDLE_OPCODE(INS_LE):
-				OPC->_float = OPA->_float <= OPB->_float;
-				DISPATCH_OPCODE();
-			HANDLE_OPCODE(INS_GT):
-				OPC->_float = OPA->_float > OPB->_float;
-				DISPATCH_OPCODE();
-			HANDLE_OPCODE(INS_LT):
-				OPC->_float = OPA->_float < OPB->_float;
+				OPC->_float = st->jumpabsolute ^ (OPA->_float <= OPB->_float);
 				DISPATCH_OPCODE();
 			HANDLE_OPCODE(INS_AND):
 				OPC->_float = FLOAT_IS_TRUE_FOR_INT(OPA->_int) && FLOAT_IS_TRUE_FOR_INT(OPB->_int); // TODO change this back to float, and add AND_I to be used by fteqcc for anything not a float

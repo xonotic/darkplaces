@@ -149,8 +149,7 @@ typedef enum instruction_e
 
 	INS_LE,
 	INS_GE,
-	INS_LT,
-	INS_GT,
+	//GAP: 4(rewritten)
 
 	INS_LOAD_SCALAR,
 	INS_LOAD_VECTOR,

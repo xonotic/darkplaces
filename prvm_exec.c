@@ -52,8 +52,6 @@ const char *prvm_opnames[] =
 
 "^2LE",
 "^2GE",
-"^2LT",
-"^2GT",
 
 "^6FIELD_SCALAR",
 "^6FIELD_VECTOR",
