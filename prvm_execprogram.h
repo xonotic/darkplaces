@@ -362,6 +362,7 @@
 				// although mostly unneeded, thanks to the only float being false being 0x0 and 0x80000000 (negative zero)
 				// and entity, string, field values can never have that value
 				{
+					HANDLE_OPCODE(INS_GOTO):
 					ADVANCE_PROFILE_BEFORE_JUMP();
 					st = cached_statements + st->jumpabsolute - 1;	// offset the st++
 					startst = st;
@@ -372,19 +373,6 @@
 						PRVM_Profile(prog, 1<<30, 1000000, 0);
 						prog->error_cmd("%s runaway loop counter hit limit of %d jumps\ntip: read above for list of most-executed functions", prog->name, jumpcount);
 					}
-				}
-				DISPATCH_OPCODE();
-
-			HANDLE_OPCODE(INS_GOTO):
-				ADVANCE_PROFILE_BEFORE_JUMP();
-				st = cached_statements + st->jumpabsolute - 1;	// offset the st++
-				startst = st;
-				// no bounds check needed, it is done when loading progs
-				if (++jumpcount == 10000000 && prvm_runawaycheck)
-				{
-					prog->xstatement = st - cached_statements;
-					PRVM_Profile(prog, 1<<30, 0.01, 0);
-					prog->error_cmd("%s runaway loop counter hit limit of %d jumps\ntip: read above for list of most-executed functions", prog->name, jumpcount);
 				}
 				DISPATCH_OPCODE();
 
