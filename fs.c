@@ -25,6 +25,10 @@
 #include <limits.h>
 #include <fcntl.h>
 
+#ifndef FOLDERNAME
+#define FOLERNAME "darkplaces"
+#endif
+
 #ifdef WIN32
 # include <direct.h>
 # include <io.h>
@@ -2207,7 +2211,7 @@ static void FS_Init_Dir (void)
 	accountGetProfile(&profile, userID);
 	accountProfileGet(&profile,NULL,&profileBase);
 
-	dpsnprintf(fs_basedir, sizeof(fs_basedir), "/switch/darkplaces/%s",profileBase.nickname);
+	dpsnprintf(fs_basedir, sizeof(fs_basedir), "/switch/%s/%s",FOLDERNAME,profileBase.nickname);
 	//No idea why I need to make this weird struct to use stat but stackoverflow decreed I must, so I shall.
 	struct stat sb;
 	if(stat(fs_basedir,&sb) == -1){
