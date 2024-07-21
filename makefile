@@ -329,6 +329,11 @@ else ifeq ($(DP_LINK_XMP), dlopen)
 	CFLAGS_SND_XMP=-DUSEXMP
 endif
 
+# GLES
+ifeq ($(DP_GLES),2)
+	LIB_GLES=-lGLESv2
+	CFLAGS_GLES=-DUSE_GLES2
+endif
 
 ##### Extra CFLAGS #####
 ifdef DP_FS_BASEDIR
