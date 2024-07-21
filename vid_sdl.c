@@ -1855,7 +1855,9 @@ static qbool VID_InitModeGL(const viddef_mode_t *mode)
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
 	Cvar_SetQuick(&gl_info_renderer, gl_renderer);
 	Cvar_SetQuick(&gl_info_version, gl_version);
+	#ifndef USE_GLES2
 	Cvar_SetQuick(&gl_info_driver, drivername ? drivername : "");
+	#endif
 
 	for (i = 0; i < vid_info_displaycount.integer; ++i)
 		Con_Printf("Display %i: %s\n", i, SDL_GetDisplayName(i));
