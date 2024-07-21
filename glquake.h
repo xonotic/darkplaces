@@ -587,6 +587,43 @@ typedef void (GLAPIENTRY *GLDEBUGPROCARB)(GLenum source, GLenum type, GLuint id,
 #define GL_DEBUG_SEVERITY_MEDIUM_ARB      0x9147
 #define GL_DEBUG_SEVERITY_LOW_ARB         0x9148
 
+#define GL_COLOR_ATTACHMENT0                0x8CE0
+#define GL_COLOR_ATTACHMENT1                0x8CE1
+#define GL_COLOR_ATTACHMENT2                0x8CE2
+#define GL_COLOR_ATTACHMENT3                0x8CE3
+#define GL_COLOR_ATTACHMENT4                0x8CE4
+#define GL_COLOR_ATTACHMENT5                0x8CE5
+#define GL_COLOR_ATTACHMENT6                0x8CE6
+#define GL_COLOR_ATTACHMENT7                0x8CE7
+#define GL_COLOR_ATTACHMENT8                0x8CE8
+#define GL_COLOR_ATTACHMENT9                0x8CE9
+#define GL_COLOR_ATTACHMENT10               0x8CEA
+#define GL_COLOR_ATTACHMENT11               0x8CEB
+#define GL_COLOR_ATTACHMENT12               0x8CEC
+#define GL_COLOR_ATTACHMENT13               0x8CED
+#define GL_COLOR_ATTACHMENT14               0x8CEE
+#define GL_COLOR_ATTACHMENT15               0x8CEF
+
+#define GL_RGBA32F                                       0x8814
+#define GL_RGB32F                                        0x8815
+#define GL_ALPHA32F                                      0x8816
+#define GL_INTENSITY32F                                  0x8817
+#define GL_LUMINANCE32F                                  0x8818
+#define GL_LUMINANCE_ALPHA32F                            0x8819
+#define GL_RGBA16F                                       0x881A
+#define GL_RGB16F                                        0x881B
+#define GL_ALPHA16F                                      0x881C
+#define GL_INTENSITY16F                                  0x881D
+#define GL_LUMINANCE16F                                  0x881E
+#define GL_LUMINANCE_ALPHA16F                            0x881F
+
+#define GL_TEXTURE_3D				0x806F
+
+#define GL_HALF_FLOAT                                    0x140B
+#define GL_MAJOR_VERSION                  0x821B
+#define GL_MINOR_VERSION                  0x821C
+#define GL_NUM_EXTENSIONS                 0x821D
+
 #endif //GL_ZERO
 
 extern GLboolean(GLAPIENTRY *qglIsBuffer) (GLuint buffer);
@@ -999,44 +1036,12 @@ extern void (GLAPIENTRY *qglViewport)(GLint x, GLint y, GLsizei width, GLsizei h
 #define qglVertexAttrib4usv glVertexAttrib4usv
 #define qglVertexAttribPointer glVertexAttribPointer
 #define qglViewport glViewport
+
+#define GL_RGBA16F GL_RGBA16F_EXT
+#define GL_RGBA32F GL_RGBA32F_EXT
+#define GL_HALF_FLOAT GL_HALF_FLOAT_OES
 #endif //USE_GLES2
 
-#define GL_COLOR_ATTACHMENT0                0x8CE0
-#define GL_COLOR_ATTACHMENT1                0x8CE1
-#define GL_COLOR_ATTACHMENT2                0x8CE2
-#define GL_COLOR_ATTACHMENT3                0x8CE3
-#define GL_COLOR_ATTACHMENT4                0x8CE4
-#define GL_COLOR_ATTACHMENT5                0x8CE5
-#define GL_COLOR_ATTACHMENT6                0x8CE6
-#define GL_COLOR_ATTACHMENT7                0x8CE7
-#define GL_COLOR_ATTACHMENT8                0x8CE8
-#define GL_COLOR_ATTACHMENT9                0x8CE9
-#define GL_COLOR_ATTACHMENT10               0x8CEA
-#define GL_COLOR_ATTACHMENT11               0x8CEB
-#define GL_COLOR_ATTACHMENT12               0x8CEC
-#define GL_COLOR_ATTACHMENT13               0x8CED
-#define GL_COLOR_ATTACHMENT14               0x8CEE
-#define GL_COLOR_ATTACHMENT15               0x8CEF
-
-#define GL_RGBA32F                                       0x8814
-#define GL_RGB32F                                        0x8815
-#define GL_ALPHA32F                                      0x8816
-#define GL_INTENSITY32F                                  0x8817
-#define GL_LUMINANCE32F                                  0x8818
-#define GL_LUMINANCE_ALPHA32F                            0x8819
-#define GL_RGBA16F                                       0x881A
-#define GL_RGB16F                                        0x881B
-#define GL_ALPHA16F                                      0x881C
-#define GL_INTENSITY16F                                  0x881D
-#define GL_LUMINANCE16F                                  0x881E
-#define GL_LUMINANCE_ALPHA16F                            0x881F
-
-#define GL_TEXTURE_3D				0x806F
-
-#define GL_HALF_FLOAT                                    0x140B
-#define GL_MAJOR_VERSION                  0x821B
-#define GL_MINOR_VERSION                  0x821C
-#define GL_NUM_EXTENSIONS                 0x821D
 
 
 //====================================================
