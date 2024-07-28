@@ -1433,10 +1433,10 @@ static void Q3Shader_AddToHash (shader_t* shader)
 				start = (unsigned char *) (&shader->Q3SHADERINFO_COMPARE_START);
 				end = ((unsigned char *) (&shader->Q3SHADERINFO_COMPARE_END)) + sizeof(shader->Q3SHADERINFO_COMPARE_END);
 				start2 = (unsigned char *) (&entry->shader.Q3SHADERINFO_COMPARE_START);
-				if(memcmp(start, start2, end - start))
-					Con_DPrintf("Shader '%s' already defined, ignoring mismatching redeclaration\n", shader->name);
-				else
-					Con_DPrintf("Shader '%s' already defined\n", shader->name);
+				//if(memcmp(start, start2, end - start))
+					//Con_DPrintf("Shader '%s' already defined, ignoring mismatching redeclaration\n", shader->name);
+				//else
+					//Con_DPrintf("Shader '%s' already defined\n", shader->name);
 				return;
 			}
 		}
