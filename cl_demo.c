@@ -419,16 +419,12 @@ void CL_Record_f(cmd_state_t *cmd)
 	FS_Printf(cls.demofile, "%i\n", cls.forcetrack);
 
 	cls.demorecording = true;
-	cls.demo_lastcsprogssize = -1;
-	cls.demo_lastcsprogscrc = -1;
 
 	// from ProQuake: initialize the demo file if we're already connected
 	if (c == 2 && cls.state == ca_connected)
 	{
 		sizebuf_t buf;
 		unsigned char tmpbuf[NET_MAXMESSAGE];
-		int cursize = buf.cursize;
-		int maxsize = buf.maxsize;
 		int i, count;
 
 		buf.data = demo_head;
@@ -492,6 +488,11 @@ void CL_Record_f(cmd_state_t *cmd)
 
 		CL_WriteDemoMessage(&buf);
 
+	}
+	else
+	{
+		cls.demo_lastcsprogssize = -1;
+		cls.demo_lastcsprogscrc = -1;
 	}
 }
 
