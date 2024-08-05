@@ -461,6 +461,28 @@ void CL_Record_f(cmd_state_t *cmd)
 			MSG_WriteString (&buf, cl.lightstyle[i].map);
 		}
 
+               // write stat updates
+               if (cls.protocol != PROTOCOL_QUAKE && cls.protocol != PROTOCOL_QUAKEDP && cls.protocol != PROTOCOL_NEHAHRAMOVIE && cls.protocol != PROTOCOL_NEHAHRABJP && cls.protocol != PROTOCOL_NEHAHRABJP2 && cls.protocol != PROTOCOL_NEHAHRABJP3 && cls.protocol != PROTOCOL_DARKPLACES1 && cls.protocol != PROTOCOL_DARKPLACES2 && cls.protocol != PROTOCOL_DARKPLACES3 && cls.protocol != PROTOCOL_DARKPLACES4 && cls.protocol != PROTOCOL_DARKPLACES5)
+               {
+                       for (i = 0;i < MAX_CL_STATS && buf.cursize + 6 + 11 <= buf.maxsize;i++)
+                       {
+                               if (cl.stats[i] >= 0 && cl.stats[i] < 256)
+                               {
+                                       MSG_WriteByte(&buf, svc_updatestatubyte);
+                                       MSG_WriteByte(&buf, i);
+                                       MSG_WriteByte(&buf, cl.stats[i]);
+                               }
+                               else
+                               {
+                                       MSG_WriteByte(&buf, svc_updatestat);
+                                       MSG_WriteByte(&buf, i);
+                                       MSG_WriteLong(&buf, cl.stats[i]);
+                               }
+                       }
+                       Con_Printf ("stats stored: %d\n", i);
+               }
+
+/*
 		// what about the CD track or SVC fog... future consideration.
 		MSG_WriteByte (&buf, svc_updatestat);
 		MSG_WriteByte (&buf, STAT_TOTALSECRETS);
@@ -477,7 +499,7 @@ void CL_Record_f(cmd_state_t *cmd)
 		MSG_WriteByte (&buf, svc_updatestat);
 		MSG_WriteByte (&buf, STAT_MONSTERS);
 		MSG_WriteLong (&buf, cl.stats[STAT_MONSTERS]);
-
+*/
 		// view entity
 		MSG_WriteByte (&buf, svc_setview);
 		MSG_WriteShort (&buf, cl.viewentity);
