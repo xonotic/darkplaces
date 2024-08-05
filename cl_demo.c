@@ -27,6 +27,10 @@ extern cvar_t cl_capturevideo_demo_stop;
 
 static void CL_FinishTimeDemo (void);
 
+// from ProQuake: space to fill out the demo header for record at any tim
+static unsigned char    *demo_head;
+static int              *demo_head_sizes;
+
 /*
 ==============================================================================
 
@@ -116,6 +120,11 @@ void CL_WriteDemoMessage (sizebuf_t *message)
 	if (cls.demopaused) // LadyHavoc: pausedemo
 		return;
 
+	if (cls.signon < 2)
+	{
+		Vec_Append ((void**)&demo_head, 1, message->data, message->cursize);
+		VEC_PUSH (demo_head_sizes, message->cursize);
+	}
 	len = LittleLong (message->cursize);
 	FS_Write (cls.demofile, &len, 4);
 	for (i=0 ; i<3 ; i++)
@@ -365,12 +374,16 @@ void CL_Record_f(cmd_state_t *cmd)
 
 	if (c == 2 && cls.state == ca_connected)
 	{
+#if 0
 		Con_Print("Can not record - already connected to server\nClient demo recording must be started before connecting\n");
 		return;
+#endif
 	}
 
+#if 0
 	if (cls.state == ca_connected)
 		CL_Disconnect();
+#endif
 
 	// write the forced cd track number, or -1
 	if (c == 4)
@@ -408,6 +421,78 @@ void CL_Record_f(cmd_state_t *cmd)
 	cls.demorecording = true;
 	cls.demo_lastcsprogssize = -1;
 	cls.demo_lastcsprogscrc = -1;
+
+	// from ProQuake: initialize the demo file if we're already connected
+	if (c == 2 && cls.state == ca_connected)
+	{
+		sizebuf_t buf;
+		unsigned char tmpbuf[NET_MAXMESSAGE];
+		int cursize = buf.cursize;
+		int maxsize = buf.maxsize;
+		int i, count;
+
+		buf.data = demo_head;
+		for (i = 0, count = VEC_SIZE (demo_head_sizes); i < count; i++)
+		{
+			buf.cursize = demo_head_sizes[i];
+			CL_WriteDemoMessage(&buf);
+			buf.data += buf.cursize;
+		}
+
+		buf.data = tmpbuf;
+		buf.maxsize = sizeof (tmpbuf);
+		SZ_Clear (&buf);
+
+		// current names, colors, and frag counts
+		for (i = 0; i < cl.maxclients; i++)
+		{
+			MSG_WriteByte (&buf, svc_updatename);
+			MSG_WriteByte (&buf, i);
+			MSG_WriteString (&buf, cl.scores[i].name);
+			MSG_WriteByte (&buf, svc_updatefrags);
+			MSG_WriteByte (&buf, i);
+			MSG_WriteShort (&buf, cl.scores[i].frags);
+			MSG_WriteByte (&buf, svc_updatecolors);
+			MSG_WriteByte (&buf, i);
+			MSG_WriteByte (&buf, cl.scores[i].colors);
+		}
+
+		// send all current light styles
+		for (i = 0; i < MAX_LIGHTSTYLES; i++)
+		{
+			MSG_WriteByte (&buf, svc_lightstyle);
+			MSG_WriteByte (&buf, i);
+			MSG_WriteString (&buf, cl.lightstyle[i].map);
+		}
+
+		// what about the CD track or SVC fog... future consideration.
+		MSG_WriteByte (&buf, svc_updatestat);
+		MSG_WriteByte (&buf, STAT_TOTALSECRETS);
+		MSG_WriteLong (&buf, cl.stats[STAT_TOTALSECRETS]);
+
+		MSG_WriteByte (&buf, svc_updatestat);
+		MSG_WriteByte (&buf, STAT_TOTALMONSTERS);
+		MSG_WriteLong (&buf, cl.stats[STAT_TOTALMONSTERS]);
+
+		MSG_WriteByte (&buf, svc_updatestat);
+		MSG_WriteByte (&buf, STAT_SECRETS);
+		MSG_WriteLong (&buf, cl.stats[STAT_SECRETS]);
+
+		MSG_WriteByte (&buf, svc_updatestat);
+		MSG_WriteByte (&buf, STAT_MONSTERS);
+		MSG_WriteLong (&buf, cl.stats[STAT_MONSTERS]);
+
+		// view entity
+		MSG_WriteByte (&buf, svc_setview);
+		MSG_WriteShort (&buf, cl.viewentity);
+
+		// signon
+		MSG_WriteByte (&buf, svc_signonnum);
+		MSG_WriteByte (&buf, 3);
+
+		CL_WriteDemoMessage(&buf);
+
+	}
 }
 
 void CL_PlayDemo(const char *demo)
