@@ -1077,6 +1077,7 @@ void EntityStateQW_ReadPlayerUpdate(void);
 void EntityFrameQW_CL_ReadFrame(qbool delta);
 
 struct client_s;
+void EntityFrameCSQC_LostAllFrames(struct client_s *client);
 void EntityFrameCSQC_LostFrame(struct client_s *client, int framenum);
 qbool EntityFrameCSQC_WriteFrame (struct sizebuf_s *msg, int maxsize, int numnumbers, const unsigned short *numbers, int framenum);
 

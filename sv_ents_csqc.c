@@ -5,7 +5,7 @@
 // (including QUAKE), no packet loss handling for CSQC is done, which makes
 // CSQC basically useless.
 // Always use the DP5 protocol, or a higher one, when using CSQC entities.
-static void EntityFrameCSQC_LostAllFrames(client_t *client)
+void EntityFrameCSQC_LostAllFrames(client_t *client)
 {
 	prvm_prog_t *prog = SVVM_prog;
 	// mark ALL csqc entities as requiring a FULL resend!

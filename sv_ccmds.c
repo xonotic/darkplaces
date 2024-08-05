@@ -735,6 +735,20 @@ static void SV_Pings_f(cmd_state_t *cmd)
 }
 
 /*
+====================
+SV_Resend_All_Csqc_Ents_f
+
+send all csqc ents from scratch to this player
+====================
+*/
+static void SV_Resend_All_Csqc_Ents_f(cmd_state_t *cmd)
+{
+	if (!host_client->netconnection)
+		return;
+	EntityFrameCSQC_LostAllFrames(host_client); //resend all entities
+}
+
+/*
 ==================
 SV_Status_f
 ==================
@@ -1669,6 +1683,7 @@ void SV_InitOperatorCommands(void)
 	Cmd_AddCommand(CF_SERVER_FROM_CLIENT, "spawn", SV_Spawn_f, "internal use - signon 2 (client has sent player information, and is asking server to send scoreboard rankings)");
 	Cmd_AddCommand(CF_SERVER_FROM_CLIENT, "begin", SV_Begin_f, "internal use - signon 3 (client asks server to start sending entities, and will go to signon 4 (playing) when the first entity update is received)");
 	Cmd_AddCommand(CF_SERVER_FROM_CLIENT, "pings", SV_Pings_f, "internal use - command sent by clients to request updated ping and packetloss of players on scoreboard (originally from QW, but also used on NQ servers)");
+	Cmd_AddCommand(CF_SERVER_FROM_CLIENT, "resendcsqcents", SV_Resend_All_Csqc_Ents_f, "internal use - command sent by clients to request updated ping and packetloss of players on scoreboard (originally from QW, but also used on NQ servers)");
 
 	Cmd_AddCommand(CF_CHEAT | CF_SERVER_FROM_CLIENT, "god", SV_God_f, "god mode (invulnerability)");
 	Cmd_AddCommand(CF_CHEAT | CF_SERVER_FROM_CLIENT, "notarget", SV_Notarget_f, "notarget mode (monsters do not see you)");
