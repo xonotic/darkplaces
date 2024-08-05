@@ -510,6 +510,10 @@ void CL_Record_f(cmd_state_t *cmd)
 
 		CL_WriteDemoMessage(&buf);
 
+		// request server all csqc entities
+		MSG_WriteByte(&cls.netcon->message, clc_stringcmd);
+		MSG_WriteString(&cls.netcon->message, "resendcsqcents");
+
 	}
 	else
 	{
