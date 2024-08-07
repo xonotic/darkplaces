@@ -1618,7 +1618,6 @@ static void SCR_DrawLoadingScreen(void);
 static void SCR_DrawScreen (void)
 {
 	Draw_Frame();
-	DrawQ_Start();
 	R_Mesh_Start();
 	R_UpdateVariables();
 
@@ -2383,6 +2382,11 @@ void CL_UpdateScreen(void)
 
 	qglFlush(); // ensure that the commands are submitted to the GPU before we do other things
 	VID_Finish();
+	if (gl_dither.integer) {
+		qglEnable(GL_DITHER);CHECKGLERROR
+	} else {
+		qglDisable(GL_DITHER);CHECKGLERROR
+	}
 }
 
 void CL_Screen_NewMap(void)
