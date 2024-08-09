@@ -410,6 +410,40 @@ void CL_Record_f(cmd_state_t *cmd)
 	cls.demo_lastcsprogscrc = -1;
 }
 
+/*
+====================
+CL_RenameDemo_f
+
+renamedemo <demoname>
+====================
+*/
+void CL_RenameDemo_f(cmd_state_t *cmd)
+{
+	int c;
+	char name[MAX_OSPATH];
+
+	c = Cmd_Argc(cmd);
+	if (c != 2)
+	{
+		Con_Print("renamedemo <demoname>\n");
+		return;
+	}
+	if (!cls.demorecording)
+	{
+		Con_Print("Not recording a demo.\n");
+		return;
+	}
+	if (strstr(Cmd_Argv(cmd, 1), ".."))
+	{
+		Con_Print("Relative pathnames are not allowed.\n");
+		return;
+	}
+	// get the demo name
+	dp_strlcpy (name, Cmd_Argv(cmd, 1), sizeof (name));
+	FS_DefaultExtension (name, ".dem", sizeof (name));
+	FS_RenameOnClose(cls.demofile, name);
+}
+
 void CL_PlayDemo(const char *demo)
 {
 	char name[MAX_QPATH];
@@ -738,6 +772,7 @@ void CL_Demo_Init(void)
 {
 	Cmd_AddCommand(CF_CLIENT, "record", CL_Record_f, "record a demo");
 	Cmd_AddCommand(CF_CLIENT, "stop", CL_Stop_f, "stop recording or playing a demo");
+	Cmd_AddCommand(CF_CLIENT, "renamedemo", CL_RenameDemo_f, "rename currently recording demo on finish");
 	Cmd_AddCommand(CF_CLIENT, "playdemo", CL_PlayDemo_f, "watch a demo file");
 	Cmd_AddCommand(CF_CLIENT, "timedemo", CL_TimeDemo_f, "play back a demo as fast as possible and save statistics to benchmark.log");
 	Cmd_AddCommand(CF_CLIENT, "startdemos", CL_Startdemos_f, "start playing back the selected demos sequentially (used at end of startup script)");
