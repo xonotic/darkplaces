@@ -2939,9 +2939,6 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 				//   set con_completion_playermodel "models/player/*.zym models/player/*.md3 models/player/*.psk models/player/*.dpm"
 				//   set con_completion_playdemo "*.dem"
 				//   set con_completion_play "*.wav *.ogg"
-				//
-				// TODO somehow add support for directories; these shall complete
-				// to their name + an appended slash.
 
 				stringlistinit(&resultbuf);
 				stringlistinit(&dirbuf);
@@ -2957,7 +2954,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 						const char *slash = strrchr(s, '/');
 						if(slash)
 						{
-							dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
+							dp_ustr2stp(t, sizeof(t), s, slash - s + 1); // + 1, because I want to include the slash
 							dp_strlcat(t, com_token, sizeof(t));
 							search = FS_Search(t, true, true, NULL);
 						}
@@ -2980,7 +2977,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 					const char *slash = strrchr(s, '/');
 					if(slash)
 					{
-						dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
+						dp_ustr2stp(t, sizeof(t), s, slash - s + 1); // + 1, because I want to include the slash
 						dp_strlcat(t, "*", sizeof(t));
 						search = FS_Search(t, true, true, NULL);
 					}
@@ -3000,6 +2997,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 				{
 					const char *p, *q;
 					unsigned int matchchars;
+
 					if(resultbuf.numstrings == 0 && dirbuf.numstrings == 1)
 					{
 						dpsnprintf(t, sizeof(t), "%s/", dirbuf.strings[0]);
@@ -3021,26 +3019,33 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 						{
 							Con_Printf("%s\n", resultbuf.strings[i]);
 						}
-						matchchars = sizeof(t) - 1;
-						if(resultbuf.numstrings > 0)
+
+						if(resultbuf.numstrings > 0) // matching file
 						{
 							p = resultbuf.strings[0];
 							q = resultbuf.strings[resultbuf.numstrings - 1];
+							if (dirbuf.numstrings > 0) // and matching directory
+							{
+								const char *r = dirbuf.strings[0];
+								for(; *p && *p == *q && *p == *r; ++p, ++q, ++r);
+							}
+							else
 							for(; *p && *p == *q; ++p, ++q);
 							matchchars = (unsigned int)(p - resultbuf.strings[0]);
+							dp_ustr2stp(t, sizeof(t), resultbuf.strings[0], matchchars);
 						}
-						if(dirbuf.numstrings > 0)
+						else // matching directory only
 						{
 							p = dirbuf.strings[0];
 							q = dirbuf.strings[dirbuf.numstrings - 1];
 							for(; *p && *p == *q; ++p, ++q);
-							matchchars = min(matchchars, (unsigned int)(p - dirbuf.strings[0]));
+							matchchars = (unsigned int)(p - dirbuf.strings[0]);
+							dp_ustr2stp(t, sizeof(t), dirbuf.strings[0], matchchars);
 						}
 						// now p points to the first non-equal character, or to the end
 						// of resultbuf.strings[0]. We want to append the characters
 						// from resultbuf.strings[0] to (not including) p as these are
 						// the unique prefix
-						dp_strlcpy(t, (resultbuf.numstrings > 0 ? resultbuf : dirbuf).strings[0], min(matchchars + 1, sizeof(t)));
 					}
 
 					// first move the cursor
