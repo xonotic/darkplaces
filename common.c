@@ -831,8 +831,9 @@ qbool COM_ParseToken_Console(const char **datapointer)
 	}
 
 // skip whitespace
+// unless it's an escaped space
 skipwhite:
-	for (;ISWHITESPACE(*data);data++)
+	for (;ISWHITESPACE_ANDNOTESCAPED(*data, data > *datapointer ? data[-1] : *data);data++)
 	{
 		if (*data == 0)
 		{
@@ -869,8 +870,9 @@ skipwhite:
 	else
 	{
 		// regular word
-		for (;!ISWHITESPACE(*data);data++)
-			if (len < (int)sizeof(com_token) - 1)
+		for (;!ISWHITESPACE_ANDNOTESCAPED(*data, data > *datapointer ? data[-1] : *data); data++)
+			if (len < (int)sizeof(com_token) - 1
+			&& !(*data == '\\' && data[1] == ' '))
 				com_token[len++] = *data;
 		com_token[len] = '\0';
 		com_token_len = len;

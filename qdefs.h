@@ -185,6 +185,8 @@
 #define ISCOMMENT(ch, pos) ch[pos] == '/' && ch[pos + 1] == '/' && (pos == 0 || ISWHITESPACE(ch[pos - 1]))
 // This also includes extended characters, and ALL control chars
 #define ISWHITESPACEORCONTROL(ch) ((signed char) (ch) <= (signed char) ' ')
+// Returns false for spaces if they're escaped
+#define ISWHITESPACE_ANDNOTESCAPED(ch, prevch) (!(ch) || ((ch) == ' ' && (prevch) != '\\') || (ch) == '\t' || (ch) == '\r' || (ch) == '\n')
 
 #define DOUBLE_IS_TRUE_FOR_INT(x) ((x) & 0x7FFFFFFFFFFFFFFF) // also match "negative zero" doubles of value 0x8000000000000000
 #define DOUBLE_LOSSLESS_FORMAT "%.17g"
