@@ -87,6 +87,7 @@ cvar_t con_nickcompletion_flags = {CF_CLIENT | CF_ARCHIVE, "con_nickcompletion_f
 cvar_t con_completion_playdemo = {CF_CLIENT | CF_ARCHIVE, "con_completion_playdemo", "*.dem", "completion pattern for the playdemo command"};
 cvar_t con_completion_timedemo = {CF_CLIENT | CF_ARCHIVE, "con_completion_timedemo", "*.dem", "completion pattern for the timedemo command"};
 cvar_t con_completion_exec = {CF_CLIENT | CF_ARCHIVE, "con_completion_exec", "*.cfg", "completion pattern for the exec command"};
+cvar_t con_completion_which = {CF_CLIENT | CF_ARCHIVE, "con_completion_which", "*", "completion pattern for the which, ls, and dir commands"};
 
 cvar_t condump_stripcolors = {CF_CLIENT | CF_SERVER| CF_ARCHIVE, "condump_stripcolors", "0", "strip color codes from console dumps"};
 
@@ -912,6 +913,9 @@ void Con_Init (void)
 	Cvar_RegisterVariable (&con_completion_playdemo); // *.dem
 	Cvar_RegisterVariable (&con_completion_timedemo); // *.dem
 	Cvar_RegisterVariable (&con_completion_exec); // *.cfg
+	Cvar_RegisterVariable (&con_completion_which); // *
+	Cvar_RegisterVirtual  (&con_completion_which, "con_completion_ls");
+	Cvar_RegisterVirtual  (&con_completion_which, "con_completion_dir");
 
 	Cvar_RegisterVariable (&condump_stripcolors);
 
