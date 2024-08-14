@@ -244,7 +244,6 @@ LDFLAGS_WASMJS=$(LDFLAGS_UNIXCOMMON) -s USE_SDL=2 \
                                    -s ALLOW_MEMORY_GROWTH=1 \
                                    -s ASSERTIONS=1 \
                                    -s STACK_SIZE=8mb \
-                                   -DUSE_GLES2 \
                                    -lidbfs.js \
                                    --pre-js ../../../wasm/pre.js \
                                    -s EXPORTED_RUNTIME_METHODS=callMain,addRunDependency,removeRunDependency
@@ -262,7 +261,6 @@ LDFLAGS_WASM=$(LDFLAGS_UNIXCOMMON) -s USE_SDL=2 \
                                    -s ALLOW_MEMORY_GROWTH=1 \
                                    -s ASSERTIONS=1 \
                                    -s STACK_SIZE=8mb \
-                                   -DUSE_GLES2 \
                                    -lidbfs.js \
                                    --pre-js ../../../wasm/standaloneprejs.js \
                                    -s EXPORTED_RUNTIME_METHODS=callMain,addRunDependency,removeRunDependency \
