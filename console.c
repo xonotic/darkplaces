@@ -2517,12 +2517,13 @@ static int Nicks_strncasecmp(char *a, char *b, unsigned int a_len)
 
    Count the number of possible nicks to complete
  */
-static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon)
+static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon, qbool only_pnumbers)
 {
 	char name[MAX_SCOREBOARDNAME];
 	int i, p;
 	int match;
 	int spos;
+	int digits = 0;
 	int count = 0;
 
 	if(!con_nickcompletion.integer)
@@ -2559,7 +2560,17 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 			}
 			if(isCon && spos == 0)
 				break;
-			if(Nicks_strncasecmp(line+spos, name, pos-spos) == 0)
+			if(only_pnumbers)
+			{
+				if(line[spos] == '#')
+				{
+					digits = (int) strspn(line+spos+1, "0123456789");
+					//  word lenght EQUAL digits count OR digits count + 1 trailing space
+					if(((pos)-(spos+1)) == (line[pos-1] == ' ' ? digits+1 : digits) && p == (atoi(line+spos+1)-1))
+						match = spos;
+				}
+			}
+			else if(Nicks_strncasecmp(line+spos, name, pos-spos) == 0)
 				match = spos;
 			--spos;
 		}
@@ -2872,7 +2883,7 @@ static size_t Con_EscapeSpaces(char *dst, const char *src, size_t dsize)
 	Directory support by divVerent
 	Escaping support by bones_was_here
 */
-int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
+int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool only_pnumbers)
 {
 	const char *text = "";
 	char *s;
@@ -2918,7 +2929,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 	line[linepos] = 0; //hide them
 
 	c = v = a = n = cmd_len = 0;
-	if (!is_console)
+	if (!is_console || only_pnumbers)
 		goto nicks;
 
 	space = strchr(line + 1, ' ');
@@ -3137,7 +3148,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 	}
 
 nicks:
-	n = Nicks_CompleteCountPossible(line, linepos, s, is_console);
+	n = Nicks_CompleteCountPossible(line, linepos, s, is_console, only_pnumbers);
 	if (n)
 	{
 		Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
