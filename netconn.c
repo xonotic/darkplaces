@@ -33,6 +33,11 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define DPMASTER_PORT 27950
 #define SRVMAIN_PORT 26000  
 #define CLSTAT_PORT 26062 
+
+// can be set to 0 - 65536 aka random uPnP , they can use same range really, it's alice and bob, check sockets
+const int clPortRange[] = {26192,26262} ;
+const int svPortRange[] = {26000,26184} ; 
+
 // then redefine with var from config files, hardcoded stuff is not the best idea / if CLSTAT_PORT = 0 - is random ? uPnP alike the func is down there, port can be defined now
 
 // note this defaults on for dedicated servers, off for listen servers
@@ -1098,7 +1103,7 @@ void NetConn_OpenClientPorts(void)
 	Crypto_LoadKeys(); // client sockets
 	SV_UnlockThreadMutex();
 
-	port = bound(0, cl_netport.integer, 65535);
+	port = bound(clPortRange[0], cl_netport.integer, clPortRange[1]);
 	if (cl_netport.integer != port)
 		Cvar_SetValueQuick(&cl_netport, port);
 	if(port == 0)
@@ -1169,7 +1174,7 @@ void NetConn_OpenServerPorts(int opennetports)
 	SV_UnlockThreadMutex();
 
 	NetConn_UpdateSockets();
-	port = bound(0, sv_netport.integer, 65535);
+	port = bound(svPortRange[0], sv_netport.integer, svPortRange[1]);
 	if (port == 0)
 		port = SRVMAIN_PORT;
 	if (sv_netport.integer != port)
@@ -4159,7 +4164,7 @@ void NetConn_Init(void)
 	if (((i = Sys_CheckParm("-port")) || (i = Sys_CheckParm("-ipport")) || (i = Sys_CheckParm("-udpport"))) && i + 1 < sys.argc)
 	{
 		i = atoi(sys.argv[i + 1]);
-		if (i >= 0 && i < 65536)
+		if (i >= svPortRange[0] && i < svPortRange[1])
 		{
 			Con_Printf("-port option used, setting port cvar to %i\n", i);
 			Cvar_SetValueQuick(&sv_netport, i);
