@@ -1206,6 +1206,12 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 		}
 	}
 
+	if (texturetype == GLTEXTURETYPE_CUBEMAP && vid.maxtexturesize_cubemap == 0)
+	{
+		Con_Printf ("R_LoadTexture: cubemap texture not supported by driver\n");
+		return NULL;
+	}
+
 	texinfo = R_GetTexTypeInfo(textype, flags);
 	size = width * height * depth * sides * texinfo->inputbytesperpixel;
 	if (size < 1)
