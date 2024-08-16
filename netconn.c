@@ -31,6 +31,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #define QWMASTER_PORT 27000
 #define DPMASTER_PORT 27950
+#define SRVMAIN_PORT 26000  
+#define CLSTAT_PORT 26062 
+
+// can be set to 0 - 65536 aka random uPnP , they can use same range really, it's alice and bob, check sockets
+const int clPortRange[] = {26192,26262} ;
+const int svPortRange[] = {26000,26184} ; 
+
+// then redefine with var from config files, hardcoded stuff is not the best idea / if CLSTAT_PORT = 0 - is random ? uPnP alike the func is down there, port can be defined now
 
 // note this defaults on for dedicated servers, off for listen servers
 cvar_t sv_public = {CF_SERVER, "sv_public", "0", "1: advertises this server on the master server (so that players can find it in the server browser); 0: allow direct queries only; -1: do not respond to direct queries; -2: do not allow anyone to connect; -3: already block at getchallenge level"};
@@ -56,10 +64,10 @@ static cvar_t sv_qwmasters [] =
 	{CF_CLIENT | CF_ARCHIVE, "sv_qwmaster2", "", "user-chosen qwmaster server 2"},
 	{CF_CLIENT | CF_ARCHIVE, "sv_qwmaster3", "", "user-chosen qwmaster server 3"},
 	{CF_CLIENT | CF_ARCHIVE, "sv_qwmaster4", "", "user-chosen qwmaster server 4"},
-	{CF_CLIENT, "sv_qwmasterextra1", "master.quakeservers.net:27000", "Global master server. (admin: unknown)"},
-	{CF_CLIENT, "sv_qwmasterextra2", "asgaard.morphos-team.net:27000", "Global master server. (admin: unknown)"},
-	{CF_CLIENT, "sv_qwmasterextra3", "qwmaster.ocrana.de:27000", "German master server. (admin: unknown)"},
-	{CF_CLIENT, "sv_qwmasterextra4", "qwmaster.fodquake.net:27000", "Global master server. (admin: unknown)"},
+	{CF_CLIENT, "sv_qwmasterextra1", "master.quakeservers.net:" +QWMASTER_PORT, "Global master server. (admin: unknown)"},
+	{CF_CLIENT, "sv_qwmasterextra2", "asgaard.morphos-team.net:" +QWMASTER_PORT, "Global master server. (admin: unknown)"},
+	{CF_CLIENT, "sv_qwmasterextra3", "qwmaster.ocrana.de:" +QWMASTER_PORT, "German master server. (admin: unknown)"},
+	{CF_CLIENT, "sv_qwmasterextra4", "qwmaster.fodquake.net:" +QWMASTER_PORT, "Global master server. (admin: unknown)"},
 };
 #endif
 
@@ -140,16 +148,17 @@ char serverlist_dpserverquerykey[12]; // challenge_t uses [12]
 #endif
 
 static unsigned cl_numsockets;
-static lhnetsocket_t *cl_sockets[16];
+static lhnetsocket_t *cl_sockets[32];  //client sockets ? to get into any random party, doesn't cost much until is busy
 static unsigned sv_numsockets;
-static lhnetsocket_t *sv_sockets[16];
+static lhnetsocket_t *sv_sockets[64]; //server sockets ? up to 256 clients / oh, Reilly, enough with 16 ? sv_maxclients / not equal to max connections, but similar, test and change
+// 80-byte UDP packets are transmitted at a rate of 100 packets/sec , srv sends 120 ticks with 16384
 
 netconn_t *netconn_list = NULL;
 mempool_t *netconn_mempool = NULL;
 void *netconn_mutex = NULL;
 
-cvar_t cl_netport = {CF_CLIENT, "cl_port", "0", "forces client to use chosen port number if not 0"};
-cvar_t sv_netport = {CF_SERVER, "port", "26000", "server port for players to connect to"};
+cvar_t cl_netport = {CF_CLIENT, "cl_port", CLSTAT_PORT, "forces client to use chosen port number if not 0"}; 
+cvar_t sv_netport = {CF_SERVER, "port", SRVMAIN_PORT, "server port for players to connect to"};
 cvar_t net_address = {CF_CLIENT | CF_SERVER, "net_address", "", "network address to open ipv4 ports on (if empty, use default interfaces)"};
 cvar_t net_address_ipv6 = {CF_CLIENT | CF_SERVER, "net_address_ipv6", "", "network address to open ipv6 ports on (if empty, use default interfaces)"};
 
@@ -200,7 +209,7 @@ void NetConn_UpdateFavorites_c(cvar_t *var)
 		}
 		else 
 		{
-			if(LHNETADDRESS_FromString(&favorites[nFavorites], com_token, 26000))
+			if(LHNETADDRESS_FromString(&favorites[nFavorites], com_token, SRVMAIN_PORT))
 				++nFavorites;
 		}
 	}
@@ -452,7 +461,7 @@ static void ServerList_ViewList_Insert( serverlist_entry_t *entry )
 
 	// refresh the "favorite" status
 	entry->info.isfavorite = false;
-	if(LHNETADDRESS_FromString(&addr, entry->info.cname, 26000))
+	if(LHNETADDRESS_FromString(&addr, entry->info.cname, SRVMAIN_PORT))
 	{
 		char idfp[FP64_SIZE+1];
 		for(i = 0; i < nFavorites; ++i)
@@ -676,9 +685,9 @@ void ServerList_QueryList(qbool resetcache, qbool querydp, qbool queryqw, qbool 
 	masterquerytime = host.realtime + (Sys_DirtyTime() - host.dirtytime);
 	ServerList_BuildDPServerQuery(dpquery, sizeof(dpquery), masterquerytime);
 
-	// 26000 is the default quake server port, servers on other ports will not be found
+	// SRVMAIN_PORT (26000) is the default quake server port, servers on other ports will not be found
 	// note this is IPv4-only, I doubt there are IPv6-only LANs out there
-	LHNETADDRESS_FromString(&broadcastaddress, "255.255.255.255", 26000);
+	LHNETADDRESS_FromString(&broadcastaddress, "255.255.255.255", SRVMAIN_PORT);
 
 	for (i = 0; i < cl_numsockets; ++i)
 	{
@@ -1094,7 +1103,7 @@ void NetConn_OpenClientPorts(void)
 	Crypto_LoadKeys(); // client sockets
 	SV_UnlockThreadMutex();
 
-	port = bound(0, cl_netport.integer, 65535);
+	port = bound(clPortRange[0], cl_netport.integer, clPortRange[1]);
 	if (cl_netport.integer != port)
 		Cvar_SetValueQuick(&cl_netport, port);
 	if(port == 0)
@@ -1165,9 +1174,9 @@ void NetConn_OpenServerPorts(int opennetports)
 	SV_UnlockThreadMutex();
 
 	NetConn_UpdateSockets();
-	port = bound(0, sv_netport.integer, 65535);
+	port = bound(svPortRange[0], sv_netport.integer, svPortRange[1]);
 	if (port == 0)
-		port = 26000;
+		port = SRVMAIN_PORT;
 	if (sv_netport.integer != port)
 		Cvar_SetValueQuick(&sv_netport, port);
 	if (cls.state != ca_dedicated)
@@ -4151,11 +4160,11 @@ void NetConn_Init(void)
 		else
 			Con_Printf(CON_ERROR "-ip option used, but unable to parse the address \"%s\"\n", sys.argv[i + 1]);
 	}
-// COMMANDLINEOPTION: Server: -port <portnumber> sets the port to use for a server (default 26000, the same port as QUAKE itself), useful if you host multiple servers on your machine
+// COMMANDLINEOPTION: Server: -port <portnumber> sets the port to use for a server (default SRVMAIN_PORT (26000), the same port as QUAKE itself), useful if you host multiple servers on your machine
 	if (((i = Sys_CheckParm("-port")) || (i = Sys_CheckParm("-ipport")) || (i = Sys_CheckParm("-udpport"))) && i + 1 < sys.argc)
 	{
 		i = atoi(sys.argv[i + 1]);
-		if (i >= 0 && i < 65536)
+		if (i >= svPortRange[0] && i < svPortRange[1])
 		{
 			Con_Printf("-port option used, setting port cvar to %i\n", i);
 			Cvar_SetValueQuick(&sv_netport, i);
