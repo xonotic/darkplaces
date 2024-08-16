@@ -1,0 +1,18 @@
+this folder contains data , client , server, math
+
+/dat
+//cl
+//sv
+//mt
+
+for some reason git apps don't see new empty folders, it is
+ 
+/gui 
+/net //sv //cl  
+/snd 
+/inp 
+
+it's not the final and best solution, but something for a start
+basically it doesn't matter on the name of folders
+but you can use this naming to refer to some functions in other parts
+and you will know where to check that , because of the naming
