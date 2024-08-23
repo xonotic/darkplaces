@@ -7187,7 +7187,7 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	const colbrushf_t *brush;
 	const int *e;
 	const texture_t *texture;
-	vec3_t start, end, startmins, startmaxs, endmins, endmaxs, mins, maxs;
+	vec3_t start, end, startmaxs, endmaxs, mins, maxs;
 	vec3_t nodebigmins, nodebigmaxs, nodestart, nodeend, sweepnodemins, sweepnodemaxs;
 	vec_t d1, d2, d3, d4, f, nodestackline[1024][6];
 	int axis, nodenum, nodestackpos = 0, nodestack[1024];
@@ -7216,16 +7216,12 @@ void Mod_CollisionBIH_TraceBrush(dp_model_t *model, const frameblend_t *frameble
 	// calculate tracebox-like parameters for efficient culling
 	VectorMAM(0.5f, thisbrush_start->mins, 0.5f, thisbrush_start->maxs, start);
 	VectorMAM(0.5f, thisbrush_end->mins, 0.5f, thisbrush_end->maxs, end);
-	VectorSubtract(thisbrush_start->mins, start, startmins);
 	VectorSubtract(thisbrush_start->maxs, start, startmaxs);
-	VectorSubtract(thisbrush_end->mins, end, endmins);
 	VectorSubtract(thisbrush_end->maxs, end, endmaxs);
-	mins[0] = min(startmins[0], endmins[0]);
-	mins[1] = min(startmins[1], endmins[1]);
-	mins[2] = min(startmins[2], endmins[2]);
 	maxs[0] = max(startmaxs[0], endmaxs[0]);
 	maxs[1] = max(startmaxs[1], endmaxs[1]);
 	maxs[2] = max(startmaxs[2], endmaxs[2]);
+	VectorNegate(maxs, mins);
 
 	// push first node
 	nodestackline[nodestackpos][0] = start[0];
