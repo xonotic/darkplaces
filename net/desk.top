@@ -1,0 +1,8 @@
+move the netconn here and separate it for few files
+there can be /sv abd /cl folder, depends on amount of data
+for now not neccessary maybe
+
+each folder may have an include.h to get all files together 
+and refer to eachh folder include
+so you can make a function to parse all include files from folders
+that's the basics of having structure
