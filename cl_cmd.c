@@ -402,81 +402,6 @@ static void CL_Users_f(cmd_state_t *cmd) // credit: taken from QuakeWorld
 }
 
 /*
-====================
-CL_Packet_f
-
-packet <destination> <contents>
-
-Contents allows \n escape character
-====================
-*/
-static void CL_Packet_f(cmd_state_t *cmd) // credit: taken from QuakeWorld
-{
-	char send[2048];
-	int i, l;
-	const char *in;
-	char *out;
-	lhnetaddress_t address;
-	lhnetsocket_t *mysocket;
-
-	if (Cmd_Argc(cmd) != 3)
-	{
-		Con_Printf ("packet <destination> <contents>\n");
-		return;
-	}
-
-	if (!LHNETADDRESS_FromString (&address, Cmd_Argv(cmd, 1), sv_netport.integer))
-	{
-		Con_Printf ("Bad address\n");
-		return;
-	}
-
-	in = Cmd_Argv(cmd, 2);
-	out = send+4;
-	send[0] = send[1] = send[2] = send[3] = -1;
-
-	l = (int)strlen (in);
-	for (i=0 ; i<l ; i++)
-	{
-		if (out >= send + sizeof(send) - 1)
-			break;
-		if (in[i] == '\\' && in[i+1] == 'n')
-		{
-			*out++ = '\n';
-			i++;
-		}
-		else if (in[i] == '\\' && in[i+1] == '0')
-		{
-			*out++ = '\0';
-			i++;
-		}
-		else if (in[i] == '\\' && in[i+1] == 't')
-		{
-			*out++ = '\t';
-			i++;
-		}
-		else if (in[i] == '\\' && in[i+1] == 'r')
-		{
-			*out++ = '\r';
-			i++;
-		}
-		else if (in[i] == '\\' && in[i+1] == '"')
-		{
-			*out++ = '\"';
-			i++;
-		}
-		else
-			*out++ = in[i];
-	}
-
-	mysocket = NetConn_ChooseClientSocketForAddress(&address);
-	if (!mysocket)
-		mysocket = NetConn_ChooseServerSocketForAddress(&address);
-	if (mysocket)
-		NetConn_Write(mysocket, send, out - send, &address);
-}
-
-/*
 =====================
 CL_PQRcon_f
 
@@ -777,7 +702,6 @@ void CL_InitCommands(void)
 	Cmd_AddCommand(CF_CLIENT, "pqrcon", CL_PQRcon_f, "sends a command to a proquake server console (if your rcon_password matches the server's rcon_password), or to the address specified by rcon_address when not connected (again rcon_password must match the server's)");
 	Cmd_AddCommand(CF_SHARED, "user", CL_User_f, "prints additional information about a player number or name on the scoreboard");
 	Cmd_AddCommand(CF_SHARED, "users", CL_Users_f, "prints additional information about all players on the scoreboard");
-	Cmd_AddCommand(CF_CLIENT, "packet", CL_Packet_f, "send a packet to the specified address:port containing a text string");
 	Cmd_AddCommand(CF_CLIENT, "fullinfo", CL_FullInfo_f, "allows client to modify their userinfo");
 	Cmd_AddCommand(CF_CLIENT, "setinfo", CL_SetInfo_f, "modifies your userinfo");
 	Cmd_AddCommand(CF_CLIENT, "fixtrans", Image_FixTransparentPixels_f, "change alpha-zero pixels in an image file to sensible values, and write out a new TGA (warning: SLOW)");
