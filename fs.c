@@ -2998,7 +2998,7 @@ int FS_Close (qfile_t* file)
 		if (file->flags & QFILE_FLAG_RENAME && file->renameto)
 		{
 			FS_CreatePath (file->renameto);
-			if (rename(file->filename, file->renameto) == -1)
+			if (rename(file->filename, file->renameto) != 0)
 				Con_Printf(CON_WARN "WARNING: could not rename %s to %s on close.\n", file->filename, file->renameto);
 			Mem_Free((void *) file->renameto);
 		}
