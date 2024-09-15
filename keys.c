@@ -864,8 +864,10 @@ int Key_Parse_CommonKeys(cmd_state_t *cmd, qbool is_console, int key, int unicod
 			return linepos;
 		}
 
+		if (KM_SHIFT) // only complete player references #N as names
+			return Con_CompleteCommandLine(cmd, is_console, true);
 		if (KM_NONE)
-			return Con_CompleteCommandLine(cmd, is_console);
+			return Con_CompleteCommandLine(cmd, is_console, false);
 	}
 
 	// Advanced Console Editing by Radix radix@planetquake.com

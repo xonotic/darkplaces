@@ -299,7 +299,6 @@ size_t COM_StringLengthNoColors(const char *s, size_t size_s, qbool *valid);
 size_t COM_StringDecolorize(const char *in, size_t size_in, char *out, size_t size_out, qbool escape_carets);
 
 
-
 #define dp_strlcpy(dst, src, dsize) dp__strlcpy(dst, src, dsize, __func__, __LINE__)
 #define dp_strlcat(dst, src, dsize) dp__strlcat(dst, src, dsize, __func__, __LINE__)
 size_t dp__strlcpy(char *dst, const char *src, size_t dsize, const char *func, unsigned line);

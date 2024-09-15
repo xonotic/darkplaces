@@ -74,13 +74,13 @@ void Con_DrawNotify (void);
 void Con_ClearNotify (void);
 void Con_ToggleConsole_f(cmd_state_t *cmd);
 
-qbool GetMapList (const char *s, char *completedname, int completednamebufferlength);
+size_t GetMapList (const char *s, char *completedname, int completednamebuffersize);
 
 /// wrapper function to attempt to either complete the command line
 /// or to list possible matches grouped by type
 /// (i.e. will display possible variables, aliases, commands
 /// that match what they've typed so far)
-int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console);
+int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool only_pnumbers);
 
 /// Generic libs/util/console.c function to display a list
 /// formatted in columns on the console
