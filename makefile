@@ -116,19 +116,18 @@ ifeq ($(DP_MAKE_TARGET), wasm)
 # 	              --use-port=libpng \
 # 	              --use-port=libjpeg \
 # 	              --use-port=zlib \
-# 	              -DNOSUPPORTIPV6 \
-# 	              -DUSE_GLES2
+# 	              -DNOSUPPORTIPV6
 	CFLAGS_EXTRA+=-s USE_SDL=2 \
 	              -s USE_LIBPNG=1 \
 	              -s USE_LIBJPEG=1 \
 	              -s USE_ZLIB=1 \
-	              -DNOSUPPORTIPV6 \
-	              -DUSE_GLES2
+	              -DNOSUPPORTIPV6
 
 	SDLCONFIG_CFLAGS=$(SDLCONFIG_UNIXCFLAGS) $(SDLCONFIG_UNIXCFLAGS_X11)
 	SDLCONFIG_LIBS=$(SDLCONFIG_UNIXLIBS) $(SDLCONFIG_UNIXLIBS_X11)
 	SDLCONFIG_STATICLIBS=$(SDLCONFIG_UNIXSTATICLIBS) $(SDLCONFIG_UNIXSTATICLIBS_X11)
 	DP_SSE=0
+	DP_GLES=2
 
 	DP_LINK_SDL?=shared
 	DP_LINK_ZLIB?=shared
@@ -358,6 +357,11 @@ else ifeq ($(DP_LINK_XMP), dlopen)
 	CFLAGS_SND_XMP=-DUSEXMP
 endif
 
+# GLES
+ifeq ($(DP_GLES),2)
+	LIB_GLES=-lGLESv2
+	CFLAGS_GLES=-DUSE_GLES2
+endif
 
 ##### Extra CFLAGS #####
 ifdef DP_FS_BASEDIR

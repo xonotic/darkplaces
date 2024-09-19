@@ -148,7 +148,7 @@ else
 	CFLAGS_MAKEDEP?=-MMD
 endif
 
-CFLAGS_COMMON=$(CFLAGS_STANDARD) $(CFLAGS_TCC) $(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_SND_XMP) $(CFLAGS_NET) $(CFLAGS_SDL) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
+CFLAGS_COMMON=$(CFLAGS_STANDARD) $(CFLAGS_TCC) $(CFLAGS_MAKEDEP) $(CFLAGS_PRELOAD) $(CFLAGS_FS) $(CFLAGS_WARNINGS) $(CFLAGS_LIBZ) $(CFLAGS_LIBJPEG) $(CFLAGS_SND_XMP) $(CFLAGS_NET) $(CFLAGS_SDL) $(CFLAGS_GLES) -D_FILE_OFFSET_BITS=64 -D__KERNEL_STRICT_NAMES -I../../../
 CFLAGS_CLIENT=-DCONFIG_MENU $(CFLAGS_VIDEO_CAPTURE)
 CFLAGS_SERVER=
 CFLAGS_DEBUG=-ggdb
@@ -207,7 +207,7 @@ LDFLAGS_UNIXSV_PRELOAD=-lz -ljpeg -lpng -lcurl
 LDFLAGS_UNIXSDL_PRELOAD=-lz -ljpeg -lpng -logg -ltheora -lvorbis -lvorbisenc -lvorbisfile -lcurl -lxmp
 CFLAGS_UNIX_PRELOAD=-DPREFER_PRELOAD
 
-LDFLAGS_UNIXSDL=$(SDL_LIBS) #-lGLESv2
+LDFLAGS_UNIXSDL=$(SDL_LIBS) $(LIB_GLES)
 EXE_UNIXSV=darkplaces-dedicated
 EXE_UNIXSDL=darkplaces-sdl
 EXE_UNIXSVNEXUIZ=nexuiz-dedicated
@@ -244,7 +244,6 @@ LDFLAGS_WASMJS=$(LDFLAGS_UNIXCOMMON) -s USE_SDL=2 \
                                    -s ALLOW_MEMORY_GROWTH=1 \
                                    -s ASSERTIONS=1 \
                                    -s STACK_SIZE=8mb \
-                                   -DUSE_GLES2 \
                                    -lidbfs.js \
                                    --pre-js ../../../wasm/pre.js \
                                    -s EXPORTED_RUNTIME_METHODS=callMain,addRunDependency,removeRunDependency
@@ -262,7 +261,6 @@ LDFLAGS_WASM=$(LDFLAGS_UNIXCOMMON) -s USE_SDL=2 \
                                    -s ALLOW_MEMORY_GROWTH=1 \
                                    -s ASSERTIONS=1 \
                                    -s STACK_SIZE=8mb \
-                                   -DUSE_GLES2 \
                                    -lidbfs.js \
                                    --pre-js ../../../wasm/standaloneprejs.js \
                                    -s EXPORTED_RUNTIME_METHODS=callMain,addRunDependency,removeRunDependency \
