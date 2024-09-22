@@ -1061,6 +1061,27 @@ void Sys_SDL_HandleEvents(void)
 				host.state = host_shutdown;
 				break;
 			case SDL_KEYDOWN:
+#ifdef WIN32
+				if (event.key.repeat)
+				{
+					// ignore repeat events for keys that don't need key repetition while pressed down
+					bool ignore = false;
+					switch(event.key.keysym.sym)
+					{
+						case SDLK_LCTRL: case SDLK_LSHIFT: case SDLK_LALT:
+						case SDLK_RCTRL: case SDLK_RSHIFT: case SDLK_RALT:
+						case SDLK_ESCAPE:     case SDLK_PAUSE:
+						case SDLK_CAPSLOCK:   case SDLK_INSERT:
+						case SDLK_SCROLLLOCK: case SDLK_NUMLOCKCLEAR:
+#ifdef DEBUGSDLEVENTS
+							Con_DPrintf("SDL_Event: SDL_KEYDOWN %i  IGNORED\n", event.key.keysym.sym);
+#endif
+							ignore = true;
+					}
+					if (ignore) break;
+				}
+				// fallthrough
+#endif
 			case SDL_KEYUP:
 #ifdef DEBUGSDLEVENTS
 				if (event.type == SDL_KEYDOWN)
