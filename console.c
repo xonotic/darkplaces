@@ -2523,7 +2523,6 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	int i, p;
 	int match;
 	int spos;
-	int digits = 0;
 	int count = 0;
 
 	if(!con_nickcompletion.integer)
@@ -2564,9 +2563,11 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 			{
 				if(line[spos] == '#')
 				{
-					digits = (int) strspn(line+spos+1, "0123456789");
+					int len = (int) strspn(line+spos+1, "0123456789"); // number of digits
+					if (line[pos-1] == ' ')
+						++len;
 					//  word lenght EQUAL digits count OR digits count + 1 trailing space
-					if(((pos)-(spos+1)) == (line[pos-1] == ' ' ? digits+1 : digits) && p == (atoi(line+spos+1)-1))
+					if(((pos)-(spos+1)) == len && p == (atoi(line+spos+1)-1))
 						match = spos;
 				}
 			}
