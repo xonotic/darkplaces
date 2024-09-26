@@ -34,6 +34,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 float con_cursorspeed = 4;
 
 // lines up from bottom to display
+int hash_completion_player;
 int con_backscroll;
 
 conbuffer_t con;
@@ -2517,7 +2518,7 @@ static int Nicks_strncasecmp(char *a, char *b, unsigned int a_len)
 
    Count the number of possible nicks to complete
  */
-static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon, qbool only_pnumbers)
+static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon, int hash_completion)
 {
 	char name[MAX_SCOREBOARDNAME];
 	int i, p;
@@ -2531,6 +2532,20 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	// changed that to 1
 	if(!line[0])// || !line[1]) // we want at least... 2 written characters
 		return 0;
+
+	if(hash_completion == 1) // cycle through players
+	{
+		int initial;
+		if (hash_completion_player < 0)
+			hash_completion_player = 0;
+		initial = hash_completion_player;
+		while(true)
+		{
+			hash_completion_player = (hash_completion_player + 1) % cl.maxclients;
+			if (hash_completion_player == initial || cl.scores[hash_completion_player].name[0])
+				break;
+		}
+	}
 
 	for(i = 0; i < cl.maxclients; ++i)
 	{
@@ -2559,16 +2574,25 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 			}
 			if(isCon && spos == 0)
 				break;
-			if(only_pnumbers)
+			if(hash_completion)
 			{
 				if(line[spos] == '#')
 				{
 					int len = (int) strspn(line+spos+1, "0123456789"); // number of digits
-					if (line[pos-1] == ' ')
-						++len;
-					//  word lenght EQUAL digits count OR digits count + 1 trailing space
-					if(((pos)-(spos+1)) == len && p == (atoi(line+spos+1)-1))
-						match = spos;
+					if (len == 0)
+					{
+						if (p == hash_completion_player)
+							match = spos;
+					}
+					else
+					{
+						hash_completion_player = -1;
+						if (line[pos-1] == ' ')
+							++len;
+						// word lenght EQUAL digits count OR digits count + 1 trailing space
+						if(((pos)-(spos+1)) == len && p == (atoi(line+spos+1)-1))
+							match = spos;
+					}
 				}
 			}
 			else if(Nicks_strncasecmp(line+spos, name, pos-spos) == 0)
@@ -2595,11 +2619,16 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	return count;
 }
 
-static void Cmd_CompleteNicksPrint(int count)
+static void Cmd_CompleteNicksPrint(int count, int hash_completion)
 {
 	int i;
 	for(i = 0; i < count; ++i)
-		Con_Printf("%s\n", Nicks_list[i]);
+	{
+		if (hash_completion == 1 && hash_completion_player >= 0)
+			Con_Printf("#%d %s\n", hash_completion_player + 1, Nicks_list[i]);
+		else
+			Con_Printf("%s\n", Nicks_list[i]);
+	}
 }
 
 static void Nicks_CutMatchesNormal(int count)
@@ -2884,7 +2913,7 @@ static size_t Con_EscapeSpaces(char *dst, const char *src, size_t dsize)
 	Directory support by divVerent
 	Escaping support by bones_was_here
 */
-int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool only_pnumbers)
+int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, int hash_completion)
 {
 	const char *text = "";
 	char *s;
@@ -2930,7 +2959,7 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool only_pnumb
 	line[linepos] = 0; //hide them
 
 	c = v = a = n = cmd_len = 0;
-	if (!is_console || only_pnumbers)
+	if (!is_console || hash_completion)
 		goto nicks;
 
 	space = strchr(line + 1, ' ');
@@ -3149,11 +3178,13 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool only_pnumb
 	}
 
 nicks:
-	n = Nicks_CompleteCountPossible(line, linepos, s, is_console, only_pnumbers);
+	n = Nicks_CompleteCountPossible(line, linepos, s, is_console, hash_completion);
 	if (n)
 	{
 		Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
-		Cmd_CompleteNicksPrint(n);
+		Cmd_CompleteNicksPrint(n, hash_completion);
+		if (hash_completion == 1 && hash_completion_player >= 0)
+			n = 0; // cycle player names without autocompleting
 	}
 
 	if (!(c + v + a + n))	// No possible matches

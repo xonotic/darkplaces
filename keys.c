@@ -864,10 +864,18 @@ int Key_Parse_CommonKeys(cmd_state_t *cmd, qbool is_console, int key, int unicod
 			return linepos;
 		}
 
-		if (KM_SHIFT) // only complete player references #N as names
-			return Con_CompleteCommandLine(cmd, is_console, true);
+		if (KM_SHIFT) // SHIFT-TAB after #N autocompletes the name of player N; after # it cycles through player names
+			return Con_CompleteCommandLine(cmd, is_console, 1);
 		if (KM_NONE)
-			return Con_CompleteCommandLine(cmd, is_console, false);
+		{
+			if (hash_completion_player >= 0) // TAB after # autocompletes the name of hash_completion_player
+			{
+				int r = Con_CompleteCommandLine(cmd, is_console, 2);
+				hash_completion_player = -1;
+				return r;
+			}
+			return Con_CompleteCommandLine(cmd, is_console, 0);
+		}
 	}
 
 	// Advanced Console Editing by Radix radix@planetquake.com
