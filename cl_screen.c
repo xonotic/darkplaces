@@ -132,6 +132,7 @@ int			scr_erase_lines;
 int			scr_erase_center;
 char        scr_infobarstring[MAX_INPUTLINE];
 float       scr_infobartime_off;
+qbool       scr_infobartime_left_align;
 
 /*
 ==============
@@ -582,7 +583,10 @@ static int SCR_DrawInfobarString(int offset)
 	float size = scr_infobar_height.value;
 
 	len = (int)strlen(scr_infobarstring);
-	x = (vid_conwidth.integer - DrawQ_TextWidth(scr_infobarstring, len, size, size, false, FONT_INFOBAR)) / 2;
+	if (scr_infobartime_left_align)
+		x = 0;
+	else
+		x = (vid_conwidth.integer - DrawQ_TextWidth(scr_infobarstring, len, size, size, false, FONT_INFOBAR)) / 2;
 	y = vid_conheight.integer - size - offset;
 	DrawQ_Fill(0, y, vid_conwidth.integer, size, 0, 0, 0, cls.signon == SIGNONS ? 0.5 : 1, 0);
 	DrawQ_String(x, y, scr_infobarstring, len, size, size, 1, 1, 1, 1, 0, NULL, false, FONT_INFOBAR);
@@ -684,10 +688,11 @@ static int SCR_InfobarHeight(void)
 	return offset;
 }
 
-int SCR_Infobar(float bartime, char *barstring)
+void SCR_Infobar(float bartime, char *barstring, qbool left_align)
 {
 	scr_infobartime_off = bartime;
 	dp_strlcpy(scr_infobarstring, barstring, sizeof(scr_infobarstring));
+	scr_infobartime_left_align = left_align;
 }
 
 
@@ -702,6 +707,7 @@ static void SCR_InfoBar_f(cmd_state_t *cmd)
 	{
 		scr_infobartime_off = atof(Cmd_Argv(cmd, 1));
 		dp_strlcpy(scr_infobarstring, Cmd_Argv(cmd, 2), sizeof(scr_infobarstring));
+		scr_infobartime_left_align = false;
 	}
 	else
 	{

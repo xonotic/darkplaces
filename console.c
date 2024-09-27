@@ -2644,7 +2644,7 @@ static void Cmd_CompleteNicksPrint(int count, int hash_completion, qbool infobar
 			}
 		}
 
-		SCR_Infobar(2, pl_list);
+		SCR_Infobar(2, pl_list, true);
 		return;
 	}
 

@@ -27,7 +27,7 @@ void CL_UpdateScreen(void);
 qbool R_Stereo_Active(void);
 qbool R_Stereo_ColorMasking(void);
 
-int SCR_Infobar(float bartime, char *barstring);
+void SCR_Infobar(float bartime, char *barstring, qbool left_align);
 
 #endif
 
