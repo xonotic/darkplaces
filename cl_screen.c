@@ -684,6 +684,13 @@ static int SCR_InfobarHeight(void)
 	return offset;
 }
 
+int SCR_Infobar(float bartime, char *barstring)
+{
+	scr_infobartime_off = bartime;
+	dp_strlcpy(scr_infobarstring, barstring, sizeof(scr_infobarstring));
+}
+
+
 /*
 ==============
 SCR_InfoBar_f

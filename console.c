@@ -2619,10 +2619,36 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	return count;
 }
 
-static void Cmd_CompleteNicksPrint(int count, int hash_completion)
+static void Cmd_CompleteNicksPrint(int count, int hash_completion, qbool infobar)
 {
-	int i;
-	for(i = 0; i < count; ++i)
+	if (infobar)
+	{
+		char pl_list[MAX_INPUTLINE] = "";
+		int initial = hash_completion_player;
+		int next = initial;
+		int next_players_count = 3;
+
+		dpsnprintf(pl_list, sizeof(pl_list), "#%d %s", hash_completion_player + 1, Nicks_list[0]);
+		while(next_players_count >= 0)
+		{
+			next = (next + 1) % cl.maxclients;
+			if (next == initial)
+				break;
+			if (cl.scores[next].name[0])
+			{
+				if (next_players_count == 0)
+					dpsnprintf(pl_list, sizeof(pl_list), "%s^8, ...", pl_list);
+				else
+					dpsnprintf(pl_list, sizeof(pl_list), "%s^8, #%d ^7%s", pl_list, next + 1, cl.scores[next].name);
+				--next_players_count;
+			}
+		}
+
+		SCR_Infobar(2, pl_list);
+		return;
+	}
+
+	for(int i = 0; i < count; ++i)
 	{
 		if (hash_completion == 1 && hash_completion_player >= 0)
 			Con_Printf("#%d %s\n", hash_completion_player + 1, Nicks_list[i]);
@@ -3181,10 +3207,18 @@ nicks:
 	n = Nicks_CompleteCountPossible(line, linepos, s, is_console, hash_completion);
 	if (n)
 	{
-		Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
-		Cmd_CompleteNicksPrint(n, hash_completion);
-		if (hash_completion == 1 && hash_completion_player >= 0)
+		if (!is_console && hash_completion == 1 && hash_completion_player >= 0)
+		{
+			Cmd_CompleteNicksPrint(n, hash_completion, true); // print to infobar
 			n = 0; // cycle player names without autocompleting
+		}
+		else
+		{
+			Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
+			Cmd_CompleteNicksPrint(n, hash_completion, false);
+			if (hash_completion == 1 && hash_completion_player >= 0)
+				n = 0; // cycle player names without autocompleting
+		}
 	}
 
 	if (!(c + v + a + n))	// No possible matches
