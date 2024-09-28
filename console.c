@@ -2578,20 +2578,23 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 			{
 				if(line[spos] == '#')
 				{
-					int len = (int) strspn(line+spos+1, "0123456789"); // number of digits
-					if (len == 0)
+					if (line[spos + 1] == 0)
 					{
 						if (p == hash_completion_player)
 							match = spos;
 					}
 					else
 					{
-						hash_completion_player = -1;
-						if (line[pos-1] == ' ')
-							++len;
-						// word lenght EQUAL digits count OR digits count + 1 trailing space
-						if(((pos)-(spos+1)) == len && p == (atoi(line+spos+1)-1))
-							match = spos;
+						int len = (int) strspn(line+spos+1, "0123456789"); // number of digits
+						if (len > 0)
+						{
+							hash_completion_player = -1;
+							if (line[pos-1] == ' ')
+								++len;
+							// word lenght EQUAL digits count OR digits count + 1 trailing space
+							if(((pos)-(spos+1)) == len && p == (atoi(line+spos+1)-1))
+								match = spos;
+						}
 					}
 				}
 			}
