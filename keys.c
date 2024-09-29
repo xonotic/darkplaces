@@ -667,6 +667,7 @@ static const keyname_t   keynames[] = {
 
 int Key_ClearEditLine(qbool is_console)
 {
+	Hash_Completion_Reset();
 	if (is_console)
 	{
 		key_line[0] = ']';
@@ -676,6 +677,7 @@ int Key_ClearEditLine(qbool is_console)
 	else
 	{
 		chat_buffer[0] = 0;
+		Chat_NicksBar_Clear();
 		return 0;
 	}
 }
@@ -864,18 +866,10 @@ int Key_Parse_CommonKeys(cmd_state_t *cmd, qbool is_console, int key, int unicod
 			return linepos;
 		}
 
-		if (KM_SHIFT) // SHIFT-TAB after #N autocompletes the name of player N; after # it cycles through player names
-			return Con_CompleteCommandLine(cmd, is_console, 1);
+		if (KM_SHIFT)
+			return Con_CompleteCommandLine(cmd, is_console, true);
 		if (KM_NONE)
-		{
-			if (hash_completion_player >= 0) // TAB after # autocompletes the name of hash_completion_player
-			{
-				int r = Con_CompleteCommandLine(cmd, is_console, 2);
-				hash_completion_player = -1;
-				return r;
-			}
-			return Con_CompleteCommandLine(cmd, is_console, 0);
-		}
+			return Con_CompleteCommandLine(cmd, is_console, false);
 	}
 
 	// Advanced Console Editing by Radix radix@planetquake.com
@@ -1112,7 +1106,7 @@ static int Key_Convert_NumPadKey(int key)
 
 static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 {
-	int linepos;
+	int linepos, prev_linepos;
 
 	key = Key_Convert_NumPadKey(key);
 
@@ -1123,7 +1117,11 @@ static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 	if (keydown[K_CTRL] && keydown[K_ALT])
 		goto add_char;
 
+	prev_linepos = key_linepos;
 	linepos = Key_Parse_CommonKeys(cmd, true, key, unicode);
+	if (linepos != prev_linepos)
+		Hash_Completion_Reset();
+
 	if (linepos >= 0)
 	{
 		key_linepos = linepos;
@@ -1310,7 +1308,7 @@ add_char:
 static void
 Key_Message (cmd_state_t *cmd, int key, int ascii)
 {
-	int linepos;
+	int linepos, prev_linepos;
 	char vabuf[1024];
 
 	key = Key_Convert_NumPadKey(key);
@@ -1333,7 +1331,14 @@ Key_Message (cmd_state_t *cmd, int key, int ascii)
 		return;
 	}
 
+	prev_linepos = chat_bufferpos;
 	linepos = Key_Parse_CommonKeys(cmd, false, key, ascii);
+	if (linepos != prev_linepos)
+	{
+		Hash_Completion_Reset();
+		Chat_NicksBar_Clear();
+	}
+
 	if (linepos >= 0)
 	{
 		chat_bufferpos = linepos;

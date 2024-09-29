@@ -34,7 +34,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 float con_cursorspeed = 4;
 
 // lines up from bottom to display
-int hash_completion_player;
+int hash_completion_player = -1;
+float chat_nicksbar_time;
 int con_backscroll;
 
 conbuffer_t con;
@@ -1611,6 +1612,69 @@ void Con_CenterPrint(const char *str)
 }
 
 
+void Hash_Completion_Reset(void)
+{
+	hash_completion_player = -1;
+}
+
+char chat_nicksbarstring[MAX_INPUTLINE];
+void Chat_NicksBar_Build(void)
+{
+	int initial = hash_completion_player;
+	int next = initial;
+	int next_players_count = 3;
+
+	dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "#%d %s", hash_completion_player + 1, cl.scores[hash_completion_player].name);
+	while(next_players_count >= 0)
+	{
+		next = (next + 1) % cl.maxclients;
+		if (next == initial)
+			break;
+		if (cl.scores[next].name[0])
+		{
+			if (next_players_count == 0)
+				dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
+			else
+				dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
+			--next_players_count;
+		}
+	}
+	chat_nicksbar_time = 3;
+}
+
+void Chat_NicksBar_Clear(void)
+{
+	chat_nicksbarstring[0] = 0;
+}
+
+static void Chat_NicksBar_Draw(float ofs_x, float ofs_y)
+{
+	int len;
+	float str_width, hash_width, alpha;
+	float fontsize = con_chatsize.value;
+
+	if (cl.time > cl.oldtime)
+		chat_nicksbar_time -= cl.time - cl.oldtime;
+
+	if (!chat_nicksbarstring[0] || chat_nicksbar_time <= 0)
+	{
+		Hash_Completion_Reset();
+		chat_nicksbarstring[0] = 0;
+		chat_nicksbar_time = 0;
+		return;
+	}
+
+	len = (int)strlen(chat_nicksbarstring);
+	str_width = DrawQ_TextWidth(chat_nicksbarstring, len, fontsize, fontsize, false, FONT_CHAT);
+	hash_width = DrawQ_TextWidth("#", (int)strlen("#"), fontsize, fontsize, false, FONT_CHAT);
+	ofs_x -= hash_width;
+	ofs_y -= fontsize;
+	alpha = bound(0, chat_nicksbar_time, 0.25) * 4;
+	DrawQ_Fill(ofs_x - fontsize / 2, ofs_y, str_width + fontsize, fontsize, 0, 0, 0, 0.7 * alpha, 0);
+	DrawQ_String(ofs_x, ofs_y, chat_nicksbarstring, len, fontsize, fontsize, 1, 1, 1, alpha, 0, NULL, false, FONT_CHAT);
+}
+
+
 
 /*
 ==============================================================================
@@ -1740,6 +1804,9 @@ static void Con_DrawInput(qbool is_console, float x, float v, float inputsize)
 		}
 		DrawQ_String(text_start + xo, v, text, 0, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, fnt);
 	}
+
+	if (!is_console)
+		Chat_NicksBar_Draw(text_start + xo, v);
 }
 
 typedef struct
@@ -2537,7 +2604,7 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	{
 		int initial;
 		if (hash_completion_player < 0)
-			hash_completion_player = 0;
+			hash_completion_player = cl.maxclients - 1;
 		initial = hash_completion_player;
 		while(true)
 		{
@@ -2588,7 +2655,7 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 						int len = (int) strspn(line+spos+1, "0123456789"); // number of digits
 						if (len > 0)
 						{
-							hash_completion_player = -1;
+							Hash_Completion_Reset();
 							if (line[pos-1] == ' ')
 								++len;
 							// word lenght EQUAL digits count OR digits count + 1 trailing space
@@ -2622,42 +2689,10 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 	return count;
 }
 
-static void Cmd_CompleteNicksPrint(int count, int hash_completion, qbool infobar)
+static void Cmd_CompleteNicksPrint(int count)
 {
-	if (infobar)
-	{
-		char pl_list[MAX_INPUTLINE] = "";
-		int initial = hash_completion_player;
-		int next = initial;
-		int next_players_count = 3;
-
-		dpsnprintf(pl_list, sizeof(pl_list), "#%d %s", hash_completion_player + 1, Nicks_list[0]);
-		while(next_players_count >= 0)
-		{
-			next = (next + 1) % cl.maxclients;
-			if (next == initial)
-				break;
-			if (cl.scores[next].name[0])
-			{
-				if (next_players_count == 0)
-					dpsnprintf(pl_list, sizeof(pl_list), "%s^8, ...", pl_list);
-				else
-					dpsnprintf(pl_list, sizeof(pl_list), "%s^8, #%d ^7%s", pl_list, next + 1, cl.scores[next].name);
-				--next_players_count;
-			}
-		}
-
-		SCR_Infobar(2, pl_list, true);
-		return;
-	}
-
 	for(int i = 0; i < count; ++i)
-	{
-		if (hash_completion == 1 && hash_completion_player >= 0)
-			Con_Printf("#%d %s\n", hash_completion_player + 1, Nicks_list[i]);
-		else
-			Con_Printf("%s\n", Nicks_list[i]);
-	}
+		Con_Printf("%s\n", Nicks_list[i]);
 }
 
 static void Nicks_CutMatchesNormal(int count)
@@ -2942,7 +2977,7 @@ static size_t Con_EscapeSpaces(char *dst, const char *src, size_t dsize)
 	Directory support by divVerent
 	Escaping support by bones_was_here
 */
-int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, int hash_completion)
+int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, qbool shift_mode)
 {
 	const char *text = "";
 	char *s;
@@ -2953,10 +2988,18 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console, int hash_complet
 	int n; // nicks --blub
 	const char *space, *patterns;
 	char vabuf[1024];
+	int hash_completion;
 
 	char *line;
 	int linestart, linepos;
 	unsigned int linesize;
+
+	hash_completion = (shift_mode != 0) ? 1 : (hash_completion_player >= 0 ? 2 : 0);
+	// 0: normal TAB autocompletion
+	// 1: SHIFT-TAB after #N autocompletes player N name
+	// 1: SHIFT-TAB after # cycles through player names (no actual autocompletion)
+	// 2: TAB after cycling with SHIFT-TAB autocompletes the selected name
+
 	if (is_console)
 	{
 		line = key_line;
@@ -3212,15 +3255,21 @@ nicks:
 	{
 		if (!is_console && hash_completion == 1 && hash_completion_player >= 0)
 		{
-			Cmd_CompleteNicksPrint(n, hash_completion, true); // print to infobar
+			Chat_NicksBar_Build();
 			n = 0; // cycle player names without autocompleting
 		}
 		else
 		{
-			Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
-			Cmd_CompleteNicksPrint(n, hash_completion, false);
 			if (hash_completion == 1 && hash_completion_player >= 0)
+			{
 				n = 0; // cycle player names without autocompleting
+				Con_Printf("#%d %s\n", hash_completion_player + 1, Nicks_list[0]);
+			}
+			else
+			{
+				Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
+				Cmd_CompleteNicksPrint(n);
+			}
 		}
 	}
 
@@ -3286,6 +3335,13 @@ done:
 			}
 			line[linepos++] = ' ';
 		}
+	}
+
+	if (hash_completion == 2) // requested autocompletion of player name with TAB
+	{
+		Hash_Completion_Reset();
+		if (!is_console)
+			Chat_NicksBar_Clear();
 	}
 
 	// use strlcat to avoid a buffer overrun
