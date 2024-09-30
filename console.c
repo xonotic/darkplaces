@@ -1634,9 +1634,9 @@ void Chat_NicksBar_Build(void)
 		if (cl.scores[next].name[0])
 		{
 			if (next_players_count == 0)
-				len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
+				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
 			else
-				len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
+				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
 			--next_players_count;
 		}
 	}
