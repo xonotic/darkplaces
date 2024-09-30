@@ -1620,11 +1620,12 @@ void Hash_Completion_Reset(void)
 char chat_nicksbarstring[MAX_INPUTLINE];
 void Chat_NicksBar_Build(void)
 {
+	int len = 0;
 	int initial = hash_completion_player;
 	int next = initial;
 	int next_players_count = 3;
 
-	dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "#%d %s", hash_completion_player + 1, cl.scores[hash_completion_player].name);
+	len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "#%d %s", hash_completion_player + 1, cl.scores[hash_completion_player].name);
 	while(next_players_count >= 0)
 	{
 		next = (next + 1) % cl.maxclients;
@@ -1633,9 +1634,9 @@ void Chat_NicksBar_Build(void)
 		if (cl.scores[next].name[0])
 		{
 			if (next_players_count == 0)
-				dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
+				len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
 			else
-				dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
+				len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
 			--next_players_count;
 		}
 	}
@@ -2691,7 +2692,8 @@ static int Nicks_CompleteCountPossible(char *line, int pos, char *s, qbool isCon
 
 static void Cmd_CompleteNicksPrint(int count)
 {
-	for(int i = 0; i < count; ++i)
+	int i;
+	for(i = 0; i < count; ++i)
 		Con_Printf("%s\n", Nicks_list[i]);
 }
 

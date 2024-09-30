@@ -684,7 +684,6 @@ static int SCR_InfobarHeight(void)
 	return offset;
 }
 
-
 /*
 ==============
 SCR_InfoBar_f
