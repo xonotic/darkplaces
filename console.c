@@ -1617,27 +1617,34 @@ void Hash_Completion_Reset(void)
 	hash_completion_player = -1;
 }
 
-char chat_nicksbarstring[MAX_INPUTLINE];
+#define CHAT_NICKSBAR_NETXPLAYERS 3
+char chat_nicksbarstring[
+	(CHAT_NICKSBAR_NETXPLAYERS + 1) * 5 // strlen("#255 ")
+	+ (CHAT_NICKSBAR_NETXPLAYERS + 1) * (MAX_SCOREBOARDNAME - 1)
+	+ CHAT_NICKSBAR_NETXPLAYERS * 6 // strlen("^8, ^7")
+	+ 7 // strlen("^8, ...")
+	+ 1 // final \0
+];
 void Chat_NicksBar_Build(void)
 {
 	int len = 0;
 	int initial = hash_completion_player;
 	int next = initial;
-	int next_players_count = 3;
+	int i = CHAT_NICKSBAR_NETXPLAYERS;
 
-	len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring), "#%d %s", hash_completion_player + 1, cl.scores[hash_completion_player].name);
-	while(next_players_count >= 0)
+	len += dpsnprintf(chat_nicksbarstring, sizeof(chat_nicksbarstring) - len, "#%d %s", hash_completion_player + 1, cl.scores[hash_completion_player].name);
+	while(i >= 0)
 	{
 		next = (next + 1) % cl.maxclients;
 		if (next == initial)
 			break;
 		if (cl.scores[next].name[0])
 		{
-			if (next_players_count == 0)
-				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring), "%s^8, ...", chat_nicksbarstring);
+			if (i == 0)
+				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring) - len, "^8, ...");
 			else
-				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring), "%s^8, #%d ^7%s", chat_nicksbarstring, next + 1, cl.scores[next].name);
-			--next_players_count;
+				len += dpsnprintf(chat_nicksbarstring + len, sizeof(chat_nicksbarstring) - len, "^8, #%d ^7%s", next + 1, cl.scores[next].name);
+			--i;
 		}
 	}
 	chat_nicksbar_time = 3;
