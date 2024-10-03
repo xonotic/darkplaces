@@ -699,6 +699,8 @@ void Con_ToggleConsole_f(cmd_state_t *cmd)
 	// toggle the 'user wants console' bit
 	key_consoleactive ^= KEY_CONSOLEACTIVE_USER;
 	Con_ClearNotify();
+	Hash_Completion_Reset();
+	Chat_NicksBar_Clear();
 }
 
 /*
@@ -1655,11 +1657,12 @@ void Chat_NicksBar_Clear(void)
 	chat_nicksbarstring[0] = 0;
 }
 
-static void Chat_NicksBar_Draw(float ofs_x, float ofs_y)
+static void Chat_NicksBar_Draw(float ofs_x, float ofs_y, qbool is_console)
 {
 	int len;
 	float str_width, hash_width, alpha;
-	float fontsize = con_chatsize.value;
+	float fontsize;
+	dp_font_t *font;
 
 	if (cl.time > cl.oldtime)
 		chat_nicksbar_time -= cl.time - cl.oldtime;
@@ -1672,14 +1675,17 @@ static void Chat_NicksBar_Draw(float ofs_x, float ofs_y)
 		return;
 	}
 
+	fontsize = is_console ? con_textsize.value : con_chatsize.value;
+	font = is_console ? FONT_CONSOLE : FONT_CHAT;
+
 	len = (int)strlen(chat_nicksbarstring);
-	str_width = DrawQ_TextWidth(chat_nicksbarstring, len, fontsize, fontsize, false, FONT_CHAT);
-	hash_width = DrawQ_TextWidth("#", (int)strlen("#"), fontsize, fontsize, false, FONT_CHAT);
+	str_width = DrawQ_TextWidth(chat_nicksbarstring, len, fontsize, fontsize, false, font);
+	hash_width = DrawQ_TextWidth("#", (int)strlen("#"), fontsize, fontsize, false, font);
 	ofs_x -= hash_width;
 	ofs_y -= fontsize;
 	alpha = bound(0, chat_nicksbar_time, 0.25) * 4;
-	DrawQ_Fill(ofs_x - fontsize / 2, ofs_y, str_width + fontsize, fontsize, 0, 0, 0, 0.7 * alpha, 0);
-	DrawQ_String(ofs_x, ofs_y, chat_nicksbarstring, len, fontsize, fontsize, 1, 1, 1, alpha, 0, NULL, false, FONT_CHAT);
+	DrawQ_Fill(ofs_x - fontsize / 2, ofs_y, str_width + fontsize, fontsize, 0, 0, 0, 0.8 * alpha, 0);
+	DrawQ_String(ofs_x, ofs_y, chat_nicksbarstring, len, fontsize, fontsize, 1, 1, 1, alpha, 0, NULL, false, font);
 }
 
 
@@ -1813,8 +1819,7 @@ static void Con_DrawInput(qbool is_console, float x, float v, float inputsize)
 		DrawQ_String(text_start + xo, v, text, 0, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, fnt);
 	}
 
-	if (!is_console)
-		Chat_NicksBar_Draw(text_start + xo, v);
+	Chat_NicksBar_Draw(text_start + xo, v, is_console);
 }
 
 typedef struct
@@ -3262,23 +3267,15 @@ nicks:
 	n = Nicks_CompleteCountPossible(line, linepos, s, is_console, hash_completion);
 	if (n)
 	{
-		if (!is_console && hash_completion == 1 && hash_completion_player >= 0)
+		if (hash_completion == 1 && hash_completion_player >= 0)
 		{
 			Chat_NicksBar_Build();
 			n = 0; // cycle player names without autocompleting
 		}
 		else
 		{
-			if (hash_completion == 1 && hash_completion_player >= 0)
-			{
-				n = 0; // cycle player names without autocompleting
-				Con_Printf("#%d %s\n", hash_completion_player + 1, Nicks_list[0]);
-			}
-			else
-			{
-				Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
-				Cmd_CompleteNicksPrint(n);
-			}
+			Con_Printf("\n%i possible nick%s\n", n, (n > 1) ? "s: " : ":");
+			Cmd_CompleteNicksPrint(n);
 		}
 	}
 
@@ -3349,8 +3346,7 @@ done:
 	if (hash_completion == 2) // requested autocompletion of player name with TAB
 	{
 		Hash_Completion_Reset();
-		if (!is_console)
-			Chat_NicksBar_Clear();
+		Chat_NicksBar_Clear();
 	}
 
 	// use strlcat to avoid a buffer overrun

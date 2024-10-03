@@ -668,6 +668,7 @@ static const keyname_t   keynames[] = {
 int Key_ClearEditLine(qbool is_console)
 {
 	Hash_Completion_Reset();
+	Chat_NicksBar_Clear();
 	if (is_console)
 	{
 		key_line[0] = ']';
@@ -677,7 +678,6 @@ int Key_ClearEditLine(qbool is_console)
 	else
 	{
 		chat_buffer[0] = 0;
-		Chat_NicksBar_Clear();
 		return 0;
 	}
 }
@@ -1120,7 +1120,10 @@ static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 	prev_linepos = key_linepos;
 	linepos = Key_Parse_CommonKeys(cmd, true, key, unicode);
 	if (linepos != prev_linepos)
+	{
 		Hash_Completion_Reset();
+		Chat_NicksBar_Clear();
+	}
 
 	if (linepos >= 0)
 	{
