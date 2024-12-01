@@ -2249,10 +2249,17 @@ void CL_UpdateScreen(void)
 			SCR_EndLoadingPlaque();
 		else if (scr_loadingscreen_maxfps.value > 0)
 		{
-			static double lastupdate;
-			if (host.realtime - lastupdate < min(1.0f / scr_loadingscreen_maxfps.value, 0.1))
+			static double lastupdate = 0.0;
+			// NOTE: We can't use host.realtime/dirtytime here because SCR_PushLoadingScreen
+			//       is called from various load functions (sounds, models etc.) which are
+			//       triggered from CL_Frame synchronously and block Sys_Frame from being
+			//       called (which is responsible for updating those fields). We have to
+			//       grab the current time ad-hoc to keep updating the loading screen
+			//       even when the event loop is frozen.
+			double now = Sys_DirtyTime();
+			if (now - lastupdate < min(1.0f / scr_loadingscreen_maxfps.value, 0.1))
 				return;
-			lastupdate = host.realtime;
+			lastupdate = now;
 		}
 	}
 
