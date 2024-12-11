@@ -129,7 +129,6 @@ cvar_t gl_info_vendor = {CF_CLIENT | CF_READONLY, "gl_info_vendor", "", "indicat
 cvar_t gl_info_renderer = {CF_CLIENT | CF_READONLY, "gl_info_renderer", "", "indicates graphics chip model and other information"};
 cvar_t gl_info_version = {CF_CLIENT | CF_READONLY, "gl_info_version", "", "indicates version of current renderer. begins with 1.0.0, 1.1.0, 1.2.0, 1.3.1 etc."};
 cvar_t gl_info_extensions = {CF_CLIENT | CF_READONLY, "gl_info_extensions", "", "indicates extension list found by engine, space separated."};
-cvar_t gl_info_driver = {CF_CLIENT | CF_READONLY, "gl_info_driver", "", "name of driver library (opengl32.dll, libGL.so.1, or whatever)."};
 
 cvar_t vid_fullscreen = {CF_CLIENT | CF_ARCHIVE, "vid_fullscreen", "1", "use fullscreen (1) or windowed (0)"};
 cvar_t vid_borderless = {CF_CLIENT | CF_ARCHIVE, "vid_borderless", "0", "make the window borderless by removing all window decorations. has no effect in fullscreen mode"};
@@ -1276,7 +1275,6 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&gl_info_renderer);
 	Cvar_RegisterVariable(&gl_info_version);
 	Cvar_RegisterVariable(&gl_info_extensions);
-	Cvar_RegisterVariable(&gl_info_driver);
 	Cvar_RegisterVariable(&v_gamma);
 	Cvar_RegisterVariable(&v_brightness);
 	Cvar_RegisterVariable(&v_contrastboost);
