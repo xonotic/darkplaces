@@ -50,7 +50,6 @@ cvar_t pausable = {CF_SERVER, "pausable","1", "allow players to pause or not (ot
 cvar_t pr_checkextension = {CF_SERVER | CF_READONLY, "pr_checkextension", "1", "indicates to QuakeC that the standard quakec extensions system is available (if 0, quakec should not attempt to use extensions)"};
 cvar_t samelevel = {CF_SERVER | CF_NOTIFY, "samelevel","0", "repeats same level if level ends (due to timelimit or someone hitting an exit)"};
 cvar_t skill = {CF_SERVER, "skill","1", "difficulty level of game, affects monster layouts in levels, 0 = easy, 1 = normal, 2 = hard, 3 = nightmare (same layout as hard but monsters fire twice)"};
-cvar_t campaign = {CF_SERVER, "campaign", "0", "singleplayer mode"};
 cvar_t host_timescale = {CF_CLIENT | CF_SERVER, "host_timescale", "1.0", "controls game speed, 0.5 is half speed, 2 is double speed"};
 
 cvar_t sv_accelerate = {CF_SERVER, "sv_accelerate", "10", "rate at which a player accelerates to sv_maxspeed"};
@@ -131,6 +130,7 @@ cvar_t sv_gameplayfix_q1bsptracelinereportstexture = {CF_SERVER, "sv_gameplayfix
 cvar_t sv_gameplayfix_unstickplayers = {CF_SERVER, "sv_gameplayfix_unstickplayers", "1", "big hack to try and fix the rare case of MOVETYPE_WALK entities getting stuck in the world clipping hull. Quake did something similar."};
 cvar_t sv_gameplayfix_unstickentities = {CF_SERVER, "sv_gameplayfix_unstickentities", "0", "hack to check if entities are crossing world collision hull and try to move them to the right position. Quake didn't do this so maps shouldn't depend on it."};
 cvar_t sv_gameplayfix_fixedcheckwatertransition = {CF_SERVER, "sv_gameplayfix_fixedcheckwatertransition", "1", "fix two very stupid bugs in SV_CheckWaterTransition when watertype is CONTENTS_EMPTY (the bugs causes waterlevel to be 1 on first frame, -1 on second frame - the fix makes it 0 on both frames)"};
+cvar_t sv_gameplayfix_nosquashentities = {CF_SERVER, "sv_gameplayfix_nosquashentities", "0", "Entity hitboxes will not be resized or disabled when they are crushed by movers, and will continue to be affected by movers."};
 cvar_t sv_gravity = {CF_SERVER | CF_NOTIFY, "sv_gravity","800", "how fast you fall (512 = roughly earth gravity)"};
 cvar_t sv_init_frame_count = {CF_SERVER, "sv_init_frame_count", "2", "number of frames to run to allow everything to settle before letting clients connect"};
 cvar_t sv_idealpitchscale = {CF_SERVER, "sv_idealpitchscale","0.8", "how much to look up/down slopes and stairs when not using freelook"};
@@ -536,7 +536,6 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&pr_checkextension);
 	Cvar_RegisterVariable (&samelevel);
 	Cvar_RegisterVariable (&skill);
-	Cvar_RegisterVariable (&campaign);
 	Cvar_RegisterVariable (&host_timescale);
 	Cvar_RegisterCallback (&host_timescale, Host_Timescale_c);
 	Cvar_RegisterVirtual (&host_timescale, "slowmo");
@@ -619,6 +618,7 @@ void SV_Init (void)
 	Cvar_RegisterVariable (&sv_gameplayfix_unstickplayers);
 	Cvar_RegisterVariable (&sv_gameplayfix_unstickentities);
 	Cvar_RegisterVariable (&sv_gameplayfix_fixedcheckwatertransition);
+	Cvar_RegisterVariable (&sv_gameplayfix_nosquashentities);
 	Cvar_RegisterVariable (&sv_qcstats);
 	Cvar_RegisterVariable (&sv_gravity);
 	Cvar_RegisterVariable (&sv_init_frame_count);
@@ -1195,7 +1195,7 @@ static void Download_CheckExtensions(cmd_state_t *cmd)
 
 	// first reset them all
 	host_client->download_deflate = false;
-	
+
 	for(i = 2; i < argc; ++i)
 	{
 		if(!strcmp(Cmd_Argv(cmd, i), "deflate"))
@@ -1239,7 +1239,7 @@ static void SV_Download_f(cmd_state_t *cmd)
 	}
 
 	is_csqc = (sv.csqc_progname[0] && strcmp(Cmd_Argv(cmd, 1), sv.csqc_progname) == 0);
-	
+
 	if (!sv_allowdownloads.integer && !is_csqc)
 	{
 		SV_ClientPrintf("Downloads are disabled on this server\n");
@@ -1260,17 +1260,17 @@ static void SV_Download_f(cmd_state_t *cmd)
 	{
 		char extensions[MAX_QPATH]; // make sure this can hold all extensions
 		extensions[0] = '\0';
-		
+
 		if(host_client->download_deflate)
 			dp_strlcat(extensions, " deflate", sizeof(extensions));
-		
+
 		Con_DPrintf("Downloading %s to %s\n", host_client->download_name, host_client->name);
 
 		if(host_client->download_deflate && svs.csqc_progdata_deflated)
 			host_client->download_file = FS_FileFromData(svs.csqc_progdata_deflated, svs.csqc_progsize_deflated, true);
 		else
 			host_client->download_file = FS_FileFromData(svs.csqc_progdata, sv.csqc_progsize, true);
-		
+
 		// no, no space is needed between %s and %s :P
 		SV_ClientCommands("\ncl_downloadbegin %i %s%s\n", (int)FS_FileSize(host_client->download_file), host_client->download_name, extensions);
 
@@ -1373,7 +1373,7 @@ static void SV_Download_f(cmd_state_t *cmd)
 	{
 		char extensions[MAX_QPATH]; // make sure this can hold all extensions
 		extensions[0] = '\0';
-		
+
 		if(host_client->download_deflate)
 			strlcat(extensions, " deflate", sizeof(extensions));
 
@@ -1723,7 +1723,7 @@ static void SV_Prepare_CSQC(void)
 
 	svs.csqc_progdata = NULL;
 	svs.csqc_progdata_deflated = NULL;
-	
+
 	sv.csqc_progname[0] = 0;
 	svs.csqc_progdata = FS_LoadFile(csqc_progname.string, sv_mempool, false, &progsize);
 
@@ -1903,16 +1903,8 @@ void SV_SpawnServer (const char *map)
 //
 // make cvars consistant
 //
-
 	if (coop.integer)
-	{
 		Cvar_SetValueQuick(&deathmatch, 0);
-		Cvar_SetValueQuick(&campaign, 0);
-	}
-	else if(!deathmatch.integer)
-		Cvar_SetValueQuick(&campaign, 1);
-	else
-		Cvar_SetValueQuick(&campaign, 0);
 	// LadyHavoc: it can be useful to have skills outside the range 0-3...
 	//current_skill = bound(0, (int)(skill.value + 0.5), 3);
 	//Cvar_SetValue ("skill", (float)current_skill);
@@ -2659,7 +2651,7 @@ double SV_Frame(double time)
 			++sv.perf_acc_offset_samples;
 			sv.perf_acc_offset += offset;
 			sv.perf_acc_offset_squared += offset * offset;
-			
+
 			if(sv.perf_acc_offset_max < offset)
 				sv.perf_acc_offset_max = offset;
 		}

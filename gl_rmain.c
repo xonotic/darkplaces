@@ -4410,7 +4410,7 @@ void R_SetupView(qbool allowwaterclippingplane, int viewfbo, rtexture_t *viewdep
 		R_Viewport_InitPerspectiveInfinite(&r_refdef.view.viewport, &r_refdef.view.matrix, viewx, viewy_adjusted, viewwidth, viewheight, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, customclipplane);
 	else
 		R_Viewport_InitPerspective(&r_refdef.view.viewport, &r_refdef.view.matrix, viewx, viewy_adjusted, viewwidth, viewheight, r_refdef.view.frustum_x, r_refdef.view.frustum_y, r_refdef.nearclip, r_refdef.farclip, customclipplane);
-	R_Mesh_SetRenderTargets(viewfbo, viewdepthtexture, viewcolortexture, NULL, NULL, NULL);
+	R_Mesh_SetRenderTargets(viewfbo);
 	R_SetViewport(&r_refdef.view.viewport);
 }
 
@@ -4448,7 +4448,7 @@ void R_ResetViewRendering2D_Common(int viewfbo, rtexture_t *viewdepthtexture, rt
 	viewy_adjusted = viewfbo ? viewy : vid.mode.height - viewheight - viewy;
 
 	R_Viewport_InitOrtho(&viewport, &identitymatrix, viewx, viewy_adjusted, viewwidth, viewheight, 0, 0, x2, y2, -10, 100, NULL);
-	R_Mesh_SetRenderTargets(viewfbo, viewdepthtexture, viewcolortexture, NULL, NULL, NULL);
+	R_Mesh_SetRenderTargets(viewfbo);
 	R_SetViewport(&viewport);
 	GL_Scissor(viewport.x, viewport.y, viewport.width, viewport.height);
 	GL_Color(1, 1, 1, 1);
@@ -5127,7 +5127,7 @@ static void R_Bloom_MakeTexture(void)
 	CHECKGLERROR
 	prev = r_fb.rt_screen;
 	cur = R_RenderTarget_Get(r_fb.bloomwidth, r_fb.bloomheight, TEXTYPE_UNUSED, false, textype, TEXTYPE_UNUSED, TEXTYPE_UNUSED, TEXTYPE_UNUSED);
-	R_Mesh_SetRenderTargets(cur->fbo, NULL, cur->colortexture[0], NULL, NULL, NULL);
+	R_Mesh_SetRenderTargets(cur->fbo);
 	R_SetViewport(&bloomviewport);
 	GL_CullFace(GL_NONE);
 	GL_DepthTest(false);
@@ -5146,7 +5146,7 @@ static void R_Bloom_MakeTexture(void)
 	{
 		prev = cur;
 		cur = R_RenderTarget_Get(r_fb.bloomwidth, r_fb.bloomheight, TEXTYPE_UNUSED, false, textype, TEXTYPE_UNUSED, TEXTYPE_UNUSED, TEXTYPE_UNUSED);
-		R_Mesh_SetRenderTargets(cur->fbo, NULL, cur->colortexture[0], NULL, NULL, NULL);
+		R_Mesh_SetRenderTargets(cur->fbo);
 		x *= 2;
 		r = bound(0, r_bloom_colorexponent.value / x, 1); // always 0.5 to 1
 		if(x <= 2)
@@ -5170,7 +5170,7 @@ static void R_Bloom_MakeTexture(void)
 	{
 		prev = cur;
 		cur = R_RenderTarget_Get(r_fb.bloomwidth, r_fb.bloomheight, TEXTYPE_UNUSED, false, textype, TEXTYPE_UNUSED, TEXTYPE_UNUSED, TEXTYPE_UNUSED);
-		R_Mesh_SetRenderTargets(cur->fbo, NULL, cur->colortexture[0], NULL, NULL, NULL);
+		R_Mesh_SetRenderTargets(cur->fbo);
 		// blend on at multiple vertical offsets to achieve a vertical blur
 		// TODO: do offset blends using GLSL
 		// TODO instead of changing the texcoords, change the target positions to prevent artifacts at edges
@@ -5671,7 +5671,7 @@ void R_RenderView(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture, i
 	if (r_refdef.view.isoverlay)
 	{
 		// TODO: FIXME: move this into its own backend function maybe? [2/5/2008 Andreas]
-		R_Mesh_SetRenderTargets(0, NULL, NULL, NULL, NULL, NULL);
+		R_Mesh_SetRenderTargets(0);
 		GL_Clear(GL_DEPTH_BUFFER_BIT, NULL, 1.0f, 0);
 		R_TimeReport("depthclear");
 
@@ -5809,10 +5809,6 @@ void R_RenderWaterPlanes(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *
 			R_TimeReport("waterworld");
 	}
 
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
-
 	R_DrawModelsAddWaterPlanes();
 	if (r_timereport_active)
 		R_TimeReport("watermodels");
@@ -5842,10 +5838,6 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 
 	R_UpdateFog();
 
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
-
 	R_MeshQueue_BeginScene();
 
 	R_SkyStartFrame();
@@ -5857,10 +5849,6 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 
 	if (cl.csqc_vidvars.drawworld)
 	{
-		// don't let sound skip if going slow
-		if (r_refdef.scene.extraupdate)
-			S_ExtraUpdate ();
-
 		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->DrawSky)
 		{
 			r_refdef.scene.worldmodel->DrawSky(r_refdef.scene.worldentity);
@@ -5930,17 +5918,9 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 			R_TimeReport("world");
 	}
 
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
-
 	R_DrawModels();
 	if (r_timereport_active)
 		R_TimeReport("models");
-
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
 
 	if (!r_shadow_usingdeferredprepass)
 	{
@@ -5948,10 +5928,6 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 		if (r_timereport_active)
 			R_TimeReport("rtlights");
 	}
-
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
 
 	if (cl.csqc_vidvars.drawworld)
 	{
@@ -6021,10 +5997,6 @@ void R_RenderScene(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewco
 		if (r_timereport_active)
 			R_TimeReport("coronas");
 	}
-
-	// don't let sound skip if going slow
-	if (r_refdef.scene.extraupdate)
-		S_ExtraUpdate ();
 }
 
 static const unsigned short bboxelements[36] =
@@ -9169,7 +9141,6 @@ void R_DecalSystem_Reset(decalsystem_t *decalsystem)
 static void R_DecalSystem_SpawnTriangle(decalsystem_t *decalsystem, const float *v0, const float *v1, const float *v2, const float *t0, const float *t1, const float *t2, const float *c0, const float *c1, const float *c2, int triangleindex, int surfaceindex, unsigned int decalsequence)
 {
 	tridecal_t *decal;
-	tridecal_t *decals;
 	int i;
 
 	// expand or initialize the system
@@ -9197,13 +9168,7 @@ static void R_DecalSystem_SpawnTriangle(decalsystem_t *decalsystem, const float 
 	}
 
 	// grab a decal and search for another free slot for the next one
-	decals = decalsystem->decals;
-	decal = decalsystem->decals + (i = decalsystem->freedecal++);
-	for (i = decalsystem->freedecal;i < decalsystem->numdecals && decals[i].color4f[0][3];i++)
-		;
-	decalsystem->freedecal = i;
-	if (decalsystem->numdecals <= i)
-		decalsystem->numdecals = i + 1;
+	decal = &decalsystem->decals[decalsystem->numdecals++];
 
 	// initialize the decal
 	decal->lived = 0;
@@ -9569,7 +9534,6 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 {
 	int i;
 	decalsystem_t *decalsystem = &ent->decalsystem;
-	int numdecals;
 	unsigned int killsequence;
 	tridecal_t *decal;
 	float frametime;
@@ -9595,38 +9559,18 @@ static void R_DrawModelDecals_FadeEntity(entity_render_t *ent)
 	else
 		frametime = 0;
 	decalsystem->lastupdatetime = r_refdef.scene.time;
-	numdecals = decalsystem->numdecals;
 
-	for (i = 0, decal = decalsystem->decals;i < numdecals;i++, decal++)
+	for (i = 0, decal = decalsystem->decals;i < decalsystem->numdecals;i++, decal++)
 	{
-		if (decal->color4f[0][3])
+		decal->lived += frametime;
+		if (killsequence > decal->decalsequence || decal->lived >= lifetime)
 		{
-			decal->lived += frametime;
-			if (killsequence > decal->decalsequence || decal->lived >= lifetime)
-			{
-				memset(decal, 0, sizeof(*decal));
-				if (decalsystem->freedecal > i)
-					decalsystem->freedecal = i;
-			}
+			*decal = decalsystem->decals[--decalsystem->numdecals];
+			--i, --decal;  // Consider the just moved decal next.
 		}
 	}
-	decal = decalsystem->decals;
-	while (numdecals > 0 && !decal[numdecals-1].color4f[0][3])
-		numdecals--;
 
-	// collapse the array by shuffling the tail decals into the gaps
-	for (;;)
-	{
-		while (decalsystem->freedecal < numdecals && decal[decalsystem->freedecal].color4f[0][3])
-			decalsystem->freedecal++;
-		if (decalsystem->freedecal == numdecals)
-			break;
-		decal[decalsystem->freedecal] = decal[--numdecals];
-	}
-
-	decalsystem->numdecals = numdecals;
-
-	if (numdecals <= 0)
+	if (decalsystem->numdecals <= 0)
 	{
 		// if there are no decals left, reset decalsystem
 		R_DecalSystem_Reset(decalsystem);

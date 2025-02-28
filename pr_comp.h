@@ -67,10 +67,10 @@ typedef enum opcode_e
 	OP_NE_E,
 	OP_NE_FNC,
 
-	OP_LE,
-	OP_GE,
-	OP_LT,
-	OP_GT,
+	OP_LE_F,
+	OP_GE_F,
+	OP_LT_F,
+	OP_GT_F,
 
 	OP_LOAD_F,
 	OP_LOAD_V,
@@ -114,14 +114,14 @@ typedef enum opcode_e
 	OP_CALL8,
 	OP_STATE,
 	OP_GOTO,
-	OP_AND,
-	OP_OR,
+	OP_AND_F,
+	OP_OR_F,
 
-	OP_BITAND,
-	OP_BITOR,
+	OP_BITAND_F,
+	OP_BITOR_F,
 
 	// TODO: actually support Hexen 2?
-	
+
 	OP_MULSTORE_F,	//66 redundant, for h2 compat
 	OP_MULSTORE_VF,	//67 redundant, for h2 compat
 	OP_MULSTOREP_F,	//68
@@ -194,11 +194,11 @@ typedef enum opcode_e
 	OP_SUB_FI,
 	OP_SUB_IF,
 
-	OP_CONV_IF,
-	OP_CONV_FI,
-	
-	OP_LOADP_IF,
-	OP_LOADP_FI,
+	OP_CONV_ITOF,
+	OP_CONV_FTOI,
+
+	OP_LOADP_ITOF,
+	OP_LOADP_FTOI,
 
 	OP_LOAD_I,
 
@@ -230,7 +230,7 @@ typedef enum opcode_e
 	OP_ADD_PIW,
 
 	OP_LOADA_F,
-	OP_LOADA_V,	
+	OP_LOADA_V,
 	OP_LOADA_S,
 	OP_LOADA_ENT,
 	OP_LOADA_FLD,
@@ -241,7 +241,7 @@ typedef enum opcode_e
 	OP_LOAD_P,
 
 	OP_LOADP_F,
-	OP_LOADP_V,	
+	OP_LOADP_V,
 	OP_LOADP_S,
 	OP_LOADP_ENT,
 	OP_LOADP_FLD,
@@ -252,7 +252,7 @@ typedef enum opcode_e
 	OP_GE_I,
 	OP_LT_I,
 	OP_GT_I,
-	
+
 	OP_LE_IF,
 	OP_GE_IF,
 	OP_LT_IF,
@@ -295,7 +295,7 @@ typedef enum opcode_e
 	OP_GSTOREP_ENT,
 	OP_GSTOREP_FLD,
 	OP_GSTOREP_S,
-	OP_GSTOREP_FNC,		
+	OP_GSTOREP_FNC,
 	OP_GSTOREP_V,
 	OP_GADDRESS,
 	OP_GLOAD_I,
@@ -320,6 +320,65 @@ typedef enum opcode_e
 	OP_STOREF_F,	//1 fpu element...
 	OP_STOREF_S,	//1 string reference
 	OP_STOREF_I,	//1 non-string reference/int
+
+	//fteqw r5744+
+	OP_STOREP_B,//((char*)b)[(int)c] = (int)a
+	OP_LOADP_B,	//(int)c = *(char*)
+
+	//fteqw r5768+
+	//opcodes for 32bit uints
+	OP_LE_U,		//aka GT
+	OP_LT_U,		//aka GE
+	OP_DIV_U,		//don't need mul+add+sub
+	OP_RSHIFT_U,	//lshift is the same for signed+unsigned
+
+	//opcodes for 64bit ints
+	OP_ADD_I64,
+	OP_SUB_I64,
+	OP_MUL_I64,
+	OP_DIV_I64,
+	OP_BITAND_I64,
+	OP_BITOR_I64,
+	OP_BITXOR_I64,
+	OP_LSHIFT_I64I,
+	OP_RSHIFT_I64I,
+	OP_LE_I64,		//aka GT
+	OP_LT_I64,		//aka GE
+	OP_EQ_I64,
+	OP_NE_I64,
+	//extra opcodes for 64bit uints
+	OP_LE_U64,		//aka GT
+	OP_LT_U64,		//aka GE
+	OP_DIV_U64,
+	OP_RSHIFT_U64I,
+
+	//general 64bitness
+	OP_STORE_I64,
+	OP_STOREP_I64,
+	OP_STOREF_I64,
+	OP_LOAD_I64,
+	OP_LOADA_I64,
+	OP_LOADP_I64,
+	//various conversions for our 64bit types (yay type promotion)
+	OP_CONV_UI64, //zero extend
+	OP_CONV_II64, //sign extend
+	OP_CONV_I64I,	//truncate
+	OP_CONV_FD,	//extension
+	OP_CONV_DF,	//truncation
+	OP_CONV_I64F,	//logically a promotion (always signed)
+	OP_CONV_FI64,	//demotion (always signed)
+	OP_CONV_I64D,	//'promotion' (always signed)
+	OP_CONV_DI64,	//demotion (always signed)
+
+	//opcodes for doubles.
+	OP_ADD_D,
+	OP_SUB_D,
+	OP_MUL_D,
+	OP_DIV_D,
+	OP_LE_D,
+	OP_LT_D,
+	OP_EQ_D,
+	OP_NE_D,
 }
 opcode_t;
 
@@ -409,8 +468,7 @@ mfunction_t;
 typedef struct mstatement_s
 {
 	opcode_t	op;
-	int			operand[3]; // always a global or -1 for unused
-	int			jumpabsolute; // only used by IF, IFNOT, GOTO
+	int			operand[3]; // always a global, or a relative statement offset ([0] for GOTO, [1] for IF/IFNOT), or -1 for unused
 }
 mstatement_t;
 

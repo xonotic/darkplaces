@@ -4,7 +4,7 @@
 
 #define MAX_RENDERTARGETS 4
 
-cvar_t gl_debug = {CF_CLIENT, "gl_debug", "0", "enables OpenGL debug output, 0 = off, 1 = HIGH severity only, 2 = also MEDIUM severity, 3 = also LOW severity messages.  (note: enabling may not take effect until vid_restart on some drivers)"};
+cvar_t gl_debug = {CF_CLIENT, "gl_debug", "0", "enables OpenGL 4.3 debug output, 0 = off, 1 = HIGH severity only, 2 = also MEDIUM severity, 3 = also LOW severity messages.  (note: enabling may not take effect until vid_restart on some drivers, and only X11 and Windows are known to support the debug context)"};
 cvar_t gl_paranoid = {CF_CLIENT, "gl_paranoid", "0", "enables OpenGL error checking and other tests"};
 cvar_t gl_printcheckerror = {CF_CLIENT, "gl_printcheckerror", "0", "prints all OpenGL error checks, useful to identify location of driver crashes"};
 
@@ -37,62 +37,58 @@ void GL_PrintError(GLenum errornumber, const char *filename, unsigned int linenu
 	{
 #ifdef GL_INVALID_ENUM
 	case GL_INVALID_ENUM:
-		Con_Printf("GL_INVALID_ENUM at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_INVALID_ENUM at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_INVALID_VALUE
 	case GL_INVALID_VALUE:
-		Con_Printf("GL_INVALID_VALUE at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_INVALID_VALUE at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_INVALID_OPERATION
 	case GL_INVALID_OPERATION:
-		Con_Printf("GL_INVALID_OPERATION at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_INVALID_OPERATION at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_STACK_OVERFLOW
 	case GL_STACK_OVERFLOW:
-		Con_Printf("GL_STACK_OVERFLOW at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_STACK_OVERFLOW at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_STACK_UNDERFLOW
 	case GL_STACK_UNDERFLOW:
-		Con_Printf("GL_STACK_UNDERFLOW at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_STACK_UNDERFLOW at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_OUT_OF_MEMORY
 	case GL_OUT_OF_MEMORY:
-		Con_Printf("GL_OUT_OF_MEMORY at %s:%i\n", filename, linenumber);
-		break;
-#endif
-#ifdef GL_TABLE_TOO_LARGE
-	case GL_TABLE_TOO_LARGE:
-		Con_Printf("GL_TABLE_TOO_LARGE at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_OUT_OF_MEMORY at %s:%i\n", filename, linenumber);
 		break;
 #endif
 #ifdef GL_INVALID_FRAMEBUFFER_OPERATION
 	case GL_INVALID_FRAMEBUFFER_OPERATION:
-		Con_Printf("GL_INVALID_FRAMEBUFFER_OPERATION at %s:%i\n", filename, linenumber);
+		Con_Printf(CON_ERROR "GL_INVALID_FRAMEBUFFER_OPERATION at %s:%i\n", filename, linenumber);
 		break;
 #endif
 	default:
-		Con_Printf("GL UNKNOWN (%i) at %s:%i\n", errornumber, filename, linenumber);
+		Con_Printf(CON_ERROR "GL UNKNOWN (%i) at %s:%i\n", errornumber, filename, linenumber);
 		break;
 	}
 }
+#endif // DEBUGGL
 
 static void GLAPIENTRY GL_DebugOutputCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const GLvoid* userParam)
 {
-	const char *sev = "ENUM?", *typ = "ENUM?", *src = "ENUM?";
+	const char *sev = "ENUM?", *typ = "ENUM?", *src = "ENUM?", *col = "";
 	switch (severity)
 	{
 	case GL_DEBUG_SEVERITY_LOW_ARB: sev = "LOW"; break;
-	case GL_DEBUG_SEVERITY_MEDIUM_ARB: sev = "MED"; break;
-	case GL_DEBUG_SEVERITY_HIGH_ARB: sev = "HIGH"; break;
+	case GL_DEBUG_SEVERITY_MEDIUM_ARB: sev = "MED"; col = CON_WARN; break;
+	case GL_DEBUG_SEVERITY_HIGH_ARB: sev = "HIGH"; col = CON_ERROR; break;
 	}
 	switch (type)
 	{
-	case GL_DEBUG_TYPE_ERROR_ARB: typ = "ERROR"; break;
+	case GL_DEBUG_TYPE_ERROR_ARB: typ = "ERROR"; col = CON_ERROR; break;
 	case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR_ARB: typ = "DEPRECATED"; break;
 	case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR_ARB: typ = "UNDEFINED"; break;
 	case GL_DEBUG_TYPE_PORTABILITY_ARB: typ = "PORTABILITY"; break;
@@ -108,9 +104,8 @@ static void GLAPIENTRY GL_DebugOutputCallback(GLenum source, GLenum type, GLuint
 	case GL_DEBUG_SOURCE_APPLICATION_ARB: src = "APP"; break;
 	case GL_DEBUG_SOURCE_OTHER_ARB: src = "OTHER"; break;
 	}
-	Con_Printf("GLDEBUG: %s %s %s: %u: %s\n", sev, typ, src, (unsigned int)id, message);
+	Con_Printf("gl_debug: %s%s %s %s: %u: %s\n", col, sev, typ, src, (unsigned int)id, message);
 }
-#endif
 
 #define BACKENDACTIVECHECK if (!gl_state.active) Sys_Error("GL backend function called when backend is not active");
 
@@ -374,7 +369,9 @@ void gl_backend_init(void)
 	Cvar_RegisterVariable(&v_flipped);
 	Cvar_RegisterVariable(&gl_debug);
 	Cvar_RegisterVariable(&gl_paranoid);
+#ifdef DEBUGGL // gl_printcheckerror does nothing in normal builds
 	Cvar_RegisterVariable(&gl_printcheckerror);
+#endif
 
 	Cmd_AddCommand(CF_CLIENT, "gl_vbostats", GL_VBOStats_f, "prints a list of all buffer objects (vertex data and triangle elements) and total video memory used by them");
 
@@ -972,7 +969,7 @@ int R_Mesh_CreateFramebufferObject(rtexture_t *depthtexture, rtexture_t *colorte
 		qglGenFramebuffers(1, (GLuint*)&temp);CHECKGLERROR
 
 #ifndef USE_GLES2
-		R_Mesh_SetRenderTargets(temp, NULL, NULL, NULL, NULL, NULL);  // This breaks GLES2.
+		R_Mesh_SetRenderTargets(temp);  // This breaks GLES2.
 		// GL_ARB_framebuffer_object (GL3-class hardware) - depth stencil attachment
 #endif
 
@@ -1032,7 +1029,7 @@ int R_Mesh_CreateFramebufferObject(rtexture_t *depthtexture, rtexture_t *colorte
 		status = qglCheckFramebufferStatus(GL_FRAMEBUFFER);CHECKGLERROR
 		if (status != GL_FRAMEBUFFER_COMPLETE)
 		{
-			Con_Printf("R_Mesh_CreateFramebufferObject: glCheckFramebufferStatus returned %i\n", status);
+			Con_Printf(CON_ERROR "R_Mesh_CreateFramebufferObject: glCheckFramebufferStatus returned %i\n", status);
 			gl_state.framebufferobject = 0; // GL unbinds it for us
 			qglDeleteFramebuffers(1, (GLuint*)&temp);CHECKGLERROR
 			temp = 0;
@@ -1059,19 +1056,8 @@ void R_Mesh_DestroyFramebufferObject(int fbo)
 	}
 }
 
-void R_Mesh_SetRenderTargets(int fbo, rtexture_t *depthtexture, rtexture_t *colortexture, rtexture_t *colortexture2, rtexture_t *colortexture3, rtexture_t *colortexture4)
+void R_Mesh_SetRenderTargets(int fbo)
 {
-	unsigned int i;
-	unsigned int j;
-	rtexture_t *textures[5];
-	Vector4Set(textures, colortexture, colortexture2, colortexture3, colortexture4);
-	textures[4] = depthtexture;
-	// unbind any matching textures immediately, otherwise D3D will complain about a bound texture being used as a render target
-	for (j = 0;j < 5;j++)
-		if (textures[j])
-			for (i = 0;i < MAX_TEXTUREUNITS;i++)
-				if (gl_state.units[i].texture == textures[j])
-					R_Mesh_TexBind(i, NULL);
 	// set up framebuffer object or render targets for the active rendering API
 	switch (vid.renderpath)
 	{
@@ -1111,11 +1097,11 @@ static void GL_Backend_ResetState(void)
 	case RENDERPATH_GL32:
 	case RENDERPATH_GLES2:
 		// set up debug output early
-#ifdef DEBUGGL
-		if (vid.support.arb_debug_output)
+		if (gl_debug.integer > 0 && vid.support.arb_debug_output)
 		{
 			GLuint unused = 0;
 			CHECKGLERROR
+			Con_Print("gl_debug: GL_ARB_debug_output is supported, enabling callback\n");
 			if (gl_debug.integer >= 1)
 				qglEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
 			if (gl_debug.integer >= 3)
@@ -1130,7 +1116,6 @@ static void GL_Backend_ResetState(void)
 				qglDebugMessageControlARB(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, &unused, GL_FALSE);
 			qglDebugMessageCallbackARB(GL_DebugOutputCallback, NULL);
 		}
-#endif //DEBUGGL
 		CHECKGLERROR
 		qglColorMask(1, 1, 1, 1);CHECKGLERROR
 		qglBlendFunc(gl_state.blendfunc1, gl_state.blendfunc2);CHECKGLERROR
@@ -1526,9 +1511,11 @@ void GL_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpi
 	switch(vid.renderpath)
 	{
 	case RENDERPATH_GL32:
-	case RENDERPATH_GLES2:
 		CHECKGLERROR
-#ifndef GL_BGRA
+		qglReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, outpixels);CHECKGLERROR
+		break;
+	case RENDERPATH_GLES2: // glReadPixels() lacks GL_BGRA support (even in ES 3.2)
+		CHECKGLERROR
 		{
 			int i;
 			int r;
@@ -1548,23 +1535,125 @@ void GL_ReadPixelsBGRA(int x, int y, int width, int height, unsigned char *outpi
 		//		outpixels[i+3] = a;
 			}
 		}
-#else
-		qglReadPixels(x, y, width, height, GL_BGRA, GL_UNSIGNED_BYTE, outpixels);CHECKGLERROR
-#endif
-			break;
+		break;
 	}
 }
+
+
+#ifdef CONFIG_VIDEO_CAPTURE
+/*
+ * GL_CaptureVideo*
+ * GPU scaling and async DMA transfer of completed frames
+ * Minimum GL version: 3.0, for glBlitFramebuffer
+ * Minimum GLES version: 3.0, for glBlitFramebuffer and GL_PIXEL_PACK_BUFFER (PBOs)
+ */
+
+void GL_CaptureVideo_BeginVideo(void)
+{
+	int width = cls.capturevideo.width, height = cls.capturevideo.height;
+	// format is GL_BGRA type is GL_UNSIGNED_BYTE
+	GLsizeiptr data_size = width * height * 4;
+
+// create PBOs
+	qglGenBuffers(PBO_COUNT, cls.capturevideo.PBOs);
+	for (int i = 0; i < PBO_COUNT; ++i)
+	{
+		qglBindBuffer(GL_PIXEL_PACK_BUFFER, cls.capturevideo.PBOs[i]);
+		// Allocate memory and leave it uninitialised.
+		qglBufferData(GL_PIXEL_PACK_BUFFER, data_size, NULL, GL_DYNAMIC_READ);CHECKGLERROR
+	}
+	qglBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+
+// If scaling is necessary create an FBO with attached texture
+	if (width == vid.mode.width && height == vid.mode.height)
+	{
+		cls.capturevideo.FBO = 0;
+		return;
+	}
+	qglGenFramebuffers(1, &cls.capturevideo.FBO);
+	qglBindFramebuffer(GL_FRAMEBUFFER, cls.capturevideo.FBO);
+	qglGenTextures(1, &cls.capturevideo.FBOtex);
+	qglBindTexture(GL_TEXTURE_2D, cls.capturevideo.FBOtex);
+	// Allocate memory and leave it uninitialised (format and type don't matter: data is NULL).
+	// Same internalformat as TEXTYPE_COLORBUFFER.
+	qglTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);CHECKGLERROR
+	qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, cls.capturevideo.FBOtex, 0);CHECKGLERROR
+	qglBindTexture(GL_TEXTURE_2D, 0);
+	qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void GL_CaptureVideo_VideoFrame(int newframestepframenum)
+{
+	int width = cls.capturevideo.width, height = cls.capturevideo.height;
+	GLubyte *pixbuf;
+	GLuint oldestPBOindex;
+
+	if (++cls.capturevideo.PBOindex >= PBO_COUNT)
+		cls.capturevideo.PBOindex = 0;
+	if ((oldestPBOindex = cls.capturevideo.PBOindex + 1) >= PBO_COUNT)
+		oldestPBOindex = 0;
+
+	// Ensure we'll read from the default FB
+	R_Mesh_SetRenderTargets(0);
+
+	// If necessary, scale the newest frame with linear filtering
+	if (cls.capturevideo.FBO)
+	{
+		qglBindFramebuffer(GL_DRAW_FRAMEBUFFER, cls.capturevideo.FBO);
+		qglBlitFramebuffer(0, 0, vid.mode.width, vid.mode.height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_LINEAR);CHECKGLERROR
+		qglBindFramebuffer(GL_READ_FRAMEBUFFER, cls.capturevideo.FBO);
+	}
+
+	// Copy the newest frame to a PBO for later CPU access.
+	qglBindBuffer(GL_PIXEL_PACK_BUFFER, cls.capturevideo.PBOs[cls.capturevideo.PBOindex]);
+	qglReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, 0);CHECKGLERROR
+
+	if (cls.capturevideo.FBO)
+		qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Save the oldest frame from its PBO (blocks until sync if still not ready)
+	// speed is critical here, so do saving as directly as possible
+	if (newframestepframenum >= PBO_COUNT) // Don't read uninitialised memory, newframestepframenum starts at 1
+	{
+		qglBindBuffer(GL_PIXEL_PACK_BUFFER, cls.capturevideo.PBOs[oldestPBOindex]);
+		pixbuf = (GLubyte *)qglMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);CHECKGLERROR
+		if(pixbuf)
+		{
+			cls.capturevideo.writeVideoFrame(newframestepframenum - cls.capturevideo.framestepframe, pixbuf);
+			qglUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+		}
+	}
+
+	qglBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+}
+
+void GL_CaptureVideo_EndVideo(void)
+{
+	// SCR_CaptureVideo won't call GL_CaptureVideo_VideoFrame again
+	// but the last frame(s) are waiting in PBO(s) due to async transfer.
+	// On the last normal frame we queued to 1 PBO and saved from 1, so we have PBO_COUNT-1 left
+	for (int i = 1; i < PBO_COUNT; ++i)
+		GL_CaptureVideo_VideoFrame(cls.capturevideo.framestepframe + i);
+
+	qglDeleteTextures(1, &cls.capturevideo.FBOtex);
+	qglDeleteFramebuffers(1, &cls.capturevideo.FBO);
+	qglDeleteBuffers(PBO_COUNT, cls.capturevideo.PBOs);
+}
+#endif
+
 
 // called at beginning of frame
 void R_Mesh_Start(void)
 {
 	BACKENDACTIVECHECK
-	R_Mesh_SetRenderTargets(0, NULL, NULL, NULL, NULL, NULL);
+	R_Mesh_SetRenderTargets(0);
+#ifdef DEBUGGL // gl_printcheckerror isn't registered in normal builds
 	if (gl_printcheckerror.integer && !gl_paranoid.integer)
 	{
 		Con_Printf(CON_WARN "WARNING: gl_printcheckerror is on but gl_paranoid is off, turning it on...\n");
 		Cvar_SetValueQuick(&gl_paranoid, 1);
 	}
+#endif
 }
 
 static qbool GL_Backend_CompileShader(int programobject, GLenum shadertypeenum, const char *shadertype, int numstrings, const char **strings)
@@ -1721,7 +1810,7 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 			{
 				if (element3i[i] < firstvertex || element3i[i] >= firstvertex + numvertices)
 				{
-					Con_Printf("R_Mesh_Draw: invalid vertex index %i (outside range %i - %i) in element3i array\n", element3i[i], firstvertex, firstvertex + numvertices);
+					Con_Printf(CON_WARN "R_Mesh_Draw: invalid vertex index %i (outside range %i - %i) in element3i array\n", element3i[i], firstvertex, firstvertex + numvertices);
 					return;
 				}
 			}
@@ -1732,7 +1821,7 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 			{
 				if (element3s[i] < firstvertex || element3s[i] >= firstvertex + numvertices)
 				{
-					Con_Printf("R_Mesh_Draw: invalid vertex index %i (outside range %i - %i) in element3s array\n", element3s[i], firstvertex, firstvertex + numvertices);
+					Con_Printf(CON_WARN "R_Mesh_Draw: invalid vertex index %i (outside range %i - %i) in element3s array\n", element3s[i], firstvertex, firstvertex + numvertices);
 					return;
 				}
 			}
@@ -1767,7 +1856,7 @@ void R_Mesh_Draw(int firstvertex, int numvertices, int firsttriangle, int numtri
 // restores backend state, used when done with 3D rendering
 void R_Mesh_Finish(void)
 {
-	R_Mesh_SetRenderTargets(0, NULL, NULL, NULL, NULL, NULL);
+	R_Mesh_SetRenderTargets(0);
 }
 
 r_meshbuffer_t *R_Mesh_CreateMeshBuffer(const void *data, size_t size, const char *name, qbool isindexbuffer, qbool isuniformbuffer, qbool isdynamic, qbool isindex16)
@@ -1918,7 +2007,7 @@ void R_Mesh_VertexPointer(int components, int gltype, size_t stride, const void 
 		{
 			int bufferobject = vertexbuffer ? vertexbuffer->bufferobject : 0;
 			if (!bufferobject && gl_paranoid.integer)
-				Con_DPrintf("Warning: no bufferobject in R_Mesh_VertexPointer(%i, %i, %i, %p, %p, %08x)", components, gltype, (int)stride, pointer, (void *)vertexbuffer, (unsigned int)bufferoffset);
+				Con_DPrintf(CON_WARN "Warning: no bufferobject in R_Mesh_VertexPointer(%i, %i, %i, %p, %p, %08x)", components, gltype, (int)stride, pointer, (void *)vertexbuffer, (unsigned int)bufferoffset);
 			gl_state.pointer_vertex_components = components;
 			gl_state.pointer_vertex_gltype = gltype;
 			gl_state.pointer_vertex_stride = stride;

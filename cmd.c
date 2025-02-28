@@ -634,6 +634,12 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 "csqc_lowres 1\n"
 					);
 			break;
+		case GAME_CTSJ2:
+			Cbuf_InsertText(cmd, "\n"
+// Doesn't completely initialise during worldspawn and the init frames, sometimes causing the
+// essential item on start.bsp to not spawn when the local client connects and spawns "too fast".
+"sv_init_frame_count 3\n"
+			);
 		default:
 			break;
 		}
@@ -660,6 +666,9 @@ static void Cmd_Exec(cmd_state_t *cmd, const char *filename)
 "sv_gameplayfix_q1bsptracelinereportstexture 0\n"
 "sv_gameplayfix_swiminbmodels 0\n"
 "sv_gameplayfix_downtracesupportsongroundflag 0\n"
+// Work around low brightness and poor legibility of Quake font
+"r_textbrightness 0.25\n"
+"r_textcontrast 1.25\n"
 				);
 			break;
 		default:

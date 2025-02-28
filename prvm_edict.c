@@ -1458,9 +1458,9 @@ qbool PRVM_ED_CallSpawnFunction(prvm_prog_t *prog, prvm_edict_t *ent, const char
 			}
 			else
 			{
-				
+
 				Con_DPrint("No spawn function for:\n");
-				if (developer.integer > 0) // don't confuse non-developers with errors	
+				if (developer.integer > 0) // don't confuse non-developers with errors
 					PRVM_ED_Print(prog, ent, NULL);
 
 				PRVM_ED_Free (prog, ent);
@@ -1567,7 +1567,7 @@ void PRVM_ED_LoadFromFile (prvm_prog_t *prog, const char *data)
 
 		if(!PRVM_ED_CallSpawnFunction(prog, ent, data, start))
 			continue;
-		
+
 		PRVM_ED_CallPostspawnFunction(prog, ent);
 
 		spawned++;
@@ -2052,6 +2052,7 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 	char vabuf2[1024];
 	cvar_t *cvar;
 	int structtype = 0;
+	int max_safe_edicts;
 
 	if (prog->loaded)
 		prog->error_cmd("%s: there is already a %s program loaded!", __func__, prog->name);
@@ -2292,21 +2293,23 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 			b = (short)b;
 			if (a >= prog->progs_numglobals || b + i < 0 || b + i >= prog->progs_numstatements)
 				prog->error_cmd("%s: out of bounds IF/IFNOT (statement %d) in %s", __func__, i, prog->name);
+			if (c)
+				Con_DPrintf("%s: unexpected offset on binary opcode in %s\n", __func__, prog->name);
 			prog->statements[i].op = op;
 			prog->statements[i].operand[0] = remapglobal(a);
-			prog->statements[i].operand[1] = -1;
+			prog->statements[i].operand[1] = b;
 			prog->statements[i].operand[2] = -1;
-			prog->statements[i].jumpabsolute = i + b;
 			break;
 		case OP_GOTO:
 			a = (short)a;
 			if (a + i < 0 || a + i >= prog->progs_numstatements)
 				prog->error_cmd("%s: out of bounds GOTO (statement %d) in %s", __func__, i, prog->name);
+			if (b || c)
+				Con_DPrintf("%s: unexpected offset on unary opcode in %s\n", __func__, prog->name);
 			prog->statements[i].op = op;
-			prog->statements[i].operand[0] = -1;
+			prog->statements[i].operand[0] = a;
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = -1;
-			prog->statements[i].jumpabsolute = i + a;
 			break;
 		default:
 			Con_DPrintf("%s: unknown opcode %d at statement %d in %s\n", __func__, (int)op, i, prog->name);
@@ -2316,19 +2319,17 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 			prog->statements[i].operand[0] = 0;
 			prog->statements[i].operand[1] =
 			prog->statements[i].operand[2] = op;
-			prog->statements[i].jumpabsolute = -1;
 			break;
-		case OP_STORE_I:
+		// global global global
 		case OP_ADD_I:
 		case OP_ADD_FI:
 		case OP_ADD_IF:
 		case OP_SUB_I:
 		case OP_SUB_FI:
 		case OP_SUB_IF:
-		case OP_CONV_IF:
-		case OP_CONV_FI:
+		case OP_CONV_ITOF:
+		case OP_CONV_FTOI:
 		case OP_LOAD_I:
-		case OP_STOREP_I:
 		case OP_BITAND_I:
 		case OP_BITOR_I:
 		case OP_MUL_I:
@@ -2337,7 +2338,6 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 		case OP_NE_I:
 		case OP_NOT_I:
 		case OP_DIV_VF:
-		case OP_STORE_P:
 		case OP_LE_I:
 		case OP_GE_I:
 		case OP_LT_I:
@@ -2385,8 +2385,6 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 		case OP_GLOAD_FNC:
 		case OP_BOUNDCHECK:
 		case OP_GLOAD_V:
-
-		// global global global
 		case OP_ADD_F:
 		case OP_ADD_V:
 		case OP_SUB_F:
@@ -2396,14 +2394,14 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 		case OP_MUL_FV:
 		case OP_MUL_VF:
 		case OP_DIV_F:
-		case OP_BITAND:
-		case OP_BITOR:
-		case OP_GE:
-		case OP_LE:
-		case OP_GT:
-		case OP_LT:
-		case OP_AND:
-		case OP_OR:
+		case OP_BITAND_F:
+		case OP_BITOR_F:
+		case OP_GE_F:
+		case OP_LE_F:
+		case OP_GT_F:
+		case OP_LT_F:
+		case OP_AND_F:
+		case OP_OR_F:
 		case OP_EQ_F:
 		case OP_EQ_V:
 		case OP_EQ_S:
@@ -2421,13 +2419,36 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 		case OP_LOAD_S:
 		case OP_LOAD_FNC:
 		case OP_LOAD_V:
+		case OP_LOAD_P:
+		case OP_ADD_PIW:
+		case OP_GLOBALADDRESS:
+		case OP_LOADA_F:
+		case OP_LOADA_V:
+		case OP_LOADA_S:
+		case OP_LOADA_ENT:
+		case OP_LOADA_FLD:
+		case OP_LOADA_FNC:
+		case OP_LOADA_I:
+		case OP_LOADP_F:
+		case OP_LOADP_V:
+		case OP_LOADP_S:
+		case OP_LOADP_ENT:
+		case OP_LOADP_FLD:
+		case OP_LOADP_FNC:
+		case OP_LOADP_I:
+		case OP_STOREP_F:
+		case OP_STOREP_ENT:
+		case OP_STOREP_FLD:
+		case OP_STOREP_S:
+		case OP_STOREP_FNC:
+		case OP_STOREP_V:
+		case OP_STOREP_I:
 			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals || c >= prog->progs_numglobals)
 				prog->error_cmd("%s: out of bounds global index (statement %d)", __func__, i);
 			prog->statements[i].op = op;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = remapglobal(b);
 			prog->statements[i].operand[2] = remapglobal(c);
-			prog->statements[i].jumpabsolute = -1;
 			break;
 		// global none global
 		case OP_NOT_F:
@@ -2437,36 +2458,31 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 		case OP_NOT_ENT:
 			if (a >= prog->progs_numglobals || c >= prog->progs_numglobals)
 				prog->error_cmd("%s: out of bounds global index (statement %d) in %s", __func__, i, prog->name);
+			if (b)
+				Con_DPrintf("%s: unexpected offset on binary opcode in %s\n", __func__, prog->name);
 			prog->statements[i].op = op;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = remapglobal(c);
-			prog->statements[i].jumpabsolute = -1;
 			break;
-		// 2 globals
-		case OP_STOREP_F:
-		case OP_STOREP_ENT:
-		case OP_STOREP_FLD:
-		case OP_STOREP_S:
-		case OP_STOREP_FNC:
-			if (c)	//Spike -- DP is alergic to pointers in QC. Try to avoid too many nasty surprises.
-				Con_DPrintf("%s: storep-with-offset is not permitted in %s\n", __func__, prog->name);
-			//fallthrough
+		// global global none
 		case OP_STORE_F:
 		case OP_STORE_ENT:
 		case OP_STORE_FLD:
 		case OP_STORE_S:
 		case OP_STORE_FNC:
-		case OP_STATE:
-		case OP_STOREP_V:
 		case OP_STORE_V:
+		case OP_STORE_I:
+		case OP_STORE_P:
+		case OP_STATE:
 			if (a >= prog->progs_numglobals || b >= prog->progs_numglobals)
 				prog->error_cmd("%s: out of bounds global index (statement %d) in %s", __func__, i, prog->name);
+			if (c)
+				Con_DPrintf("%s: unexpected offset on binary opcode in %s\n", __func__, prog->name);
 			prog->statements[i].op = op;
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = remapglobal(b);
 			prog->statements[i].operand[2] = -1;
-			prog->statements[i].jumpabsolute = -1;
 			break;
 		// 1 global
 		case OP_CALL0:
@@ -2493,7 +2509,6 @@ void PRVM_Prog_Load(prvm_prog_t *prog, const char *filename, unsigned char *data
 			prog->statements[i].operand[0] = remapglobal(a);
 			prog->statements[i].operand[1] = -1;
 			prog->statements[i].operand[2] = -1;
-			prog->statements[i].jumpabsolute = -1;
 			break;
 		}
 	}
@@ -2724,6 +2739,15 @@ fail:
 	// set flags & mdef_ts in prog
 
 	PRVM_FindOffsets(prog);
+
+	// Do not allow more than 2^31 total entityfields. Achieve this by limiting maximum edict count.
+	// TODO: For PRVM_64, this can be relaxes. May require changing some types away from int.
+	max_safe_edicts = ((1 << 31) - prog->numglobals) / prog->entityfields;
+	if (prog->limit_edicts > max_safe_edicts)
+	{
+		Con_Printf("%s: reducing maximum entity count to %d to avoid address overflow in %s\n", __func__, max_safe_edicts, prog->name);
+		prog->limit_edicts = max_safe_edicts;
+	}
 
 	prog->init_cmd(prog);
 
