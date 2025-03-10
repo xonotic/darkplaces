@@ -170,7 +170,7 @@ static cmd_input_t *Cbuf_NodeGet(cmd_buf_t *cbuf, cmd_input_t *existing)
 Cbuf_LinkString
 
 Copies a command string into a buffer node.
-The input should not be null-terminated, the output will be.
+The input need not be null-terminated, the output will be.
 ============
 */
 static void Cbuf_LinkString(cmd_state_t *cmd, llist_t *head, cmd_input_t *existing, const char *text, qbool leavepending, unsigned int cmdsize)
