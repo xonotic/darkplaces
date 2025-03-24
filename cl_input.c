@@ -121,6 +121,8 @@ static void KeyUp (cmd_state_t *cmd, kbutton_t *b)
 	b->state |= 4; 		// impulse up
 }
 
+extern cvar_t v_flipped;
+
 static void IN_KLookDown(cmd_state_t *cmd) {KeyDown(cmd, &in_klook);}
 static void IN_KLookUp(cmd_state_t *cmd) {KeyUp(cmd, &in_klook);}
 static void IN_MLookDown(cmd_state_t *cmd) {KeyDown(cmd, &in_mlook);}
@@ -134,10 +136,22 @@ static void IN_UpDown(cmd_state_t *cmd) {KeyDown(cmd, &in_up);}
 static void IN_UpUp(cmd_state_t *cmd) {KeyUp(cmd, &in_up);}
 static void IN_DownDown(cmd_state_t *cmd) {KeyDown(cmd, &in_down);}
 static void IN_DownUp(cmd_state_t *cmd) {KeyUp(cmd, &in_down);}
-static void IN_LeftDown(cmd_state_t *cmd) {KeyDown(cmd, &in_left);}
-static void IN_LeftUp(cmd_state_t *cmd) {KeyUp(cmd, &in_left);}
-static void IN_RightDown(cmd_state_t *cmd) {KeyDown(cmd, &in_right);}
-static void IN_RightUp(cmd_state_t *cmd) {KeyUp(cmd, &in_right);}
+static void IN_LeftDown(cmd_state_t *cmd)
+{
+	KeyDown(cmd, v_flipped.integer ? &in_right : &in_left);
+}
+static void IN_LeftUp(cmd_state_t *cmd)
+{
+	KeyUp(cmd, v_flipped.integer ? &in_right : &in_left);
+}
+static void IN_RightDown(cmd_state_t *cmd)
+{
+	KeyDown(cmd, v_flipped.integer ? &in_left : &in_right);
+}
+static void IN_RightUp(cmd_state_t *cmd)
+{
+	KeyUp(cmd, v_flipped.integer ? &in_left : &in_right);
+}
 static void IN_ForwardDown(cmd_state_t *cmd) {KeyDown(cmd, &in_forward);}
 static void IN_ForwardUp(cmd_state_t *cmd) {KeyUp(cmd, &in_forward);}
 static void IN_BackDown(cmd_state_t *cmd) {KeyDown(cmd, &in_back);}
@@ -418,8 +432,6 @@ cvar_t cl_netimmediatebuttons = {CF_CLIENT | CF_ARCHIVE, "cl_netimmediatebuttons
 cvar_t cl_nodelta = {CF_CLIENT, "cl_nodelta", "0", "disables delta compression of non-player entities in QW network protocol"};
 
 cvar_t cl_csqc_generatemousemoveevents = {CF_CLIENT, "cl_csqc_generatemousemoveevents", "1", "enables calls to CSQC_InputEvent with type 2, for compliance with EXT_CSQC spec"};
-
-extern cvar_t v_flipped;
 
 /*
 ================
