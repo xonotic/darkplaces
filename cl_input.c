@@ -499,8 +499,8 @@ void CL_Input (void)
 	// get basic movement from keyboard
 	if (in_strafe.state & 1)
 	{
-		cl.cmd.sidemove += cl_sidespeed.value * CL_KeyState (&in_right) * (v_flipped.integer ? -1 : 1);
-		cl.cmd.sidemove -= cl_sidespeed.value * CL_KeyState (&in_left) * (v_flipped.integer ? -1 : 1);
+		cl.cmd.sidemove += cl_sidespeed.value * CL_KeyState (&in_right);
+		cl.cmd.sidemove -= cl_sidespeed.value * CL_KeyState (&in_left);
 	}
 
 	cl.cmd.sidemove += cl_sidespeed.value * CL_KeyState (&in_moveright);
