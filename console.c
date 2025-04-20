@@ -88,6 +88,7 @@ cvar_t condump_stripcolors = {CF_CLIENT | CF_SERVER| CF_ARCHIVE, "condump_stripc
 
 cvar_t rcon_password = {CF_CLIENT | CF_SERVER | CF_PRIVATE, "rcon_password", "", "password to authenticate rcon commands; NOTE: changing rcon_secure clears rcon_password, so set rcon_secure always before rcon_password; may be set to a string of the form user1:pass1 user2:pass2 user3:pass3 to allow multiple user accounts - the client then has to specify ONE of these combinations"};
 cvar_t rcon_secure = {CF_CLIENT | CF_SERVER, "rcon_secure", "0", "force secure rcon authentication (1 = time based, 2 = challenge based); NOTE: changing rcon_secure clears rcon_password, so set rcon_secure always before rcon_password"};
+cvar_t rcon_secure_algorithm = {CF_CLIENT | CF_SERVER, "rcon_secure_algorithm", "MD4", "hash algorithm to use for rcon authentication, can be either MD4 or SHA256"};
 cvar_t rcon_secure_challengetimeout = {CF_CLIENT, "rcon_secure_challengetimeout", "5", "challenge-based secure rcon: time out requests if no challenge came within this time interval"};
 cvar_t rcon_address = {CF_CLIENT, "rcon_address", "", "server address to send rcon commands to (when not connected to a server)"};
 
@@ -923,6 +924,7 @@ void Con_Init (void)
 	Cvar_RegisterVariable(&rcon_address);
 	Cvar_RegisterVariable(&rcon_secure);
 	Cvar_RegisterCallback(&rcon_secure, Con_RCon_ClearPassword_c);
+	Cvar_RegisterVariable(&rcon_secure_algorithm);
 	Cvar_RegisterVariable(&rcon_secure_challengetimeout);
 	Cvar_RegisterVariable(&rcon_password);
 

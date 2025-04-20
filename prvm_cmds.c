@@ -14,6 +14,7 @@
 #include "clvm_cmds.h"
 #include "csprogs.h"
 #include "ft2.h"
+#include "lonesha256.h"
 #include "mdfour.h"
 
 extern cvar_t prvm_backtraceforwarnings;
@@ -5196,10 +5197,10 @@ void VM_digest_hex(prvm_prog_t *prog)
 		outlen = 16;
 		mdfour((unsigned char *) out, (unsigned char *) s, len);
 	}
-	else if(!strcmp(digest, "SHA256") && Crypto_Available())
+	else if(!strcmp(digest, "SHA256"))
 	{
 		outlen = 32;
-		sha256((unsigned char *) out, (unsigned char *) s, len);
+		lonesha256((unsigned char *) out, (unsigned char *) s, len);
 	}
 	// no warning needed on mismatch - we return string_null to QC
 
