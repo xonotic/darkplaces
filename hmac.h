@@ -12,6 +12,6 @@ qbool hmac(
 );
 
 #define HMAC_MDFOUR_16BYTES(out, in, n, key, k) hmac(mdfour, 16, 64, out, in, n, key, k)
-#define HMAC_SHA256_32BYTES(out, in, n, key, k) hmac(sha256, 32, 64, out, in, n, key, k)
+#define HMAC_SHA256_32BYTES(out, in, n, key, k) hmac(lonesha256, 32, 64, out, in, n, key, k)
 
 #endif
