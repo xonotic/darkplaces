@@ -3978,6 +3978,18 @@ static int FS_ListDirectory(const char *pattern, int oneperline)
 	const char *name;
 	char linebuf[MAX_INPUTLINE];
 	fssearch_t *search;
+
+	// if the directory path ends in '/' then list its contents
+	// so commands behave as expected and directory tab completion is convenient
+	l = strlen(pattern);
+	if (pattern[l - 1] == '/' && l < (int)sizeof(linebuf) - 1)
+	{
+		memcpy(linebuf, pattern, l);
+		linebuf[l] = '*';
+		linebuf[l + 1] = '\0';
+		pattern = linebuf;
+	}
+
 	search = FS_Search(pattern, true, true, NULL);
 	if (!search)
 		return 0;
