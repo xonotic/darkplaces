@@ -23,6 +23,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // for secure rcon authentication
 #include "hmac.h"
 #include "mdfour.h"
+#include "lonesha256.h"
 #include "image.h"
 #include <time.h>
 
@@ -42,6 +43,7 @@ cvar_t cl_pmodel = {CF_CLIENT | CF_USERINFO | CF_ARCHIVE, "pmodel", "0", "curren
 cvar_t r_fixtrans_auto = {CF_CLIENT, "r_fixtrans_auto", "0", "automatically fixtrans textures (when set to 2, it also saves the fixed versions to a fixtrans directory)"};
 
 extern cvar_t rcon_secure;
+extern cvar_t rcon_secure_algorithm;
 extern cvar_t rcon_secure_challengetimeout;
 
 /*
@@ -604,12 +606,25 @@ static void CL_Rcon_f(cmd_state_t *cmd) // credit: taken from QuakeWorld
 			char buf[1500];
 			char argbuf[1500];
 			dpsnprintf(argbuf, sizeof(argbuf), "%ld.%06d %s", (long) time(NULL), (int) (rand() % 1000000), Cmd_Args(cmd));
-			memcpy(buf, "\377\377\377\377srcon HMAC-MD4 TIME ", 24);
-			if(HMAC_MDFOUR_16BYTES((unsigned char *) (buf + 24), (unsigned char *) argbuf, (int)strlen(argbuf), (unsigned char *) rcon_password.string, n))
+			if(strcmp(rcon_secure_algorithm.string, "MD4") == 0)
 			{
-				buf[40] = ' ';
-				dp_strlcpy(buf + 41, argbuf, sizeof(buf) - 41);
-				NetConn_Write(mysocket, buf, 41 + (int)strlen(buf + 41), &cls.rcon_address);
+				memcpy(buf, "\377\377\377\377srcon HMAC-MD4 TIME ", 24);
+				if(HMAC_MDFOUR_16BYTES((unsigned char *) (buf + 24), (unsigned char *) argbuf, (int)strlen(argbuf), (unsigned char *) rcon_password.string, n))
+				{
+					buf[40] = ' ';
+					dp_strlcpy(buf + 41, argbuf, sizeof(buf) - 41);
+					NetConn_Write(mysocket, buf, 41 + (int)strlen(buf + 41), &cls.rcon_address);
+				}
+			}
+			else
+			{
+				memcpy(buf, "\377\377\377\377srcon HMAC-SHA256 TIME ", 27);
+				if(HMAC_SHA256_32BYTES((unsigned char *) (buf + 27), (unsigned char *) argbuf, (int)strlen(argbuf), (unsigned char *) rcon_password.string, n))
+				{
+					buf[59] = ' ';
+					dp_strlcpy(buf + 60, argbuf, sizeof(buf) - 60);
+					NetConn_Write(mysocket, buf, 60 + (int)strlen(buf + 60), &cls.rcon_address);
+				}
 			}
 		}
 		else
