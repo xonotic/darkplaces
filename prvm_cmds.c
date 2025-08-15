@@ -1511,10 +1511,22 @@ void VM_rint(prvm_prog_t *prog)
 	VM_SAFEPARMCOUNT(1,VM_rint);
 
 	f = PRVM_G_FLOAT(OFS_PARM0);
-	if (f > 0)
-		PRVM_G_FLOAT(OFS_RETURN) = floor(f + 0.5);
+	// Guarantee that integers (including negative zeroes) and infinities
+	// remain as is. This also guarantees the following code doesn't run
+	// for zeroes.
+	if (f == floor(f))
+		PRVM_G_FLOAT(OFS_RETURN) = f;
+	// The copysign ensures that output negative zeroes always have the
+	// same sign as the input. This likely is already the case anyway,
+	// but I honestly can't find anywhere in the C standards which kind of
+	// zero floor(0.8) and ceil(-0.8) are supposed to be.
+	else if (f < 0)
+		PRVM_G_FLOAT(OFS_RETURN) = copysign(floor(f + 0.5), f);
 	else
-		PRVM_G_FLOAT(OFS_RETURN) = ceil(f - 0.5);
+		PRVM_G_FLOAT(OFS_RETURN) = copysign(ceil(f - 0.5), f);
+	// NOTE: Technically rint() when rounding to nearest should round
+	// towards even. Leaving things as is for now, though, as it matches
+	// Quake.
 }
 
 /*
