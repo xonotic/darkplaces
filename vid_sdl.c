@@ -1693,8 +1693,6 @@ static qbool VID_InitModeGL(const viddef_mode_t *mode)
 {
 	int windowflags = SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 	int i;
-	// SDL usually knows best
-	const char *drivername = NULL;
 
 	// video display selection (multi-monitor)
 	Cvar_SetValueQuick(&vid_info_displaycount, SDL_GetNumVideoDisplays());
@@ -1705,18 +1703,6 @@ static qbool VID_InitModeGL(const viddef_mode_t *mode)
 
 	if(vid_resizable.integer)
 		windowflags |= SDL_WINDOW_RESIZABLE;
-
-#ifndef USE_GLES2
-// COMMANDLINEOPTION: SDL GL: -gl_driver <drivername> selects a GL driver library, default is whatever SDL recommends, useful only for 3dfxogl.dll/3dfxvgl.dll or fxmesa or similar, if you don't know what this is for, you don't need it
-	i = Sys_CheckParm("-gl_driver");
-	if (i && i < sys.argc - 1)
-		drivername = sys.argv[i + 1];
-	if (SDL_GL_LoadLibrary(drivername) < 0)
-	{
-		Con_Printf(CON_ERROR "Unable to load GL driver \"%s\": %s\n", drivername, SDL_GetError());
-		return false;
-	}
-#endif
 
 #ifdef DP_MOBILETOUCH
 	// mobile platforms are always fullscreen, we'll get the resolution after opening the window
@@ -1835,7 +1821,6 @@ static qbool VID_InitModeGL(const viddef_mode_t *mode)
 	Cvar_SetQuick(&gl_info_vendor, gl_vendor);
 	Cvar_SetQuick(&gl_info_renderer, gl_renderer);
 	Cvar_SetQuick(&gl_info_version, gl_version);
-	Cvar_SetQuick(&gl_info_driver, drivername ? drivername : "");
 
 	for (i = 0; i < vid_info_displaycount.integer; ++i)
 		Con_Printf("Display %i: %s\n", i, SDL_GetDisplayName(i));
