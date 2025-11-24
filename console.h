@@ -74,7 +74,7 @@ void Con_DrawNotify (void);
 void Con_ClearNotify (void);
 void Con_ToggleConsole_f(cmd_state_t *cmd);
 
-qbool GetMapList (const char *s, char *completedname, int completednamebufferlength);
+size_t GetMapList (const char *s, char *completedname, int completednamebuffersize);
 
 /// wrapper function to attempt to either complete the command line
 /// or to list possible matches grouped by type

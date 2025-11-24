@@ -831,8 +831,9 @@ qbool COM_ParseToken_Console(const char **datapointer)
 	}
 
 // skip whitespace
+// unless it's an escaped space
 skipwhite:
-	for (;ISWHITESPACE(*data);data++)
+	for (;ISWHITESPACE_ANDNOTESCAPED(*data, data > *datapointer ? data[-1] : *data);data++)
 	{
 		if (*data == 0)
 		{
@@ -869,8 +870,9 @@ skipwhite:
 	else
 	{
 		// regular word
-		for (;!ISWHITESPACE(*data);data++)
-			if (len < (int)sizeof(com_token) - 1)
+		for (;!ISWHITESPACE_ANDNOTESCAPED(*data, data > *datapointer ? data[-1] : *data); data++)
+			if (len < (int)sizeof(com_token) - 1
+			&& !(*data == '\\' && data[1] == ' '))
 				com_token[len++] = *data;
 		com_token[len] = '\0';
 		com_token_len = len;
@@ -1414,11 +1416,11 @@ size_t dp__strlcpy(char *dst, const char *src, size_t dsize, const char *func, u
 	return dsize - 1;
 }
 
-/** Catenates a string, like strlcat() but with a better return: the number of bytes copied
+/** Catenates a string, like strlcat() but with a better return: the final strlen of dst
  * excluding the \0 terminator. Truncates and warns on overflow or unterminated source,
  * whereas strlcat() truncates silently and overreads (possibly segfaulting).
  * Guarantees \0 termination.
- * Inefficient like any strcat(), please use memcpy(), dp_stpecpy() or dp_strlcpy() instead.
+ * strcat() is inefficient when the offset of \0 in dst is known, prefer dp_stpecpy() then.
  */
 size_t dp__strlcat(char *dst, const char *src, size_t dsize, const char *func, unsigned line)
 {
