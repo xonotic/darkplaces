@@ -298,6 +298,8 @@ typedef struct
 #define QFILE_FLAG_DATA (1 << 2)
 /// real file will be removed on close
 #define QFILE_FLAG_REMOVE (1 << 3)
+/// real file will be renamed on close to reanameto
+#define QFILE_FLAG_RENAME (1 << 4)
 
 #define FILE_BUFF_SIZE 2048
 typedef struct
@@ -326,7 +328,9 @@ struct qfile_s
 
 	const unsigned char *data;	///< For data files.
 
-	const char *filename; ///< Kept around for QFILE_FLAG_REMOVE, unused otherwise
+	const char *filename; ///< Kept around for QFILE_FLAG_REMOVE and QFILE_FLAG_RENAME, unused otherwise
+	char *renameto;       ///< For QFILE_FLAG_RENAME
+	const char *mode;     ///< Kept around for QFILE_FLAG_RENAME, unused otherwise
 };
 
 
@@ -2495,6 +2499,7 @@ qfile_t* FS_SysOpen (const char* filepath, const char* mode, qbool nonblocking)
 	}
 
 	file->filename = Mem_strdup(fs_mempool, filepath);
+	file->mode = Mem_strdup(fs_mempool, mode);
 
 	file->real_length = FILEDESC_SEEK (file->handle, 0, SEEK_END);
 
@@ -2991,9 +2996,19 @@ int FS_Close (qfile_t* file)
 				// like.
 			}
 		}
+		if (file->flags & QFILE_FLAG_RENAME && file->renameto)
+		{
+			FS_CreatePath (file->renameto);
+			if (rename(file->filename, file->renameto) != 0)
+				Con_Printf(CON_WARN "WARNING: could not rename %s to %s on close.\n", file->filename, file->renameto);
+			Mem_Free((void *) file->renameto);
+		}
 
 		Mem_Free((void *) file->filename);
 	}
+
+	if (file->mode)
+		Mem_Free((void *) file->mode);
 
 	if (file->ztk)
 	{
@@ -3008,6 +3023,24 @@ int FS_Close (qfile_t* file)
 void FS_RemoveOnClose(qfile_t* file)
 {
 	file->flags |= QFILE_FLAG_REMOVE;
+}
+
+void FS_RenameOnClose(qfile_t* file, char *newname)
+{
+	char real_path [MAX_OSPATH];
+	if(file->mode[0] == 'r')
+	{
+		Con_Printf("FS_RenameOnClose(\"%s\") file opened in read-only mode, won't rename it\n", file->filename);
+		return;
+	}
+	if (FS_CheckNastyPath(newname, false))
+	{
+		Con_Printf("FS_RenameOnClose(\"%s\"): nasty filename rejected\n", newname);
+		return;
+	}
+	file->flags |= QFILE_FLAG_RENAME;
+	dpsnprintf (real_path, sizeof (real_path), "%s/%s", fs_gamedir, newname);
+	file->renameto = Mem_strdup(fs_mempool, real_path);
 }
 
 /*

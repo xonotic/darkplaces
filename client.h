@@ -1310,6 +1310,7 @@ void CL_PlayDemo(const char *demo);
 void CL_NextDemo(void);
 void CL_Stop_f(cmd_state_t *cmd);
 void CL_Record_f(cmd_state_t *cmd);
+void CL_RenameDemo_f(cmd_state_t *cmd);
 void CL_PlayDemo_f(cmd_state_t *cmd);
 void CL_TimeDemo_f(cmd_state_t *cmd);
 
