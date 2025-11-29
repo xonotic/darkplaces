@@ -69,6 +69,7 @@ OBJ_COMMON= \
 	keys.o \
 	lhnet.o \
 	libcurl.o \
+	lonesha256.o \
 	mathlib.o \
 	matrixlib.o \
 	mdfour.o \
