@@ -787,6 +787,8 @@ static void CheckPendingDownloads(void)
 					}
 				}
 
+				di->slist = qcurl_slist_append(di->slist, "Accept: text/plain");
+
 				qcurl_easy_setopt(di->curle, CURLOPT_HTTPHEADER, di->slist);
 				
 				qcurl_multi_add_handle(curlm, di->curle);
