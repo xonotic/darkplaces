@@ -16,7 +16,7 @@
 #pragma comment(lib, "winmm.lib")
 #endif
 #else
-# ifdef __FreeBSD__
+# if defined(__FreeBSD__) || defined(__NetBSD__)
 #  include <sys/sysctl.h>
 # endif
 # ifdef __ANDROID__
@@ -801,8 +801,12 @@ static const char *Sys_FindExecutableName(void)
 #else
 	static char exenamebuf[MAX_OSPATH+1];
 	ssize_t n = -1;
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(__FreeBSD__)
 	int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+#else
+	int mib[4] = {CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME};
+#endif
 	size_t exenamebuflen = sizeof(exenamebuf)-1;
 	if (sysctl(mib, 4, exenamebuf, &exenamebuflen, NULL, 0) == 0)
 	{
