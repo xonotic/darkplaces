@@ -2266,6 +2266,12 @@ static void VM_CL_setcursormode (prvm_prog_t *prog)
 	VM_SAFEPARMCOUNT(1, VM_CL_setcursormode);
 	cl.csqc_wantsmousemove = PRVM_G_FLOAT(OFS_PARM0) != 0;
 	cl_ignoremousemoves = 2;
+	
+	if (!cl.csqc_wantsmousemove)
+	{
+		// Cancel setting cursor pos if we change the cursor back to aiming mode.
+		in_setmouse = 0;
+	}
 }
 
 //#344 vector() getmousepos (DP_CSQC)
@@ -2279,6 +2285,23 @@ static void VM_CL_getmousepos(prvm_prog_t *prog)
 		VectorSet(PRVM_G_VECTOR(OFS_RETURN), in_windowmouse_x * vid_conwidth.integer / vid.mode.width, in_windowmouse_y * vid_conheight.integer / vid.mode.height, 0);
 	else
 		VectorSet(PRVM_G_VECTOR(OFS_RETURN), in_mouse_x * vid_conwidth.integer / vid.mode.width, in_mouse_y * vid_conheight.integer / vid.mode.height, 0);
+}
+
+//#644 void(vector) setmousepos
+static void VM_CL_setmousepos(prvm_prog_t *prog)
+{
+	VM_SAFEPARMCOUNT(1, VM_CL_setmousepos);
+
+	if (!key_consoleactive && key_dest == key_game && cl.csqc_wantsmousemove)
+	{
+		vec3_t pos;
+		VectorCopy(PRVM_G_VECTOR(OFS_PARM0), pos);
+		// Turn it back from console space as returned by getmousepos,
+		// into window space.
+		in_windowmouse_x = pos[0] * vid.width / vid_conwidth.integer;
+		in_windowmouse_y = pos[1] * vid.height / vid_conheight.integer;
+		in_setmouse = 2;
+	}
 }
 
 //#345 float(float framenum) getinputstate (EXT_CSQC)
@@ -5648,6 +5671,8 @@ VM_digest_hex,						// #639
 VM_CL_V_CalcRefdef,					// #640 void(entity e) V_CalcRefdef (DP_CSQC_V_CALCREFDEF)
 NULL,							// #641
 VM_coverage,						// #642
+NULL,							// #643
+VM_CL_setmousepos,					// #644 void(vecor pos) setmousepos
 NULL
 };
 
