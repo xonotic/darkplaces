@@ -216,7 +216,7 @@ typedef struct gltexture_s
 	// pointer to one of the textype_ structs
 	textypeinfo_t *textype;
 	// one of the GLTEXTURETYPE_ values
-	int texturetype;
+	gltexturetype_t texturetype;
 	// palette if the texture is TEXTYPE_PALETTE
 	const unsigned int *palette;
 	// actual stored texture size after gl_picmip and gl_max_size are applied
@@ -1123,7 +1123,7 @@ static void R_UploadFullTexture(gltexture_t *glt, const unsigned char *data)
 	}
 }
 
-static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *identifier, int width, int height, int depth, int sides, int flags, int miplevel, textype_t textype, int texturetype, const unsigned char *data, const unsigned int *palette)
+static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *identifier, int width, int height, int depth, int sides, int flags, int miplevel, textype_t textype, gltexturetype_t texturetype, const unsigned char *data, const unsigned int *palette)
 {
 	int i, size;
 	gltexture_t *glt;
@@ -1204,6 +1204,12 @@ static rtexture_t *R_SetupTexture(rtexturepool_t *rtexturepool, const char *iden
 			}
 			Image_MakeLinearColorsFromsRGB(temppixels, temppixels, width*height*depth*sides);
 		}
+	}
+
+	if (texturetype == GLTEXTURETYPE_CUBEMAP && vid.maxtexturesize_cubemap == 0)
+	{
+		Con_Printf ("R_LoadTexture: cubemap texture not supported by driver\n");
+		return NULL;
 	}
 
 	texinfo = R_GetTexTypeInfo(textype, flags);
