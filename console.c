@@ -83,6 +83,7 @@ cvar_t con_nickcompletion_flags = {CF_CLIENT | CF_ARCHIVE, "con_nickcompletion_f
 cvar_t con_completion_playdemo = {CF_CLIENT | CF_ARCHIVE, "con_completion_playdemo", "*.dem", "completion pattern for the playdemo command"};
 cvar_t con_completion_timedemo = {CF_CLIENT | CF_ARCHIVE, "con_completion_timedemo", "*.dem", "completion pattern for the timedemo command"};
 cvar_t con_completion_exec = {CF_CLIENT | CF_ARCHIVE, "con_completion_exec", "*.cfg", "completion pattern for the exec command"};
+cvar_t con_completion_which = {CF_CLIENT | CF_ARCHIVE, "con_completion_which", "*", "completion pattern for the which, ls, and dir commands"};
 
 cvar_t condump_stripcolors = {CF_CLIENT | CF_SERVER| CF_ARCHIVE, "condump_stripcolors", "0", "strip color codes from console dumps"};
 
@@ -917,6 +918,9 @@ void Con_Init (void)
 	Cvar_RegisterVariable (&con_completion_playdemo); // *.dem
 	Cvar_RegisterVariable (&con_completion_timedemo); // *.dem
 	Cvar_RegisterVariable (&con_completion_exec); // *.cfg
+	Cvar_RegisterVariable (&con_completion_which); // *
+	Cvar_RegisterVirtual  (&con_completion_which, "con_completion_ls");
+	Cvar_RegisterVirtual  (&con_completion_which, "con_completion_dir");
 
 	Cvar_RegisterVariable (&condump_stripcolors);
 
@@ -2272,7 +2276,7 @@ its format (q1/q2/q3/hl) and even its message
 //LadyHavoc: rewrote bsp type detection, rewrote message extraction to do proper worldspawn parsing
 //LadyHavoc: added .ent file loading, and redesigned error handling to still try the .ent file even if the map format is not recognized, this also eliminated one goto
 //LadyHavoc: FIXME: man this GetMapList is STILL ugly code even after my cleanups...
-qbool GetMapList (const char *s, char *completedname, int completednamebufferlength)
+size_t GetMapList (const char *s, char *completedname, int completednamebuffersize)
 {
 	fssearch_t	*t;
 	char		message[1024];
@@ -2280,11 +2284,12 @@ qbool GetMapList (const char *s, char *completedname, int completednamebufferlen
 	unsigned char *len;
 	qfile_t		*f;
 	unsigned char buf[1024];
+	size_t completednamelen = 0;
 
 	dpsnprintf(message, sizeof(message), "maps/%s*.bsp", s);
 	t = FS_Search(message, 1, true, NULL);
 	if(!t)
-		return false;
+		return 0;
 	if (t->numfilenames > 1)
 		Con_Printf("^1 %i maps found :\n", t->numfilenames);
 	len = (unsigned char *)Z_Malloc(t->numfilenames);
@@ -2431,14 +2436,15 @@ qbool GetMapList (const char *s, char *completedname, int completednamebufferlen
 				goto endcomplete;
 	}
 endcomplete:
-	if(p > o && completedname && completednamebufferlength > 0)
+	if(p > o && completedname && completednamebuffersize > 0)
 	{
-		memset(completedname, 0, completednamebufferlength);
-		memcpy(completedname, (t->filenames[0]+5), min(p, completednamebufferlength - 1));
+		completednamelen = min(p, completednamebuffersize - 1);
+		memcpy(completedname, (t->filenames[0]+5), completednamelen);
+		completedname[completednamelen] = '\0';
 	}
 	Z_Free(len);
 	FS_FreeSearch(t);
-	return p > o;
+	return completednamelen;
 }
 
 /*
@@ -2885,6 +2891,30 @@ static int Nicks_AddLastColor(char *buffer, int pos)
 	return pos;
 }
 
+
+static size_t Con_UnescapeSpaces(char *dst, const char *src, size_t dsize)
+{
+	char *dstptr = dst;
+	char *end = dst + dsize - 1;
+
+	for (; *src && dstptr < end; *dstptr++ = *src++)
+		if (*src == '\\' && src[1] == ' ')
+			++src;
+	*dstptr = '\0';
+	return dstptr - dst;
+}
+static size_t Con_EscapeSpaces(char *dst, const char *src, size_t dsize)
+{
+	char *dstptr = dst;
+	char *end = dst + dsize - 2; // allow for writing 2 chars per iteration
+
+	for (; *src && dstptr < end; *dstptr++ = *src++)
+		if (*src == ' ')
+			*dstptr++ = '\\';
+	*dstptr = '\0';
+	return dstptr - dst;
+}
+
 /*
 	Con_CompleteCommandLine
 
@@ -2893,7 +2923,10 @@ static int Nicks_AddLastColor(char *buffer, int pos)
 	Thanks to Fett erich@heintz.com
 	Thanks to taniwha
 	Enhanced to tab-complete map names by [515]
-
+	Nick support by Blub
+	Pattern-matching file argument support by divVerent
+	Directory support by divVerent
+	Escaping support by bones_was_here
 */
 int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 {
@@ -2930,7 +2963,8 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 	while(--pos >= linestart)
 	{
 		k = line[pos];
-		if(k == '\"' || k == ';' || k == ' ' || k == '\'')
+		if (k == '\"' || k == ';' || k == '\''
+		|| (k == ' ' && (!is_console || pos == linestart || line[pos-1] != '\\')))
 			break;
 	}
 	pos++;
@@ -2946,6 +2980,10 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 	space = strchr(line + 1, ' ');
 	if(space && pos == (space - line) + 1)
 	{
+		char temp[MAX_QPATH];
+		char searchstr[MAX_QPATH], result[MAX_QPATH * 2]; // enough to escape all possible spaces
+		size_t searchstrlen, resultlen;
+
 		// adding 1 to line drops the leading ]
 		dp_ustr2stp(command, sizeof(command), line + 1, space - (line + 1));
 
@@ -2956,15 +2994,17 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 		if(!strcmp(command, "map") || !strcmp(command, "changelevel") || (patterns && !strcmp(patterns, "map")))
 		{
 			//maps search
-			char t[MAX_QPATH];
-			if (GetMapList(s, t, sizeof(t)))
+			Con_UnescapeSpaces(searchstr, s, sizeof(searchstr));
+			if (GetMapList(searchstr, temp, sizeof(temp)))
 			{
+				resultlen = Con_EscapeSpaces(result, temp, sizeof(result));
+
 				// first move the cursor
-				linepos += (int)strlen(t) - (int)strlen(s);
+				linepos += (int)resultlen - (int)strlen(s);
 
 				// and now do the actual work
 				*s = 0;
-				dp_strlcat(line, t, MAX_INPUTLINE);
+				dp_strlcat(line, result, MAX_INPUTLINE);
 				dp_strlcat(line, s2, MAX_INPUTLINE); //add back chars after cursor
 
 				// and fix the cursor
@@ -2973,149 +3013,162 @@ int Con_CompleteCommandLine(cmd_state_t *cmd, qbool is_console)
 			}
 			return linepos;
 		}
-		else
+		else if(patterns)
 		{
-			if(patterns)
+			stringlist_t resultbuf, dirbuf;
+
+			// Usage:
+			//   // store completion patterns (space separated) for command foo in con_completion_foo
+			//   set con_completion_foo "foodata/*.foodefault *.foo"
+			//   foo <TAB>
+			//
+			// Note: patterns with slash are always treated as absolute
+			// patterns; patterns without slash search in the innermost
+			// directory the user specified. There is no way to "complete into"
+			// a directory as of now, as directories seem to be unknown to the
+			// FS subsystem.
+			//
+			// Examples:
+			//   set con_completion_playermodel "models/player/*.zym models/player/*.md3 models/player/*.psk models/player/*.dpm"
+			//   set con_completion_playdemo "*.dem"
+			//   set con_completion_play "*.wav *.ogg"
+
+			stringlistinit(&resultbuf);
+			stringlistinit(&dirbuf);
+			searchstrlen = Con_UnescapeSpaces(searchstr, s, sizeof(searchstr));
+
+			while(COM_ParseToken_Simple(&patterns, false, false, true))
 			{
-				char t[MAX_QPATH];
-				stringlist_t resultbuf, dirbuf;
-
-				// Usage:
-				//   // store completion patterns (space separated) for command foo in con_completion_foo
-				//   set con_completion_foo "foodata/*.foodefault *.foo"
-				//   foo <TAB>
-				//
-				// Note: patterns with slash are always treated as absolute
-				// patterns; patterns without slash search in the innermost
-				// directory the user specified. There is no way to "complete into"
-				// a directory as of now, as directories seem to be unknown to the
-				// FS subsystem.
-				//
-				// Examples:
-				//   set con_completion_playermodel "models/player/*.zym models/player/*.md3 models/player/*.psk models/player/*.dpm"
-				//   set con_completion_playdemo "*.dem"
-				//   set con_completion_play "*.wav *.ogg"
-				//
-				// TODO somehow add support for directories; these shall complete
-				// to their name + an appended slash.
-
-				stringlistinit(&resultbuf);
-				stringlistinit(&dirbuf);
-				while(COM_ParseToken_Simple(&patterns, false, false, true))
+				fssearch_t *search;
+				if(strchr(com_token, '/'))
 				{
-					fssearch_t *search;
-					if(strchr(com_token, '/'))
-					{
-						search = FS_Search(com_token, true, true, NULL);
-					}
-					else
-					{
-						const char *slash = strrchr(s, '/');
-						if(slash)
-						{
-							dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
-							dp_strlcat(t, com_token, sizeof(t));
-							search = FS_Search(t, true, true, NULL);
-						}
-						else
-							search = FS_Search(com_token, true, true, NULL);
-					}
-					if(search)
-					{
-						for(i = 0; i < search->numfilenames; ++i)
-							if(!strncmp(search->filenames[i], s, strlen(s)))
-								if(FS_FileType(search->filenames[i]) == FS_FILETYPE_FILE)
-									stringlistappend(&resultbuf, search->filenames[i]);
-						FS_FreeSearch(search);
-					}
+					search = FS_Search(com_token, true, true, NULL);
 				}
-
-				// In any case, add directory names
+				else
 				{
-					fssearch_t *search;
-					const char *slash = strrchr(s, '/');
+					const char *slash = strrchr(searchstr, '/');
 					if(slash)
 					{
-						dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2))); // + 2, because I want to include the slash
-						dp_strlcat(t, "*", sizeof(t));
-						search = FS_Search(t, true, true, NULL);
+						dp_ustr2stp(temp, sizeof(temp), searchstr, slash - searchstr + 1); // + 1, because I want to include the slash
+						dp_strlcat(temp, com_token, sizeof(temp));
+						search = FS_Search(temp, true, true, NULL);
 					}
 					else
-						search = FS_Search("*", true, true, NULL);
-					if(search)
-					{
-						for(i = 0; i < search->numfilenames; ++i)
-							if(!strncmp(search->filenames[i], s, strlen(s)))
-								if(FS_FileType(search->filenames[i]) == FS_FILETYPE_DIRECTORY)
-									stringlistappend(&dirbuf, search->filenames[i]);
-						FS_FreeSearch(search);
-					}
+						search = FS_Search(com_token, true, true, NULL);
 				}
-
-				if(resultbuf.numstrings > 0 || dirbuf.numstrings > 0)
+				if(search)
 				{
-					const char *p, *q;
-					unsigned int matchchars;
-					if(resultbuf.numstrings == 0 && dirbuf.numstrings == 1)
-					{
-						dpsnprintf(t, sizeof(t), "%s/", dirbuf.strings[0]);
-					}
-					else
-					if(resultbuf.numstrings == 1 && dirbuf.numstrings == 0)
-					{
-						dpsnprintf(t, sizeof(t), "%s ", resultbuf.strings[0]);
-					}
-					else
-					{
-						stringlistsort(&resultbuf, true); // dirbuf is already sorted
-						Con_Printf("\n%i possible filenames\n", resultbuf.numstrings + dirbuf.numstrings);
-						for(i = 0; i < dirbuf.numstrings; ++i)
-						{
-							Con_Printf("^4%s^7/\n", dirbuf.strings[i]);
-						}
-						for(i = 0; i < resultbuf.numstrings; ++i)
-						{
-							Con_Printf("%s\n", resultbuf.strings[i]);
-						}
-						matchchars = sizeof(t) - 1;
-						if(resultbuf.numstrings > 0)
-						{
-							p = resultbuf.strings[0];
-							q = resultbuf.strings[resultbuf.numstrings - 1];
-							for(; *p && *p == *q; ++p, ++q);
-							matchchars = (unsigned int)(p - resultbuf.strings[0]);
-						}
-						if(dirbuf.numstrings > 0)
-						{
-							p = dirbuf.strings[0];
-							q = dirbuf.strings[dirbuf.numstrings - 1];
-							for(; *p && *p == *q; ++p, ++q);
-							matchchars = min(matchchars, (unsigned int)(p - dirbuf.strings[0]));
-						}
-						// now p points to the first non-equal character, or to the end
-						// of resultbuf.strings[0]. We want to append the characters
-						// from resultbuf.strings[0] to (not including) p as these are
-						// the unique prefix
-						dp_strlcpy(t, (resultbuf.numstrings > 0 ? resultbuf : dirbuf).strings[0], min(matchchars + 1, sizeof(t)));
-					}
-
-					// first move the cursor
-					linepos += (int)strlen(t) - (int)strlen(s);
-
-					// and now do the actual work
-					*s = 0;
-					dp_strlcat(line, t, MAX_INPUTLINE);
-					dp_strlcat(line, s2, MAX_INPUTLINE); //add back chars after cursor
-
-					// and fix the cursor
-					if(linepos > (int) strlen(line))
-						linepos = (int) strlen(line);
+					for(i = 0; i < search->numfilenames; ++i)
+						if(!strncmp(search->filenames[i], searchstr, searchstrlen))
+							if(FS_FileType(search->filenames[i]) == FS_FILETYPE_FILE)
+								stringlistappend(&resultbuf, search->filenames[i]);
+					FS_FreeSearch(search);
 				}
-				stringlistfreecontents(&resultbuf);
-				stringlistfreecontents(&dirbuf);
-
-				return linepos; // bail out, when we complete for a command that wants a file name
 			}
+
+			// In any case, add directory names
+			{
+				fssearch_t *search;
+				const char *slash = strrchr(searchstr, '/');
+				if(slash)
+				{
+					dp_ustr2stp(temp, sizeof(temp), searchstr, slash - searchstr + 1); // + 1, because I want to include the slash
+					dp_strlcat(temp, "*", sizeof(temp));
+					search = FS_Search(temp, true, true, NULL);
+				}
+				else
+					search = FS_Search("*", true, true, NULL);
+				if(search)
+				{
+					for(i = 0; i < search->numfilenames; ++i)
+						if(!strncmp(search->filenames[i], searchstr, searchstrlen))
+							if(FS_FileType(search->filenames[i]) == FS_FILETYPE_DIRECTORY)
+								stringlistappend(&dirbuf, search->filenames[i]);
+					FS_FreeSearch(search);
+				}
+			}
+
+			if(resultbuf.numstrings > 0 || dirbuf.numstrings > 0)
+			{
+				const char *p, *q;
+				unsigned int matchchars;
+				bool appendspace = false;
+
+				if(resultbuf.numstrings == 0 && dirbuf.numstrings == 1)
+				{
+					dpsnprintf(temp, sizeof(temp), "%s/", dirbuf.strings[0]);
+				}
+				else
+				if(resultbuf.numstrings == 1 && dirbuf.numstrings == 0)
+				{
+					dp_strlcpy(temp, resultbuf.strings[0], sizeof(temp));
+					// trailing space can't be appended yet as it would get escaped
+					appendspace = true;
+				}
+				else
+				{
+					stringlistsort(&resultbuf, true); // dirbuf is already sorted
+					Con_Printf("\n%i possible filenames\n", resultbuf.numstrings + dirbuf.numstrings);
+					for(i = 0; i < dirbuf.numstrings; ++i)
+					{
+						Con_Printf("^4%s^7/\n", dirbuf.strings[i]);
+					}
+					for(i = 0; i < resultbuf.numstrings; ++i)
+					{
+						Con_Printf("%s\n", resultbuf.strings[i]);
+					}
+
+					if(resultbuf.numstrings > 0) // matching file
+					{
+						p = resultbuf.strings[0];
+						q = resultbuf.strings[resultbuf.numstrings - 1];
+						if (dirbuf.numstrings > 0) // and matching directory
+						{
+							const char *r = dirbuf.strings[0];
+							for(; *p && *p == *q && *p == *r; ++p, ++q, ++r);
+						}
+						else
+						for(; *p && *p == *q; ++p, ++q);
+						matchchars = (unsigned int)(p - resultbuf.strings[0]);
+						dp_ustr2stp(temp, sizeof(temp), resultbuf.strings[0], matchchars);
+					}
+					else // matching directory only
+					{
+						p = dirbuf.strings[0];
+						q = dirbuf.strings[dirbuf.numstrings - 1];
+						for(; *p && *p == *q; ++p, ++q);
+						matchchars = (unsigned int)(p - dirbuf.strings[0]);
+						dp_ustr2stp(temp, sizeof(temp), dirbuf.strings[0], matchchars);
+					}
+					// now p points to the first non-equal character, or to the end
+					// of resultbuf.strings[0]. We want to append the characters
+					// from resultbuf.strings[0] to (not including) p as these are
+					// the unique prefix
+				}
+
+				resultlen = Con_EscapeSpaces(result, temp, sizeof(result));
+				if (appendspace && resultlen < sizeof(result) - 1)
+				{
+					result[resultlen++] = ' ';
+					result[resultlen] = '\0';
+				}
+
+				// first move the cursor
+				linepos += (int)resultlen - (int)strlen(s);
+
+				// and now do the actual work
+				*s = 0;
+				dp_strlcat(line, result, MAX_INPUTLINE);
+				dp_strlcat(line, s2, MAX_INPUTLINE); //add back chars after cursor
+
+				// and fix the cursor
+				if(linepos > (int) strlen(line))
+					linepos = (int) strlen(line);
+			}
+			stringlistfreecontents(&resultbuf);
+			stringlistfreecontents(&dirbuf);
+
+			return linepos; // bail out, when we complete for a command that wants a file name
 		}
 	}
 
