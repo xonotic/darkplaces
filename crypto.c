@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "thread.h"
 
 #include "hmac.h"
+#include "lonesha256.h"
 #include "libcurl.h"
 
 cvar_t crypto_developer = {CF_CLIENT | CF_SERVER | CF_ARCHIVE, "crypto_developer", "0", "print extra info about crypto handshake"};

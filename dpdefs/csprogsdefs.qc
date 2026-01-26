@@ -1212,7 +1212,7 @@ string(string digest, string data, ...) digest_hex = #639;
 //description:
 //returns a given hex digest of given data
 //the returned digest is always encoded in hexadecimal
-//only the "MD4" digest is always supported!
+//the "MD4" and "SHA256" digest are always supported!
 //if the given digest is not supported, string_null is returned
 //the digest string is matched case sensitively, use "MD4", not "md4"!
 
