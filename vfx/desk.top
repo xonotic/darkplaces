@@ -1,0 +1,36 @@
+this folder contains main video output , vfx and modeling stuff 
+/vfx
+//gm - geometry
+//md - model
+//sk - skeleton
+//tx - textures
+
+in this file can be desc.riptions and list on functions in files or 
+whatever is important for faster search and aggregation
+some plan on next steps for code and changes etc 
+
+model_brush :
+
+
+
+model_alias :
+
+Mod_Skeletal_AnimateVertices *SSE
+Mod_AliasInit *SSE
+Mod_Skeletal_AddBlend
+Mod_Skeletal_CompressBlend
+Mod_MD3_AnimateVertices
+Mod_MDL_AnimateVertices
+Mod_Alias_GetTagMatrix
+...
+Mod_PSKMODEL_Load
+
+when you see list of functions, you can decide if it needs some work
+for example there are SSE functions, but for AMD cpu used MMX 
+this means there should be hw identity and use of different instructions sets 
+especially for arm and mobile cpus, while it is much more better than mmx
+and those new instructions can be used also not in each function, 
+but referring to some procedural thing, that will call and use it in apropriate way
+this is what the math data should be made for
+
+todo for each folder is possible now
