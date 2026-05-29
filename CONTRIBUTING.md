@@ -11,7 +11,7 @@
 
    You must use a valid, permanent email address.
 
-2. ### All code submitted should follow the Allman style for the most part.
+3. ### All code submitted should follow the Allman style for the most part.
 
 	1. In statements, the curly brace should be placed on the next line at the
 	   same indentation level as the statement. If the statement only involves

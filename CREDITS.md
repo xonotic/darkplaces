@@ -22,9 +22,13 @@ Sorted by alphanumeric order by last name, and pseudonym if not available. Activ
 	* **David Knapp (Cloudwalk)**
 	* **Rudolf Polzer (divVerent)**
 
+* **Extended Team**
+	* **hemebond**
+
 * **Major Contributors**
 	* [515]
 	* Blub\0
+	* bones_was_here
 	* eihrul
 	* Zephaniah Hull (Mercury)
 	* Andreas Kirsch (BlackHC)
@@ -33,7 +37,6 @@ Sorted by alphanumeric order by last name, and pseudonym if not available. Activ
 
 * **Contributors**
 	* Akari
-	* **bones_was_here**
 	* Matthias Buecher (Maddes)
 	* Thomas Joseph Carter (knghtbrd)
 	* coderjo
@@ -41,7 +44,7 @@ Sorted by alphanumeric order by last name, and pseudonym if not available. Activ
 	* EvilTypeGuy
 	* fleeky
 	* GreEn`mArine
-	* **Terence Hill (terencehill)**
+	* Terence Hill (terencehill)
 	* incognico
 	* Tomas Jakobsson (Tomaz)
 	* KillPixel
