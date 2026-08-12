@@ -157,7 +157,11 @@ cvar_t gl_finish = {CF_CLIENT | CF_CLIENT, "gl_finish", "0", "make the cpu wait 
 cvar_t vid_sRGB = {CF_CLIENT | CF_ARCHIVE, "vid_sRGB", "0", "if hardware is capable, modify rendering to be gamma corrected for the sRGB color standard (computer monitors, TVs), recommended"};
 cvar_t vid_sRGB_fallback = {CF_CLIENT | CF_ARCHIVE, "vid_sRGB_fallback", "0", "do an approximate sRGB fallback if not properly supported by hardware (2: also use the fallback if framebuffer is 8bit, 3: always use the fallback even if sRGB is supported)"};
 
-cvar_t vid_touchscreen = {CF_CLIENT, "vid_touchscreen", "0", "Use touchscreen-style input (no mouse grab, track mouse motion only while button is down, screen areas for mimicing joystick axes and buttons"};
+cvar_t vid_touchscreen = {CF_CLIENT, "vid_touchscreen", "0", "Use touchscreen-style input (no mouse grab, track mouse motion only while button is down, screen areas for mimicing joystick axes and buttons). Derived from vid_touchscreen_mode unless set directly"};
+cvar_t vid_touchscreen_mode = {CF_CLIENT | CF_ARCHIVE, "vid_touchscreen_mode", "1", "Touch controls: 0 = off, 1 = auto (enable when touch hardware is detected), 2 = always on"};
+cvar_t vid_touchscreen_touchonly = {CF_CLIENT | CF_ARCHIVE, "vid_touchscreen_touchonly", "1", "When vid_touchscreen_mode is auto, enable only on touch-only devices (touchscreen and no physical keyboard)"};
+cvar_t vid_touchscreen_detected = {CF_CLIENT | CF_READONLY, "vid_touchscreen_detected", "0", "1 if a touchscreen was detected at the last scan"};
+cvar_t vid_touchscreen_touchonly_detected = {CF_CLIENT | CF_READONLY, "vid_touchscreen_touchonly_detected", "0", "1 if the last scan classified this machine as a touch-only device"};
 cvar_t vid_touchscreen_showkeyboard = {CF_CLIENT, "vid_touchscreen_showkeyboard", "0", "shows the platform's screen keyboard for text entry, can be set by csqc or menu qc if it wants to receive text input, does nothing if the platform has no screen keyboard"};
 cvar_t vid_touchscreen_supportshowkeyboard = {CF_CLIENT | CF_READONLY, "vid_touchscreen_supportshowkeyboard", "0", "indicates if the platform supports a virtual keyboard"};
 cvar_t vid_stick_mouse = {CF_CLIENT | CF_ARCHIVE, "vid_stick_mouse", "0", "have the mouse stuck in the center of the screen" };
@@ -1314,6 +1318,10 @@ void VID_Shared_Init(void)
 	Cvar_RegisterVariable(&vid_minimize_on_focus_loss);
 	Cvar_RegisterVariable(&vid_grabkeyboard);
 	Cvar_RegisterVariable(&vid_touchscreen);
+	Cvar_RegisterVariable(&vid_touchscreen_mode);
+	Cvar_RegisterVariable(&vid_touchscreen_touchonly);
+	Cvar_RegisterVariable(&vid_touchscreen_detected);
+	Cvar_RegisterVariable(&vid_touchscreen_touchonly_detected);
 	Cvar_RegisterVariable(&vid_touchscreen_showkeyboard);
 	Cvar_RegisterVariable(&vid_touchscreen_supportshowkeyboard);
 	Cvar_RegisterVariable(&vid_stick_mouse);
@@ -1382,6 +1390,10 @@ void VID_Shared_Init(void)
 
 	Cmd_AddCommand(CF_CLIENT, "force_centerview", Force_CenterView_f, "recenters view (stops looking up/down)");
 	Cmd_AddCommand(CF_CLIENT, "vid_restart", VID_Restart_f, "restarts video system (closes and reopens the window, restarts renderer)");
+	Cmd_AddCommand(CF_CLIENT, "vid_touchscreen_rescan", VID_TouchscreenRescan_f, "re-detect touchscreen hardware and apply vid_touchscreen_mode");
+	Cvar_RegisterCallback(&vid_touchscreen, VID_Touchscreen_c);
+	Cvar_RegisterCallback(&vid_touchscreen_mode, VID_TouchscreenMode_c);
+	Cvar_RegisterCallback(&vid_touchscreen_touchonly, VID_TouchscreenMode_c);
 }
 
 /// NULL mode means read it from the cvars
@@ -1534,6 +1546,9 @@ void VID_Start(void)
 {
 	int i = 0;
 	int width, height, success;
+
+	VID_ApplyTouchscreenMode();
+
 	if (vid_commandlinecheck)
 	{
 		// interpret command-line parameters

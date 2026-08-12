@@ -25,6 +25,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stddef.h>
 #include "qtypes.h"
 struct cmd_state_s;
+struct cvar_s;
 
 #define ENGINE_ICON ( (gamemode == GAME_NEXUIZ) ? nexuiz_xpm : darkplaces_xpm )
 
@@ -146,6 +147,10 @@ extern cvar_t vid_mouse_clickthrough;
 extern cvar_t vid_minimize_on_focus_loss;
 extern cvar_t vid_grabkeyboard;
 extern cvar_t vid_touchscreen;
+extern cvar_t vid_touchscreen_mode;
+extern cvar_t vid_touchscreen_touchonly;
+extern cvar_t vid_touchscreen_detected;
+extern cvar_t vid_touchscreen_touchonly_detected;
 extern cvar_t vid_touchscreen_showkeyboard;
 extern cvar_t vid_touchscreen_supportshowkeyboard;
 extern cvar_t vid_stick_mouse;
@@ -248,6 +253,14 @@ vid_mode_t VID_GetDesktopMode(void);
 size_t VID_ListModes(vid_mode_t *modes, size_t maxcount);
 size_t VID_SortModes(vid_mode_t *modes, size_t count, qbool usebpp, qbool userefreshrate, qbool useaspect);
 void VID_Soft_SharedSetup(void);
+
+qbool VID_SDL_HasTouchDevices(void);
+void VID_DetectTouchHardware(qbool *has_touchscreen, qbool *is_touch_only);
+void VID_ApplyTouchscreenMode(void);
+void VID_NoteTouchFingerSeen(void);
+void VID_TouchscreenMode_c(struct cvar_s *var);
+void VID_Touchscreen_c(struct cvar_s *var);
+void VID_TouchscreenRescan_f(struct cmd_state_s *cmd);
 
 #endif
 
