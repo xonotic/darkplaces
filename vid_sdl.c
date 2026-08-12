@@ -1275,6 +1275,7 @@ void Sys_SDL_HandleEvents(void)
 #ifdef DEBUGSDLEVENTS
 				Con_DPrintf("SDL_FINGERDOWN for finger %i\n", (int)event.tfinger.fingerId);
 #endif
+				VID_NoteTouchFingerSeen();
 				for (i = 0;i < MAXFINGERS-1;i++)
 				{
 					if (!multitouch[i][0])
@@ -1531,6 +1532,11 @@ static void VID_SetHints_c(cvar_t *var)
 	SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, vid_minimize_on_focus_loss.integer ? "1" : "0");
 }
 
+qbool VID_SDL_HasTouchDevices(void)
+{
+	return SDL_GetNumTouchDevices() > 0;
+}
+
 void VID_Init (void)
 {
 	SDL_version version;
@@ -1541,6 +1547,7 @@ void VID_Init (void)
 #endif
 #endif
 #ifdef DP_MOBILETOUCH
+	Cvar_SetValueQuick(&vid_touchscreen_mode, 2);
 	Cvar_SetValueQuick(&vid_touchscreen, 1);
 #endif
 	Cvar_RegisterVariable(&joy_sdl2_trigger_deadzone);

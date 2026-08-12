@@ -37,6 +37,11 @@ void VID_Init(void)
 {
 }
 
+qbool VID_SDL_HasTouchDevices(void)
+{
+	return false;
+}
+
 qbool VID_InitMode(const viddef_mode_t *mode)
 {
 	return false;

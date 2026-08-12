@@ -34,6 +34,7 @@ OBJ_COMMON= \
 	cl_parse.o \
 	cl_particles.o \
 	cl_screen.o \
+	vid_touchdetect.o \
 	cl_video.o \
 	cl_video_libavw.o \
 	clvm_cmds.o \
