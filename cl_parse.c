@@ -1502,7 +1502,8 @@ static void CL_ParseDownload(void)
 		return;
 	}
 
-	if (start + size > cls.qw_downloadmemorymaxsize)
+	if (start < 0 || start > cls.qw_downloadmemorymaxsize ||
+		size > cls.qw_downloadmemorymaxsize - start)
 		Host_Error("corrupt download message\n");
 
 	// only advance cursize if the data is at the expected position
