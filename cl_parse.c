@@ -995,9 +995,9 @@ static void QW_CL_UpdateUserInfo(void)
 {
 	int slot;
 	slot = MSG_ReadByte(&cl_message);
-	if (slot >= cl.maxclients)
+	if (slot < 0 || slot >= cl.maxclients)
 	{
-		Con_Printf("svc_updateuserinfo >= cl.maxclients\n");
+		Con_Printf("svc_updateuserinfo: invalid client slot %i\n", slot);
 		MSG_ReadLong(&cl_message);
 		MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring));
 		return;
@@ -1016,9 +1016,9 @@ static void QW_CL_SetInfo(void)
 	slot = MSG_ReadByte(&cl_message);
 	dp_strlcpy(key, MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof(key));
 	dp_strlcpy(value, MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof(value));
-	if (slot >= cl.maxclients)
+	if (slot < 0 || slot >= cl.maxclients)
 	{
-		Con_Printf("svc_setinfo >= cl.maxclients\n");
+		Con_Printf("svc_setinfo: invalid client slot %i\n", slot);
 		return;
 	}
 	InfoString_SetValue(cl.scores[slot].qw_userinfo, sizeof(cl.scores[slot].qw_userinfo), key, value);
@@ -3501,6 +3501,9 @@ void CL_ParseServerMessage(void)
 			cmdcount++;
 			cmdlog[cmdindex] = cmd;
 
+			if (cmd >= (int)(sizeof(qw_svc_strings) / sizeof(qw_svc_strings[0])))
+				Host_Error("CL_ParseServerMessage: invalid QW service command %i", cmd);
+
 			SHOWNET(qw_svc_strings[cmd]);
 			cmdlogname[cmdindex] = qw_svc_strings[cmd];
 			if (!cmdlogname[cmdindex])
@@ -3599,9 +3602,9 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_lightstyle:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.max_lightstyle)
+				if (i < 0 || i >= cl.max_lightstyle)
 				{
-					Con_Printf ("svc_lightstyle >= MAX_LIGHTSTYLES");
+					Con_Printf ("svc_lightstyle: invalid lightstyle index %i", i);
 					break;
 				}
 				dp_strlcpy (cl.lightstyle[i].map,  MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (cl.lightstyle[i].map));
@@ -3620,29 +3623,29 @@ void CL_ParseServerMessage(void)
 
 			case qw_svc_updatefrags:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error("CL_ParseServerMessage: svc_updatefrags >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error("CL_ParseServerMessage: invalid client index %i in svc_updatefrags", i);
 				cl.scores[i].frags = (signed short) MSG_ReadShort(&cl_message);
 				break;
 
 			case qw_svc_updateping:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error("CL_ParseServerMessage: svc_updateping >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error("CL_ParseServerMessage: invalid client index %i in svc_updateping", i);
 				cl.scores[i].qw_ping = MSG_ReadShort(&cl_message);
 				break;
 
 			case qw_svc_updatepl:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error("CL_ParseServerMessage: svc_updatepl >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error("CL_ParseServerMessage: invalid client index %i in svc_updatepl", i);
 				cl.scores[i].qw_packetloss = MSG_ReadByte(&cl_message);
 				break;
 
 			case qw_svc_updateentertime:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error("CL_ParseServerMessage: svc_updateentertime >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error("CL_ParseServerMessage: invalid client index %i in svc_updateentertime", i);
 				// seconds ago
 				cl.scores[i].qw_entertime = cl.time - MSG_ReadFloat(&cl_message);
 				break;
@@ -4018,9 +4021,9 @@ void CL_ParseServerMessage(void)
 
 			case svc_lightstyle:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.max_lightstyle)
+				if (i < 0 || i >= cl.max_lightstyle)
 				{
-					Con_Printf ("svc_lightstyle >= MAX_LIGHTSTYLES");
+					Con_Printf ("svc_lightstyle: invalid lightstyle index %i", i);
 					break;
 				}
 				dp_strlcpy (cl.lightstyle[i].map,  MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (cl.lightstyle[i].map));
@@ -4078,22 +4081,22 @@ void CL_ParseServerMessage(void)
 
 			case svc_updatename:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error ("CL_ParseServerMessage: svc_updatename >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error ("CL_ParseServerMessage: invalid client index %i in svc_updatename", i);
 				dp_strlcpy (cl.scores[i].name, MSG_ReadString(&cl_message, cl_readstring, sizeof(cl_readstring)), sizeof (cl.scores[i].name));
 				break;
 
 			case svc_updatefrags:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error ("CL_ParseServerMessage: svc_updatefrags >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error ("CL_ParseServerMessage: invalid client index %i in svc_updatefrags", i);
 				cl.scores[i].frags = (signed short) MSG_ReadShort(&cl_message);
 				break;
 
 			case svc_updatecolors:
 				i = MSG_ReadByte(&cl_message);
-				if (i >= cl.maxclients)
-					Host_Error ("CL_ParseServerMessage: svc_updatecolors >= cl.maxclients");
+				if (i < 0 || i >= cl.maxclients)
+					Host_Error ("CL_ParseServerMessage: invalid client index %i in svc_updatecolors", i);
 				cl.scores[i].colors = MSG_ReadByte(&cl_message);
 				break;
 
