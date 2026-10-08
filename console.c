@@ -30,6 +30,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // for u8_encodech
 #include "ft2.h"
 
+#define BC_IMPLEMENTATION
+#include "butterchat.h"
+
 float con_cursorspeed = 4;
 
 // lines up from bottom to display
@@ -357,6 +360,8 @@ void ConBuffer_AddLine(conbuffer_t *buf, const char *line, int len, int mask)
 	p->addtime = cl.time;
 	p->mask = mask;
 	p->height = -1; // calculate when needed
+	p->hl = false;
+	p->hl_done = false;
 }
 
 int ConBuffer_FindPrevLine(conbuffer_t *buf, int mask_must, int mask_mustnot, int start)
@@ -1602,6 +1607,9 @@ typedef struct
 
 	// PRIVATE:
 	int colorindex; // init to -1
+
+	// Used by butterchat
+	qboolean highlight;
 }
 con_text_info_t;
 
@@ -1635,6 +1643,17 @@ static int Con_CountLineFunc(void *passthrough, const char *line, size_t length,
 	return 1;
 }
 
+/* Check if line contains our nick in chat */
+static qboolean Con_LineIsHighlighted(con_lineinfo_t *l)
+{
+	if (!l->hl_done && (l->mask & CON_MASK_CHAT))
+	{
+		l->hl_done = true;
+		l->hl = BC_SelfReferred(l->start) != 0;
+	}
+	return l->hl;
+}
+
 static int Con_DisplayLineFunc(void *passthrough, const char *line, size_t length, float width, qboolean isContinuation)
 {
 	con_text_info_t *ti = (con_text_info_t *) passthrough;
@@ -1646,6 +1665,11 @@ static int Con_DisplayLineFunc(void *passthrough, const char *line, size_t lengt
 	else
 	{
 		int x = (int) (ti->x + (ti->width - width) * ti->alignment);
+		/* Add highlighting */
+		if (ti->highlight)
+		{
+			DrawQ_Fill(ti->x, ti->y, ti->width, ti->fontsize, 1.0, 0.5f, 0.0f, 0.18f, 0);
+		}
 		if(isContinuation && *ti->continuationString)
 			x = (int) DrawQ_String(x, ti->y, ti->continuationString, strlen(ti->continuationString), ti->fontsize, ti->fontsize, 1.0, 1.0, 1.0, 1.0, 0, NULL, false, ti->font);
 		if(length > 0)
@@ -1675,6 +1699,7 @@ static int Con_DrawNotifyRect(int mask_must, int mask_mustnot, float maxage, flo
 	ti.ymin = y;
 	ti.ymax = y + height;
 	ti.continuationString = continuationString;
+	ti.highlight = false;
 
 	len = 0;
 	Con_WordWidthFunc(&ti, NULL, &len, -1);
@@ -1725,6 +1750,7 @@ static int Con_DrawNotifyRect(int mask_must, int mask_mustnot, float maxage, flo
 		if(maxage && (l->addtime < t - maxage))
 			continue;
 
+		ti.highlight = Con_LineIsHighlighted(l);
 		COM_Wordwrap(l->start, l->len, continuationWidth, width, Con_WordWidthFunc, &ti, Con_DisplayLineFunc, &ti);
 	}
 
@@ -1858,6 +1884,7 @@ static int Con_LineHeight(int lineno)
 		con_text_info_t ti;
 		ti.fontsize = con_textsize.value;
 		ti.font = FONT_CONSOLE;
+		ti.highlight = false;
 		li->height = COM_Wordwrap(li->start, li->len, 0, width, Con_WordWidthFunc, &ti, Con_CountLineFunc, NULL);
 	}
 	return li->height;
@@ -1892,6 +1919,7 @@ static int Con_DrawConsoleLine(int mask_must, int mask_mustnot, float y, int lin
 	ti.ymin = ymin;
 	ti.ymax = ymax;
 	ti.width = width;
+	ti.highlight = false; // Con_LineIsHighlighted(li);
 
 	return COM_Wordwrap(li->start, li->len, 0, width, Con_WordWidthFunc, &ti, Con_DisplayLineFunc, &ti);
 }

@@ -106,6 +106,10 @@ typedef struct con_lineinfo_s
 	/// used only by console.c
 	double addtime;
 	int height; ///< recalculated line height when needed (-1 to unset)
+
+	/* Butter Chat uses these */
+	qboolean hl;        /* line mentions us */
+	qboolean hl_done;  /* check already ran */
 }
 con_lineinfo_t;
 
