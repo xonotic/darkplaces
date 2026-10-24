@@ -72,7 +72,9 @@ static qbool vid_hasfocus = false;
 static qbool vid_wmborder_waiting, vid_wmborderless;
 static SDL_Joystick *vid_sdljoystick = NULL;
 static SDL_GameController *vid_sdlgamecontroller = NULL;
+static SDL_SensorType vid_sdlgyrosensor = SDL_SENSOR_GYRO;
 static cvar_t joy_sdl2_trigger_deadzone = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_trigger_deadzone", "0.5", "deadzone for triggers to be registered as key presses"};
+static cvar_t joy_sdl2_gyro_sensor = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_gyro_sensor", "0", "0 -> general gyro, 1 -> left joy-con gyro, 2 -> right joy-con gyro"};
 // GAME_STEELSTORM specific
 static cvar_t *steelstorm_showing_map = NULL; // detect but do not create the cvar
 static cvar_t *steelstorm_showing_mousecursor = NULL; // detect but do not create the cvar
@@ -701,10 +703,10 @@ void VID_BuildJoyState(vid_joystate_t *joystate)
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX+1] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
 
-			if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, SDL_SENSOR_GYRO))
+			if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, vid_sdlgyrosensor))
 			{
 				float gyro_data[3] = {};
-				if (SDL_GameControllerGetSensorData(vid_sdlgamecontroller, SDL_SENSOR_GYRO, gyro_data, 3) == 0)
+				if (SDL_GameControllerGetSensorData(vid_sdlgamecontroller, vid_sdlgyrosensor, gyro_data, 3) == 0)
 				{
 					joystate->gyro_velocity_pitch = -RAD2DEG(gyro_data[0]);
 					joystate->gyro_velocity_yaw = RAD2DEG(gyro_data[1]);
@@ -1494,6 +1496,38 @@ static void VID_ApplyDisplayMode(const viddef_mode_t *mode)
 	vid.stencil           = mode->bitsperpixel > 16;
 }
 
+static void VID_SetGyroSensor_c(cvar_t* var)
+{
+	SDL_GameControllerSetSensorEnabled(vid_sdlgamecontroller, vid_sdlgyrosensor, SDL_FALSE);
+	switch(joy_sdl2_gyro_sensor.integer)
+	{
+		case 0: // -> SDL_SENSOR_GYRO
+		{
+			vid_sdlgyrosensor = SDL_SENSOR_GYRO;
+			break;
+		}
+		case 1: // -> SDL_SENSOR_GYRO_L
+		{
+			vid_sdlgyrosensor = SDL_SENSOR_GYRO_L;
+			break;
+		}
+		case 2: // -> SDL_SENSOR_GYRO_R
+		{
+			vid_sdlgyrosensor = SDL_SENSOR_GYRO_R;
+			break;
+		}
+		default:
+		{
+			Con_Printf("Invalid value '%i' for 'joy_sdl2_gyro_sensor'. Gyro will be disabled\n%s\n",
+			           joy_sdl2_gyro_sensor.integer,
+			           joy_sdl2_gyro_sensor.description);
+			vid_sdlgyrosensor = SDL_SENSOR_INVALID;
+			return;
+		}
+	}
+	SDL_GameControllerSetSensorEnabled(vid_sdlgamecontroller, vid_sdlgyrosensor, SDL_TRUE);
+}
+
 static void VID_ApplyDisplayMode_c(cvar_t *var)
 {
 	viddef_mode_t mode;
@@ -1558,6 +1592,8 @@ void VID_Init (void)
 	Cvar_SetValueQuick(&vid_touchscreen, 1);
 #endif
 	Cvar_RegisterVariable(&joy_sdl2_trigger_deadzone);
+	Cvar_RegisterVariable(&joy_sdl2_gyro_sensor);
+	Cvar_RegisterCallback(&joy_sdl2_gyro_sensor, VID_SetGyroSensor_c);
 
 	Cvar_RegisterCallback(&vid_display,                VID_ApplyDisplayMode_c);
 	Cvar_RegisterCallback(&vid_fullscreen,             VID_ApplyDisplayMode_c);
@@ -1638,9 +1674,9 @@ void VID_EnableJoystick(qbool enable)
 				{
 					vid_sdlgamecontroller = SDL_GameControllerOpen(vid_sdljoystickindex);
 					Con_DPrintf("Using SDL GameController mappings for Joystick %i\n", index);
-					if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, SDL_SENSOR_GYRO))
+					if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, vid_sdlgyrosensor))
 					{
-						SDL_GameControllerSetSensorEnabled(vid_sdlgamecontroller, SDL_SENSOR_GYRO, SDL_TRUE);
+						SDL_GameControllerSetSensorEnabled(vid_sdlgamecontroller, vid_sdlgyrosensor, SDL_TRUE);
 						Con_DPrintf("SDL GameController for Joystick %i has Gyro sensor\n", index);
 					}
 				}
