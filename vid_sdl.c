@@ -73,10 +73,6 @@ static qbool vid_wmborder_waiting, vid_wmborderless;
 static SDL_Joystick *vid_sdljoystick = NULL;
 static SDL_GameController *vid_sdlgamecontroller = NULL;
 static cvar_t joy_sdl2_trigger_deadzone = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_trigger_deadzone", "0.5", "deadzone for triggers to be registered as key presses"};
-static cvar_t joy_sdl2_gyro_enable = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_gyro_enable", "1", "enable gyro controls"};
-static cvar_t joy_sdl2_gyro_sensitivity = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_gyro_sensitivity", "1", "Sensitivity for gyro data to influence aim"};
-static cvar_t joy_sdl2_gyro_callibration_offset_pitch = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_gyro_callibration_offset_pitch", "0", "Callibration offset for gyro pitch"};
-static cvar_t joy_sdl2_gyro_callibration_offset_yaw = {CF_ARCHIVE | CF_CLIENT, "joy_sdl2_gyro_callibration_offset_yaw", "0", "Callibration offset for gyro yaw"};
 // GAME_STEELSTORM specific
 static cvar_t *steelstorm_showing_map = NULL; // detect but do not create the cvar
 static cvar_t *steelstorm_showing_mousecursor = NULL; // detect but do not create the cvar
@@ -704,24 +700,19 @@ void VID_BuildJoyState(vid_joystate_t *joystate)
 			// emulate joy buttons for trigger "axes"
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
 			joystate->button[SDL_CONTROLLER_BUTTON_MAX+1] = VID_JoyState_GetAxis(joystate, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1, joy_sdl2_trigger_deadzone.value) > 0.0f;
-			if (joy_sdl2_gyro_enable.integer >= 1)
+
+			if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, SDL_SENSOR_GYRO))
 			{
-				if (SDL_GameControllerHasSensor(vid_sdlgamecontroller, SDL_SENSOR_GYRO))
+				float gyro_data[3] = {};
+				if (SDL_GameControllerGetSensorData(vid_sdlgamecontroller, SDL_SENSOR_GYRO, gyro_data, 3) == 0)
 				{
-					float gyro_data[3] = {};
-					if (SDL_GameControllerGetSensorData(vid_sdlgamecontroller, SDL_SENSOR_GYRO, gyro_data, 3) == 0)
-					{
-						joystate->axis[SDL_CONTROLLER_AXIS_RIGHTX] -= (gyro_data[1] - joy_sdl2_gyro_callibration_offset_yaw.value) * joy_sdl2_gyro_sensitivity.value;
-						joystate->axis[SDL_CONTROLLER_AXIS_RIGHTY] -= (gyro_data[0] - joy_sdl2_gyro_callibration_offset_pitch.value) * joy_sdl2_gyro_sensitivity.value;
-					}
-					else
-					{
-						Con_DPrintf("Failed to get Gyro Data for GameController '%s'\n", SDL_GameControllerName(vid_sdlgamecontroller));
-					}
+					joystate->gyro_velocity_pitch = -RAD2DEG(gyro_data[0]);
+					joystate->gyro_velocity_yaw = RAD2DEG(gyro_data[1]);
+					joystate->gyro_velocity_roll = RAD2DEG(gyro_data[2]);
 				}
 				else
 				{
-					Con_Printf("GameController '%s' has no Gyro\n", SDL_GameControllerName(vid_sdlgamecontroller));
+					Con_DPrintf("Failed to get Gyro Data for GameController '%s'\n", SDL_GameControllerName(vid_sdlgamecontroller));
 				}
 			}
 		}
@@ -1567,10 +1558,6 @@ void VID_Init (void)
 	Cvar_SetValueQuick(&vid_touchscreen, 1);
 #endif
 	Cvar_RegisterVariable(&joy_sdl2_trigger_deadzone);
-	Cvar_RegisterVariable(&joy_sdl2_gyro_enable);
-	Cvar_RegisterVariable(&joy_sdl2_gyro_sensitivity);
-	Cvar_RegisterVariable(&joy_sdl2_gyro_callibration_offset_pitch);
-	Cvar_RegisterVariable(&joy_sdl2_gyro_callibration_offset_yaw);
 
 	Cvar_RegisterCallback(&vid_display,                VID_ApplyDisplayMode_c);
 	Cvar_RegisterCallback(&vid_fullscreen,             VID_ApplyDisplayMode_c);
