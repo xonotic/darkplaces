@@ -2997,6 +2997,7 @@ rtexture_t *R_GetCubemap(const char *basename)
 
 static void R_Main_FreeViewCache(void)
 {
+	unsigned int i;
 	if (r_refdef.viewcache.entityvisible)
 		Mem_Free(r_refdef.viewcache.entityvisible);
 	if (r_refdef.viewcache.world_pvsbits)
@@ -3005,6 +3006,9 @@ static void R_Main_FreeViewCache(void)
 		Mem_Free(r_refdef.viewcache.world_leafvisible);
 	if (r_refdef.viewcache.world_surfacevisible)
 		Mem_Free(r_refdef.viewcache.world_surfacevisible);
+	for (i = 0; i < sizeof(r_refdef.viewcache.bouncevis.frames) / sizeof(r_refdef.viewcache.bouncevis.frames[0]); i++)
+		if (r_refdef.viewcache.bouncevis.frames[i].rays)
+			Mem_Free(r_refdef.viewcache.bouncevis.frames[i].rays);
 	memset(&r_refdef.viewcache, 0, sizeof(r_refdef.viewcache));
 }
 
@@ -3942,7 +3946,11 @@ qbool R_CanSeeBox(int numsamples, vec_t eyejitter, vec_t entboxenlarge, vec_t en
 
 	// return true if eye overlaps enlarged box
 	if (BoxesOverlap(boxmins, boxmaxs, eyemins, eyemaxs))
+	{
+		//if (r_vis_debug.value > 0.0f)
+		//	R_DebugBox(padmins[0], padmins[1], padmins[2], padmaxs[0], padmaxs[1], padmaxs[2], r_vis_debug_linewidth.value, 0.0f, 0.3f, 0.0f, r_vis_debug.value, r_vis_debug_nodepthtest.integer != 0);
 		return true;
+	}
 
 	VectorCopy(eye, start);
 	// try specific positions in the box first - note that these can be cached
@@ -4329,6 +4337,12 @@ static void R_View_SetFrustum(const int *scissor)
 		r_refdef.view.frustum[2].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[2].normal) - r_refdef.view.ortho_y;
 		r_refdef.view.frustum[3].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[3].normal) - r_refdef.view.ortho_y;
 		r_refdef.view.frustum[4].dist = DotProduct (r_refdef.view.origin, r_refdef.view.frustum[4].normal) - r_refdef.farclip;
+
+		// Probably not used for anything currently, but could be used for shadow caster culling at some point if we put more effort into optimizing orthographic.
+		VectorMAMAM(1.0f, r_refdef.view.origin, -r_refdef.view.ortho_x, left, -r_refdef.view.ortho_y, up, r_refdef.view.frustumcorner[0]);
+		VectorMAMAM(1.0f, r_refdef.view.origin,  r_refdef.view.ortho_x, left, -r_refdef.view.ortho_y, up, r_refdef.view.frustumcorner[1]);
+		VectorMAMAM(1.0f, r_refdef.view.origin, -r_refdef.view.ortho_x, left,  r_refdef.view.ortho_y, up, r_refdef.view.frustumcorner[2]);
+		VectorMAMAM(1.0f, r_refdef.view.origin,  r_refdef.view.ortho_x, left,  r_refdef.view.ortho_y, up, r_refdef.view.frustumcorner[3]);
 	}
 	r_refdef.view.numfrustumplanes = 5;
 
@@ -6617,7 +6631,7 @@ texture_t *R_GetCurrentTexture(texture_t *t)
 
 	t->currentmaterialflags = t->basematerialflags;
 	t->currentalpha = rsurface.entity->alpha * t->basealpha;
-	if (t->basematerialflags & MATERIALFLAG_WATERALPHA && (model->brush.supportwateralpha || r_water.integer || r_novis.integer || r_trippy.integer))
+	if (t->basematerialflags & MATERIALFLAG_WATERALPHA && (model->brush.supportwateralpha || r_water.integer || r_novis.integer || r_vis_bouncevis.integer || r_trippy.integer))
 		t->currentalpha *= r_wateralpha.value;
 	if(t->basematerialflags & MATERIALFLAG_WATERSHADER && r_fb.water.enabled && !r_refdef.view.isoverlay)
 		t->currentmaterialflags |= MATERIALFLAG_ALPHA | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW; // we apply wateralpha later
@@ -10146,6 +10160,46 @@ void R_DebugLine(vec3_t start, vec3_t end)
 	Mod_Mesh_AddTriangle(mod, surf, e0, e1, e2);
 	Mod_Mesh_AddTriangle(mod, surf, e0, e2, e3);
 
+}
+
+void R_DebugLine2(float wx1, float wy1, float wz1, float wx2, float wy2, float wz2, float width, float r1, float g1, float b1, float alpha1, float r2, float g2, float b2, float alpha2, qbool nodepthtest)
+{
+	model_t* mod = CL_Mesh_Debug();
+	msurface_t* surf;
+	int e0, e1, e2, e3;
+	vec3_t start;
+	vec3_t end;
+	float vertex3f[12];
+
+	VectorSet(start, wx1, wy1, wz1);
+	VectorSet(end, wx2, wy2, wz2);
+	R_CalcBeam_Vertex3f(vertex3f, start, end, width);
+	surf = Mod_Mesh_AddSurface(mod, Mod_Mesh_GetTexture(mod, "white", 0, 0, MATERIALFLAG_WALL | MATERIALFLAG_VERTEXCOLOR | MATERIALFLAG_ALPHAGEN_VERTEX | MATERIALFLAG_ADD | MATERIALFLAG_BLENDED | MATERIALFLAG_NOSHADOW | (nodepthtest ? MATERIALFLAG_NODEPTHTEST : 0)), true);
+	e0 = Mod_Mesh_IndexForVertex(mod, surf, vertex3f[ 0], vertex3f[ 1], vertex3f[ 2], 0, 0, 0, 0, 0, 0, 0, r1, g1, b1, alpha1);
+	e1 = Mod_Mesh_IndexForVertex(mod, surf, vertex3f[ 3], vertex3f[ 4], vertex3f[ 5], 0, 0, 0, 0, 0, 0, 0, r2, g2, b2, alpha2);
+	e2 = Mod_Mesh_IndexForVertex(mod, surf, vertex3f[ 6], vertex3f[ 7], vertex3f[ 8], 0, 0, 0, 0, 0, 0, 0, r2, g2, b2, alpha2);
+	e3 = Mod_Mesh_IndexForVertex(mod, surf, vertex3f[ 9], vertex3f[10], vertex3f[11], 0, 0, 0, 0, 0, 0, 0, r1, g1, b1, alpha1);
+	Mod_Mesh_AddTriangle(mod, surf, e0, e1, e2);
+	Mod_Mesh_AddTriangle(mod, surf, e0, e2, e3);
+}
+
+void R_DebugBox(float wx1, float wy1, float wz1, float wx2, float wy2, float wz2, float width, float r, float g, float b, float alpha, qbool nodepthtest)
+{
+	// bottom
+	R_DebugLine2(wx1, wy1, wz1, wx2, wy1, wz1, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx1, wy2, wz1, wx2, wy2, wz1, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx1, wy1, wz1, wx1, wy2, wz1, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx2, wy1, wz1, wx2, wy2, wz1, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	// top
+	R_DebugLine2(wx1, wy1, wz2, wx2, wy1, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx1, wy2, wz2, wx2, wy2, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx1, wy1, wz2, wx1, wy2, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx2, wy1, wz2, wx2, wy2, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	// verticals
+	R_DebugLine2(wx1, wy1, wz1, wx1, wy1, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx2, wy1, wz1, wx2, wy1, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx1, wy2, wz1, wx1, wy2, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
+	R_DebugLine2(wx2, wy2, wz1, wx2, wy2, wz2, width, r, g, b, alpha, r, g, b, alpha, nodepthtest);
 }
 
 

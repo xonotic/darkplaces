@@ -2516,6 +2516,8 @@ const char *cl_meshentitynames[NUM_MESHENTITIES] =
 {
 	"MESH_SCENE",
 	"MESH_UI",
+	"MESH_DEBUG_APPEND",
+	"MESH_DEBUG_READONLY",
 };
 
 static void CL_MeshEntities_Restart(void)
@@ -2588,6 +2590,8 @@ void CL_MeshEntities_Init(void)
 		CL_UpdateRenderEntity(&ent->render);
 	}
 	cl_meshentities[MESH_UI].render.flags = RENDER_NOSELFSHADOW;
+	cl_meshentities[MESH_DEBUG_APPEND].render.flags = RENDER_NOSELFSHADOW;
+	cl_meshentities[MESH_DEBUG_READONLY].render.flags = RENDER_NOSELFSHADOW;
 	R_RegisterModule("CL_MeshEntities", CL_MeshEntities_Start, CL_MeshEntities_Shutdown, CL_MeshEntities_Restart, CL_MeshEntities_Restart, CL_MeshEntities_Restart);
 }
 
@@ -2596,18 +2600,33 @@ void CL_MeshEntities_Scene_Clear(void)
 	Mod_Mesh_Reset(CL_Mesh_Scene());
 }
 
+static void CL_MeshEntities_AddRenderEntity(entity_t* ent)
+{
+	r_refdef.scene.entities[r_refdef.scene.numentities++] = &ent->render;
+}
+
 void CL_MeshEntities_Scene_AddRenderEntity(void)
 {
-	entity_t* ent = &cl_meshentities[MESH_SCENE];
-	r_refdef.scene.entities[r_refdef.scene.numentities++] = &ent->render;
+	CL_MeshEntities_AddRenderEntity(&cl_meshentities[MESH_SCENE]);
+	CL_MeshEntities_AddRenderEntity(&cl_meshentities[MESH_DEBUG_READONLY]);
+}
+
+static void CL_MeshEntities_FinalizeRenderEntity(entity_t* ent)
+{
+	Mod_Mesh_Finalize(ent->render.model);
+	VectorCopy(ent->render.model->normalmins, ent->render.mins);
+	VectorCopy(ent->render.model->normalmaxs, ent->render.maxs);
 }
 
 void CL_MeshEntities_Scene_FinalizeRenderEntity(void)
 {
-	entity_t *ent = &cl_meshentities[MESH_SCENE];
-	Mod_Mesh_Finalize(ent->render.model);
-	VectorCopy(ent->render.model->normalmins, ent->render.mins);
-	VectorCopy(ent->render.model->normalmaxs, ent->render.maxs);
+	model_t* m1 = CL_Mesh_Debug();
+	model_t* m2 = CL_Mesh_DebugReadOnly();
+	CL_Mesh_Debug() = m2;
+	CL_Mesh_DebugReadOnly() = m1;
+	CL_MeshEntities_FinalizeRenderEntity(&cl_meshentities[MESH_SCENE]);
+	CL_MeshEntities_FinalizeRenderEntity(&cl_meshentities[MESH_DEBUG_READONLY]);
+	Mod_Mesh_Reset(CL_Mesh_Debug());
 }
 
 extern cvar_t r_overheadsprites_pushback;

@@ -533,6 +533,7 @@ void V_CalcRefdefUsing (const matrix4x4_t *entrendermatrix, const vec3_t clviewa
 	viewmodelmatrix_nobob = identitymatrix;
 	viewmodelmatrix_withbob = identitymatrix;
 	r_refdef.view.matrix = identitymatrix;
+	VectorCopy(clvelocity, r_refdef.view.velocity);
 
 	// player can look around, so take the origin from the entity,
 	// and the angles from the input system

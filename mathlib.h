@@ -68,6 +68,10 @@ unsigned int CeilPowerOf2(unsigned int value);
 
 #define Q_rint(x) ((x) > 0 ? (int)((x) + 0.5) : (int)((x) - 0.5)) //johnfitz -- from joequake
 
+#define ForVec2(q) for((q)=0;(q)<2;(q)++)
+#define ForVec(q) for((q)=0;(q)<3;(q)++)
+#define ForVec4(q) for((q)=0;(q)<4;(q)++)
+
 #define DotProduct2(a,b) ((a)[0]*(b)[0]+(a)[1]*(b)[1])
 #define Vector2Clear(a) ((a)[0]=(a)[1]=0)
 #define Vector2Compare(a,b) (((a)[0]==(b)[0])&&((a)[1]==(b)[1]))
@@ -122,6 +126,12 @@ unsigned int CeilPowerOf2(unsigned int value);
 #define BoxesOverlap(a,b,c,d) ((a)[0] <= (d)[0] && (b)[0] >= (c)[0] && (a)[1] <= (d)[1] && (b)[1] >= (c)[1] && (a)[2] <= (d)[2] && (b)[2] >= (c)[2])
 #define BoxInsideBox(a,b,c,d) ((a)[0] >= (c)[0] && (b)[0] <= (d)[0] && (a)[1] >= (c)[1] && (b)[1] <= (d)[1] && (a)[2] >= (c)[2] && (b)[2] <= (d)[2])
 #define TriangleBBoxOverlapsBox(a,b,c,d,e) (min((a)[0], min((b)[0], (c)[0])) < (e)[0] && max((a)[0], max((b)[0], (c)[0])) > (d)[0] && min((a)[1], min((b)[1], (c)[1])) < (e)[1] && max((a)[1], max((b)[1], (c)[1])) > (d)[1] && min((a)[2], min((b)[2], (c)[2])) < (e)[2] && max((a)[2], max((b)[2], (c)[2])) > (d)[2])
+#define VectorSnap(a,x,y,z,c) ((c)[0] = (x) * (floor((a)[0] * (1.0f / (x)) + 0.5f) + 0.5f), (c)[1] = (y) * (floor((a)[1] * (1.0f / (y)) + 0.5f) + 0.5f), (c)[2] = (z) * (floor((a)[2] * (1.0f / (z)) + 0.5f) + 0.5f))
+
+#define AABBInsertAndSetKeep(a,b,c,d,k) ((a)[0] = ((a)[0] > (c)[0] ? ((k)=true,(c)[0]) : (a)[0]), (a)[1] = ((a)[1] > (c)[1] ? ((k)=true,(c)[1]) : (a)[1]), (a)[2] = ((a)[2] > (c)[2] ? ((k)=true,(c)[2]) : (a)[2]), (b)[0] = ((b)[0] < (d)[0] ? ((k)=true,(d)[0]) : (b)[0]), (b)[1] = ((b)[1] < (d)[1] ? ((k)=true,(d)[1]) : (b)[1]), (b)[2] = ((b)[2] < (d)[2] ? ((k)=true,(d)[2]) : (b)[2]))
+#define AABBInsert(a,b,c,d) ((a)[0] = ((a)[0] > (c)[0] ? (c)[0] : (a)[0]), (a)[1] = ((a)[1] > (c)[1] ? (c)[1] : (a)[1]), (a)[2] = ((a)[2] > (c)[2] ? (c)[2] : (a)[2]), (b)[0] = ((b)[0] < (d)[0] ? (d)[0] : (b)[0]), (b)[1] = ((b)[1] < (d)[1] ? (d)[1] : (b)[1]), (b)[2] = ((b)[2] < (d)[2] ? (d)[2] : (b)[2]))
+#define AABBFrom(a,b,c,d) ((a)[0] = (c)[0], (a)[1] = (c)[1], (a)[2] = (c)[2], (b)[0] = (d)[0], (b)[1] = (d)[1], (b)[2] = (d)[2])
+#define AABBNearestPoint(a,b,p,o) ((o)[0] = bound((a)[0], (p)[0], (b)[0]), (o)[1] = bound((a)[1], (p)[1], (b)[1]), (o)[2] = bound((a)[2], (p)[2], (b)[2]))
 
 #define TriangleNormal(a,b,c,n) ( \
 	(n)[0] = ((a)[1] - (b)[1]) * ((c)[2] - (b)[2]) - ((a)[2] - (b)[2]) * ((c)[1] - (b)[1]), \

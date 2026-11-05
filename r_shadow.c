@@ -143,6 +143,9 @@ cvar_t r_shadow_bumpscale_bumpmap = {CF_CLIENT, "r_shadow_bumpscale_bumpmap", "4
 cvar_t r_shadow_debuglight = {CF_CLIENT, "r_shadow_debuglight", "-1", "renders only one light, for level design purposes or debugging"};
 cvar_t r_shadow_deferred = {CF_CLIENT | CF_ARCHIVE, "r_shadow_deferred", "0", "uses image-based lighting instead of geometry-based lighting, the method used renders a depth image and a normalmap image, renders lights into separate diffuse and specular images, and then combines this into the normal rendering, requires r_shadow_shadowmapping"};
 cvar_t r_shadow_usebihculling = {CF_CLIENT, "r_shadow_usebihculling", "1", "use BIH (Bounding Interval Hierarchy) for culling lit surfaces instead of BSP (Binary Space Partitioning)"};
+cvar_t r_shadow_bouncevis = {CF_CLIENT, "r_shadow_bouncevis", "0", "use a stochastic raytracing based visibility method for determining dynamic light bounds"};
+cvar_t r_shadow_bouncevis_new_rays_per_frame = {CF_CLIENT, "r_shadow_bouncevis_new_rays_per_frame", "16", "number of new rays to cast each frame when determining light bounds, in addition to repeating some from the previous frame"};
+cvar_t r_shadow_bouncevis_scatter_radius_multiplier = {CF_CLIENT, "r_shadow_bouncevis_scatter_radius_multiplier", "0.125", "scatter ray origins around the light by this fraction of the radius to give it more generous bounds"};
 cvar_t r_shadow_usenormalmap = {CF_CLIENT | CF_ARCHIVE, "r_shadow_usenormalmap", "1", "enables use of directional shading on lights"};
 cvar_t r_shadow_gloss = {CF_CLIENT | CF_ARCHIVE, "r_shadow_gloss", "1", "0 disables gloss (specularity) rendering, 1 uses gloss if textures are found, 2 forces a flat metallic specular effect on everything without textures (similar to tenebrae)"};
 cvar_t r_shadow_gloss2intensity = {CF_CLIENT, "r_shadow_gloss2intensity", "0.125", "how bright the forced flat gloss should look if r_shadow_gloss is 2"};
@@ -603,6 +606,9 @@ void R_Shadow_Init(void)
 	Cvar_RegisterVariable(&r_shadow_bumpscale_basetexture);
 	Cvar_RegisterVariable(&r_shadow_bumpscale_bumpmap);
 	Cvar_RegisterVariable(&r_shadow_usebihculling);
+	Cvar_RegisterVariable(&r_shadow_bouncevis);
+	Cvar_RegisterVariable(&r_shadow_bouncevis_new_rays_per_frame);
+	Cvar_RegisterVariable(&r_shadow_bouncevis_scatter_radius_multiplier);
 	Cvar_RegisterVariable(&r_shadow_usenormalmap);
 	Cvar_RegisterVariable(&r_shadow_debuglight);
 	Cvar_RegisterVariable(&r_shadow_deferred);
@@ -3048,10 +3054,13 @@ void R_RTLight_Compile(rtlight_t *rtlight)
 
 	if (model && model->GetLightInfo)
 	{
+		vec3_t clipmins, clipmaxs;
 		// this variable must be set for the CompileShadowMap code
 		r_shadow_compilingrtlight = rtlight;
 		R_FrameData_SetMark();
-		model->GetLightInfo(ent, rtlight->shadoworigin, rtlight->radius, rtlight->cullmins, rtlight->cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, 0, NULL, rtlight->shadow == 0);
+		VectorCopy(rtlight->cullmins, clipmins);
+		VectorCopy(rtlight->cullmaxs, clipmaxs);
+		model->GetLightInfo(ent, rtlight->shadoworigin, rtlight->radius, clipmins, clipmaxs, rtlight->cullmins, rtlight->cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, 0, NULL, rtlight->shadow == 0);
 		R_FrameData_ReturnToMark();
 		numleafpvsbytes = (model->brush.num_leafs + 7) >> 3;
 		numshadowtrispvsbytes = (model->surfmesh.num_triangles + 7) >> 3;
@@ -3484,9 +3493,14 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 	if (R_CullFrustum(rtlight->cullmins, rtlight->cullmaxs))
 		return;
 
-	// in the typical case this will be quickly replaced by GetLightInfo
-	VectorCopy(rtlight->cullmins, rtlight->cached_cullmins);
-	VectorCopy(rtlight->cullmaxs, rtlight->cached_cullmaxs);
+	// clip the light's full potential bounds to just the part that is in the
+	// visible bounds for this frame
+	rtlight->cached_cullmins[0] = max(rtlight->cullmins[0], r_refdef.viewcache.vismins[0]);
+	rtlight->cached_cullmins[1] = max(rtlight->cullmins[1], r_refdef.viewcache.vismins[1]);
+	rtlight->cached_cullmins[2] = max(rtlight->cullmins[2], r_refdef.viewcache.vismins[2]);
+	rtlight->cached_cullmaxs[0] = min(rtlight->cullmaxs[0], r_refdef.viewcache.vismaxs[0]);
+	rtlight->cached_cullmaxs[1] = min(rtlight->cullmaxs[1], r_refdef.viewcache.vismaxs[1]);
+	rtlight->cached_cullmaxs[2] = min(rtlight->cullmaxs[2], r_refdef.viewcache.vismaxs[2]);
 
 	R_Shadow_ComputeShadowCasterCullingPlanes(rtlight);
 
@@ -3507,11 +3521,66 @@ static void R_Shadow_PrepareLight(rtlight_t *rtlight)
 		shadowtrispvs = rtlight->static_shadowtrispvs;
 		lighttrispvs = rtlight->static_lighttrispvs;
 	}
+	else if (r_shadow_bouncevis.integer)
+	{
+		vec3_t vismins;
+		vec3_t vismaxs;
+		unsigned int newrays = bound(1, r_shadow_bouncevis_new_rays_per_frame.integer, 1000000);
+		unsigned int bounces = 0;
+		vec_t minradius = 0.0f;
+		vec_t maxradius = rtlight->radius;
+		vec_t scatter = bound(0.0f, r_shadow_bouncevis_scatter_radius_multiplier.value, 1.0f) * rtlight->radius;
+		int skipmaterialflagsmask = MATERIALFLAG_NODRAW | MATERIALFLAG_ALPHATEST | MATERIALFLAG_BLENDED;
+		qbool ortho = false;
+		qbool frustum = false;
+		R_BounceVis(newrays, bounces, rtlight->shadoworigin, scatter, minradius, maxradius, vismins, vismaxs, skipmaterialflagsmask, ortho, frustum);
+		// if the visible bounds are offscreen, skip it
+		if (R_CullFrustum(vismins, vismaxs))
+			return;
+		if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->GetLightInfo)
+		{
+			// dynamic light, world available and can receive realtime lighting
+			// calculate lit surfaces and leafs
+			vec3_t clipmins, clipmaxs;
+			VectorCopy(rtlight->cached_cullmins, clipmins);
+			VectorCopy(rtlight->cached_cullmaxs, clipmaxs);
+			r_refdef.scene.worldmodel->GetLightInfo(r_refdef.scene.worldentity, rtlight->shadoworigin, rtlight->radius, clipmins, clipmaxs, rtlight->cached_cullmins, rtlight->cached_cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, rtlight->cached_numfrustumplanes, rtlight->cached_frustumplanes, true);
+			R_Shadow_ComputeShadowCasterCullingPlanes(rtlight);
+			leaflist = r_shadow_buffer_leaflist;
+			leafpvs = r_shadow_buffer_leafpvs;
+			surfacelist = r_shadow_buffer_surfacelist;
+			//surfacesides = r_shadow_buffer_surfacesides;
+			shadowtrispvs = r_shadow_buffer_shadowtrispvs;
+			lighttrispvs = r_shadow_buffer_lighttrispvs;
+		}
+		else
+		{
+			// no world
+			numleafs = 0;
+			leaflist = NULL;
+			leafpvs = NULL;
+			numsurfaces = 0;
+			surfacelist = NULL;
+			//surfacesides = NULL;
+			shadowtrispvs = NULL;
+			lighttrispvs = NULL;
+		}
+		// clip the light bounds to what bouncevis determined
+		rtlight->cached_cullmins[0] = max(rtlight->cached_cullmins[0], vismins[0]);
+		rtlight->cached_cullmins[1] = max(rtlight->cached_cullmins[1], vismins[1]);
+		rtlight->cached_cullmins[2] = max(rtlight->cached_cullmins[2], vismins[2]);
+		rtlight->cached_cullmaxs[0] = min(rtlight->cached_cullmaxs[0], vismaxs[0]);
+		rtlight->cached_cullmaxs[1] = min(rtlight->cached_cullmaxs[1], vismaxs[1]);
+		rtlight->cached_cullmaxs[2] = min(rtlight->cached_cullmaxs[2], vismaxs[2]);
+	}
 	else if (r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->GetLightInfo)
 	{
 		// dynamic light, world available and can receive realtime lighting
 		// calculate lit surfaces and leafs
-		r_refdef.scene.worldmodel->GetLightInfo(r_refdef.scene.worldentity, rtlight->shadoworigin, rtlight->radius, rtlight->cached_cullmins, rtlight->cached_cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, rtlight->cached_numfrustumplanes, rtlight->cached_frustumplanes, rtlight->shadow == 0);
+		vec3_t clipmins, clipmaxs;
+		VectorCopy(rtlight->cached_cullmins, clipmins);
+		VectorCopy(rtlight->cached_cullmaxs, clipmaxs);
+		r_refdef.scene.worldmodel->GetLightInfo(r_refdef.scene.worldentity, rtlight->shadoworigin, rtlight->radius, clipmins, clipmaxs, rtlight->cached_cullmins, rtlight->cached_cullmaxs, r_shadow_buffer_leaflist, r_shadow_buffer_leafpvs, &numleafs, r_shadow_buffer_surfacelist, r_shadow_buffer_surfacepvs, &numsurfaces, r_shadow_buffer_shadowtrispvs, r_shadow_buffer_lighttrispvs, r_shadow_buffer_visitingleafpvs, rtlight->cached_numfrustumplanes, rtlight->cached_frustumplanes, rtlight->shadow == 0);
 		R_Shadow_ComputeShadowCasterCullingPlanes(rtlight);
 		leaflist = r_shadow_buffer_leaflist;
 		leafpvs = r_shadow_buffer_leafpvs;

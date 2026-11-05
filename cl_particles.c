@@ -297,7 +297,6 @@ cvar_t cl_particles_smoke_alpha = {CF_CLIENT | CF_ARCHIVE, "cl_particles_smoke_a
 cvar_t cl_particles_smoke_alphafade = {CF_CLIENT | CF_ARCHIVE, "cl_particles_smoke_alphafade", "0.55", "brightness fade per second"};
 cvar_t cl_particles_sparks = {CF_CLIENT | CF_ARCHIVE, "cl_particles_sparks", "1", "enables sparks (used by multiple effects)"};
 cvar_t cl_particles_bubbles = {CF_CLIENT | CF_ARCHIVE, "cl_particles_bubbles", "1", "enables bubbles (used by multiple effects)"};
-cvar_t cl_particles_visculling = {CF_CLIENT | CF_ARCHIVE, "cl_particles_visculling", "0", "perform a costly check if each particle is visible before drawing"};
 cvar_t cl_particles_collisions = {CF_CLIENT | CF_ARCHIVE, "cl_particles_collisions", "1", "allow costly collision detection on particles (sparks that bounce, particles not going through walls, blood hitting surfaces, etc)"};
 cvar_t cl_particles_forcetraileffects = {CF_CLIENT, "cl_particles_forcetraileffects", "0", "force trails to be displayed even if a non-trail draw primitive was used (debug/compat feature)"};
 cvar_t cl_decals = {CF_CLIENT | CF_ARCHIVE, "cl_decals", "1", "enables decals (bullet holes, blood, etc)"};
@@ -609,7 +608,6 @@ void CL_Particles_Init (void)
 	Cvar_RegisterVariable (&cl_particles_smoke_alphafade);
 	Cvar_RegisterVariable (&cl_particles_sparks);
 	Cvar_RegisterVariable (&cl_particles_bubbles);
-	Cvar_RegisterVariable (&cl_particles_visculling);
 	Cvar_RegisterVariable (&cl_particles_collisions);
 	Cvar_RegisterVariable (&cl_particles_forcetraileffects);
 	Cvar_RegisterVariable (&cl_decals);
@@ -2917,6 +2915,7 @@ void R_DrawParticles (void)
 	qbool update;
 	float pt_explode_frame_interval, pt_explode2_frame_interval;
 	int color;
+	vec3_t cullmins, cullmaxs;
 
 	frametime = bound(0, cl.time - cl.particles_updatetime, 1);
 	cl.particles_updatetime = bound(cl.time - 1, cl.particles_updatetime + frametime, cl.time + 1);
@@ -3138,28 +3137,48 @@ void R_DrawParticles (void)
 		// don't render particles too close to the view (they chew fillrate)
 		// also don't render particles behind the view (useless)
 		// further checks to cull to the frustum would be too slow here
-		switch(p->typeindex)
+		switch(p->orientation)
 		{
-		case pt_beam:
-			// beams have no culling
-			R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, p->sortorigin, R_DrawParticle_TransparentCallback, NULL, i, NULL);
+		case PARTICLE_HBEAM:
+		case PARTICLE_VBEAM:
+			// beams are between two points (p->org and p->vel) but have a width
+			cullmins[0] = min(p->org[0], p->vel[0]) - p->size;
+			cullmins[1] = min(p->org[1], p->vel[1]) - p->size;
+			cullmins[2] = min(p->org[2], p->vel[2]) - p->size;
+			cullmaxs[0] = max(p->org[0], p->vel[0]) + p->size;
+			cullmaxs[1] = max(p->org[1], p->vel[1]) + p->size;
+			cullmaxs[2] = max(p->org[2], p->vel[2]) + p->size;
 			break;
 		default:
-			if(cl_particles_visculling.integer)
-				if (!r_refdef.viewcache.world_novis)
-					if(r_refdef.scene.worldmodel && r_refdef.scene.worldmodel->brush.PointInLeaf)
-					{
-						mleaf_t *leaf = r_refdef.scene.worldmodel->brush.PointInLeaf(r_refdef.scene.worldmodel, p->org);
-						if(leaf)
-							if(!CHECKPVSBIT(r_refdef.viewcache.world_pvsbits, leaf->clusterindex))
-								continue;
-					}
 			// anything else just has to be in front of the viewer and visible at this distance
-			if (!r_refdef.view.useperspective || (DotProduct(p->org, r_refdef.view.forward) >= minparticledist_start && VectorDistance2(p->org, r_refdef.view.origin) < drawdist2 * (p->size * p->size)))
-				R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, p->sortorigin, R_DrawParticle_TransparentCallback, NULL, i, NULL);
+			if (r_refdef.view.useperspective && !(DotProduct(p->org, r_refdef.view.forward) >= minparticledist_start && VectorDistance2(p->org, r_refdef.view.origin) < drawdist2 * (p->size * p->size)))
+				continue;
+			if (p->orientation == PARTICLE_SPARK)
+			{
+				// sparks stretch along their velocity in both directions
+				float lenfactor = p->stretch * 0.04 * VectorLength(p->vel);
+				cullmins[0] = min(p->org[0] + p->vel[0] * lenfactor, p->org[0]) - p->size;
+				cullmins[1] = min(p->org[1] + p->vel[1] * lenfactor, p->org[1]) - p->size;
+				cullmins[2] = min(p->org[2] + p->vel[2] * lenfactor, p->org[2]) - p->size;
+				cullmins[0] = max(p->org[0] + p->vel[0] * lenfactor, p->org[0]) + p->size;
+				cullmins[1] = max(p->org[1] + p->vel[1] * lenfactor, p->org[1]) + p->size;
+				cullmins[2] = max(p->org[2] + p->vel[2] * lenfactor, p->org[2]) + p->size;
+			}
+			else
+			{
+				// point particles are just a simple box for culling purposes
+				cullmins[0] = p->org[0] - p->size;
+				cullmins[1] = p->org[1] - p->size;
+				cullmins[2] = p->org[2] - p->size;
+				cullmaxs[0] = p->org[0] + p->size;
+				cullmaxs[1] = p->org[1] + p->size;
+				cullmaxs[2] = p->org[2] + p->size;
+			}
 			break;
 		}
-
+		if (!BoxesOverlap(r_refdef.viewcache.vismins, r_refdef.viewcache.vismaxs, cullmins, cullmaxs) || R_CullFrustum(cullmins, cullmaxs))
+			continue;
+		R_MeshQueue_AddTransparent(TRANSPARENTSORT_DISTANCE, p->sortorigin, R_DrawParticle_TransparentCallback, NULL, i, NULL);
 		continue;
 killparticle:
 		p->typeindex = 0;

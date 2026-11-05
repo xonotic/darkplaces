@@ -1333,6 +1333,7 @@ static void R_Envmap_f(cmd_state_t *cmd)
 	r_refdef.view.useperspective = true;
 	r_refdef.view.isoverlay = false;
 	r_refdef.view.ismain = true;
+	VectorClear(r_refdef.view.velocity);
 
 	r_refdef.view.frustum_x = 1; // tan(45 * M_PI / 180.0);
 	r_refdef.view.frustum_y = 1; // tan(45 * M_PI / 180.0);
@@ -2260,6 +2261,7 @@ void CL_UpdateScreen(void)
 
 	R_FrameData_NewFrame();
 	R_BufferData_NewFrame();
+	R_View_WorldVisibility_NewFrame();
 
 	Matrix4x4_OriginFromMatrix(&r_refdef.view.matrix, vieworigin);
 	R_HDR_UpdateIrisAdaptation(vieworigin);

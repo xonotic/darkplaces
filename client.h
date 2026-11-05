@@ -168,7 +168,7 @@ typedef struct rtlight_s
 	unsigned char *cached_shadowtrispvs;
 	unsigned char *cached_lighttrispvs;
 	int *cached_surfacelist;
-	// reduced light cullbox from GetLightInfo
+	// reduced light cullbox from R_BounceVis or GetLightInfo
 	vec3_t cached_cullmins;
 	vec3_t cached_cullmaxs;
 	// current shadow-caster culling planes based on view
@@ -1363,13 +1363,17 @@ void CL_RotateMoves(const matrix4x4_t *m);
 typedef enum meshname_e {
 	MESH_SCENE, // CSQC R_PolygonBegin, potentially also engine particles and debug stuff
 	MESH_UI,
+	MESH_DEBUG_APPEND, // debug geometry, double buffered (these two swap model)
+	MESH_DEBUG_READONLY, // debug geometry, double buffered (these two swap model)
 	NUM_MESHENTITIES,
 } meshname_t;
 extern entity_t cl_meshentities[NUM_MESHENTITIES];
 extern model_t cl_meshentitymodels[NUM_MESHENTITIES];
 extern const char *cl_meshentitynames[NUM_MESHENTITIES];
-#define CL_Mesh_Scene() (&cl_meshentitymodels[MESH_SCENE])
-#define CL_Mesh_UI() (&cl_meshentitymodels[MESH_UI])
+#define CL_Mesh_Scene() (cl_meshentities[MESH_SCENE].render.model)
+#define CL_Mesh_UI() (cl_meshentities[MESH_UI].render.model)
+#define CL_Mesh_Debug() (cl_meshentities[MESH_DEBUG_APPEND].render.model)
+#define CL_Mesh_DebugReadOnly() (cl_meshentities[MESH_DEBUG_READONLY].render.model)
 void CL_MeshEntities_Init(void);
 void CL_MeshEntities_Scene_Clear(void);
 void CL_MeshEntities_Scene_AddRenderEntity(void);

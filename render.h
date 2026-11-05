@@ -269,6 +269,8 @@ typedef struct r_refdef_view_s
 	vec3_t left;
 	vec3_t right;
 	vec3_t up;
+	// movement of the view position
+	vec3_t velocity;
 	int numfrustumplanes;
 	mplane_t frustum[6];
 	qbool useclipplane;
@@ -322,6 +324,30 @@ typedef struct r_refdef_view_s
 }
 r_refdef_view_t;
 
+typedef struct bouncevis_ray_s
+{
+	vec3_t origin;
+	vec3_t direction;
+}
+bouncevis_ray_t;
+
+typedef struct bouncevis_frame_s
+{
+	unsigned int maxrays;
+	unsigned int numrays;
+	bouncevis_ray_t* rays;
+}
+bouncevis_frame_t;
+
+// LadyHavoc: This implements a stochastic but convergent visibility algorithm where scattered rays from near the eye position determine an AABB for culling the entire scene, including bounced rays for any future hardware raytracing (where knowing the scene bounds including reflections is crucial), each frame the best rays are retaiend from the previous frame and some new ones are added, rays whose origin is too far away from the eye are not retained, this visibility algorithm is entirely dynamic so it can include doors and other occluders.  Optionally it can retain rays that passed near entities and surfaces and lights and such, which retains a lot more rays than the basic AABB approach but is much more exact about what is visible if that kind of granularity is necessary.  As far as I know this algorithm is entirely original, a result of noodling on the problem of dynamic visibility for many years, the key breakthrough was retaining rays across frames to converge to a perfect solution given enough time.
+typedef struct bouncevis_state_s
+{
+	// set by CL_UpdateScreen() to toggle between 0 and 1 on consecutive frames, this is for retaining useful rays across frames
+	unsigned int currentframe;
+	bouncevis_frame_t frames[2];
+}
+bouncevis_state_t;
+
 typedef struct r_refdef_viewcache_s
 {
 	// updated by gl_main_newmap()
@@ -342,6 +368,14 @@ typedef struct r_refdef_viewcache_s
 	unsigned char *world_surfacevisible;
 	/// if true, the view is currently in a leaf without pvs data
 	qbool world_novis;
+
+	// bouncevis based visibility has some state retained across frames
+	bouncevis_state_t bouncevis;
+
+	/// currently visible bounds of the world - culling particles and entities
+	/// and lights against this is sufficient for decent culling
+	vec3_t vismins;
+	vec3_t vismaxs;
 }
 r_refdef_viewcache_t;
 
@@ -454,7 +488,6 @@ typedef struct r_refdef_s
 	// true during envmap command capture
 	qbool envmap;
 
-	// whether to draw world lights realtime, dlights realtime, and their shadows
 	float polygonfactor;
 	float polygonoffset;
 
@@ -489,6 +522,10 @@ skinframe_t *R_SkinFrame_LoadNoTexture(void);
 skinframe_t *R_SkinFrame_LoadInternalUsingTexture(const char *name, int textureflags, rtexture_t *tex, int width, int height, qbool sRGB);
 
 rtexture_t *R_GetCubemap(const char *basename);
+
+cvar_t r_vis_bouncevis;
+void R_View_WorldVisibility_NewFrame(void);
+void R_BounceVis(unsigned int newrays, unsigned int bounces, vec3_t vieworigin, vec_t scatter, vec_t minradius, vec_t maxradius, vec3_t vismins, vec3_t vismaxs, int skipmaterialflagsmask, qbool ortho, qbool frustum);
 
 void R_View_WorldVisibility(qbool forcenovis);
 void R_DrawParticles(void);
@@ -914,6 +951,12 @@ void R_ResetViewRendering2D(int viewfbo, rtexture_t *viewdepthtexture, rtexture_
 void R_ResetViewRendering3D(int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewcolortexture, int viewx, int viewy, int viewwidth, int viewheight);
 void R_SetupView(qbool allowwaterclippingplane, int viewfbo, rtexture_t *viewdepthtexture, rtexture_t *viewcolortexture, int viewx, int viewy, int viewwidth, int viewheight);
 void R_DebugLine(vec3_t start, vec3_t end);
+void R_DebugLine2(float wx1, float wy1, float wz1, float wx2, float wy2, float wz2, float width, float r1, float g1, float b1, float alpha1, float r2, float g2, float b2, float alpha2, qbool nodepthtest);
+void R_DebugBox(float wx1, float wy1, float wz1, float wx2, float wy2, float wz2, float width, float r, float g, float b, float alpha, qbool nodepthtest);
+extern cvar_t r_vis_debug;
+extern cvar_t r_vis_debug_linewidth;
+extern cvar_t r_vis_debug_nodepthtest;
+
 extern const float r_screenvertex3f[12];
 extern cvar_t r_showspriteedges;
 extern cvar_t r_showparticleedges;
