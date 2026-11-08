@@ -1011,6 +1011,13 @@ void IN_Move( void )
 
 	//Con_Printf("Mouse position: in_mouse %f %f in_windowmouse %f %f\n", in_mouse_x, in_mouse_y, in_windowmouse_x, in_windowmouse_y);
 
+#ifdef __ANDROID__
+	{
+		extern void Android_TouchPad_Look(float *dx, float *dy);
+		Android_TouchPad_Look(&in_mouse_x, &in_mouse_y); // on-screen drag-to-aim
+	}
+#endif
+
 	VID_BuildJoyState(&joystate);
 	VID_ApplyJoyState(&joystate);
 }
@@ -1049,6 +1056,12 @@ void Sys_SDL_HandleEvents(void)
 	Uchar unicode;
 	SDL_Event event;
 
+#ifdef __ANDROID__
+	{
+		extern void Android_TouchPad_Frame(void);
+		Android_TouchPad_Frame(); // on-screen virtual gamepad (android/app/jni/android_touchpad.c)
+	}
+#endif
 	VID_EnableJoystick(true);
 
 	while( SDL_PollEvent( &event ) )

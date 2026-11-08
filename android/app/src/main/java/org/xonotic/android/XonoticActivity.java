@@ -12,11 +12,24 @@ import java.io.OutputStream;
 
 /** Runs the DarkPlaces engine (libmain.so) in Xonotic mode via SDL2. */
 public class XonoticActivity extends SDLActivity {
+    private TouchControlsView touch;
+
+    @Override
+    protected void onDestroy() {
+        if (touch != null) touch.shutdown();
+        super.onDestroy();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         installAndroidConfig();
         super.onCreate(savedInstanceState);
+        if (mLayout != null) {
+            touch = new TouchControlsView(this);
+            mLayout.addView(touch, new android.view.ViewGroup.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT));
+        }
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 

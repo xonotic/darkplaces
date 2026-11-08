@@ -40,7 +40,18 @@ In menus: stick/D-pad navigate, A selects, B goes back.
 Defaults live in `assets/android.cfg` (re-copied every launch). Personal overrides go in
 `Android/data/org.xonotic.android/files/data/autoexec.cfg`, e.g. `joy_x360_sensitivityyaw -3`.
 
-Touch: DarkPlaces' built-in mobile touch layer (`DP_MOBILETOUCH`) is enabled; a controller is recommended.
+## On-screen controls
+
+Shown automatically in a match when no physical gamepad is connected.
+
+- Left side: floating thumbstick (move). Touch anywhere on the lower-left to grab it.
+- Right side: drag on empty space to aim.
+- Buttons: FIRE, ALT, JUMP, CRCH, RLD, HOOK, ZOOM, WPN+/WPN-, LAST; top-left MENU, TAB (scores), CHAT.
+- Top-right PAD button cycles AUTO (hide when gamepad connected) / ON / OFF; choice is saved.
+- In menus and console the overlay steps aside and taps go to the game as mouse clicks.
+
+Buttons drive an SDL virtual game controller (`app/jni/android_touchpad.c`), so they use the same
+`X360_*` binds as a real pad; rebinding the pad rebinds the touch buttons too. Aim speed follows `sensitivity`.
 
 ## Build
 

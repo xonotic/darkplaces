@@ -100,7 +100,8 @@ set(DP_SRC
 list(TRANSFORM DP_SRC PREPEND ${DP_DIR}/)
 
 # SDLActivity loads "libmain.so" and calls SDL_main.
-add_library(main SHARED ${DP_SRC} gles_compat.c)
+add_library(main SHARED ${DP_SRC} gles_compat.c android_touchpad.c)
+target_include_directories(main PRIVATE ${DP_DIR})
 target_compile_definitions(main PRIVATE
 	CONFIG_MENU CONFIG_VIDEO_CAPTURE LINK_TO_LIBJPEG BUILDTYPE=release _FILE_OFFSET_BITS=64 SDL_DISABLE_IMMINTRIN_H)
 target_compile_options(main PRIVATE -O3 -fno-strict-aliasing -Wno-everything)
