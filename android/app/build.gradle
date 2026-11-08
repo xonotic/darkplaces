@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.xonotic.android'
+    compileSdk 34
+    ndkVersion '26.3.11579264'
+
+    defaultConfig {
+        applicationId 'org.xonotic.android'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '0.8.6-android1'
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_static', '-DANDROID_ARM_NEON=ON'
+            }
+        }
+    }
+
+    signingConfigs {
+        // Public sideload key (password 'android') so every build upgrades in place.
+        // NOT secret: use your own keystore via XON_KEYSTORE* env vars for store releases.
+        release {
+            storeFile file(System.getenv('XON_KEYSTORE') ?: 'xonotic-sideload.keystore')
+            storePassword System.getenv('XON_KEYSTORE_PASS') ?: 'android'
+            keyAlias System.getenv('XON_KEY_ALIAS') ?: 'xonotic'
+            keyPassword System.getenv('XON_KEY_PASS') ?: 'android'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'jni/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint { abortOnError false }
+}

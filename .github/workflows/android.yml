@@ -1,0 +1,53 @@
+name: Android APK
+
+on:
+  push:
+    branches: [ android-port ]
+    tags: [ 'android-*' ]
+    paths: [ 'android/**', '*.c', '*.h', '.github/workflows/android.yml' ]
+  pull_request:
+    paths: [ 'android/**', '.github/workflows/android.yml' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install NDK and CMake
+        run: sdkmanager "ndk;26.3.11579264" "cmake;3.22.1" "platforms;android-34" "build-tools;34.0.0"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('android/**/*.gradle') }}
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --console=plain
+
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk xonotic-android.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xonotic-android-apk
+          path: xonotic-android.apk
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/android-')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: xonotic-android.apk

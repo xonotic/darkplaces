@@ -1561,7 +1561,7 @@ int R_SaveTextureDDSFile(rtexture_t *rt, const char *filename, qbool skipuncompr
 #endif
 }
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && defined(DP_KTX)
 // ELUAN: FIXME: separate this code
 #include "ktx10/include/ktx.h"
 #endif
@@ -1586,7 +1586,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	fs_offset_t ddsfilesize;
 	unsigned int ddssize;
 	qbool force_swdecode;
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && defined(DP_KTX)
 	// ELUAN: FIXME: separate this code
 	char vabuf[1024];
 	char vabuf2[1024];
@@ -1597,7 +1597,7 @@ rtexture_t *R_LoadTextureDDSFile(rtexturepool_t *rtexturepool, const char *filen
 	if (cls.state == ca_dedicated)
 		return NULL;
 
-#ifdef __ANDROID__
+#if defined(__ANDROID__) && defined(DP_KTX)
 	// ELUAN: FIXME: separate this code
 	if (vid.renderpath != RENDERPATH_GLES2)
 	{

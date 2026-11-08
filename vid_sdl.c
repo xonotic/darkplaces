@@ -1720,7 +1720,7 @@ static qbool VID_InitModeGL(const viddef_mode_t *mode)
 
 #ifdef DP_MOBILETOUCH
 	// mobile platforms are always fullscreen, we'll get the resolution after opening the window
-	mode->fullscreen = true;
+	((viddef_mode_t *)mode)->fullscreen = true;
 	// hide the menu with SDL_WINDOW_BORDERLESS
 	windowflags |= SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS;
 #endif
