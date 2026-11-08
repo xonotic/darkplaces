@@ -41,6 +41,8 @@ public class LauncherActivity extends Activity {
     private ProgressBar progress;
     private Button downloadButton, playButton;
     private volatile boolean busy;
+    private volatile long grandTotal;
+    static final int PICK_ZIP = 42;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     static File baseDir(Activity a) {
@@ -110,6 +112,11 @@ public class LauncherActivity extends Activity {
         downloadButton.setOnClickListener(v -> startDownload());
         root.addView(downloadButton);
 
+        Button importButton = new Button(this);
+        importButton.setText("Import Xonotic ZIP from device");
+        importButton.setOnClickListener(v -> pickZip());
+        root.addView(importButton);
+
         playButton = new Button(this);
         playButton.setText("Play");
         playButton.setEnabled(hasGameData(this));
@@ -130,6 +137,60 @@ public class LauncherActivity extends Activity {
         return super.onKeyDown(keyCode, event);
     }
 
+    private void pickZip() {
+        if (busy) return;
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");
+        i.putExtra(Intent.EXTRA_MIME_TYPES, new String[] { "application/zip", "application/x-zip-compressed", "application/octet-stream" });
+        startActivityForResult(i, PICK_ZIP);
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != PICK_ZIP || res != RESULT_OK || data == null || data.getData() == null) return;
+        final android.net.Uri uri = data.getData();
+        long len = -1;
+        try (android.content.res.AssetFileDescriptor fd = getContentResolver().openAssetFileDescriptor(uri, "r")) {
+            if (fd != null) len = fd.getLength();
+        } catch (Exception ignored) { }
+        final long total = len;
+        runJob(() -> {
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                int n = ZipExtractor.extractDataPk3s(in, dataDir(this), total,
+                        (name, done) -> setStatus("Extracting " + name + "\n" + (done >> 20) + " MB read", done, total));
+                if (n == 0) throw new IOException("No .pk3 game files found in that ZIP");
+            }
+        });
+    }
+
+    private interface Job { void run() throws Exception; }
+
+    private void runJob(Job job) {
+        busy = true;
+        downloadButton.setEnabled(false);
+        progress.setVisibility(View.VISIBLE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        new Thread(() -> {
+            String err = null;
+            try { job.run(); } catch (Exception e) { err = e.toString(); }
+            final String error = err;
+            ui.post(() -> {
+                busy = false;
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                downloadButton.setEnabled(true);
+                if (error == null && hasGameData(this)) {
+                    status.setText("Game files ready.");
+                    playButton.setEnabled(true);
+                    playButton.requestFocus();
+                } else {
+                    status.setText("Failed: " + error + "\nTry again (downloads resume).");
+                }
+            });
+        }, "xonotic-data-job").start();
+    }
+
     private void startGame() {
         startActivity(new Intent(this, XonoticActivity.class));
         finish();
@@ -144,37 +205,13 @@ public class LauncherActivity extends Activity {
 
     private void startDownload() {
         if (busy) return;
-        busy = true;
-        downloadButton.setEnabled(false);
-        progress.setVisibility(View.VISIBLE);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        new Thread(() -> {
-            String err = null;
-            try {
-                download();
-            } catch (Exception e) {
-                err = e.toString();
-            }
-            final String error = err;
-            ui.post(() -> {
-                busy = false;
-                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-                downloadButton.setEnabled(true);
-                if (error == null && hasGameData(this)) {
-                    status.setText("Download complete.");
-                    playButton.setEnabled(true);
-                    playButton.requestFocus();
-                } else {
-                    status.setText("Download failed: " + error + "\nTap Download to resume.");
-                }
-            });
-        }, "xonotic-data-download").start();
+        runJob(this::download);
     }
 
     // ------------------------------------------------------------------ ZIP range download
 
     static final class Entry {
-        String name; long size; long localHeaderOffset; long dataOffset;
+        String name; int method; long csize, size, crc; long localHeaderOffset; long dataOffset;
     }
 
     private static HttpURLConnection open(String url, long from, long to) throws IOException {
@@ -231,15 +268,20 @@ public class LauncherActivity extends Activity {
         int p = 0;
         while (p + 46 <= cd.length && d.getInt(p) == 0x02014b50) {
             int method = d.getShort(p + 10) & 0xffff;
+            long crc = d.getInt(p + 16) & 0xffffffffL;
             long csize = d.getInt(p + 20) & 0xffffffffL;
+            long usize = d.getInt(p + 24) & 0xffffffffL;
             int nlen = d.getShort(p + 28) & 0xffff, xlen = d.getShort(p + 30) & 0xffff, clen = d.getShort(p + 32) & 0xffff;
             long lho = d.getInt(p + 42) & 0xffffffffL;
             String name = new String(cd, p + 46, nlen, "UTF-8");
             if (name.startsWith(ENTRY_PREFIX) && name.endsWith(".pk3") && name.indexOf('/', ENTRY_PREFIX.length()) < 0) {
-                if (method != 0) throw new IOException(name + " is compressed; unsupported");
+                if (method != 0 && method != 8) throw new IOException(name + ": unsupported ZIP method " + method);
                 Entry e = new Entry();
                 e.name = name.substring(ENTRY_PREFIX.length());
-                e.size = csize;
+                e.method = method;
+                e.csize = csize;
+                e.size = usize;
+                e.crc = crc;
                 e.localHeaderOffset = lho;
                 out.add(e);
             }
@@ -254,6 +296,7 @@ public class LauncherActivity extends Activity {
         List<Entry> entries = listEntries(DATA_ZIP_URL);
         long grand = 0, grandDone = 0;
         for (Entry e : entries) grand += e.size;
+        grandTotal = grand;
         File dir = dataDir(this);
         for (Entry e : entries) {
             File dst = new File(dir, e.name);
@@ -264,25 +307,19 @@ public class LauncherActivity extends Activity {
             e.dataOffset = e.localHeaderOffset + 30 + (h.getShort(26) & 0xffff) + (h.getShort(28) & 0xffff);
 
             File part = new File(dir, e.name + ".part");
-            long have = part.exists() ? Math.min(part.length(), e.size) : 0;
+            // Stored entries resume byte-exact; deflated ones restart (inflater state can't resume).
+            long have = (e.method == 0 && part.exists()) ? Math.min(part.length(), e.size) : 0;
+            if (e.method != 0) part.delete();
             if (have < e.size) {
-                HttpURLConnection c = open(DATA_ZIP_URL, e.dataOffset + have, e.dataOffset + e.size - 1);
-                try (InputStream in = c.getInputStream();
-                     RandomAccessFile out = new RandomAccessFile(part, "rw")) {
-                    out.seek(have);
-                    byte[] buf = new byte[1 << 16];
-                    int r;
-                    long lastUi = 0;
-                    while (have < e.size && (r = in.read(buf, 0, (int) Math.min(buf.length, e.size - have))) > 0) {
-                        out.write(buf, 0, r);
-                        have += r;
-                        long now = System.currentTimeMillis();
-                        if (now - lastUi > 250) {
-                            lastUi = now;
-                            setStatus(String.format("Downloading %s\n%d / %d MB", e.name,
-                                    (grandDone + have) >> 20, grand >> 20), grandDone + have, grand);
-                        }
-                    }
+                HttpURLConnection c = open(DATA_ZIP_URL, e.dataOffset + have, e.dataOffset + e.csize - 1);
+                final long base = grandDone;
+                try (InputStream raw = c.getInputStream()) {
+                    InputStream in = e.method == 8
+                            ? new java.util.zip.InflaterInputStream(raw, new java.util.zip.Inflater(true), 1 << 16)
+                            : raw;
+                    ZipExtractor.extract(in, part, have, e.size, e.crc, have == 0,
+                            (done) -> setStatus(String.format("Downloading + extracting %s\n%d / %d MB", e.name,
+                                    (base + done) >> 20, grandTotal >> 20), base + done, grandTotal));
                 } finally {
                     c.disconnect();
                 }

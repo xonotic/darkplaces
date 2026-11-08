@@ -9,6 +9,10 @@ Native Android port of the DarkPlaces engine running Xonotic, with game controll
 3. Launch **Xonotic**. On first run, tap **Download game data** (about 1.2 GB, resumable; Wi-Fi recommended).
    The launcher fetches only the `Xonotic/data/*.pk3` files out of the official
    `xonotic-0.8.6.zip` using HTTP range requests.
+   Files are decompressed (stored or deflate) and CRC32-verified while they download, so the
+   full archive never sits on the device; interrupted stored files resume where they stopped.
+   Already have the ZIP? Tap **Import Xonotic ZIP from device** and pick it; the game files are
+   extracted in one streaming pass.
    Alternative: copy the `.pk3` files from a desktop install's `data/` folder to
    `Android/data/org.xonotic.android/files/data/`.
 
