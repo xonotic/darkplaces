@@ -2211,6 +2211,8 @@ static void FS_Init_Dir (void)
 	if (fs_basedir[0] && fs_basedir[strlen(fs_basedir) - 1] != '/' && fs_basedir[strlen(fs_basedir) - 1] != '\\')
 		dp_strlcat(fs_basedir, "/", sizeof(fs_basedir));
 
+	Con_Printf("Game base directory: \"%s\" (gamedir \"%s\")\n", fs_basedir, gamedirname1);
+
 	// Add the personal game directory
 	if((i = Sys_CheckParm("-userdir")) && i < sys.argc - 1)
 		dpsnprintf(fs_userdir, sizeof(fs_userdir), "%s/", sys.argv[i+1]);

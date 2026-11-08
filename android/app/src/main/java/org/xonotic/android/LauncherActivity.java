@@ -61,9 +61,50 @@ public class LauncherActivity extends Activity {
         if (files == null) return false;
         for (File f : files) {
             String n = f.getName();
-            if (n.startsWith("xonotic-") && n.endsWith("-data.pk3") && f.length() > 1000000) return true;
+            if (n.startsWith("xonotic-") && n.endsWith("-data.pk3") && f.length() > 1000000 && validPk3(f)) return true;
         }
         return false;
+    }
+
+    /** A PK3 is a ZIP: valid if its end-of-central-directory record is present. */
+    static boolean validPk3(File f) {
+        try (RandomAccessFile r = new RandomAccessFile(f, "r")) {
+            long len = r.length();
+            int n = (int) Math.min(len, 70000);
+            byte[] b = new byte[n];
+            r.seek(len - n);
+            r.readFully(b);
+            for (int i = n - 22; i >= 0; i--)
+                if (b[i] == 0x50 && b[i + 1] == 0x4b && b[i + 2] == 0x05 && b[i + 3] == 0x06) return true;
+        } catch (IOException ignored) { }
+        return false;
+    }
+
+    /** Human-readable listing of the data folder, flagging broken files. */
+    String describeFiles() {
+        StringBuilder sb = new StringBuilder("Game folder: " + dataDir(this).getAbsolutePath() + "\n");
+        File[] files = dataDir(this).listFiles();
+        if (files == null || files.length == 0) return sb.append("(empty)").toString();
+        java.util.Arrays.sort(files);
+        for (File f : files) {
+            String n = f.getName();
+            sb.append(n).append("  ").append(f.length() >> 20).append(" MB");
+            if (n.endsWith(".pk3")) sb.append(validPk3(f) ? "  OK" : "  BROKEN");
+            else if (n.endsWith(".part")) sb.append("  (incomplete)");
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    private void checkFiles() {
+        int removed = 0;
+        File[] files = dataDir(this).listFiles();
+        if (files != null) for (File f : files)
+            if (f.getName().endsWith(".pk3") && !validPk3(f) && f.delete()) removed++;
+        status.setText(describeFiles() + (removed > 0
+                ? "\nRemoved " + removed + " broken file(s). Tap Download to fetch them again."
+                : (hasGameData(this) ? "\nAll game files look good." : "\nMain data file missing. Tap Download.")));
+        playButton.setEnabled(hasGameData(this));
     }
 
     @Override
@@ -116,6 +157,11 @@ public class LauncherActivity extends Activity {
         importButton.setText("Import Xonotic ZIP from device");
         importButton.setOnClickListener(v -> pickZip());
         root.addView(importButton);
+
+        Button checkButton = new Button(this);
+        checkButton.setText("Check game files");
+        checkButton.setOnClickListener(v -> { if (!busy) checkFiles(); });
+        root.addView(checkButton);
 
         playButton = new Button(this);
         playButton.setText("Play");
