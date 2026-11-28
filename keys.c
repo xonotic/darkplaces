@@ -1100,6 +1100,64 @@ static int Key_Convert_NumPadKey(int key)
 	return key;
 }
 
+/* Handle Suggest keys all in one place, so won't have to duplicate
+ * it in Key_Console & Key_Message
+ *
+ * Key bindings:
+ * Arrow UP   | CTRL + k          -> move the selction pointer up
+ * Arrow Down | CTRL + j          -> move the selction pointer down
+ * Page UP    | CTRL + SHIFT + k  -> move to the prev page
+ * Page Down  | CTRL + SHIFT + j  -> move to the next page
+ * TAB                            -> Accept the suggestion.
+ * CTRL + c                       -> Discard the line.
+ *
+ * Vim like key bindings, so you don't have to leave the main keys :)
+ */
+#define SUGGEST_KEY_HANDLED 1
+#define SUGGEST_KEY_IGNORED 0
+static int Key_HandleSuggestKeys(int key, int *linepos, qbool is_console)
+{
+	if (Suggest_Available())
+	{
+		if (key == K_TAB && KM_NONE)
+		{
+			*linepos = Suggest_Accept();
+			return SUGGEST_KEY_HANDLED;
+		}
+		if (key == 'c' && KM_CTRL)
+		{
+			*linepos = Key_ClearEditLine(is_console);
+			Suggest_Clear();
+			return SUGGEST_KEY_HANDLED;
+		}
+		if (((key == K_UPARROW || key == K_KP_UPARROW) && KM_NONE) ||
+				(key == 'k' && KM_CTRL))
+		{
+			Suggest_SelectionMove(-1);
+			return SUGGEST_KEY_HANDLED;
+		}
+		if (((key == K_DOWNARROW || key == K_KP_DOWNARROW) && KM_NONE) ||
+				(key == 'j' && KM_CTRL))
+		{
+			Suggest_SelectionMove(1);
+			return SUGGEST_KEY_HANDLED;
+		}
+		if (((key == K_PGUP || key == K_KP_PGUP ) && KM_NONE) ||
+				(key == 'k' && KM_CTRL_SHIFT))
+		{
+			Suggest_SelectionMovePage(-1);
+			return SUGGEST_KEY_HANDLED;
+		}
+		if (((key == K_PGDN || key == K_KP_PGDN) && KM_NONE) ||
+				(key == 'j' && KM_CTRL_SHIFT))
+		{
+			Suggest_SelectionMovePage(1);
+			return SUGGEST_KEY_HANDLED;
+		}
+	}
+	return SUGGEST_KEY_IGNORED; /* Nothing done */
+}
+
 static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 {
 	int linepos;
@@ -1113,10 +1171,14 @@ static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 	if (keydown[K_CTRL] && keydown[K_ALT])
 		goto add_char;
 
+	if (Key_HandleSuggestKeys(key, &key_linepos, true) == SUGGEST_KEY_HANDLED)
+		return;
+
 	linepos = Key_Parse_CommonKeys(cmd, true, key, unicode);
 	if (linepos >= 0)
 	{
 		key_linepos = linepos;
+		Suggest_UpdateEntries(cmd, true);
 		return;
 	}
 
@@ -1127,6 +1189,7 @@ static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 		Cbuf_InsertText(cmd, key_line+1); // skip the ]
 		Key_History_Push();
 		key_linepos = Key_ClearEditLine(true);
+		Suggest_Clear();
 		// force an update, because the command may take some time
 		if (cls.state == ca_disconnected)
 			CL_UpdateScreen ();
@@ -1144,6 +1207,7 @@ static void Key_Console(cmd_state_t *cmd, int key, int unicode)
 		// clear line
 		Key_History_Push();
 		key_linepos = Key_ClearEditLine(true);
+		Suggest_Clear();
 		return;
 	}
 
@@ -1293,6 +1357,7 @@ add_char:
 		return;
 
 	key_linepos = Key_AddChar(unicode, true);
+	Suggest_UpdateEntries(cmd, true);
 }
 
 //============================================================================
@@ -1314,19 +1379,25 @@ Key_Message (cmd_state_t *cmd, int key, int ascii)
 
 		key_dest = key_game;
 		chat_bufferpos = Key_ClearEditLine(false);
+		Suggest_Clear();
 		return;
 	}
 
 	if (key == K_ESCAPE) {
 		key_dest = key_game;
 		chat_bufferpos = Key_ClearEditLine(false);
+		Suggest_Clear();
 		return;
 	}
+
+	if(Key_HandleSuggestKeys(key, &chat_bufferpos, false) == SUGGEST_KEY_HANDLED)
+		return;
 
 	linepos = Key_Parse_CommonKeys(cmd, false, key, ascii);
 	if (linepos >= 0)
 	{
 		chat_bufferpos = linepos;
+		Suggest_UpdateEntries(cmd, false);
 		return;
 	}
 
@@ -1338,6 +1409,7 @@ Key_Message (cmd_state_t *cmd, int key, int ascii)
 		return;							// non printable
 
 	chat_bufferpos = Key_AddChar(ascii, false);
+	Suggest_UpdateEntries(cmd, false);
 }
 
 //============================================================================

@@ -31,6 +31,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // for u8_encodech
 #include "ft2.h"
 
+// for suggestion popup
+#include <assert.h>
+
 float con_cursorspeed = 4;
 
 // lines up from bottom to display
@@ -935,6 +938,9 @@ void Con_Init (void)
 	Cmd_AddCommand(CF_SHARED, "maps", Con_Maps_f, "list information about available maps");
 	Cmd_AddCommand(CF_SHARED, "condump", Con_ConDump_f, "output console history to a file (see also log_file)");
 
+	// Suggest module
+	Suggest_Init();
+
 	con_initialized = true;
 }
 
@@ -1791,6 +1797,46 @@ static void Con_DrawInput(qbool is_console, float x, float v, float inputsize)
 		}
 		DrawQ_String(text_start + xo, v, text, 0, inputsize, inputsize, 1.0, 1.0, 1.0, 1.0, 0, &col_out, false, fnt);
 	}
+
+	if (suggest.built_for_console == is_console && Suggest_Available() && linepos == y)
+	{
+		const SuggestEntry *e = &suggest.entries[suggest.selected_index];
+		int wordstart = suggest.word_start;
+		int typed_len;
+		vec4_t color;      /* Color used to render the ghost text */
+		const char *ghost; /* Text rendered after the input cursor */
+
+		/* Nicks carry their own color, use them */
+		if (e->type == SUGGEST_ENTRY_TYPE_MENTION || e->type == SUGGEST_ENTRY_TYPE_NICK)
+			Vector4Set(color, 1.0f, 1.0f, 1.0f, 1.0f);
+		else
+			Vector4Set(color, 0.4f, 1.0f, 0.4f, 0.5f); /* Dim green for non nick entries */
+
+		if (e->type == SUGGEST_ENTRY_TYPE_NICK)
+			wordstart -= e->nick_offset;
+
+		if (e->type == SUGGEST_ENTRY_TYPE_MENTION)
+			wordstart++; // since '@' is at the current pos, draw ghost text after it
+
+		typed_len = linepos - wordstart;
+		if (typed_len > 0)
+		{
+			/* Partially entered nicks have color codes, that bleed into the editline.
+			 * Skip those.
+			 */
+			ghost = Suggest_SkipColoredChars(e->text, typed_len);
+
+			if (*ghost)
+			{
+				int ghost_colorindex = -1;
+				DrawQ_String(text_start + xo, v, ghost, 0, inputsize, inputsize, color[0], color[1], color[2], color[3], 0, &ghost_colorindex, false, fnt);
+			}
+		}
+	}
+
+	/* Draw the suggestion pop up */
+	if (suggest.built_for_console == is_console && suggest_enable_popup.integer == 1)
+		Suggest_DrawPopup(x, v, inputsize, fnt);
 }
 
 typedef struct
@@ -3226,3 +3272,670 @@ done:
 	return linepos;
 }
 
+/* ============================
+ * Console Suggestion Subsystem
+ * ============================
+ */
+
+/* NOTE: Color order must match SuggestEntryType */
+static const float suggest_entry_colors[][4] =
+{
+	{0.4f, 1.0f, 0.4f, 1.0f},  /* CMD: green */
+	{1.0f, 0.9f, 0.3f, 1.0f},  /* CVAR: yellow */
+	{1.0f, 1.0f, 1.0f, 1.0f},  /* NICK: white */
+	{0.4f, 0.8f, 1.0f, 1.0f},  /* ALIAS: cyan */
+	{1.0f, 1.0f, 1.0f, 1.0f},  /* MENTION: white */
+	{1.0f, 0.6f, 1.0f, 1.0f},  /* MAP: magenta */
+	{0.8f, 0.8f, 0.8f, 1.0f},  /* FILE: light grey */
+	{0.6f, 0.8f, 1.0f, 1.0f},  /* DIR: light blue */
+};
+
+static_assert(sizeof(suggest_entry_colors) / sizeof(suggest_entry_colors[0]) == SUGGEST_ENTRY_TYPE_COUNT,
+               "suggest_entry_colors must match SuggestEntryType");
+
+/* Cvars can be aliased, in that case we need the matched name and the pointer to that
+ * cvar, so description box can access it.
+ */
+typedef struct SuggestCvarMatch
+{
+	const char *name;   /* Matched name, can be alias or real */
+	const cvar_t *cvar; /* Pointer to the matched cvar */
+}
+SuggestCvarMatch;
+
+/* Globals */
+SuggestState suggest;
+
+/* Cvars */
+cvar_t suggest_enable_popup = {CF_ARCHIVE | CF_CLIENT, "suggest_enable_popup", "1",
+                               "Enable the suggestion popup. (0 = Disable, 1 = Enable)"};
+
+
+
+/* Helpers */
+
+/* NOTE: These `Suggest_Build*` helpers are adapted from their respective implementation.
+ *       The original functions didn't give access to the structs holding the data. These
+ *       provide access to the raw pointers to matched structs (cvars, alias, cmd). So
+ *       description box has access to the required data. Is this the best way? IDK don't
+ *       ask me.
+ */
+
+static cmd_function_t **Suggest_BuildCmdList(cmd_state_t *cmd, const char *partial)
+{
+	cmd_function_t *func;
+	cmd_function_t **buf;
+	size_t len = 0;
+	size_t bpos = 0;
+	size_t sizeofbuf;
+	size_t match_count;
+
+	match_count = Cmd_CompleteCountPossible(cmd, partial);
+
+	if (!match_count) return NULL; /* found no matches */
+	sizeofbuf = (match_count + 1) * sizeof(cmd_function_t *);
+
+	len = strlen(partial);
+	buf = (cmd_function_t **)Mem_Alloc(tempmempool, sizeofbuf);
+
+	// Look for userdefined commands.
+	for (func = cmd->userdefined->qc_functions; func; func = func->next)
+		if (!strncasecmp(partial, func->name, len))
+			buf[bpos++] = func;
+
+	// Look for engine built-in commands.
+	for (func = cmd->engine_functions; func; func = func->next)
+		if (!strncasecmp(partial, func->name, len))
+			buf[bpos++] = func;
+
+	buf[bpos] = NULL;
+	return buf;
+}
+
+static SuggestCvarMatch *Suggest_BuildCvarList(cvar_state_t *cvars, const char *partial, unsigned neededflags)
+{
+	const cvar_t *cvar;
+	size_t len = 0;
+	size_t bpos = 0;
+	size_t sizeofbuf;
+	size_t match_count;
+	SuggestCvarMatch *buf;
+
+	match_count = Cvar_CompleteCountPossible(cvars, partial, neededflags);
+
+	if (!match_count) return NULL;
+
+	sizeofbuf = (match_count + 1) * sizeof(SuggestCvarMatch);
+
+	len = strlen(partial);
+	buf = (SuggestCvarMatch *) Mem_Alloc(tempmempool, sizeofbuf);
+
+	for (cvar = cvars->vars; cvar; cvar = cvar->next)
+		if (!strncasecmp(partial, cvar->name, len) && (cvar->flags & neededflags)) {
+			buf[bpos].name = cvar->name;
+			buf[bpos].cvar = cvar;
+			bpos++;
+		} else {
+			for (char **alias = cvar->aliases; alias && *alias; alias++)
+				if (!strncasecmp(partial, *alias, len) && (cvar->flags & neededflags)) {
+					buf[bpos].name = *alias;
+					buf[bpos].cvar = cvar;
+					bpos++;
+				}
+		}
+	buf[bpos].name = NULL;
+	buf[bpos].cvar = NULL;
+	return buf;
+}
+
+
+static cmd_alias_t **Suggest_BuildAliasList(cmd_state_t *cmd, const char *partial)
+{
+	cmd_alias_t *alias;
+	size_t len = 0;
+	size_t bpos = 0;
+	size_t sizeofbuf;
+	size_t match_count;
+	cmd_alias_t **buf;
+
+	match_count = Cmd_CompleteAliasCountPossible(cmd, partial);
+
+	if (!match_count) return NULL;
+
+	sizeofbuf = (match_count + 1) * sizeof (cmd_alias_t *);
+
+	len = strlen(partial);
+	buf = (cmd_alias_t **)Mem_Alloc(tempmempool, sizeofbuf);
+	for (alias = cmd->userdefined->alias; alias; alias = alias->next)
+		if (!strncasecmp(partial, alias->name, len))
+			buf[bpos++] = alias;
+
+	buf[bpos] = NULL;
+	return buf;
+}
+
+
+/* Suggestion Implementation */
+void Suggest_Init(void)
+{
+  /* Initialize the state */
+  suggest.entry_count = 0;
+  suggest.selected_index = 0;
+  suggest.scroll_top = 0;
+  suggest.word_start = 0;
+  suggest.built_for_console = true;
+
+  /* Register cvars */
+  Cvar_RegisterVariable(&suggest_enable_popup);
+}
+
+void Suggest_Clear(void)
+{
+	suggest.entry_count = 0;
+	suggest.selected_index = 0;
+	suggest.scroll_top = 0;
+}
+
+/* Check whether there are any suggestions available */
+qbool Suggest_Available(void) { return suggest.entry_count > 0; }
+
+void Suggest_SelectionMove(int dir)
+{
+	if (suggest.entry_count <= 0) return;
+
+	suggest.selected_index = (suggest.selected_index + dir + suggest.entry_count) % suggest.entry_count;
+
+	if (suggest.selected_index < suggest.scroll_top)
+		suggest.scroll_top = suggest.selected_index;
+	else if (suggest.selected_index >= suggest.scroll_top + SUGGEST_POPUP_VISIBLE_ROW)
+		suggest.scroll_top = suggest.selected_index - SUGGEST_POPUP_VISIBLE_ROW + 1;
+
+	if (suggest.selected_index == 0)
+		suggest.scroll_top = 0;
+	else if (suggest.selected_index == suggest.entry_count - 1)
+		suggest.scroll_top = max(0, suggest.entry_count - SUGGEST_POPUP_VISIBLE_ROW);
+}
+
+void Suggest_SelectionMovePage(int dir)
+{
+	int old_top, max_top, row;
+
+	if (suggest.entry_count <= 0) return;
+
+	old_top = suggest.scroll_top;
+	max_top = max(0, suggest.entry_count - SUGGEST_POPUP_VISIBLE_ROW);
+	row     = bound(0, suggest.selected_index - old_top, SUGGEST_POPUP_VISIBLE_ROW - 1);
+
+	suggest.scroll_top = bound(0, old_top + dir * SUGGEST_POPUP_VISIBLE_ROW, max_top);
+
+	if (suggest.scroll_top == old_top)
+	{
+		// can't scroll any further go to the first/last entry
+		suggest.selected_index = (dir > 0) ? suggest.entry_count - 1 : 0;
+	}
+	else
+	{
+		suggest.selected_index = bound(0, suggest.scroll_top + row, suggest.entry_count - 1);
+	}
+}
+
+/* Put the currently selected suggestion into the input buffer */
+int Suggest_Accept(void) {
+	const SuggestEntry *entry;
+	int match_len, taillen, wordstart, *poslinepos;
+	char tail[MAX_INPUTLINE];
+	char *line;
+	size_t linesize;
+	char sep;
+
+	if (suggest.entry_count <= 0)
+		return suggest.built_for_console ? key_linepos : chat_bufferpos;
+
+	if (suggest.built_for_console)
+	{
+		line = key_line;
+		linesize = sizeof(key_line);
+		poslinepos = &key_linepos;
+	}
+	else
+	{
+		line = chat_buffer;
+		linesize = sizeof(chat_buffer);
+		poslinepos = &chat_bufferpos;
+	}
+
+	entry = &suggest.entries[suggest.selected_index];
+	match_len = (int)strlen(entry->text);
+
+	wordstart = suggest.word_start;
+
+	if (entry->type == SUGGEST_ENTRY_TYPE_NICK)
+		wordstart -= entry->nick_offset;
+
+	if (wordstart < 0)
+		wordstart = 0;
+
+	match_len = min(match_len, (int)linesize - 2 - wordstart);
+
+	taillen = (int)strlen(line + *poslinepos);
+	dp_strlcpy(tail, line + *poslinepos, sizeof(tail));
+
+	memcpy(&line[wordstart], entry->text, match_len);
+	*poslinepos = wordstart + match_len;
+
+	sep = (entry->type == SUGGEST_ENTRY_TYPE_DIR) ? '/' : ' ';
+	if (*poslinepos < (int)linesize - 1)
+		line[(*poslinepos)++] = sep;
+
+	line[*poslinepos] = 0;
+	if (taillen > 0)
+		dp_strlcat(line, tail, linesize);
+	Suggest_Clear();
+	return *poslinepos;
+}
+
+#define SUGGEST_ISDIGIT(c) ((c) >= '0' && (c) <= '9')
+#define SUGGEST_ISXDIGIT(c) (SUGGEST_ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || ((c) >= 'A' && (c) <= 'F'))
+
+const char *Suggest_SkipColoredChars(const char *text, int n) {
+  while (*text && n > 0) {
+    if (text[0] == '^' && text[1] == '^') {
+      text += 2;
+      n--;
+    } else if (text[0] == '^' && SUGGEST_ISDIGIT(text[1])) {
+      text += 2;
+    } else if (text[0] == '^' && text[1] == 'x' && text[2] && text[3] &&
+               text[4] && SUGGEST_ISXDIGIT(text[2]) &&
+               SUGGEST_ISXDIGIT(text[3]) && SUGGEST_ISXDIGIT(text[4])) {
+      text += 5;
+    } else {
+      text++;
+      n--;
+    }
+  }
+  return text;
+}
+
+/* Append an entry to the global entries list. */
+static void Suggest_AddEntry(int *n, const char *text, SuggestEntryType type, const char *value, const char *description)
+{
+	if (*n >= SUGGEST_MAX_ENTRIES)
+		return;
+
+	dp_strlcpy(suggest.entries[*n].text, text, sizeof(suggest.entries[*n].text));
+	suggest.entries[*n].type = type;
+	suggest.entries[*n].value = value;
+	suggest.entries[*n].description = description;
+	suggest.entries[*n].nick_offset = 0;
+	(*n)++;
+}
+
+
+static void Suggest_SearchMaps(int *n, const char *word)
+{
+	fssearch_t *search;
+	char pattern[MAX_QPATH];
+	int i;
+
+	dpsnprintf(pattern, sizeof(pattern), "maps/%s*.bsp", word);
+	search = FS_Search(pattern, true, true, NULL);
+	if (!search)
+		return;
+
+	for (i = 0; i < search->numfilenames && *n < SUGGEST_MAX_ENTRIES; i++)
+	{
+		const char *f = search->filenames[i];
+		size_t len = strlen(f);
+		char name[MAX_QPATH];
+
+		if (len > 9 && !strncmp(f, "maps/", 5))
+		{
+			dp_strlcpy(name, f + 5, sizeof(name));
+			if (len - 5 > 4)
+				name[len - 5 - 4] = 0;
+			Suggest_AddEntry(n, name, SUGGEST_ENTRY_TYPE_MAP, NULL, NULL);
+		}
+	}
+	FS_FreeSearch(search);
+}
+
+static void Suggest_PatternLookup(int *n, const char *s, const char *patterns_in)
+{
+	const char *patterns = patterns_in;
+	char t[MAX_QPATH];
+	const char *slash = strrchr(s, '/');
+
+	while (COM_ParseToken_Simple(&patterns, false, false, true))
+	{
+		fssearch_t *search;
+		if (strchr(com_token, '/'))
+		{
+			search = FS_Search(com_token, true, true, NULL);
+		}
+		else if (slash)
+		{
+			dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2)));
+			dp_strlcat(t, com_token, sizeof(t));
+			search = FS_Search(t, true, true, NULL);
+		}
+		else
+		{
+			search = FS_Search(com_token, true, true, NULL);
+		}
+
+		if (search)
+		{
+			int i;
+			for (i = 0; i < search->numfilenames && *n < SUGGEST_MAX_ENTRIES; i++)
+				if (!strncasecmp(search->filenames[i], s, strlen(s)) && FS_FileType(search->filenames[i]) == FS_FILETYPE_FILE)
+					Suggest_AddEntry(n, search->filenames[i], SUGGEST_ENTRY_TYPE_FILE, NULL, NULL);
+			FS_FreeSearch(search);
+		}
+	}
+	{
+		fssearch_t *search;
+		if (slash)
+		{
+			dp_strlcpy(t, s, min(sizeof(t), (unsigned int)(slash - s + 2)));
+			dp_strlcat(t, "*", sizeof(t));
+			search = FS_Search(t, true, true, NULL);
+		}
+		else
+			search = FS_Search("*", true, true, NULL);
+
+		if (search)
+		{
+			int i;
+			for (i = 0; i < search->numfilenames && *n < SUGGEST_MAX_ENTRIES; i++)
+				if (!strncmp(search->filenames[i], s, strlen(s)) && FS_FileType(search->filenames[i]) == FS_FILETYPE_DIRECTORY)
+					Suggest_AddEntry(n, search->filenames[i], SUGGEST_ENTRY_TYPE_DIR, NULL, NULL);
+			FS_FreeSearch(search);
+		}
+	}
+}
+
+static void Suggest_SearchNicks(int *n, char *line, int linepos, char *s, qbool is_console)
+{
+	int nickcount = Nicks_CompleteCountPossible(line, linepos, s, is_console);
+	int i;
+
+	for (i = 0; i < nickcount && *n < SUGGEST_MAX_ENTRIES; i++)
+	{
+		SuggestEntry *e = &suggest.entries[*n];
+		dp_strlcpy(e->text, Nicks_list[i], sizeof(e->text));
+		e->type = SUGGEST_ENTRY_TYPE_NICK;
+		e->description = NULL;
+		e->value = NULL;
+		e->nick_offset = Nicks_offset[i];
+		(*n)++;
+	}
+}
+
+/* Special case show nicks suggestion when @ is typed */
+static void Suggest_AddNicks(int *n, const char *word)
+{
+	char name[MAX_SCOREBOARDNAME];
+	const char *prefix = word + 1; // skip the '@'
+	unsigned int prefix_len = (unsigned int)strlen(prefix);
+	int i;
+
+	if (!con_nickcompletion.integer) return;
+
+	for (i = 0; i < cl.maxclients && *n < SUGGEST_MAX_ENTRIES; i++)
+	{
+		if (!cl.scores[i].name[0]) continue;
+
+		SanitizeString(cl.scores[i].name, name);
+
+		if (!name[0])
+			continue;
+
+		if (Nicks_strncasecmp((char *)prefix, name, prefix_len) != 0)
+			continue;
+
+		{
+			SuggestEntry *e = &suggest.entries[*n];
+			dp_strlcpy(e->text, cl.scores[i].name, sizeof(e->text));
+			e->type = SUGGEST_ENTRY_TYPE_MENTION;
+			e->value = NULL;
+			e->description = NULL;
+			e->nick_offset = -1;
+			(*n)++;
+		}
+	}
+}
+
+/* Restrict the first argument of any <command> with cvar con_completion_<command> defined
+ * to the one of the 3 namespaces commands/cvars/aliases. As a fallback use all.
+ */
+static void Suggest_ScopedCompletions(int *n, cmd_state_t *cmd, const char *word, qbool want_cmd, qbool want_cvar, qbool want_alias)
+{
+	cmd_function_t **cmdlist = NULL, **cmd_ptr = NULL;
+	SuggestCvarMatch *cvarlist = NULL, *cvar_ptr = NULL;
+	cmd_alias_t **aliaslist = NULL, **alias_ptr = NULL;
+	const char *description;
+
+	if (want_cmd)
+		cmdlist = Suggest_BuildCmdList(cmd, word);
+
+	if (want_cvar)
+		cvarlist = Suggest_BuildCvarList(cmd->cvars, word, CF_CLIENT | CF_SERVER);
+
+	if (want_alias)
+		aliaslist = Suggest_BuildAliasList(cmd, word);
+
+	/* Append the items from each list into the suggestion box */
+	if (cmdlist)
+		for (cmd_ptr = cmdlist; *cmd_ptr && *n < SUGGEST_MAX_ENTRIES; cmd_ptr++)
+			Suggest_AddEntry(n, (*cmd_ptr)->name, SUGGEST_ENTRY_TYPE_CMD, NULL, (*cmd_ptr)->description);
+
+	if (cvarlist)
+		for (cvar_ptr = cvarlist; cvar_ptr->name && *n < SUGGEST_MAX_ENTRIES; cvar_ptr++)
+		{
+			description = cvar_ptr->cvar->description ? cvar_ptr->cvar->description : NULL;
+			Suggest_AddEntry(n, cvar_ptr->name, SUGGEST_ENTRY_TYPE_CVAR, cvar_ptr->cvar->string, description);
+		}
+
+	if (aliaslist)
+		for (alias_ptr = aliaslist; *alias_ptr && *n < SUGGEST_MAX_ENTRIES; alias_ptr++)
+			Suggest_AddEntry(n, (*alias_ptr)->name, SUGGEST_ENTRY_TYPE_ALIAS, (*alias_ptr)->value, NULL);
+
+	if (cmdlist)   Mem_Free((void *)cmdlist);
+	if (cvarlist)  Mem_Free((void *)cvarlist);
+	if (aliaslist) Mem_Free((void *)aliaslist);
+}
+
+void Suggest_UpdateEntries(cmd_state_t *cmd, qbool is_console)
+{
+	char *line;
+	char *s;
+	char word[512];
+	char command[512];
+	int linepos, linestart, pos, k, wordlen, n = 0;
+	qbool acts_like_commandline, did_special = false;
+	const char *space;
+	char vabuf[1024];
+
+	Suggest_Clear();
+
+	suggest.built_for_console = is_console;
+
+	if (is_console)
+	{
+		line = key_line;
+		linepos = key_linepos;
+		linestart = 1;
+	}
+	else
+	{
+		line = chat_buffer;
+		linepos = chat_bufferpos;
+		linestart =0;
+	}
+
+	pos = linepos;
+	while (--pos >= linestart)
+	{
+		k = line[pos];
+		if (k == '\"' || k == ';' || k == ' ' || k == '\'' || k == '$'
+				|| (k == '{' && line[pos-1] == '$')) /* Complete after `${` is typed */
+			break;
+	}
+
+	pos++;
+	suggest.word_start = pos;
+	s = line + pos;
+	wordlen = linepos - pos;
+	dp_ustr2stp(word, sizeof(word), s, wordlen);
+
+	/* chat_mode < 0 means the chat prompt is being used to type raw commands, treat it as console */
+	acts_like_commandline = is_console || (!is_console && chat_mode < 0);
+
+	/* Explicitly suggest nicks when `@` is typed */
+	if (wordlen > 0 && s[0] == '@')
+	{
+		Suggest_AddNicks(&n, word);
+		did_special = true;
+	}
+
+	space = acts_like_commandline ? strchr(line + linestart, ' ') : NULL;
+
+	if (!did_special && acts_like_commandline && space && pos == (space - line) + 1)
+	{
+		const char *patterns;
+		dp_ustr2stp(command, sizeof(command), line + linestart, space - (line + linestart));
+
+		patterns = Cvar_VariableString(
+				cmd->cvars,
+				va(vabuf, sizeof(vabuf), "con_completion_%s", command),
+				CF_CLIENT | CF_SERVER);
+
+		if (patterns && !*patterns)
+			patterns = NULL;
+
+		/* Suggest according to the required pattern */
+		if (!strcmp(command, "map") || !strcmp(command, "changelevel") || (patterns && !strcmp(patterns, "map")))
+		{
+			Suggest_SearchMaps(&n, word);
+			did_special = true;
+		}
+		else if (patterns && !strcmp(patterns, "nicks"))
+		{
+			Suggest_SearchNicks(&n, line, linepos, s, is_console);
+			did_special = true;
+		}
+		else if (patterns && !strcmp(patterns, "cvars"))
+		{
+			Suggest_ScopedCompletions(&n, cmd, word, false, true, false);
+			did_special = true;
+		}
+		else if (patterns && !strcmp(patterns, "commands"))
+		{
+			Suggest_ScopedCompletions(&n, cmd, word, true, false, false);
+			did_special = true;
+		}
+		else if (patterns && !strcmp(patterns, "aliases"))
+		{
+			Suggest_ScopedCompletions(&n, cmd, word, false, false, true);
+			did_special = true;
+		}
+		else if (patterns)
+		{
+			Suggest_PatternLookup(&n, s, patterns);
+			did_special = true;
+		}
+	}
+
+	if (!did_special)
+	{
+		/* Suggest from all, cmd, alias, cvar */
+		if (acts_like_commandline && wordlen > 0)
+			Suggest_ScopedCompletions(&n, cmd, word, true, true, true);
+
+		/* Suggest nicks in chat, implicitely */
+		if (!is_console && !acts_like_commandline)
+			Suggest_SearchNicks(&n, line, linepos, s, is_console);
+	}
+	suggest.entry_count = n;
+}
+
+
+void Suggest_DrawPopup(float x, float v, float inputsize, dp_font_t *fnt)
+{
+	int i, first, visible_count, row;
+	float box_w, box_h, box_y, line_h, sep_h, footer_h;
+	char status[64];
+	qbool more_above, more_below;
+	const float *color;
+
+	if (suggest.entry_count <= 0) return;
+
+	line_h = inputsize;
+	sep_h = inputsize * 0.08f;
+	footer_h = line_h;
+
+	visible_count = min(suggest.entry_count, SUGGEST_POPUP_VISIBLE_ROW);
+	first = suggest.scroll_top;
+	if (first > suggest.entry_count - visible_count)
+		first = max(0, suggest.entry_count - visible_count);
+
+	box_h = visible_count * line_h + footer_h + 4;
+	box_w = 0;
+
+	/* Find the text with largest width, in the visible region */
+	for (i = first; i < first + visible_count; i++)
+	{
+		float w = DrawQ_TextWidth(suggest.entries[i].text, 0, inputsize, inputsize, false, fnt);
+
+		if (w > box_w)
+			box_w = w;
+	}
+	box_w += 30;
+
+	/* clamp the box width */
+	if (box_w > SUGGEST_POPUP_WIDTH) box_w = SUGGEST_POPUP_WIDTH;
+
+	box_y = v - box_h;
+
+	DrawQ_Fill(x, box_y, box_w, box_h, 0, 0, 0, 0.75f, 0);
+
+	for (row = 0; row < visible_count; row++)
+	{
+		qbool selected;
+		float row_y = box_y + row * line_h;
+		int colorindex = -1;
+		SuggestEntryType type;
+
+		i = first + row;
+		selected = (i == suggest.selected_index);
+
+		type = suggest.entries[i].type;
+		if ((unsigned)type >= SUGGEST_ENTRY_TYPE_COUNT)
+			type = SUGGEST_ENTRY_TYPE_CMD;
+
+		color = suggest_entry_colors[type];
+
+		/* Highlight the selected entry */
+		if (selected) DrawQ_Fill(x, row_y, box_w, line_h, 0.3f, 0.3f, 0.5f, 0.75f, 0);
+
+		DrawQ_String(x + 4, row_y, suggest.entries[i].text, 0, inputsize,
+				inputsize, color[0], color[1], color[2],
+				selected ? 1.0f : 0.75f, 0, &colorindex, false, fnt);
+
+		if (row < visible_count - 1)
+			DrawQ_Fill(x, row_y + line_h - sep_h, box_w, sep_h, 1, 1, 1, 0.15f, 0);
+	}
+
+	more_above = first > 0;
+	more_below = (first + visible_count) < suggest.entry_count;
+
+	/* Construct the string containing count and index of suggestions */
+	dpsnprintf(status, sizeof(status), "%s%d/%d%s", more_above ? "^ " : "  ",
+			suggest.selected_index + 1, suggest.entry_count,
+			more_below ? " v" : "  ");
+
+	/* Draw the footer containing the count and index of current selected entry */
+	DrawQ_Fill(x, box_y + visible_count * line_h, box_w, footer_h, 0, 0, 0.1f, 0.85f, 0);
+	DrawQ_String(x + 4, box_y + visible_count * line_h, status, 0, inputsize,
+			inputsize, 0.6f, 0.6f, 0.6f, 1.0f, 0, NULL, false, fnt);
+}

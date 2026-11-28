@@ -27,6 +27,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "cmd.h"
 #include "lhnet.h"
 
+#include "draw.h" /* dp_font_t */
+#include "cvar.h" /* cvar_t */
+#include "zone.h" /* mempool_t */
+
 //
 // console
 //
@@ -159,5 +163,65 @@ int ConBuffer_FindPrevLine(conbuffer_t *buf, unsigned mask_must, unsigned mask_m
 int ConBuffer_FindNextLine(conbuffer_t *buf, unsigned mask_must, unsigned mask_mustnot, int start);
 const char *ConBuffer_GetLine(conbuffer_t *buf, int i);
 
+/* ============================
+ * Console Suggestion Subsystem
+ * ============================
+ */
+
+#define SUGGEST_MAX_ENTRIES         2048       ///< Maximum number of suggestion entries
+#define SUGGEST_ENTRY_MAX_TEXTSIZE   128       ///< Max size of the text in the entry
+#define SUGGEST_POPUP_WIDTH          480       ///< Clamp the text so it doesn't takeup whole screen
+#define SUGGEST_POPUP_VISIBLE_ROW     12       ///< Maximum number of visible entries in the popup
+
+/* Type of thing a suggestion entry refers to. */
+typedef enum SuggestEntryType
+{
+	SUGGEST_ENTRY_TYPE_CMD,        ///< Console command
+	SUGGEST_ENTRY_TYPE_CVAR,       ///< Console variable
+	SUGGEST_ENTRY_TYPE_NICK,       ///< Player nickname
+	SUGGEST_ENTRY_TYPE_ALIAS,      ///< Command alias
+	SUGGEST_ENTRY_TYPE_MENTION,    ///< Player mention ("@")
+	SUGGEST_ENTRY_TYPE_MAP,        ///< Map
+	SUGGEST_ENTRY_TYPE_FILE,       ///< File
+	SUGGEST_ENTRY_TYPE_DIR,        ///< Directory
+	SUGGEST_ENTRY_TYPE_COUNT       ///< Total count of types in SuggestEntryType
+}
+SuggestEntryType;
+
+/* Single entry with complete detail about the item. */
+typedef struct SuggestEntry
+{
+	char text[SUGGEST_ENTRY_MAX_TEXTSIZE];  ///< Text that is displayed and added to editline on accept.
+	SuggestEntryType type;                  ///< Type of entry contained in this.
+	const char *description;                ///< Pointer to the description of cvar or command, NULL for everything else.
+	const char *value;                      ///< Pointer to the value of cvar or alias, NULL for everything else.
+	int nick_offset;                        ///< Only valid when #type == SUGGEST_ENTRY_TYPE_NICK.
+}
+SuggestEntry;
+
+/* Global state of suggest subsystem. */
+typedef struct SuggestState
+{
+  SuggestEntry entries[SUGGEST_MAX_ENTRIES];  ///< Contains all the entries matched built per key stroke.
+  int entry_count;                            ///< Total number of entries.
+  int selected_index;                         ///< Index into entries, used to select and move around in the entries.
+  int scroll_top;                             ///< Pager top
+  int word_start;
+  qbool built_for_console;                    ///< Entries in #entries are for chat mode (false) or console mode (true).
+}
+SuggestState;
+
+extern SuggestState suggest;
+extern cvar_t suggest_enable_popup;
+
+void        Suggest_Init(void);
+void        Suggest_Clear(void);
+qbool       Suggest_Available(void);
+void        Suggest_SelectionMove(int dir);
+void        Suggest_SelectionMovePage(int dir);
+int         Suggest_Accept(void);
+void        Suggest_UpdateEntries(cmd_state_t *cmd, qbool is_console);
+void        Suggest_DrawPopup(float x, float y, float inputsize, dp_font_t *fnt);
+const char *Suggest_SkipColoredChars(const char *text, int n);
 #endif
 
